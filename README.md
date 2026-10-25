@@ -23,12 +23,14 @@
 |------|--------|----------|
 | 3DCG | Blender 4.0.2（EEVEE） | `apt install blender` |
 | GPU なし環境での描画 | Xvfb + Mesa（llvmpipe） | `apt install xvfb` |
-| 男性ナレーション | Open JTalk 1.11 + HTS 音声 `nitech_jp_atr503_m001` | `apt install open-jtalk open-jtalk-mecab-naist-jdic hts-voice-nitech-jp-atr503-m001` |
+| 男性ナレーション | VOICEVOX ENGINE 0.24.1（CPU 版、話者：青山龍星） | GitHub の VOICEVOX/voicevox_engine リリースから `linux-cpu-x64` 版を取得し、`./run --port 50021` で起動 |
+| 予備の音声合成 | Open JTalk 1.11 + HTS 音声 `nitech_jp_atr503_m001` | `apt install open-jtalk open-jtalk-mecab-naist-jdic hts-voice-nitech-jp-atr503-m001` |
 | 編集・書き出し | FFmpeg 6.1（libx264 / aac / libass） | `apt install ffmpeg` |
 | 画像・音声処理 | Python 3、numpy、Pillow | 既存の環境 |
 | フォント | Noto Sans CJK JP | `apt install fonts-noto-cjk` |
 
 **ライセンスの注意**
+- **VOICEVOX:青山龍星**：利用規約にしたがい、クレジット表記が必要です。動画のエンドカードに「VOICEVOX:青山龍星」と表示しています。投稿するときは、概要欄にも同じ表記を入れてください。
 - **HTS 音声 `nitech_jp_atr503_m001`**：名古屋工業大学のもので、修正 BSD ライセンスです。
 - **Noto フォント**：SIL Open Font License です。
 - **BGM・効果音**：`scripts/make_audio.py` で一から合成しています。
@@ -42,6 +44,9 @@ sudo apt install blender xvfb ffmpeg open-jtalk open-jtalk-mecab-naist-jdic \
 pip install numpy pillow
 
 # 1) ナレーション合成 → assets/audio/narration.wav と timeline.json（各文の開始・終了時刻）
+#    VOICEVOX ENGINE を 127.0.0.1:50021 で起動しておく。
+#    各文はカットの時刻（timeline_slots.json）に合わせて置かれる。
+#    VOICEVOX を使わない場合: ENGINE=openjtalk python3 scripts/make_narration.py
 python3 scripts/make_narration.py
 
 # 2) チョークの筆記アニメーション（連番 PNG）と静止テクスチャ
@@ -72,7 +77,5 @@ python3 scripts/compose.py
 - **音量**：ナレーションは文ごとに音量をそろえてから、EQ・コンプレッサー・軽い残響をかけています。最終的なミックスは −14 LUFS（YouTube の基準付近）に正規化しています。
 
 ## 既知の制約
-- **ナレーションの音質**：無料のローカル音声合成（Open JTalk + HTS）なので、ニューラル音声と比べると機械っぽさが残ります。
-  - VOICEVOX ENGINE（無料、低音の男性話者あり）はダウンロードできましたが、このクラウド環境では外部の実行ファイルを動かす許可が出ず、使えませんでした。
-  - 自分の PC で VOICEVOX を使えば、`make_narration.py` の `tts()` を VOICEVOX API（`/audio_query` → `/synthesis`）に差し替えるだけで品質を上げられます（クレジット表記「VOICEVOX:話者名」が必要です）。
+- **ナレーションの時間**：映像のカット割りは最初のナレーション（Open JTalk）の長さで決めました。VOICEVOX の音声は、各文をそのカットの開始時刻に合わせて置いています。枠に収まらなかった1文だけ、話す速さを 1.07 倍にしました。
 - **資料の確認**：歴史資料は、ネットワーク制限のため Web 検索の要約で確認しました。詳しくは `sources.md` を見てください。
