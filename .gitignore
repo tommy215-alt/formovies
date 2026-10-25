@@ -1,0 +1,5 @@
+# large intermediates (regenerate with the scripts; see README)
+assets/frames/
+work/
+__pycache__/
+assets/audio/mix.wav
