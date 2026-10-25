@@ -583,7 +583,7 @@ def shot_A1(n):
     sp.data.energy = 420; sp.data.keyframe_insert("energy", frame=40)
     area((-6, -3, 2.0), (0, -3, 0.5), 300, size=3, color=(0.5, 0.6, 1.0))
     cs = chalk_stick(); animate_pen(cs, "A1", bc, bw, bh, n)
-    camera([(0, (0.35, -6.2, 1.5), (0.1, 1, 1.5)), (1, (-0.30, -2.35, 1.42), (-0.30, 1, 1.47))], n, lens=28, fstop=2.2)
+    camera([(0, (0.35, -6.2, 1.5), (0.1, 1, 1.5)), (1, (0.0, -2.9, 1.42), (-0.02, 1, 1.47))], n, lens=28, fstop=2.2)
 
 
 def shot_B1(n):
