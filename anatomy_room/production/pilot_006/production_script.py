@@ -32,7 +32,7 @@ EP = {
             ("impact", "crack", 0.6), ("ok", "backup"), ("tick", "fog"), ("boop", "jab"), ("stab", "punch")],
     # BGM：sky（136 BPM）。(きっかけ, ずらす秒, モード)。エンディングは自動
     "music": {"style": "sky", "seed": 6, "sections": [
-        ("hook", -1.0, "hook"), ("gag", -0.05, "chaos"), ("rewind", 0.0, "drop"), ("hypo", -0.2, "banter"),
+        ("hook", -1.0, "hook"), ("gag", -0.05, "chaos"), ("rewind", 0.0, "drop"), ("rewind", 1.3, "banter"),
         ("explode", 0.0, "reveal"), ("pressure", 0.0, "explain"), ("rice", 0.0, "banter"), ("insight", 0.0, "explain"),
         ("equal", 0.0, "reveal"), ("standby", 0.0, "banter"), ("outerload", 0.0, "explain"), ("bigrole", 0.0, "banter"),
         ("fog", 0.0, "explain"), ("outro", 0.0, "banter"), ("punch", -0.35, "drop"), ("punch", 0.9, "banter")]},

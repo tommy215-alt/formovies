@@ -34,7 +34,7 @@ EP = {
     "music": {"style": "chip", "seed": 7, "sections": [
         ("hook", -1.0, "hook"), ("glitch", -0.05, "chaos"), ("inside", 0.0, "banter"), ("parity", 0.0, "explain"),
         ("solve", 0.0, "reveal"), ("jab", 0.4, "banter"), ("restore", 0.0, "explain"), ("back", 0.0, "reveal"),
-        ("levels", 0.0, "explain"), ("logo", 0.0, "banter"), ("vanish", -0.1, "drop"), ("finder", 0.0, "explain"),
+        ("levels", 0.0, "explain"), ("logo", 0.0, "banter"), ("vanish", -0.1, "drop"), ("dark", 0.0, "explain"), ("finder", 0.0, "explain"),
         ("rescue", 0.0, "banter"), ("punch", -0.35, "drop"), ("punch", 0.9, "banter")]},
     "segments": ["glitch", "inside", "parity", "restore", "levels", "logo", "vanish", "finder", "rescue"],
     "extra_files": ["qr_demo.js"],
