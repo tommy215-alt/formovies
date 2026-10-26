@@ -34,5 +34,8 @@
 
 ## 現在の状態（2026-10-26 時点）
 
-- パイロット 5 本のシナリオ、事実確認リスト、内部レビュー、ChatGPT レビュー資料を作成済み。
-- 次の工程：ユーザーによる ChatGPT レビュー → 採用シナリオの指定（`PRODUCTION_WORKFLOW.md` の工程 6）。
+- パイロット 5 本：第 2 回監査（`anatomy_room/audit/`）を経て v2 に改訂済み。修正前は各 `scripts/pilot_00N/versions/`。
+- **第 1 話 pilot_005 はユーザーの指示で動画化済み**：`anatomy_room/production/pilot_005/world_anatomy_pilot_005.mp4`。
+  制作方法は同フォルダの `production_notes.md`。音声は VOICEVOX ENGINE（ローカル、無料）。
+- 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
+- YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。

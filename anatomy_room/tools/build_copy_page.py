@@ -38,13 +38,16 @@ def main():
     for path in sorted(SRC.glob("pilot_*_chatgpt_review.md")):
         text = path.read_text(encoding="utf-8")
         title = re.search(r"^# ChatGPT レビュー依頼：(.+)（(pilot_\d+)）", text, re.M)
-        verdict = re.search(r"\*\*(PASS|NEEDS_REVISION|HOLD)\*\*", text.split("## C. ", 1)[1])
+        # 最新の判定（第 2 回監査の「判定：v1 → v2」があればその v2、なければ自己レビューの総合判定）
+        part_c = text.split("## C. ", 1)[1]
+        latest = re.findall(r"判定：\S+ → (PASS|NEEDS_REVISION|HOLD)", part_c)
+        verdict = latest[-1] if latest else (re.search(r"\*\*(PASS|NEEDS_REVISION|HOLD)\*\*", part_c) or [None, "—"])[1]
         parts = split_parts(text)
         head = parts[0]
         items.append({
             "id": title.group(2),
             "title": title.group(1),
-            "verdict": verdict.group(1) if verdict else "—",
+            "verdict": verdict,
             "full": text,
             # パート単体で貼っても意味が通るよう、A〜D には依頼文の要約を前置きする
             "parts": [head] + [
@@ -77,7 +80,7 @@ def card(i, it):
     return f"""
 <article class="card" id="{it['id']}">
   <header>
-    <p class="pid">{it['id'].replace('_', ' ').upper()} <span class="verdict">{it['verdict']}</span></p>
+    <p class="pid">{it['id'].replace('_', ' ').upper()} <span class="verdict{' nr' if it['verdict'] != 'PASS' else ''}">{it['verdict']}</span></p>
     <h2>{html.escape(it['title'])}</h2>
   </header>
   <button type="button" class="copy-all" data-i="{i}">
@@ -99,16 +102,16 @@ TEMPLATE = """<title>解剖室レビュー資料</title>
 /* 1 カラムのカード列。スマホで親指が届く大きなボタンを主役にする */
 :root {
   --bg: #F3F6FA; --surface: #FFFFFF; --fg: #0E1A2B; --muted: #546478;
-  --line: #D5DEE9; --accent: #0B8FB0; --accent-fg: #FFFFFF; --ok: #1F7A4D;
+  --line: #D5DEE9; --accent: #0B8FB0; --accent-fg: #FFFFFF; --ok: #1F7A4D; --warn: #A15C00;
   --sans: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0A1424; --surface: #111F36; --fg: #EAF1F8; --muted: #93A8BF;
-  --line: #22385A; --accent: #46D3F0; --accent-fg: #06121F; --ok: #5FD39A; color-scheme: dark } }
+  --line: #22385A; --accent: #46D3F0; --accent-fg: #06121F; --ok: #5FD39A; --warn: #FFB547; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #0A1424; --surface: #111F36; --fg: #EAF1F8; --muted: #93A8BF;
-  --line: #22385A; --accent: #46D3F0; --accent-fg: #06121F; --ok: #5FD39A; color-scheme: dark }
+  --line: #22385A; --accent: #46D3F0; --accent-fg: #06121F; --ok: #5FD39A; --warn: #FFB547; color-scheme: dark }
 body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.6; }
 .wrap { max-width: 640px; margin: 0 auto; display: grid; gap: 16px;
   padding-block: 20px 48px;
@@ -126,6 +129,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-s
 .card header { display: grid; gap: 4px; }
 .pid { margin: 0; font-family: var(--mono); font-size: 12px; letter-spacing: .12em; color: var(--muted);
   display: flex; gap: 8px; align-items: center; }
+.verdict.nr { color: var(--warn); }
 .verdict { color: var(--ok); border: 1px solid currentColor; border-radius: 99px; padding: 0 8px; letter-spacing: .06em; }
 .card h2 { margin: 0; font-size: 17px; line-height: 1.45; text-wrap: balance; }
 button { font: inherit; cursor: pointer; }

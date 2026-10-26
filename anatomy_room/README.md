@@ -7,16 +7,18 @@ YouTube Shorts チャンネルの制作プロジェクトです。
 
 ## 現在の状態
 
-**パイロット 5 本のシナリオ制作と自己検証が完了し、ユーザーによる ChatGPT レビュー待ちです。**
-動画（CG・音声・書き出し）は、採用シナリオが指定されるまで制作しません。
+**パイロット 5 本は第 2 回監査を経て v2 に改訂済み。第 1 話（pilot_005）の完成動画を制作しました。**
+
+- 完成動画：`production/pilot_005/world_anatomy_pilot_005.mp4`（制作方法は `production/pilot_005/production_notes.md`）
+- 監査：`audit/summary.md`
 
 | ID | タイトル | 分野 | 判定 |
 |----|---------|------|------|
 | pilot_001 | 送ったメッセージは、空を飛んでいるのか？ | インターネット | PASS |
 | pilot_002 | 蛇口の水は、誰が押している？ | インフラ（水道） | PASS |
-| pilot_003 | コンビニおにぎりの海苔は、なぜパリパリなのか？ | 日常・食品包装 | PASS |
+| pilot_003 | コンビニおにぎりの海苔は、なぜパリパリなのか？ | 日常・食品包装 | NEEDS_REVISION |
 | pilot_004 | エレベーターのロープが切れたら、落ちる？ | 機械・安全・歴史 | PASS |
-| pilot_005 | マイナス×マイナスは、なぜプラスになる？ | 数学 | PASS |
+| pilot_005 | マイナス×マイナスは、なぜプラスになる？ | 数学 | PASS・**動画化済み** |
 
 ## ファイル構成
 
@@ -37,13 +39,16 @@ anatomy_room/
 ├── reviews/
 │   ├── internal_review/          # 自己レビュー（pilot_00N_review.md, SUMMARY.md）
 │   └── chatgpt_review/           # ChatGPT にそのまま貼れるレビュー資料（自動生成）
+├── audit/                        # 第 2 回監査の報告書（pilot_00N_audit.md, summary.md）
+├── production/pilot_005/         # 第 1 話の制作物（完成動画・制作スクリプト・完成台本・検証記録）
 ├── templates/
 │   └── script_template.md        # 新しいシナリオのひな形
 ├── branding/                     # チャンネルのアイコン・ヘッダー（render.js で生成）
 ├── tools/
 │   ├── check_scripts.py          # 台本の書式・話速・事実 ID の整合チェック
 │   ├── build_chatgpt_review.py   # ChatGPT レビュー資料の生成
-│   └── build_copy_page.py        # スマホ用コピーページ（copy_page.html）の生成
+│   ├── build_copy_page.py        # スマホ用コピーページ（copy_page.html）の生成
+│   └── measure_tts.py            # VOICEVOX で全セリフを合成して尺を実測
 └── output/                       # 完成動画の書き出し先（現在は空）
 ```
 

@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 
 COLUMNS = ["時間", "キャラクター・音声", "セリフ", "映像・CGの指示", "画面字幕", "事実確認ID"]
-CHARS_PER_SEC = 6.0      # 標準的な話速の目安
-MAX_CHARS_PER_SEC = 7.5  # これを超えると早口すぎる
+CHARS_PER_SEC = 5.4      # 目安（VOICEVOX 1.1〜1.15 倍速の実測から）。尺の判定は tools/measure_tts.py の実測を正とする
+MAX_CHARS_PER_SEC = 7.0  # これを超えると枠に収まらない可能性が高い
 MIN_SEC, MAX_SEC = 60, 90
 
 
