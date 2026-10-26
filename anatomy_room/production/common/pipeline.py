@@ -321,7 +321,8 @@ class Episode:
         for e in res["issues"]:
             by.setdefault((e["kind"], e["s"]), []).append(e["t"])
         names = {"safe": "安全領域の外", "right_ui": "右側のボタン列と重なる", "small": "文字が小さい（26px 未満）", "overflow": "入れ物からはみ出し",
-                 "overlap": "文字どうしの重なり", "small_subtitle": "字幕が小さい（44px 未満）", "over_character": "文字がオモテにかぶる"}
+                 "overlap": "文字どうしの重なり", "small_subtitle": "字幕が小さい（44px 未満）", "over_character": "文字がオモテにかぶる",
+                 "over_wave": "文字がウラの声の波形と重なる", "under_mark": "文字が大きな × に隠れる"}
         rows = [f"| {names.get(k, k)}{'（一時的：0.3 秒以下）' if len(ts) <= 3 else ''} | {s_[:40]} | {ts[0]:.1f}〜{ts[-1]:.1f}s（{len(ts)} コマ） |"
                 for (k, s_), ts in sorted(by.items(), key=lambda kv: kv[1][0])]
         real = sum(1 for ts in by.values() if len(ts) > 3)
@@ -364,8 +365,11 @@ class Episode:
             rows.append(f"| {x['id']} | {tl['names'][x['who']]} | {fmt(x['start'])} | {r.split('mean_volume:')[1].split('dB')[0].strip()} "
                         f"| {r.split('max_volume:')[1].split('dB')[0].strip()} |")
         rep += ["## セリフごとの音量（完成動画から、dB）", "", "| ID | 話者 | 開始 | 平均 | 最大 |", "|----|------|------|------|------|", *rows, ""]
-        short = [(x["id"], s, b - a_) for x in tl["lines"] for a_, b, s in sub_chunks(x) if b - a_ < 0.7]
-        rep += ["## 字幕の表示時間", "", f"- 字幕 {sum(len(sub_chunks(x)) for x in tl['lines'])} 枚。0.7 秒未満："
+        shown = shown_chunks(tl)
+        short = [(i, s, b - a_) for i, a_, b, s in shown if b - a_ < 0.7]
+        rep += ["## 字幕の表示時間", "", "画面に出ている時間（stage.js の currentLine と同じ計算：次のセリフが始まるまで、最大で話し終わりの 0.4 秒後まで残す）。"
+                "エンディングの句は字幕でなく専用の画面で出すため除く。", "",
+                f"- 字幕 {len(shown)} 枚。0.7 秒未満："
                 + ("なし" if not short else "、".join(f"{i}「{s.replace('**', '')}」{d:.2f}s" for i, s, d in short)), ""]
         rep += ["## 読み上げの照合（VOICEVOX が使った読み）", "", "| ID | 字幕 | 読み（カナ） |", "|----|------|------------|",
                 *[f"| {x['id']} | {' ／ '.join(x['sub'] if isinstance(x['sub'], list) else [x['sub']]).replace('**', '')} | {x['kana']} |"
@@ -516,6 +520,19 @@ def sub_chunks(x):
         a = x["start"] + (x["end"] - x["start"]) * acc / tot
         acc += n
         out.append((a, x["start"] + (x["end"] - x["start"]) * acc / tot, s))
+    return out
+
+
+def shown_chunks(tl):
+    """字幕のかたまりが画面に出ている区間 [(ID, 開始, 終了, 文字)]。stage.js の currentLine・subChunk と同じ計算。"""
+    L = [x for x in tl["lines"] if not x.get("ending")]
+    out = []
+    for i, x in enumerate(L):
+        nxt = L[i + 1]["start"] if i + 1 < len(L) else float("inf")
+        end = min(nxt - 0.02, x["end"] + 0.4)
+        ch = sub_chunks(x)
+        for j, (a_, b, s) in enumerate(ch):
+            out.append((x["id"], x["start"] - 0.05 if j == 0 else a_, end if j == len(ch) - 1 else b, s))
     return out
 
 

@@ -27,7 +27,7 @@
   // ---------------------------------------------------------------- 文字
   // ---------------------------------------------------------------- 文字の自動検査（2026-10-26）
   // text() で描いた文字の画面上の範囲を記録し、checkText() で「安全領域の外」「文字どうしの重なり」「小さすぎる文字」「入れ物からのはみ出し」を調べる。
-  const TEXTLOG = [], CHARLOG = []; let GROUP = 0, CONTAINER = null, NOCHAR = false;
+  const TEXTLOG = [], CHARLOG = [], OBSLOG = []; let GROUP = 0, CONTAINER = null, NOCHAR = false;
   const SAFE = { x0: 40, x1: 1040, y0: 170, y1: 1650 };       // 縦型ショートの安全領域（上：検索・メニュー、下：タイトル・説明欄）
   const RIGHT_UI = { x0: 950, y0: 880, y1: 1650 };              // 右側のボタン列（いいね・コメントなど）
   function screenBox(ctx, x0, y0, x1, y1) {
@@ -59,6 +59,11 @@
       if (e.small_sub) continue;
       const area = (e.box[2] - e.box[0]) * (e.box[3] - e.box[1]);
       if (area > 0 && ov(e.box, c) / area > .1) out.push({ t, kind: "over_character", s: e.s });
+    }
+    for (const o of OBSLOG) for (let i = 0; i < L.length; i++) { // 声の波形・大きな × など、文字を隠すもの
+      const e = L[i]; if (e.small_sub || (o.before && i >= o.n)) continue;
+      const area = (e.box[2] - e.box[0]) * (e.box[3] - e.box[1]);
+      if (area > 0 && ov(e.box, o.box) / area > .05) out.push({ t, kind: o.kind, s: e.s });
     }
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
       const a = L[i], b = L[j];
@@ -462,6 +467,8 @@
   function bigX(ctx, x, y, r, k, col = C.red) {
     if (k <= 0) return;
     const s = back(k);
+    if (k > .5 && !ctx.__noCheck) { const rr = r * 1.21 * s; // 線の太さを含めた範囲。これより前に描いた文字を隠していないか
+      OBSLOG.push({ kind: "under_mark", box: screenBox(ctx, x - rr, y - rr, x + rr, y + rr), before: true, n: TEXTLOG.filter(e => !e.ignore).length }); }
     ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.strokeStyle = "#FFFFFF"; ctx.lineCap = "round";
     for (const [w, c] of [[r * .42, "#FFFFFF"], [r * .26, col]]) {
       ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(-r, -r); ctx.lineTo(r, r); ctx.moveTo(r, -r); ctx.lineTo(-r, r); ctx.stroke();
@@ -641,6 +648,7 @@
     if (!speaking(t, "W")) return;
     r = Math.min(r, 125);
     const k = talk(t, "W"), w = r * 2.1, h = Math.max(50, r * .55);
+    if ((o.alpha ?? 1) > .35) OBSLOG.push({ kind: "over_wave", box: screenBox(ctx, cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2) });
     ctx.save(); ctx.globalAlpha *= clamp(o.alpha ?? 1);
     rrect(ctx, cx - w / 2, cy - h / 2, w, h, h / 2); ctx.fillStyle = "rgba(12,18,40,.72)"; ctx.fill();
     ctx.strokeStyle = C.ura; ctx.lineWidth = 3; ctx.stroke();
@@ -749,7 +757,7 @@
     W, H, FONT, C, clamp, lerp, easeOut, easeIn, easeInOut, back, elastic, prog, win, rng, hexA,
     text, rrect, pill, rich, note, setup, sceneRange, sceneAt, currentLine, talk, speaking, subtitles: subtitles2, header: header2, rewindIcon,
     omote: omote3, omote2d: omote, omotePixel, uraBust, wipe: wipe2, speedLines, burst, bigX, bigO, arrow, vhs, glitch, flash, gradientBG: techBG, dots, rays,
-    techBG, hud, camera, resetCam, whip, mixHex, panel, group, checkText, TEXTLOG, CHARLOG, clearTextLog: () => { TEXTLOG.length = 0; CHARLOG.length = 0; }, subtitlesOld: subtitles, headerOld: header, gradientOld: gradientBG,
+    techBG, hud, camera, resetCam, whip, mixHex, panel, group, checkText, TEXTLOG, CHARLOG, clearTextLog: () => { TEXTLOG.length = 0; CHARLOG.length = 0; OBSLOG.length = 0; }, subtitlesOld: subtitles, headerOld: header, gradientOld: gradientBG,
     get TL() { return TL; }, get CUE() { return CUE; },
   };
 })(typeof window !== "undefined" ? window : globalThis);

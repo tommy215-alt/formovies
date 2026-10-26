@@ -97,7 +97,7 @@ function drawScene(t, name) {
   } else if (name === "hook") {
     wallBG(bg, t);
     const q = back(prog(t, a, .25)) * (1 - prog(t, CUE.dare - .2, .3));
-    if (q > 0) { ui.save(); ui.translate(540, 300); ui.scale(q, q); text(ui, "消しても読める!?", 0, 0, 100, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
+    if (q > 0) { ui.save(); ui.translate(450, 300); ui.scale(q, q); text(ui, "消しても読める!?", 0, 0, 86, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
     const z = lerp(.92, 1, easeOut(lt / 1.2));
     // 消しゴムが左から右へ通ると、ARM の範囲のマスが消える
     const ek = easeInOut(prog(t, CUE.erase, 1.4));
@@ -212,8 +212,7 @@ function drawScene(t, name) {
         sx: back(prog(t, CUE.redraw + .9, .35)), sy: back(prog(t, CUE.redraw + .9, .35)) });
       resultCard(ui, !!DEC.H.clean, 540, geo.y0 - 100, easeOut(prog(t, CUE.redraw + .9, .35)), .8);
     }
-    const big = easeOut(prog(t, CUE.punch - .1, .45));
-    uraWipe(t, t >= CUE.punch ? "amused" : "smirk", { x: lerp(930, 720, big), y: lerp(300, 1000, big), r: lerp(105, 210, big), idle: t >= CUE.punch ? "amused" : "smirk" });
+    uraWipe(t, t >= CUE.punch ? "amused" : "smirk", { idle: t >= CUE.punch ? "amused" : "smirk" }); // ウラは姿を出さないので、波形は右上のまま
   }
 }
 // 冒頭のつかみ（0〜1.5 秒、セリフなし）：巨大な QR コードが画面を埋め尽くし、オモテがドット絵になって内部へ吸い込まれる
@@ -315,9 +314,9 @@ function parityScene(t, a, lt) {
   if (tw > 0) {
     ui.save(); ui.globalAlpha = tw;
     for (const [x, lab] of [[340, "データ"], [740, "データ（コピー）"]]) { ui.fillStyle = "#FFFFFF"; rrect(ui, x - 170, 520, 340, 240, 30); ui.fill(); drawQR(ui, MH, x, 640, 9); text(ui, lab, x, 800, 34, C.navy2, { weight: 800 }); }
-    text(ui, "＝", 540, 640, 80, C.navy2, { weight: 900 });
+    ui.__noCheck = true; text(ui, "＝", 540, 640, 80, C.navy2, { weight: 900 }); ui.__noCheck = false; // わざと × で消す記号
     ui.restore();
-    S.bigX(ui, 540, 640, 160, prog(t, CUE.stingy, .3) * tw);
+    S.bigX(ui, 540, 630, 120, prog(t, CUE.stingy, .3) * tw); // 下のラベル（y 800）を隠さない大きさ
     if (t > CUE.stingy) pill(ui, "場所の無駄", 540, 900, 50, "#FFFFFF", C.red, easeOut(prog(t, CUE.stingy + .3, .3)) * tw);
   }
   // L12〜L14：3・5・2 と合計 10

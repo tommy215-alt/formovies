@@ -302,7 +302,7 @@ function caveatScene(t, a, lt) {
   const na = prog(t, CUE.notalways, .3);
   tag(ui, 540, 560, 1.3, "298", easeOut(prog(t, a + .1, .35)));
   text(ui, "必ず売れる？", 540, 760, 70, C.navy2, { weight: 900, alpha: easeOut(prog(t, a + .3, .35)) * (1 - prog(t, CUE.factors, .3)) });
-  S.bigX(ui, 540, 600, 150, na * (1 - prog(t, CUE.factors, .3)));
+  S.bigX(ui, 855, 760, 58, na * (1 - prog(t, CUE.factors, .3))); // 値札・文字を隠さないよう、横に小さく
   const cards = [["原価", "#3E6FD8"], ["ライバル店", C.orange], ["売り方", C.green]];
   cards.forEach(([lab, col], i) => {
     const k = easeOut(prog(t, CUE.factors + i * .25, .35));
@@ -351,8 +351,7 @@ function finalScene(t, a, lt) {
     ui.restore();
     S.burst(ui, 760, 1080, 110, prog(t, CUE.wallet, .3) * (1 - prog(t, CUE.punch - .2, .3)), "−2,000", { size: 48, fill: "#FFFFFF", stroke: TAG, color: TAG });
   }
-  const big = easeOut(prog(t, CUE.punch - .1, .45));
-  uraWipe(t, t >= CUE.punch ? "amused" : "smirk", { x: lerp(930, 760, big), y: lerp(300, 1080, big), r: lerp(105, 190, big), idle: t >= CUE.punch ? "amused" : "smirk" });
+  uraWipe(t, t >= CUE.punch ? "amused" : "smirk", { idle: t >= CUE.punch ? "amused" : "smirk" }); // ウラは姿を出さないので、波形は右上のまま
 }
 
 // ---------------------------------------------------------------- 1 コマ

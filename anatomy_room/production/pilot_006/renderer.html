@@ -186,7 +186,7 @@ function drawScene(t, name) {
     note(ui, "飛行中の機内（イメージ）", 540, 1180, easeOut(prog(t, a + .2, .4)) * (1 - prog(t, CUE.dare, .4)));
     // 疑問を叩きつける（冒頭 1.5〜3 秒）
     const q = back(prog(t, a, .25)) * (1 - prog(t, CUE.dare - .2, .3));
-    if (q > 0) { ui.save(); ui.translate(540, 300); ui.scale(q, q); text(ui, "なんで窓に穴!?", 0, 0, 104, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
+    if (q > 0) { ui.save(); ui.translate(430, 300); ui.scale(q, q); text(ui, "なんで窓に穴!?", 0, 0, 92, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 16 }); ui.restore(); }
   } else if (name === "gag") {
     gagFrame(t, lt, 1);
   } else if (name === "rewind") {
@@ -230,9 +230,9 @@ function drawScene(t, name) {
       S.group(() => { text(ui, "オモテの仮説：換気口", 410, 345, 40, C.omote, { weight: 900, alpha: k }); text(ui, "機内 → 外？", 410, 705, 34, C.navy2, { weight: 800, alpha: k }); },
         [110, 300, 710, 750]);
     }
-    S.bigX(ui, 410, 525, 160, prog(t, CUE.deny, .3) * (1 - prog(t, CUE.notout - .1, .25)));
+    S.bigX(ui, 410, 530, 100, prog(t, CUE.deny, .3) * (1 - prog(t, CUE.notout - .1, .25)));
     const no = easeOut(prog(t, CUE.notout, .35));
-    if (no > 0) pill(ui, "穴は外につながっていない", 470, 330, 50, "#FFFFFF", C.navy2, no);
+    if (no > 0) pill(ui, "穴は外につながっていない", 420, 330, 50, "#FFFFFF", C.navy2, no);
     if (deny && !S.speaking(t, "M")) S.burst(ui, ox + 150, 900, 60, prog(t, CUE.deny + .3, .25), "むっ", { size: 40, fill: "#FFFFFF", stroke: C.omote, color: C.omote });
     uraWipe(t, deny ? "amused" : "smirk");
   } else if (name === "explode") {
@@ -292,7 +292,7 @@ function drawScene(t, name) {
     else o = { expr: "smug", armR: 2.3, elbowR: .3, look: [1, -.6] };
     omoteCabin(t, { ...o, y: 1330 - jump });
     if (half > 0 && !dp) S.burst(ui, 640, 520, 160, half, "50%", { fill: "#FFFFFF", stroke: C.omote, color: C.omote, size: 90, rot: .1 });
-    if (jab) S.bigX(ui, 640, 520, 110, prog(t, CUE.jab + .6, .3) * (1 - prog(t, CUE.deadpan, .2)));
+    if (jab) S.bigX(ui, 865, 650, 55, prog(t, CUE.jab + .6, .3) * (1 - prog(t, CUE.deadpan, .2)));
     uraWipe(t, pu ? "amused" : "smirk");
   }
   if (!use3d) renderer.clear();
@@ -309,10 +309,10 @@ function coldScene(t) {
     gagFrame(t, (t - .2) * 1.7, 1);
   }
   // 警告：画面の縁が赤く点滅（暗くしない）
-  const al = t > .18 ? .5 + .5 * Math.sin(t * 40) : 0;
+  const al = t > .18 ? (.5 + .5 * Math.sin(t * 40)) * (1 - prog(t, .8, .15)) : 0; // 巻き戻しの文字と重ならないよう、その前に消す
   if (al > 0) { ui.save(); ui.strokeStyle = `rgba(255,50,70,${.75 * al})`; ui.lineWidth = 46; ui.strokeRect(0, 0, W, H); ui.restore();
-    pill(ui, "⚠ WARNING", 540, 360, 56, "#FFFFFF", "rgba(255,50,70,.92)", al); }
-  S.burst(ui, 760, 1020, 150, prog(t, .25, .2), "!?", { size: 120, fill: C.yellow });
+    pill(ui, "⚠ WARNING", 330, 380, 56, "#FFFFFF", "rgba(255,50,70,.92)", al); }
+  S.burst(ui, 760, 1090, 150, prog(t, .25, .2), "!?", { size: 120, fill: C.yellow });
   const rw = prog(t, 1.25, .25);
   if (rw > 0) { S.vhs(ui, t, rw); S.glitch(ui, t, rw, 5); }
 }
@@ -333,7 +333,7 @@ function gagFrame(t, gt, amp) {
   }
   S.omote(ui, lerp(250, 360, suck), 1330 - 60 * suck, .95, { expr: "panic", talk: S.talk(t, "M"), sx: 1 - .12 * suck, sy: 1 + .12 * suck,
     rot: .22 * suck, lean: .12 * suck, armL: lerp(.3, 2.9, suck), armR: lerp(.3, 1.6, suck), elbowR: .2, wind: 1.6 * suck, sweat: suck > .3, look: [1, -1] });
-  S.burst(ui, 690, 470, 150, prog(gt, 0, .25) * (1 - prog(gt, .8, .3)), "ポンッ!", { size: 78 });
+  S.burst(ui, 760, 640, 150, prog(gt, 0, .25) * (1 - prog(gt, .8, .3)), "ポンッ!", { size: 78 });
   uraWipe(t, "smirk", { idle: "smirk" });
   note(ui, "※ギャグ演出：実際の窓はこうなりません", 540, 260, 1);
 }
@@ -368,8 +368,8 @@ function sideBase(t, fill, crackK) {
   text(bg, "外側", xOut, top - 40, 34, "#1565C0", { weight: 900 });
   text(bg, "機内", 200, 560, 66, "#C2541A", { weight: 900 });
   text(bg, "気圧が高い", 200, 630, 36, "#C2541A", { weight: 800 });
-  text(bg, "上空", 890, 740, 66, "#1F5E9C", { weight: 900 });
-  text(bg, "空気が薄い", 890, 810, 36, "#1F5E9C", { weight: 800 });
+  text(bg, "上空", 880, 560, 66, "#1F5E9C", { weight: 900 });
+  text(bg, "空気が薄い", 880, 630, 36, "#1F5E9C", { weight: 800 });
   note(bg, "※断面の模式図（厚み・すき間は誇張）", 540, 1130, 1, 26);
 }
 function pushArrows(x, k, col, w = 22) {
@@ -391,7 +391,7 @@ function sideView(t, name, a, lt) {
     const squash = easeOut(prog(t, CUE.rice, .35));
     // 押す力の矢印：機内 → 外側の窓（＝オモテ）
     for (let i = 0; i < 4; i++) { const y = lerp(top + 90, bot - 90, i / 3), ph = (t * 1.5 + i * .3) % 1;
-      S.arrow(ui, 150 + ph * 30, y, xOut - 70 + ph * 20, y, "#FF4D2E", 24, 58, ar); }
+      S.arrow(ui, 300 + ph * 30, y, xOut - 70 + ph * 20, y, "#FF4D2E", 24, 58, ar); } // 「機内」の文字（x≈130〜270）より右から
     if (ar > 0) note(ui, "イメージ：オモテ＝外側の窓", 430, 330, ar, 34);
     const ox = lerp(230, xOut + 60, go);
     S.omote(ui, ox, bot + 10, .62, { expr: squash > 0 ? "panic" : ar > 0 ? "shock" : t > CUE.howmuch ? "think" : "normal", talk: S.talk(t, "M"),
@@ -491,7 +491,6 @@ function fogScene(t, a, lt) {
   const wipeArm = clamp(1 - clear * 1.2);
   S.omote(ui, 245, 1150, .55, wipeArm > 0 ? { expr: "think", talk: S.talk(t, "M"), armR: 2.0 + .55 * Math.sin(t * 14) * wipeArm, elbowR: .5, armL: .3, yaw: .5, look: [1, -.4] }
     : { expr: "happy", talk: S.talk(t, "M"), armR: 2.2, elbowR: 2.4, armL: .3, look: [1, -.4] });
-  if (wipeArm > 0) { const ax = 245 + 150 + 30 * Math.sin(t * 14), ay = 1150 - 470; ui.fillStyle = "#FFFFFF"; rrect(ui, ax - 40, ay - 28, 80, 56, 14); ui.fill(); ui.strokeStyle = "#9BB0C4"; ui.lineWidth = 4; ui.stroke(); }
   uraWipe(t, "excited");
 }
 
