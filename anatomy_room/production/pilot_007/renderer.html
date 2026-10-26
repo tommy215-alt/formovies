@@ -11,6 +11,7 @@ html,body{margin:0;background:#000}
   <canvas id="bg" width="1080" height="1920"></canvas>
   <canvas id="ui" width="1080" height="1920"></canvas>
 </div>
+<script src="../common/vendor/three.min.js"></script>
 <script src="../common/stage.js"></script>
 <script src="../common/ending.js"></script>
 <script src="qr_demo.js"></script>
@@ -20,7 +21,7 @@ html,body{margin:0;background:#000}
 const S = Stage, { W, H, C, clamp, lerp, easeOut, easeIn, easeInOut, back, prog, win, text, pill, note, rrect } = Stage;
 const bg = document.getElementById("bg").getContext("2d");
 const ui = document.getElementById("ui").getContext("2d");
-const SCN = ["hook", "glitch", "inside", "parity", "restore", "levels", "logo", "vanish", "finder", "rescue"];
+const SCN = ["cold", "hook", "glitch", "inside", "parity", "restore", "levels", "logo", "vanish", "finder", "rescue"];
 let TL, CUE;
 const N = QR.size, MH = QR.matrix.H, ML = QR.matrix.L;
 const ARM = QR.rects.arm[0], FINDER = QR.rects.finder[0], LOGO = QR.rects.logo[0];
@@ -91,8 +92,12 @@ const QX = 540, QY = 800, QM = 30; // 通常の QR の位置と 1 マスの大�
 // ---------------------------------------------------------------- 場面
 function drawScene(t, name) {
   const [a, b] = S.sceneRange(name), lt = t - a;
-  if (name === "hook") {
+  if (name === "cold") {
+    coldScene(t);
+  } else if (name === "hook") {
     wallBG(bg, t);
+    const q = back(prog(t, a, .25)) * (1 - prog(t, CUE.dare - .2, .3));
+    if (q > 0) { ui.save(); ui.translate(540, 300); ui.scale(q, q); text(ui, "消しても読める!?", 0, 0, 100, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
     const z = lerp(.92, 1, easeOut(lt / 1.2));
     // 消しゴムが左から右へ通ると、ARM の範囲のマスが消える
     const ek = easeInOut(prog(t, CUE.erase, 1.4));
@@ -210,6 +215,23 @@ function drawScene(t, name) {
     const big = easeOut(prog(t, CUE.punch - .1, .45));
     uraWipe(t, t >= CUE.punch ? "amused" : "smirk", { x: lerp(930, 720, big), y: lerp(300, 1000, big), r: lerp(105, 210, big), idle: t >= CUE.punch ? "amused" : "smirk" });
   }
+}
+// 冒頭のつかみ（0〜1.5 秒、セリフなし）：巨大な QR コードが画面を埋め尽くし、オモテがドット絵になって内部へ吸い込まれる
+function coldScene(t) {
+  wallBG(bg, t, "#F4ECFF", "#D8C8FF");
+  const sl = easeOut(prog(t, 0, .22));
+  const z = lerp(3.4, 1.15, sl) + .5 * easeIn(prog(t, .6, .8));
+  const [hx, hy] = cellXY(QX, QY, QM, ARM[0] + ARM[2] / 2, ARM[1] + ARM[3] / 2);
+  bg.save(); bg.translate(hx, hy); bg.scale(z, z); bg.rotate(-.2 * (1 - sl) + .15 * easeIn(prog(t, .6, .8))); bg.translate(-hx, -hy);
+  drawQR(bg, MH, QX, QY, QM, { erased: (r, c) => inRect(r, c, ARM) && t > .3 ? 1 : 0, ghost: true });
+  bg.restore();
+  S.speedLines(ui, hx, hy, t, "rgba(123,92,255,.45)", 56, 160);
+  const sp = prog(t, .35, 1.0), ang = sp * 10, rad = lerp(420, 0, easeIn(sp));
+  if (sp < 1) S.omotePixel(ui, hx + Math.cos(ang) * rad, hy + 220 + Math.sin(ang) * rad * .5, .7 * (1 - .8 * easeIn(sp)),
+    { expr: "panic", armL: 2.6, armR: 2.6, rot: ang * .3, sweat: true }, lerp(4, 26, sp));
+  S.burst(ui, 760, 1050, 140, prog(t, .3, .2) * (1 - prog(t, 1.0, .2)), "!?", { size: 120, fill: C.yellow });
+  S.glitch(ui, t, .9 * (1 - prog(t, .05, .3)) + prog(t, 1.2, .3), 9);
+  S.flash(ui, .6 * (1 - prog(t, 0, .12)));
 }
 function penHand(ctx, x, y) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(-.6);
@@ -391,14 +413,19 @@ function renderFrame(t) {
   const es = TL.ending_start;
   if (t >= es) {
     const e = TL.lines.filter(x => x.ending);
-    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "" });
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
     return;
   }
-  const name = S.sceneAt(t), [a] = S.sceneRange(name);
+  window.__t = t;
+  const name = S.sceneAt(t), [a, b] = S.sceneRange(name);
+  S.camera([bg, ui], t, a, b, [.02, CUE.glitch, CUE.solve, CUE.back, CUE.compare, CUE.vanish, CUE.punch], [540, 800]);
   drawScene(t, name);
+  S.resetCam([bg, ui]);
+  S.hud(ui, t);
   S.header(ui, false);
   S.subtitles(ui, t);
-  if (SCN.indexOf(name) > 0 && name !== "glitch" && name !== "vanish") S.flash(ui, (1 - prog(t, a, .22)) * .6);
+  const i = SCN.indexOf(name);
+  if (i > 1 && name !== "glitch" && name !== "vanish") S.whip(ui, 1 - prog(t, a, .2), i);
 }
 function renderThumb() {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);

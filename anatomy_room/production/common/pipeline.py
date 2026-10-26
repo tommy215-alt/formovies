@@ -58,7 +58,9 @@ class Episode:
     def voice_params(self, ln):
         v = self.voices[ln["who"]]
         style = ln.get("style", v["default_style"])
-        return {"speaker": v["styles"][style], "style": style, "speed": ln.get("speed", v["speed"]),
+        # speed_mul：その版の声全体の速さの倍率（行ごとの speed 指定にもかける。エンディングは ending の値をそのまま使う）
+        mul = 1.0 if ln.get("ending") else v.get("speed_mul", 1.0)
+        return {"speaker": v["styles"][style], "style": style, "speed": round(ln.get("speed", v["speed"]) * mul, 3),
                 "pitch": ln.get("pitch", v["pitch"]), "inton": ln.get("inton", v["inton"])}
 
     def synth_cached(self, ln, cache):
@@ -95,7 +97,7 @@ class Episode:
         vdir.mkdir(parents=True, exist_ok=True)
         cache = self.work / "voice_cache"
         cache.mkdir(exist_ok=True)
-        t, fresh, timeline = LEAD_IN, 0, []
+        t, fresh, timeline = self.cfg.get("lead_in", LEAD_IN), 0, []  # lead_in：最初のセリフまでの秒（冒頭の演出の長さ）
         for ln in data["lines"]:
             end, f = self.place(ln, t, vdir, cache, timeline)
             fresh += f
@@ -133,6 +135,7 @@ class Episode:
             x = by[lid]
             cues[name] = round(x["start"] + frac * (x["end"] - x["start"]), 5)
         cues["end1"], cues["end2"] = by["END1"]["start"], by["END2"]["start"]
+        cues["t0"] = 0.0  # 動画の先頭（冒頭の演出の効果音・BGM の起点）
         return cues
 
     # ------------------------------------------------------------ audio
@@ -157,7 +160,8 @@ class Episode:
             voice[i:j] *= min(4.0, 0.1 / r)
         cues = {**tl["cues"], "endcard": tl["ending_start"]}
         m = self.cfg["music"]
-        bg, _ = music.bgm(total, self.sections(tl), m["style"], m.get("seed", 0))
+        tech = m["style"] in music.TECH_STYLES
+        bg, _ = music.bgm_techno(total, self.sections(tl), m["style"]) if tech else music.bgm(total, self.sections(tl), m["style"], m.get("seed", 0))
         mus = np.zeros(n)
         mus[: len(bg)] = bg
         # ダッキング：セリフ中は BGM を下げる（解説のモードでは BGM 自体も控えめ）。立ち上がり 0.08 秒、戻り 0.3 秒
@@ -170,10 +174,10 @@ class Episode:
         duck = 1 - 0.6 * np.clip(env, 0, 1)
         mus *= duck
         sfx = np.zeros(n)
-        bank = music.sfx_bank()
-        for name, cue, *rest in self.cfg["sfx"]:
+        bank = music.sfx_bank_techno() if tech else music.sfx_bank()
+        for name, cue, *rest in self.cfg["sfx"]:  # (効果音, きっかけ[, 音量[, ずらす秒]])
             s = bank[name] * (rest[0] if rest else 1.0)
-            i = int(cues[cue] * SR)
+            i = max(0, int((cues[cue] + (rest[1] if len(rest) > 1 else 0.0)) * SR))
             sfx[i:i + len(s)] += s[: max(0, n - i)]
         mix = voice + 0.8 * mus + 0.5 * sfx
         write_wav(self.work / "mix_raw.wav", mix[: int(total * SR)])
@@ -187,7 +191,7 @@ class Episode:
               f"measured_LRA={st['input_lra']}:measured_thresh={st['input_thresh']}:offset={st['target_offset']}:linear=true")
         subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(self.work / "mix_raw.wav"),
                         "-af", af, "-ar", str(SR), str(self.work / "mix.wav")], check=True)
-        print(f"audio: {total:.1f}s, BGM {m['style']}（{music.STYLES[m['style']]['bpm']} BPM）, "
+        print(f"audio: {total:.1f}s, BGM {m['style']}（{bpm_of(m['style'])} BPM）, "
               f"元の積分ラウドネス {st['input_i']} LUFS → -14 LUFS")
 
     # ------------------------------------------------------------ render / mux
@@ -370,7 +374,7 @@ class Episode:
             rows.append(f"| {fmt(s0)}–{fmt(s1)} | {mode} | {db:.1f} |")
         st = self.cfg["music"]["style"]
         return ["## BGM（ダッキング後の BGM だけを測定）", "",
-                f"- スタイル {st}、設計 {music.STYLES[st]['bpm']} BPM。BGM の音から推定したテンポ：**{bpm:.1f} BPM**（第 2 話の BGM は 96 BPM）",
+                f"- スタイル {st}、設計 {bpm_of(st)} BPM。BGM の音から推定したテンポ：**{bpm:.1f} BPM**（第 2 話の BGM は 96 BPM）",
                 "- 場面ごとの BGM の大きさ（RMS、dBFS）。モードで厚さと音量が変わっていることの確認：", "",
                 "| 区間 | モード | BGM の大きさ |", "|------|-------|------------|", *rows, ""]
 
@@ -412,6 +416,10 @@ class Episode:
 
 
 # ---------------------------------------------------------------- helpers
+def bpm_of(style):
+    return (music.TECH_STYLES.get(style) or music.STYLES[style])["bpm"]
+
+
 def envelope(path, fps=FPS):
     with wave.open(str(path)) as w:
         a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768

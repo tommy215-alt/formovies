@@ -104,5 +104,40 @@
    "inton": 1.15,
    "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）"
   }
+ },
+ "v4": {
+  "from_episode": "pilot_006（テクノ改修版）",
+  "note": "v3 と同じ声（オモテ＝青山龍星、ウラ＝冥鳴ひまり：第 1 話の女性の声）。テンポを v3 からさらに約 1.3 倍に（話速の倍率 speed_mul 1.26 ＋ セリフの間の短縮 ＋ 重複するセリフの削除）。speed_mul は行ごとの speed 指定にもかかる。共通エンディングの話速は ending の値のまま。",
+  "M": {
+   "name": "青山龍星",
+   "display": "オモテ",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13,
+    "dry": 82,
+    "hot": 81,
+    "whisper": 86
+   },
+   "default_style": "normal",
+   "speed": 1.22,
+   "pitch": 0.0,
+   "inton": 1.0,
+   "license_note": "個人利用はクレジットで商用・非商用可。企業が携わる形で利用する場合は、ななはぴへの事前確認が必要（エンジン内蔵の規約）",
+   "speed_mul": 1.26
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
+   "speed_mul": 1.26
+  }
  }
 }

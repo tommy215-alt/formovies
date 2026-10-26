@@ -269,3 +269,165 @@ def estimate_bpm(x, lo=90, hi=180):
     lo_l, hi_l = int(60 / hi * 100), int(60 / lo * 100)
     k = lo_l + int(np.argmax(ac[lo_l:hi_l]))
     return 60 / (k / 100)
+
+
+# ================================================================ テクノ版（2026-10-26 改修：第 3 話以降）
+# 4 つ打ちの重いキック、サイドチェインで「うねる」ベースとパッド、硬いシンセの和音（スタブ）、16 分のアルペジオ。
+# 軽いポップ／コミカルな音色は使わない。笑いは映像と効果音の組み合わせで作る。
+TECH_STYLES = {
+    # 和音は（ルート周波数, 構成音）の 4 小節ループ（短調で緊張感を出す）
+    "tech_air":   {"bpm": 132, "chords": [(43.65, [349.23, 415.30, 523.25]), (69.30, [277.18, 349.23, 415.30]),
+                                          (51.91, [311.13, 415.30, 523.25]), (77.78, [311.13, 392.00, 466.16])], "seed": 1},
+    "tech_data":  {"bpm": 138, "chords": [(55.00, [440.00, 523.25, 659.25]), (55.00, [440.00, 523.25, 659.25]),
+                                          (43.65, [349.23, 440.00, 523.25]), (49.00, [392.00, 493.88, 587.33])], "seed": 2},
+    "tech_price": {"bpm": 128, "chords": [(73.42, [293.66, 349.23, 440.00]), (58.27, [293.66, 349.23, 466.16]),
+                                          (43.65, [349.23, 440.00, 523.25]), (65.41, [329.63, 392.00, 523.25])], "seed": 3},
+}
+# モード → パートの音量。旧モード名（hook/banter/reveal）も受け付ける
+TECH_MODES = {
+    "intro":   {"kick": 1.0, "clap": 1.0, "hat": 1.0, "ohat": 1.0, "bass": 1.0, "bass_dark": 0.0, "stab": 1.0, "arp": 0.8, "pad": 0.6},
+    "chaos":   {"kick": 1.0, "clap": 1.0, "hat": 1.0, "ohat": 1.0, "bass": 1.0, "bass_dark": 0.0, "stab": 0.8, "arp": 1.0, "pad": 0.4},
+    "drive":   {"kick": 0.9, "clap": 0.8, "hat": 0.8, "ohat": 0.7, "bass": 0.9, "bass_dark": 0.0, "stab": 0.55, "arp": 0.0, "pad": 0.35},
+    "explain": {"kick": 0.55, "clap": 0.0, "hat": 0.5, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.8, "stab": 0.0, "arp": 0.0, "pad": 0.55},
+    "lift":    {"kick": 0.9, "clap": 0.7, "hat": 0.9, "ohat": 0.8, "bass": 0.9, "bass_dark": 0.0, "stab": 0.4, "arp": 0.9, "pad": 0.5},
+    "drop":    {k: 0.0 for k in ("kick", "clap", "hat", "ohat", "bass", "bass_dark", "stab", "arp", "pad")},
+    "ending":  {"kick": 0.0, "clap": 0.0, "hat": 0.25, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.45, "stab": 0.0, "arp": 0.45, "pad": 0.9},
+}
+TECH_MODES.update(hook=TECH_MODES["intro"], banter=TECH_MODES["drive"], reveal=TECH_MODES["lift"])
+
+
+def _supersaw(f, dur, amp, n=5, spread=0.012, attack=0.004, decay=0.25, seed=0):
+    t = np.arange(int(dur * SR)) / SR
+    r = np.random.default_rng(seed)
+    x = np.zeros_like(t)
+    for i in range(n):
+        d = 1 + spread * (i - (n - 1) / 2) / ((n - 1) / 2)
+        ph = (f * d * t + r.random()) % 1.0
+        x += 2 * ph - 1
+    env = np.minimum(1, t / attack) * np.exp(-t / decay)
+    return amp * x / n * env
+
+
+def _kick_hard(dur=0.4):
+    t = np.arange(int(dur * SR)) / SR
+    f = 46 + 130 * np.exp(-t / 0.028)
+    body = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.16)
+    click = _noise(len(t), 31) * np.exp(-t / 0.002) * 0.5
+    return np.tanh(1.6 * (body + click)) * 0.85
+
+
+def bgm_techno(total, sections, style="tech_air"):
+    st = TECH_STYLES[style]
+    beat = 60 / st["bpm"]
+    n = int(total * SR)
+    names = ("kick", "clap", "hat", "ohat", "bass", "stab", "arp", "pad")
+    P = {k: np.zeros(n) for k in names}
+    kick = _kick_hard()
+    clap = _add(*[np.concatenate([np.zeros(int(d * SR)), _snare(0.18, 40 + i) * .7]) for i, d in enumerate((0, .008, .016))])
+    hat, ohat = _hat(0.04, 41), _hat(open_=True, seed=42)
+    nb = int(total / beat) + 2
+    kicks = []
+
+    def put(name, i, x, amp=1.0):
+        if 0 <= i < n:
+            m = min(len(x), n - i)
+            P[name][i:i + m] += x[:m] * amp
+
+    stab_pat = [0, 0.75, 1.5, 2.5, 3.25]          # 1 小節の中の和音の位置（拍）
+    for b in range(nb):
+        tb, (bar, pos) = b * beat, divmod(b, 4)
+        root, tones = st["chords"][bar % 4]
+        i = int(tb * SR)
+        put("kick", i, kick); kicks.append(tb)
+        if pos in (1, 3):
+            put("clap", i, clap)
+        for s16 in range(4):                       # 16 分のハイハット（強弱をつける）
+            put("hat", int((tb + s16 * beat / 4) * SR), hat, (0.55, 0.3, 0.8, 0.35)[s16])
+        put("ohat", int((tb + beat / 2) * SR), ohat, 0.7)
+        for s16 in (1, 2, 3):                      # 裏の 16 分で転がるベース（キックの位置は空ける）
+            f = root * (2 if s16 == 2 else 1)
+            _note(P["bass"], int((tb + s16 * beat / 4) * SR), f, beat * 0.22, 0.5, "saw", attack=0.002, decay=0.07)
+        for s16 in range(4):                       # 16 分のアルペジオ（1 オクターブ上）
+            f = tones[(b * 4 + s16) % 3] * (2 if (b // 2) % 2 else 1)
+            _note(P["arp"], int((tb + s16 * beat / 4) * SR), f, beat * 0.2, 0.06, "square", attack=0.002, decay=0.045)
+        if pos == 0:
+            for sp in stab_pat:                    # 硬いシンセの和音
+                j = int((tb + sp * beat) * SR)
+                for k_, f in enumerate(tones):
+                    x = _supersaw(f / 2, beat * 0.4, 0.09, decay=0.11, seed=b + k_)
+                    put("stab", j, x)
+            for f in tones:                        # パッド（長く、うねる）
+                put("pad", i, _supersaw(f / 2, beat * 4.1, 0.05, n=5, spread=.008, attack=.3, decay=3.0, seed=bar))
+    P["bass"] = _lp(P["bass"], 700)
+    P["bass_dark"] = _lp(P["bass"], 260)
+    P["stab"] = _lp(P["stab"], 3200)
+    P["arp"] = _lp(P["arp"], 4200)
+    P["pad"] = _lp(P["pad"], 1800)
+    # サイドチェイン：キックのたびにベース・和音・パッドを一瞬下げる（うねり）
+    t = np.arange(n) / SR
+    sc = np.ones(n)
+    for kt in kicks:
+        a = int(kt * SR)
+        if a >= n:
+            break
+        m = min(n - a, int(beat * SR))
+        sc[a:a + m] = np.minimum(sc[a:a + m], 1 - 0.65 * np.exp(-np.arange(m) / SR / 0.11))
+    for k in ("bass", "bass_dark", "stab", "pad"):
+        P[k] *= sc
+    gains = {k: np.zeros(n) for k in P}
+    sec = sorted(sections) + [(total + 1, None)]
+    for (a, mode), (b, _) in zip(sec, sec[1:]):
+        ia, ib = max(0, int(a * SR)), min(n, int(b * SR))
+        for k in P:
+            gains[k][ia:ib] = TECH_MODES[mode][k]
+    ker = np.ones(int(0.05 * SR)) / int(0.05 * SR)  # 切り替えは短く（急な展開に合わせる）
+    level = {"kick": 0.62, "clap": 0.3, "hat": 0.2, "ohat": 0.14, "bass": 0.42, "bass_dark": 0.5, "stab": 0.55, "arp": 0.4, "pad": 0.5}
+    mix, out = np.zeros(n), {}
+    for k, x in P.items():
+        out[k] = x * np.convolve(gains[k], ker, mode="same") * level[k]
+        mix += out[k]
+    mix = np.tanh(1.3 * mix) / 1.3                  # 軽いサチュレーションで硬く
+    fade = np.clip(t / 0.01, 0, 1) * np.clip((total - t) / 1.2, 0, 1)
+    return mix * fade, out
+
+
+def sfx_bank_techno():
+    t = lambda d: np.arange(int(d * SR)) / SR
+    boom_f = 60 * np.exp(-t(0.9) / 0.5) + 34
+    boom = np.sin(2 * np.pi * np.cumsum(boom_f) / SR) * np.exp(-t(0.9) / 0.35)
+    crack = _noise(int(0.12 * SR), 51); crack = (crack - _lp(crack, 2500)) * np.exp(-t(0.12) / 0.02)
+    impact = np.tanh(2 * _add(boom * 0.9, crack * 0.5, _kick_hard(0.4) * 0.7)) * 0.8
+    tape = np.sin(2 * np.pi * np.cumsum(440 * (1 - t(0.45) / 0.45) ** 2 + 20) / SR) * (1 - t(0.45) / 0.45) * 0.3
+    alarm = np.concatenate([np.sign(np.sin(2 * np.pi * f * t(0.16))) * 0.16 for f in (988, 740, 988, 740)])
+    zap_f = 2400 * np.exp(-t(0.12) / 0.025) + 180
+    zap = np.sin(2 * np.pi * np.cumsum(zap_f) / SR) * np.exp(-t(0.12) / 0.05) * 0.3
+    blips = _add(*[np.concatenate([np.zeros(int(k * 0.045 * SR)), _tone(f, 0.12, 0.16, 0.05) + 0.4 * np.sign(_tone(f, 0.12, 0.16, 0.05))])
+                   for k, f in enumerate([880, 1175, 1480, 1976])])
+    rev = _noise(int(0.7 * SR), 53); rev = (rev - _lp(rev, 3000)) * (t(0.7) / 0.7) ** 3 * 0.45
+    stab = _add(*[_supersaw(f, 0.5, 0.2, decay=0.16, seed=i) for i, f in enumerate((220.0, 261.63, 329.63, 440.0))], _kick_hard(0.3) * 0.6)
+    g = np.zeros(int(0.5 * SR)); r = np.random.default_rng(55)
+    for k in range(14):
+        i = int(r.uniform(0, 0.45) * SR); m = int(r.uniform(0.008, 0.04) * SR)
+        g[i:i + m] += np.round(np.sin(2 * np.pi * r.uniform(150, 2500) * np.arange(m) / SR) * 3) / 3 * 0.28
+    return {
+        "impact": impact,                                      # 衝撃：低音と鋭いアタック
+        "sweep_up": _noise_sweep(0.5, 300, 7000, 0.45, 57),    # 急接近
+        "sweep_down": _noise_sweep(0.5, 7000, 300, 0.4, 58),
+        "glitch": g,                                           # デジタル空間
+        "brake": _add(tape, _noise_sweep(0.3, 3000, 200, 0.2, 59)),  # 急停止（テープストップ）
+        "discover": _add(blips, _tone(2637, 0.6, 0.08, 0.25)),  # 発見
+        "zap": zap,                                            # ウラの鋭いツッコミ（短い電子音）
+        "stab": stab,                                          # オチの和音
+        "revswell": rev,                                       # オチ前の吸い込み
+        "alarm": alarm,                                        # 警告音（窓の冒頭）
+        "rewind": _add(_sweep(0.9, 1400, 150, 0.22, "saw", 0.6), _noise_sweep(0.9, 6000, 300, 0.25, 9)),
+        "scan": _sweep(0.6, 500, 2400, 0.14, "saw", 1.0),
+        "ok": _add(_tone(1046.5, 0.1, 0.22, 0.05), np.concatenate([np.zeros(int(0.09 * SR)), _tone(1568, 0.25, 0.22, 0.08)])),
+        "error": _add(*[np.concatenate([np.zeros(int(k * 0.14 * SR)), np.sign(np.sin(2 * np.pi * 110 * t(0.1))) * 0.18 * np.exp(-t(0.1) / 0.08)])
+                        for k in range(2)]),
+        "riser": _noise_sweep(1.0, 300, 8000, 0.32, 13) * np.linspace(0.15, 1, int(1.0 * SR)),
+        "tick": _add(_tone(1760, 0.06, 0.18, 0.015), _tone(3520, 0.04, 0.05, 0.01)),
+        "cash": _add(_tone(2093, 0.5, 0.18, 0.18), _tone(2637, 0.4, 0.12, 0.15), _noise(int(0.06 * SR), 17) * np.exp(-t(0.06) / 0.015) * 0.18),
+        "rain": _add(*[np.concatenate([np.zeros(int(k * 0.06 * SR)), np.sign(_tone(f, 0.05, 0.1, 0.02)) * 0.08])
+                       for k, f in enumerate([1200, 900, 1500, 1100, 1700, 1000, 1400, 1250])]),
+    }

@@ -289,7 +289,7 @@
     pixCan.width = w; pixCan.height = h;
     const p = pixCan.getContext("2d");
     p.clearRect(0, 0, w, h);
-    omote(p, w / 2, h - 30, 1, { ...o, noShadow: true });
+    omote3(p, w / 2, h - 30, 1, { ...o, noShadow: true });
     const bs = Math.max(1, block / s);
     smallCan.width = Math.ceil(w / bs); smallCan.height = Math.ceil(h / bs);
     const q = smallCan.getContext("2d");
@@ -422,7 +422,7 @@
     for (let y = (t * 900) % 12; y < H; y += 12) { ctx.fillStyle = "rgba(255,255,255,.10)"; ctx.fillRect(0, y, W, 3); }
     const by = (t * 1400) % (H + 200) - 100;
     ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(0, by, W, 60);
-    text(ctx, "◀◀ REWIND", 70, 250, 64, "#FFFFFF", { align: "left", weight: 900, stroke: "rgba(14,26,48,.8)", sw: 10 });
+    text(ctx, "◀◀ REWIND", 70, 400, 64, "#FFFFFF", { align: "left", weight: 900, stroke: "rgba(14,26,48,.8)", sw: 10 });
     ctx.restore();
   }
   // グリッチ：画面の横の帯をずらす（そのキャンバス自身を使う）
@@ -452,10 +452,228 @@
     ctx.restore();
   }
 
+  // ================================================================ テクノ改修（2026-10-26）
+  // ---------------------------------------------------------------- オモテ（3D ピクトグラム）
+  // three.js で描く立体のピクトグラム。頭（球）＋胴（カプセル）＋手足（カプセル）、頭のてっぺんにアンテナのような 1 本の毛（シルエットの目印）、
+  // 胸に光るリング。表情は目・まゆ・口の形だけで出す。呼び出し方は旧版（2D）の omote(ctx, x, y, s, o) と同じ。
+  const O3W = 640, O3H = 760;
+  let O3 = null;
+  function o3init() {
+    const THREE = root.THREE;
+    const can = document.createElement("canvas"); can.width = O3W; can.height = O3H;
+    const r = new THREE.WebGLRenderer({ canvas: can, antialias: true, alpha: true, preserveDrawingBuffer: true });
+    r.setPixelRatio(1); r.setSize(O3W, O3H, false); r.setClearColor(0x000000, 0); r.outputEncoding = THREE.sRGBEncoding;
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(24, O3W / O3H, .1, 100);
+    cam.position.set(0, 2.35, 14.6); cam.lookAt(0, 2.2, 0); cam.updateMatrixWorld();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x7f94b8, .7));
+    const key = new THREE.DirectionalLight(0xffffff, .95); key.position.set(4, 7, 9); scene.add(key);
+    const rim = new THREE.DirectionalLight(0x49e3ff, .9); rim.position.set(-7, 3, -6); scene.add(rim);
+    const rim2 = new THREE.DirectionalLight(0xff4fd8, .35); rim2.position.set(7, 2, -5); scene.add(rim2);
+    const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).convertSRGBToLinear(), roughness: .3, metalness: .05, ...o });
+    const skin = M(0xff5410), dark = M(0x101225, { roughness: .5 }), white = M(0xffffff, { roughness: .25 });
+    const glow = new THREE.MeshBasicMaterial({ color: 0x3ff0ff });
+    const g = new THREE.Group(); scene.add(g);
+    const body = new THREE.Group(); g.add(body);
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.62, .78, 8, 24), skin); torso.position.y = 1.78; body.add(torso);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(.26, .045, 10, 40), glow); ring.position.set(0, 1.92, .6); body.add(ring);
+    const head = new THREE.Group(); head.position.y = 3.25; body.add(head);
+    head.add(new THREE.Mesh(new THREE.SphereGeometry(.95, 40, 28), skin));
+    // アンテナ毛（曲がった円錐）＋光る先端
+    const hair = new THREE.Group(); hair.position.set(.1, .88, 0); head.add(hair);
+    const hc = new THREE.Mesh(new THREE.ConeGeometry(.13, .75, 16), skin); hc.position.y = .35; hc.rotation.z = -.35; hair.add(hc);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(.1, 16, 12), glow); tip.position.set(.26, .72, 0); hair.add(tip);
+    // 顔：目（白）・ひとみ（黒）・まゆ・口・×目・笑い目
+    const face = new THREE.Group(); head.add(face);
+    const eyes = [], pupils = [], brows = [], xs = [], arcs = [];
+    for (const sd of [-1, 1]) {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(.25, 24, 16), white); e.position.set(sd * .34, .12, .8); e.scale.set(1, 1.2, .5); face.add(e); eyes.push(e);
+      const p = new THREE.Mesh(new THREE.SphereGeometry(.12, 16, 12), dark); p.position.set(sd * .34, .12, .93); p.scale.set(1, 1.1, .4); face.add(p); pupils.push(p);
+      const b = new THREE.Mesh(new THREE.CapsuleGeometry(.04, .24, 4, 8), dark); b.rotation.z = Math.PI / 2; b.position.set(sd * .33, .45, .86); face.add(b); brows.push(b);
+      const xg = new THREE.Group(); xg.position.set(sd * .33, .12, .92);
+      for (const a of [.8, -.8]) { const m = new THREE.Mesh(new THREE.BoxGeometry(.34, .06, .04), dark); m.rotation.z = a; xg.add(m); }
+      face.add(xg); xs.push(xg);
+      const ar = new THREE.Mesh(new THREE.TorusGeometry(.14, .035, 8, 20, Math.PI), dark); ar.position.set(sd * .33, .08, .9); face.add(ar); arcs.push(ar);
+    }
+    const mouth = new THREE.Mesh(new THREE.SphereGeometry(.16, 20, 14), dark); mouth.position.set(0, -.36, .84); mouth.scale.set(1, .25, .4); face.add(mouth);
+    const sweat = [];
+    for (const [x, y] of [[.95, .3], [-1.0, .05]]) { const d = new THREE.Mesh(new THREE.SphereGeometry(.11, 12, 10), M(0x7fd8ff, { transparent: true, opacity: .9 })); d.position.set(x, y, .4); d.scale.set(1, 1.5, 1); head.add(d); sweat.push(d); }
+    // 腕・脚：肩／ひじ（腰／ひざ）の位置を軸にした入れ子
+    function limb(len1, len2, rad, shoulder) {
+      const a = new THREE.Group(); a.position.set(...shoulder); body.add(a);
+      const u = new THREE.Mesh(new THREE.CapsuleGeometry(rad, len1, 6, 14), skin); u.position.y = -len1 / 2; a.add(u);
+      const el = new THREE.Group(); el.position.y = -len1; a.add(el);
+      const l = new THREE.Mesh(new THREE.CapsuleGeometry(rad, len2, 6, 14), skin); l.position.y = -len2 / 2; el.add(l);
+      const h = new THREE.Mesh(new THREE.SphereGeometry(rad * 1.35, 16, 12), skin); h.position.y = -len2 - rad * .6; el.add(h);
+      return { a, el };
+    }
+    const armL = limb(.55, .55, .17, [-.72, 2.3, 0]), armR = limb(.55, .55, .17, [.72, 2.3, 0]);
+    const legL = limb(.5, .45, .22, [-.32, 1.1, 0]), legR = limb(.5, .45, .22, [.32, 1.1, 0]);
+    O3 = { THREE, r, can, scene, cam, g, body, head, hair, eyes, pupils, brows, xs, arcs, mouth, sweat, armL, armR, legL, legR, face };
+    return O3;
+  }
+  function omote3(ctx, x, y, s, o = {}) {
+    if (!root.THREE) return omote(ctx, x, y, s, o); // three.js が無いレンダラーでは旧 2D 版
+    const Q = O3 || o3init();
+    const ex = o.expr || "normal", tk = clamp(o.talk || 0), lk = o.look || [0, 0];
+    const big = ex === "shock" || ex === "panic";
+    const yaw = o.yaw ?? (lk[0] >= 0 ? .32 : -.32);
+    Q.g.rotation.set(0, yaw, -(o.rot || 0)); Q.g.scale.set(o.sx || 1, o.sy || 1, o.sx || 1);
+    Q.body.rotation.set(0, 0, -(o.lean || 0));
+    Q.head.rotation.set(lk[1] * .18, lk[0] * .25, 0);
+    const al = o.armL ?? .25, ar = o.armR ?? .25;
+    Q.armL.a.rotation.z = -al; Q.armL.el.rotation.z = -(o.elbowL ?? .2);
+    Q.armR.a.rotation.z = ar; Q.armR.el.rotation.z = (o.elbowR ?? .2);
+    Q.armL.a.visible = !o.noArmL;
+    const lp = o.legs || 0;
+    Q.legL.a.rotation.z = -.06 + .22 * Math.sin(lp); Q.legR.a.rotation.z = .06 + .22 * Math.sin(lp + Math.PI);
+    Q.legL.el.rotation.z = Q.legR.el.rotation.z = 0;
+    Q.hair.rotation.z = -(o.wind || 0) * .7;
+    // 表情
+    const eyeY = ex === "smug" ? .5 : ex === "deadpan" ? .38 : ex === "think" ? .8 : big ? 1.35 : 1.2;
+    Q.eyes.forEach(e => { e.visible = ex !== "happy" && ex !== "dizzy"; e.scale.set(big ? 1.25 : 1, eyeY, .5); });
+    Q.pupils.forEach((p, i) => {
+      p.visible = ex !== "happy" && ex !== "dizzy";
+      const sc = big ? .6 : 1;
+      p.scale.set(sc, sc * Math.min(1.1, eyeY), .4);
+      p.position.set((i ? .34 : -.34) + lk[0] * .08, .12 + lk[1] * -.07 + (ex === "think" ? .07 : 0), .95);
+    });
+    Q.xs.forEach(m => m.visible = ex === "dizzy");
+    Q.arcs.forEach(m => m.visible = ex === "happy");
+    const bh = big ? .6 : ex === "smug" ? .4 : ex === "deadpan" ? .36 : .46;
+    Q.brows.forEach((b, i) => {
+      const sd = i ? 1 : -1;
+      b.position.y = bh + (ex === "smug" && sd > 0 ? .1 : 0);
+      b.rotation.z = Math.PI / 2 + (ex === "think" ? sd * .25 : ex === "smug" ? (sd > 0 ? -.35 : .1) : big ? -sd * .25 : 0);
+    });
+    let mw = 1, mh = .25, mx = 0;
+    if (big) { mw = .9 + .3 * tk; mh = .9 + .5 * tk + (ex === "panic" ? .3 : 0); }
+    else if (ex === "happy") { mw = 1.5; mh = .7 + .3 * tk; }
+    else if (tk > .08) { mw = 1.05; mh = .3 + 1.0 * tk; mx = ex === "smug" ? .1 : 0; }
+    else if (ex === "smug") { mw = 1.1; mh = .18; mx = .12; }
+    else if (ex === "deadpan" || ex === "think") { mw = 1.0; mh = .1; }
+    Q.mouth.scale.set(mw, mh, .4); Q.mouth.position.x = mx;
+    Q.sweat.forEach(d => d.visible = !!o.sweat);
+    Q.r.render(Q.scene, Q.cam);
+    // 足もと（原点）が (x, y) に来るように貼る。s＝1 で身長 約 560px
+    const p = new Q.THREE.Vector3(0, 0, 0).project(Q.cam);
+    const fx = (p.x + 1) / 2 * O3W, fy = (1 - p.y) / 2 * O3H;
+    ctx.save(); ctx.globalAlpha *= (o.alpha ?? 1);
+    if (!o.noShadow) { ctx.fillStyle = "rgba(10,30,60,.16)"; ctx.beginPath(); ctx.ellipse(x, y + 4 * s, 120 * s * (o.sx || 1), 18 * s, 0, 0, 7); ctx.fill(); }
+    ctx.drawImage(Q.can, x - fx * s, y - fy * s, O3W * s, O3H * s);
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- ウラ：姿は出さない（声の波形だけ）
+  function wipe2(ctx, t, who, cx, cy, r, o = {}) {
+    if (who !== "W") return wipe(ctx, t, who, cx, cy, r, o);
+    if (!speaking(t, "W")) return;
+    r = Math.min(r, 125);
+    const k = talk(t, "W"), w = r * 2.1, h = Math.max(50, r * .55);
+    ctx.save(); ctx.globalAlpha *= clamp(o.alpha ?? 1);
+    rrect(ctx, cx - w / 2, cy - h / 2, w, h, h / 2); ctx.fillStyle = "rgba(12,18,40,.72)"; ctx.fill();
+    ctx.strokeStyle = C.ura; ctx.lineWidth = 3; ctx.stroke();
+    const n = 18;
+    for (let i = 0; i < n; i++) {
+      const e = (.25 + .75 * k) * (.45 + .55 * Math.abs(Math.sin(i * 1.7 + t * 23)));
+      const bh = (h - 18) * e, bx = cx - w / 2 + 26 + i * (w - 52) / (n - 1);
+      ctx.fillStyle = i % 3 ? "#9B86FF" : "#3FF0FF"; ctx.fillRect(bx - 3, cy - bh / 2, 6, bh);
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- テクノの背景・HUD・カメラ・切り替え
+  function mixHex(a, b, k) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const ch = s => Math.round(((pa >> s) & 255) * (1 - k) + ((pb >> s) & 255) * k);
+    return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+  }
+  // 明るいテクノの背景：白〜淡い寒色の地に、場面の色をわずかに混ぜ、遠近の格子と光
+  function techBG(ctx, c1, c2, c3) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, mixHex("#F6FBFF", c1 || "#F6FBFF", .35)); g.addColorStop(.6, mixHex("#E4EEFF", c2 || c1 || "#E4EEFF", .35));
+    g.addColorStop(1, mixHex("#D6E4FF", c3 || c2 || c1 || "#D6E4FF", .4));
+    ctx.fillStyle = g; ctx.fillRect(-200, -200, W + 400, H + 400);
+    const t = (TL && root.__t) || 0;
+    ctx.save(); ctx.strokeStyle = "rgba(25,140,255,.13)"; ctx.lineWidth = 2;
+    const hy = 1180, vx = W / 2;
+    for (let i = -12; i <= 12; i++) { ctx.beginPath(); ctx.moveTo(vx + i * 30, hy); ctx.lineTo(vx + i * 260, H + 100); ctx.stroke(); }
+    for (let k = 0; k < 9; k++) { const y = hy + Math.pow((k + (t * 1.2) % 1) / 9, 2) * (H - hy + 100); ctx.beginPath(); ctx.moveTo(-100, y); ctx.lineTo(W + 100, y); ctx.stroke(); }
+    ctx.strokeStyle = "rgba(25,140,255,.07)";
+    for (let x = 0; x <= W; x += 90) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, hy); ctx.stroke(); }
+    for (let y = 0; y <= hy; y += 90) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    const rg = ctx.createRadialGradient(W * .5, 620, 40, W * .5, 620, 760);
+    rg.addColorStop(0, "rgba(63,240,255,.20)"); rg.addColorStop(1, "rgba(63,240,255,0)"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+  // 画面の四隅の細い枠（テクノの世界観で全場面をそろえる）
+  function hud(ctx, t) {
+    ctx.save(); ctx.strokeStyle = "rgba(25,160,255,.55)"; ctx.lineWidth = 4; const m = 28, L = 70;
+    for (const [x, y, dx, dy] of [[m, m, 1, 1], [W - m, m, -1, 1], [m, H - m, 1, -1], [W - m, H - m, -1, -1]]) {
+      ctx.beginPath(); ctx.moveTo(x, y + dy * L); ctx.lineTo(x, y); ctx.lineTo(x + dx * L, y); ctx.stroke();
+    }
+    const sy = (t * 520) % (H + 300) - 150;
+    const g = ctx.createLinearGradient(0, sy - 60, 0, sy + 60); g.addColorStop(0, "rgba(63,240,255,0)"); g.addColorStop(.5, "rgba(63,240,255,.10)"); g.addColorStop(1, "rgba(63,240,255,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, sy - 60, W, 120);
+    ctx.restore();
+  }
+  // カメラ：場面ごとのゆっくりした寄り＋衝撃の瞬間のパンチズームと揺れ。bg と ui の両方に同じ変換をかける
+  function camera(ctxs, t, sceneStart, sceneEnd, hits = [], focus = [W / 2, 760]) {
+    const push = 1 + .035 * easeInOut(clamp((t - sceneStart) / Math.max(.5, sceneEnd - sceneStart)));
+    let punch = 0, shake = 0;
+    for (const h of hits) { const d = t - h; if (d >= 0 && d < .6) { punch = Math.max(punch, .07 * Math.exp(-d / .12)); shake = Math.max(shake, 14 * Math.exp(-d / .1)); } }
+    const z = push + punch, sx = shake * Math.sin(t * 91), sy = shake * Math.cos(t * 73);
+    for (const c of ctxs) { c.setTransform(z, 0, 0, z, focus[0] * (1 - z) + sx, focus[1] * (1 - z) + sy); }
+  }
+  function resetCam(ctxs) { for (const c of ctxs) c.setTransform(1, 0, 0, 1, 0, 0); }
+  // 場面の切り替え：横に流れる光の筋（ホワイトフラッシュの代わり）
+  function whip(ctx, k, seed = 1) {
+    if (k <= 0) return;
+    const r = rng(seed);
+    ctx.save(); ctx.globalAlpha = clamp(k);
+    ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 22; i++) {
+      const y = r() * H, h = 4 + r() * 26, x = (1 - k) * W * (r() < .5 ? 1 : -1) * 0.6;
+      ctx.fillStyle = i % 3 ? "rgba(63,240,255,.75)" : "rgba(255,79,216,.6)"; ctx.fillRect(x - 200, y, W + 400, h);
+    }
+    ctx.restore();
+  }
+  // 字幕（テクノ版）：暗いガラスの帯に、話者の色の細い発光線
+  function subtitles2(ctx, t, cy = 1440) {
+    const line = currentLine(t);
+    if (!line || t >= TL.ending_start) return;
+    const rows = subChunk(line, t).split(" / ");
+    let size = 58;
+    const cx = 505;
+    ctx.font = `800 ${size}px ${FONT}`;
+    let wmax = Math.max(...rows.map(r => ctx.measureText(r.replace(/\*\*/g, "")).width));
+    if (wmax > 860) { size = Math.floor(size * 860 / wmax); ctx.font = `800 ${size}px ${FONT}`; wmax = 860; }
+    const lh = size * 1.34, bw = Math.min(930, wmax + 64), bh = rows.length * lh + 30;
+    const k = easeOut(prog(t, line.start - .04, .1));
+    const col = line.who === "M" ? C.omote : "#8C74FF";
+    ctx.save(); ctx.globalAlpha = k; ctx.translate(0, 12 * (1 - k));
+    ctx.shadowColor = hexA(col, .55); ctx.shadowBlur = 26;
+    rrect(ctx, cx - bw / 2, cy - bh / 2, bw, bh, 18); ctx.fillStyle = "rgba(10,16,34,.86)"; ctx.fill();
+    ctx.shadowColor = "transparent"; ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+    rows.forEach((r, i) => rich(ctx, r, cx, cy - (rows.length - 1) * lh / 2 + i * lh + 2, size, "#FFFFFF", "#3FF0FF"));
+    const name = (TL.names || {})[line.who] || line.who;
+    ctx.font = `900 30px ${FONT}`; const tw = ctx.measureText(name).width + 40;
+    rrect(ctx, cx - bw / 2 + 18, cy - bh / 2 - 22, tw, 44, 10); ctx.fillStyle = col; ctx.fill();
+    text(ctx, name, cx - bw / 2 + 18 + tw / 2, cy - bh / 2 + 1, 30, "#FFFFFF", { weight: 900 });
+    ctx.restore();
+  }
+  function header2(ctx) {
+    ctx.save(); rrect(ctx, 40, 92, 250, 62, 14); ctx.fillStyle = "rgba(10,16,34,.78)"; ctx.fill();
+    ctx.strokeStyle = "#3FF0FF"; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
+    rewindIcon(ctx, 82, 123, 17, "#3FF0FF");
+    text(ctx, "リバース", 112, 124, 34, "#FFFFFF", { align: "left", weight: 900 });
+  }
+
   root.Stage = {
     W, H, FONT, C, clamp, lerp, easeOut, easeIn, easeInOut, back, elastic, prog, win, rng, hexA,
-    text, rrect, pill, rich, note, setup, sceneRange, sceneAt, currentLine, talk, speaking, subtitles, header, rewindIcon,
-    omote, omotePixel, uraBust, wipe, speedLines, burst, bigX, bigO, arrow, vhs, glitch, flash, gradientBG, dots, rays,
+    text, rrect, pill, rich, note, setup, sceneRange, sceneAt, currentLine, talk, speaking, subtitles: subtitles2, header: header2, rewindIcon,
+    omote: omote3, omote2d: omote, omotePixel, uraBust, wipe: wipe2, speedLines, burst, bigX, bigO, arrow, vhs, glitch, flash, gradientBG: techBG, dots, rays,
+    techBG, hud, camera, resetCam, whip, mixHex, subtitlesOld: subtitles, headerOld: header, gradientOld: gradientBG,
     get TL() { return TL; }, get CUE() { return CUE; },
   };
 })(typeof window !== "undefined" ? window : globalThis);

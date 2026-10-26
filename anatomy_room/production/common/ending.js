@@ -104,6 +104,27 @@
     if (opts.credits && opts.credits.length)
       text(ctx, "音声：" + opts.credits.join("／"), cx, H * 0.80 + 70, 28, "#4A5B70", { weight: 500, alpha: k3 });
 
+    // テクノ版（opts.techno、第 3 話以降）：薄い格子・四隅の枠・走査線、「リバース」の出だしに一瞬のグリッチ
+    if (opts.techno) {
+      ctx.save(); ctx.strokeStyle = "rgba(25,140,255,.10)"; ctx.lineWidth = 2;
+      for (let x = 0; x <= W; x += 90) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = 0; y <= H; y += 90) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      ctx.strokeStyle = "rgba(25,160,255,.55)"; ctx.lineWidth = 4; const m = 28, L = 70;
+      for (const [x, y, dx, dy] of [[m, m, 1, 1], [W - m, m, -1, 1], [m, H - m, 1, -1], [W - m, H - m, -1, -1]]) {
+        ctx.beginPath(); ctx.moveTo(x, y + dy * L); ctx.lineTo(x, y); ctx.lineTo(x + dx * L, y); ctx.stroke();
+      }
+      const sy = (t * 600) % (H + 300) - 150, sg = ctx.createLinearGradient(0, sy - 60, 0, sy + 60);
+      sg.addColorStop(0, "rgba(63,240,255,0)"); sg.addColorStop(.5, "rgba(63,240,255,.14)"); sg.addColorStop(1, "rgba(63,240,255,0)");
+      ctx.fillStyle = sg; ctx.fillRect(0, sy - 60, W, 120);
+      const gk = 1 - clamp((t - e1) / .25);
+      if (t > e1 - .05 && gk > 0) {
+        for (let i = 0; i < 6; i++) {
+          const y = cy - 120 + ((i * 53 + Math.floor(t * 40) * 37) % 240), dx = (((i * 97 + Math.floor(t * 40) * 13) % 60) - 30) * gk;
+          ctx.drawImage(ctx.canvas, 0, y, W, 18, dx, y, W, 18);
+        }
+      }
+      ctx.restore();
+    }
     // 本編からの切り替え：白い閃光
     const flash = 1 - prog(t, 0, 0.35);
     if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, W, H); }

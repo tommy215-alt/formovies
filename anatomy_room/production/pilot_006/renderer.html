@@ -21,7 +21,7 @@ html,body{margin:0;background:#000}
 const S = Stage, { W, H, C, clamp, lerp, easeOut, easeIn, easeInOut, back, prog, win, text, pill, note, rrect } = Stage;
 const bg = document.getElementById("bg").getContext("2d");
 const ui = document.getElementById("ui").getContext("2d");
-const SCN = ["hook", "gag", "rewind", "hypo", "explode", "pressure", "insight", "standby", "fog", "outro"];
+const SCN = ["cold", "hook", "gag", "rewind", "hypo", "explode", "pressure", "insight", "standby", "fog", "outro"];
 let TL, CUE;
 
 // ---------------------------------------------------------------- 機内（2D）
@@ -173,7 +173,9 @@ function drawScene(t, name) {
   const [a, b] = S.sceneRange(name), lt = t - a;
   resetPanes();
   let use3d = false;
-  if (name === "hook") {
+  if (name === "cold") {
+    coldScene(t);
+  } else if (name === "hook") {
     const z = lerp(1.0, 1.1, easeInOut(lt / 8));
     cabin(bg, t, { zoom: z });
     const pt = easeOut(prog(t, a + .4, .6));
@@ -181,7 +183,10 @@ function drawScene(t, name) {
     omoteCabin(t, { expr: t > CUE.dare + .4 ? (S.speaking(t, "M") ? "deadpan" : "shock") : "think", armR: lerp(.3, 2.05, pt), elbowR: .1, look: [1, -.5] });
     if (t < CUE.dare) S.arrow(ui, 470, 1010, 548, 932, C.orange, 12, 34, pt);
     uraWipe(t, "smirk");
-    note(ui, "飛行中の機内（イメージ）", 540, 260, easeOut(prog(t, a + .2, .4)) * (1 - prog(t, CUE.dare, .4)));
+    note(ui, "飛行中の機内（イメージ）", 540, 1180, easeOut(prog(t, a + .2, .4)) * (1 - prog(t, CUE.dare, .4)));
+    // 疑問を叩きつける（冒頭 1.5〜3 秒）
+    const q = back(prog(t, a, .25)) * (1 - prog(t, CUE.dare - .2, .3));
+    if (q > 0) { ui.save(); ui.translate(540, 300); ui.scale(q, q); text(ui, "なんで窓に穴!?", 0, 0, 104, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
   } else if (name === "gag") {
     gagFrame(t, lt, 1);
   } else if (name === "rewind") {
@@ -198,7 +203,7 @@ function drawScene(t, name) {
       if (k > 0) { pill(ui, "この穴が原因 → ✕", 560, 1010, 46, "#FFFFFF", C.red, k); }
       uraWipe(t, "smirk");
     }
-    note(ui, "※ギャグ演出：実際の窓はこうなりません", 540, back_ < 1 ? 330 : 260, back_ < 1 ? 1 : 1 - prog(t, a + rwDur, .4));
+    if (back_ >= 1) note(ui, "※ギャグ演出：実際の窓はこうなりません", 540, 260, 1 - prog(t, a + rwDur, .4)); // 巻き戻し中は gagFrame が表示
   } else if (name === "hypo") {
     cabin(bg, t, { zoom: 1.08 });
     const deny = t >= CUE.deny;
@@ -265,6 +270,24 @@ function drawScene(t, name) {
   if (!use3d) renderer.clear();
 }
 
+// 冒頭のつかみ（0〜1.5 秒、セリフなし）：指が穴に触れた瞬間、警告音とともに窓が抜け、オモテが吸い寄せられる → 巻き戻しノイズ
+function coldScene(t) {
+  if (t < .2) {
+    cabin(bg, t, { zoom: lerp(1.75, 1.1, easeOut(prog(t, 0, .2))) });
+    omoteCabin(t, { expr: "smug", armR: 2.05, elbowR: .1, look: [1, -.5] });
+    S.speedLines(ui, WIN.x, WIN.y, t, "rgba(255,255,255,.85)", 60, 200);
+    S.flash(ui, .5 * (1 - prog(t, 0, .12)));
+  } else {
+    gagFrame(t, (t - .2) * 1.7, 1);
+  }
+  // 警告：画面の縁が赤く点滅（暗くしない）
+  const al = t > .18 ? .5 + .5 * Math.sin(t * 40) : 0;
+  if (al > 0) { ui.save(); ui.strokeStyle = `rgba(255,50,70,${.75 * al})`; ui.lineWidth = 46; ui.strokeRect(0, 0, W, H); ui.restore();
+    pill(ui, "⚠ WARNING", 540, 360, 56, "#FFFFFF", "rgba(255,50,70,.92)", al); }
+  S.burst(ui, 760, 1020, 150, prog(t, .25, .2), "!?", { size: 120, fill: C.yellow });
+  const rw = prog(t, 1.25, .25);
+  if (rw > 0) { S.vhs(ui, t, rw); S.glitch(ui, t, rw, 5); }
+}
 // ギャグ：窓が抜けて、オモテが吸い寄せられる（gt＝ギャグの経過秒、amp＝強さ）
 function gagFrame(t, gt, amp) {
   const pop = clamp(gt / .5);
@@ -439,15 +462,20 @@ function renderFrame(t) {
   if (t >= es) {
     renderer.clear();
     const e = TL.lines.filter(x => x.ending);
-    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "" });
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
     return;
   }
-  const name = S.sceneAt(t), [a] = S.sceneRange(name);
+  window.__t = t;
+  const name = S.sceneAt(t), [a, b] = S.sceneRange(name);
+  // カメラ：場面ごとの寄り＋衝撃のパンチズーム（3D の窓の場面は 3D のカメラが動くので 2D 側は動かさない）
+  if (name !== "explode") S.camera([bg, ui], t, a, b, [.22, CUE.gag, CUE.fifty, CUE.crack, CUE.rice, CUE.punch], [560, 800]);
   drawScene(t, name);
+  S.resetCam([bg, ui]);
+  S.hud(ui, t);
   S.header(ui, false);
   S.subtitles(ui, t);
   const i = SCN.indexOf(name);
-  if (i > 0 && name !== "rewind") S.flash(ui, (1 - prog(t, a, .22)) * .6);
+  if (i > 1 && name !== "rewind") S.whip(ui, 1 - prog(t, a, .2), i);
 }
 function renderThumb() {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); renderer.clear();

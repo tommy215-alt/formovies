@@ -11,6 +11,7 @@ html,body{margin:0;background:#000}
   <canvas id="bg" width="1080" height="1920"></canvas>
   <canvas id="ui" width="1080" height="1920"></canvas>
 </div>
+<script src="../common/vendor/three.min.js"></script>
 <script src="../common/stage.js"></script>
 <script src="../common/ending.js"></script>
 <script>
@@ -19,7 +20,7 @@ html,body{margin:0;background:#000}
 const S = Stage, { W, H, C, clamp, lerp, easeOut, easeIn, easeInOut, back, prog, win, text, pill, note, rrect } = Stage;
 const bg = document.getElementById("bg").getContext("2d");
 const ui = document.getElementById("ui").getContext("2d");
-const SCN = ["hook", "rain", "left", "same", "menu", "caveat", "rule", "final"];
+const SCN = ["cold", "hook", "rain", "left", "same", "menu", "caveat", "rule", "final"];
 let TL, CUE;
 const TAG = "#E8312A";
 
@@ -101,15 +102,19 @@ function meter(ctx, cx, cy, v, label, k = 1) {
 // ---------------------------------------------------------------- 場面
 function drawScene(t, name) {
   const [a, b] = S.sceneRange(name), lt = t - a;
-  if (name === "hook") {
+  if (name === "cold") {
+    coldScene(t);
+  } else if (name === "hook") {
     shelfBG(bg, t);
+    const q = back(prog(t, a, .25)) * (1 - prog(t, CUE.basket - .1, .3));
+    if (q > 0) { ui.save(); ui.translate(540, 600); ui.scale(q, q); text(ui, "2円で安く感じる!?", 0, 0, 96, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
     // 298 と 300：同じお菓子に、値札がドン
     bag(bg, 420, 900, .8, "#FF7A2A"); bag(bg, 800, 900, .8, "#FF7A2A");
     const k1 = prog(t, .15, .35), k2 = prog(t, .45, .35);
     const inBasket = easeInOut(prog(t, CUE.basket, .6));
     if (inBasket < 1) tag(ui, 420, 1110, .9, "298", k1);
     tag(ui, 800, 1110, .9, "300", k2);
-    text(ui, "たった 2 円の差", 540, 600, 64, C.navy2, { weight: 900, alpha: easeOut(prog(t, 1.2, .4)) * (1 - prog(t, CUE.dare, .3)), stroke: "#FFFFFF", sw: 12 });
+    text(ui, "たった 2 円の差", 540, 600, 64, C.navy2, { weight: 900, alpha: easeOut(prog(t, CUE.basket - .1, .4)) * (1 - prog(t, CUE.dare, .3)), stroke: "#FFFFFF", sw: 12 });
     // オモテ：298 円をカゴへ
     const ox = 150;
     om(t, ox, 1335, .5, { expr: t > CUE.jab0 ? (S.speaking(t, "M") ? "smug" : "shock") : t > CUE.basket ? "happy" : "think",
@@ -169,6 +174,29 @@ function drawScene(t, name) {
   }
 }
 
+// 冒頭のつかみ（0〜1.5 秒、セリフなし）：巨大な「298」が叩きつけられ、大量の値札が噴き出してオモテを追い詰める
+function coldScene(t) {
+  S.gradientBG(bg, "#FFF3E0", "#FFE0C0", "#FFD0A0");
+  const k = back(prog(t, .02, .22));
+  const shake = 18 * Math.exp(-Math.max(0, t - .05) / .12);
+  ui.save(); ui.translate(540 + shake * Math.sin(t * 90), 620); ui.scale(k * lerp(1.25, 1, easeOut(prog(t, .05, .5))), k * lerp(1.25, 1, easeOut(prog(t, .05, .5))));
+  text(ui, "298", 0, 0, 380, TAG, { weight: 900, stroke: "#FFFFFF", sw: 26 });
+  text(ui, "円", 330, 80, 120, TAG, { weight: 900, stroke: "#FFFFFF", sw: 14 });
+  ui.restore();
+  // 値札が噴き出して、オモテのまわりに集まる
+  const r = S.rng(31), prices = ["298", "498", "980", "1,980", "198", "2,980", "398", "98"];
+  const ox = lerp(760, 880, easeOut(prog(t, .4, .6)));
+  for (let i = 0; i < 26; i++) {
+    const d = .35 + r() * .25, kk = easeOut(prog(t, d, .7)), an = r() * 6.28, rr = 120 + r() * 160;
+    if (kk <= 0) continue;
+    const x = lerp(540, ox + Math.cos(an + t * 2) * rr, kk), y = lerp(620, 1080 + Math.sin(an + t * 2) * rr * .7, kk);
+    tag(ui, x, y, .5, prices[i % prices.length], 1, Math.sin(t * 6 + i) * .5);
+  }
+  om(t, ox, 1335, .58, { expr: t > .4 ? "panic" : "shock", armL: 2.4, armR: 2.4, sx: lerp(1, .9, prog(t, .6, .4)), sweat: t > .5, look: [-1, -.6] });
+  S.speedLines(ui, 540, 620, t, "rgba(255,255,255,.7)", 48, 300);
+  S.flash(ui, .6 * (1 - prog(t, 0, .12)));
+  S.glitch(ui, t, prog(t, 1.2, .3), 11);
+}
 function leftScene(t, a, lt) {
   S.gradientBG(bg, "#FFFFFF", "#FFF1E0", "#FFE2C2");
   S.dots(bg, "rgba(255,122,42,.12)");
@@ -327,14 +355,19 @@ function renderFrame(t) {
   const es = TL.ending_start;
   if (t >= es) {
     const e = TL.lines.filter(x => x.ending);
-    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "" });
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
     return;
   }
-  const name = S.sceneAt(t), [a] = S.sceneRange(name);
+  window.__t = t;
+  const name = S.sceneAt(t), [a, b] = S.sceneRange(name);
+  S.camera([bg, ui], t, a, b, [.05, CUE.rain, CUE.bucket, CUE.cross, CUE.almost, CUE.punch], [540, 800]);
   drawScene(t, name);
+  S.resetCam([bg, ui]);
+  S.hud(ui, t);
   S.header(ui, false);
   S.subtitles(ui, t);
-  if (SCN.indexOf(name) > 0) S.flash(ui, (1 - prog(t, a, .22)) * .6);
+  const i = SCN.indexOf(name);
+  if (i > 1) S.whip(ui, 1 - prog(t, a, .2), i);
 }
 function renderThumb() {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);

@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_007 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/stage.js"></script>
+<script src="../common/ending.js"></script>
+<script src="qr_demo.js"></script>
+<script>
+// pilot_007「QRコードを消したら、オモテが消えた」のレンダラー（2D）。renderFrame(t) が時刻 t の 1 コマを描く（決定的）。
+// QR コードは qr_demo.py で作った本物（「REVERSE」・バージョン 1）。「読める／読めない」は qr_demo.py の実際の読み取り結果だけを表示する。
+const S = Stage, { W, H, C, clamp, lerp, easeOut, easeIn, easeInOut, back, prog, win, text, pill, note, rrect } = Stage;
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["hook", "glitch", "inside", "parity", "restore", "levels", "logo", "vanish", "finder", "rescue"];
+let TL, CUE;
+const N = QR.size, MH = QR.matrix.H, ML = QR.matrix.L;
+const ARM = QR.rects.arm[0], FINDER = QR.rects.finder[0], LOGO = QR.rects.logo[0];
+const DEC = QR.decoded;
+const INK = "#10203A";
+const inRect = (r, c, R) => r >= R[0] && r < R[0] + R[2] && c >= R[1] && c < R[1] + R[3];
+function hash(r, c, s = 1) { let h = (r * 73856093) ^ (c * 19349663) ^ (s * 83492791); h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+
+// QR を描く。o: erased(r,c)→0〜1（消えた度合い）, glow（位置検出パターンを光らせる）, logo（真ん中のロゴ）, ghost（消えたところに点線）
+function drawQR(ctx, M, cx, cy, mod, o = {}) {
+  const size = N * mod, x0 = cx - size / 2, y0 = cy - size / 2, q = mod * 1.6;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,.18)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+  ctx.fillStyle = "#FFFFFF"; rrect(ctx, x0 - q, y0 - q, size + 2 * q, size + 2 * q, mod * .9); ctx.fill();
+  ctx.restore();
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const e = o.erased ? o.erased(r, c) : 0;
+    const x = x0 + c * mod, y = y0 + r * mod;
+    if (M[r][c] && e < 1) {
+      ctx.fillStyle = (o.color && o.color(r, c)) || INK; ctx.globalAlpha = 1 - e;
+      ctx.fillRect(x - .5, y - .5, mod + 1, mod + 1); ctx.globalAlpha = 1;
+    }
+    if (e > .5 && o.ghost) { ctx.strokeStyle = "rgba(255,90,140,.45)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]); ctx.strokeRect(x + 3, y + 3, mod - 6, mod - 6); ctx.setLineDash([]); }
+  }
+  if (o.glow) for (const [r0, c0] of [[0, 0], [0, N - 7], [N - 7, 0]]) {
+    const k = o.glow;
+    ctx.strokeStyle = `rgba(255,122,42,${k})`; ctx.lineWidth = 12; rrect(ctx, x0 + c0 * mod - 10, y0 + r0 * mod - 10, 7 * mod + 20, 7 * mod + 20, 18); ctx.stroke();
+  }
+  if (o.logo) {
+    const k = o.logo, lx = x0 + LOGO[1] * mod, ly = y0 + LOGO[0] * mod, lw = LOGO[3] * mod;
+    ctx.save(); ctx.globalAlpha = k; ctx.fillStyle = "#FFFFFF"; rrect(ctx, lx - 4, ly - 4, lw + 8, lw + 8, mod); ctx.fill();
+    ctx.fillStyle = C.ura; rrect(ctx, lx + mod * .4, ly + mod * .4, lw - mod * .8, lw - mod * .8, mod * .8); ctx.fill();
+    S.rewindIcon(ctx, lx + lw / 2, ly + lw / 2, lw * .26, "#FFFFFF"); ctx.restore();
+  }
+  return { x0, y0, size };
+}
+function cellXY(cx, cy, mod, r, c) { const x0 = cx - N * mod / 2, y0 = cy - N * mod / 2; return [x0 + (c + .5) * mod, y0 + (r + .5) * mod]; }
+// 消しゴム（オモテが持つ）
+function eraser(ctx, x, y, s, rot = -.4) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.fillStyle = "#FF8FB1"; rrect(ctx, -70, -40, 140, 80, 16); ctx.fill();
+  ctx.fillStyle = "#3E6FD8"; rrect(ctx, -70, -40, 70, 80, 16); ctx.fill(); ctx.fillRect(-30, -40, 30, 80);
+  ctx.strokeStyle = "rgba(0,0,0,.2)"; ctx.lineWidth = 5; rrect(ctx, -70, -40, 140, 80, 16); ctx.stroke();
+  ctx.restore();
+}
+function wallBG(ctx, t, c1 = "#E9FBFF", c2 = "#BDEBFF") {
+  S.gradientBG(ctx, c1, c2, c2);
+  ctx.fillStyle = "rgba(25,180,224,.10)";
+  for (let y = 0; y < H; y += 60) for (let x = (y / 60) % 2 ? 30 : 0; x < W; x += 60) ctx.fillRect(x, y, 30, 30);
+}
+function resultCard(ctx, ok, cx, cy, k, s = 1, label = "") {
+  if (k <= 0) return;
+  const sc = back(k) * s;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc);
+  ctx.shadowColor = "rgba(0,0,0,.2)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 8;
+  ctx.font = `800 30px ${S.FONT}`; const hw = Math.max(230, ctx.measureText(label).width / 2 + 40);
+  ctx.fillStyle = ok ? C.green : C.red; rrect(ctx, -hw, -62, hw * 2, 124, 30); ctx.fill(); ctx.shadowColor = "transparent";
+  text(ctx, ok ? "○ 読み取り成功" : "✕ 読めない", 0, label ? -14 : 0, 50, "#FFFFFF", { weight: 900 });
+  if (label) text(ctx, label, 0, 34, 30, "#FFFFFF", { weight: 800 });
+  ctx.restore();
+}
+function uraWipe(t, expr, extra = {}) {
+  const sp = S.speaking(t, "W");
+  S.wipe(ui, t, "W", extra.x ?? 930, extra.y ?? 300, extra.r ?? 105, { expr: sp ? expr : (extra.idle || "smirk"), pop: extra.pop ?? 1 });
+}
+const QX = 540, QY = 800, QM = 30; // 通常の QR の位置と 1 マスの大きさ
+
+// ---------------------------------------------------------------- 場面
+function drawScene(t, name) {
+  const [a, b] = S.sceneRange(name), lt = t - a;
+  if (name === "hook") {
+    wallBG(bg, t);
+    const z = lerp(.92, 1, easeOut(lt / 1.2));
+    // 消しゴムが左から右へ通ると、ARM の範囲のマスが消える
+    const ek = easeInOut(prog(t, CUE.erase, 1.4));
+    const erased = (r, c) => inRect(r, c, ARM) && (c - ARM[1] + .5) / ARM[3] < ek ? 1 : 0;
+    bg.save(); bg.translate(QX, QY); bg.scale(z, z); bg.translate(-QX, -QY);
+    drawQR(bg, MH, QX, QY, QM, { erased, ghost: true });
+    bg.restore();
+    text(ui, "巨大 QR コード", QX, QY - N * QM / 2 - 70, 46, C.navy2, { weight: 900, alpha: 1 - prog(t, CUE.erase, .3) });
+    const going = t > CUE.erase - .6;
+    let [hx, hy] = cellXY(QX, QY, QM, ARM[0] + ARM[2] / 2, ARM[1] + ARM[3] * ek);
+    const ox = going ? lerp(260, hx - 120, easeOut(prog(t, CUE.erase - .6, .6))) : 230;
+    S.omote(ui, ox, 1330, .62, { expr: t > CUE.dare + .3 ? (S.speaking(t, "M") ? "deadpan" : "smug") : "think", talk: S.talk(t, "M"),
+      armR: going ? 2.3 : 1.2, elbowR: going ? .3 : 1.8, look: [1, -.6] });
+    const ehx = going ? lerp(ox + 110, hx, easeOut(prog(t, CUE.erase - .6, .6))) : ox + 120;
+    const ehy = going ? lerp(950, hy, easeOut(prog(t, CUE.erase - .6, .6))) : 980;
+    eraser(ui, ehx, ehy + 10 * Math.sin(t * 20) * (ek > 0 && ek < 1 ? 1 : 0), .9);
+    uraWipe(t, "amused");
+  } else if (name === "glitch") {
+    wallBG(bg, t, "#F4ECFF", "#D8C8FF");
+    const k = easeIn(prog(t, CUE.suck, 3.2));
+    const z = lerp(1, 2.6, k);
+    const [hx, hy] = cellXY(QX, QY, QM, ARM[0] + ARM[2] / 2, ARM[1] + ARM[3] / 2);
+    bg.save(); bg.translate(hx, hy); bg.scale(z, z); bg.rotate(k * .25); bg.translate(-hx, -hy);
+    drawQR(bg, MH, QX, QY, QM, { erased: (r, c) => inRect(r, c, ARM) ? 1 : 0, ghost: true });
+    bg.restore();
+    // オモテ：ドット絵になり、渦を巻いて吸い込まれる
+    const px = easeOut(prog(t, a, .6));
+    const sp = prog(t, CUE.suck, 3.5);
+    const ang = sp * 9, rad = lerp(330, 0, easeIn(sp));
+    const ox = lerp(250, hx + Math.cos(ang) * rad, easeOut(prog(t, CUE.suck, .5))), oy = lerp(1330, hy + 240 + Math.sin(ang) * rad * .5, easeOut(prog(t, CUE.suck, .5)));
+    const s = .62 * (1 - .75 * easeIn(sp));
+    S.omotePixel(ui, ox, oy, s, { expr: "panic", talk: S.talk(t, "M"), armL: 2.6, armR: 2.6, rot: ang * .3, sweat: true }, lerp(4, 22, px));
+    S.speedLines(ui, hx, hy, t, "rgba(123,92,255,.35)", 40, 200);
+    S.glitch(ui, t, .8 * win(t, a, CUE.inside, .1, .4) + .4 * (1 - prog(t, a, .5)), 3);
+    note(ui, "※明らかにありえない演出です", 540, 250, 1);
+    uraWipe(t, "amused");
+  } else if (name === "inside") {
+    // コードの中：巨大なマスの床。左腕の欠けたドット絵のオモテ
+    insideWorld(t, a, lt);
+  } else if (name === "parity") {
+    parityScene(t, a, lt);
+  } else if (name === "restore") {
+    wallBG(bg, t, "#EAFBF3", "#BFF0DA");
+    const fk = prog(t, CUE.fill, 2.0);
+    const order = (r, c) => hash(r, c, 5);
+    const erased = (r, c) => inRect(r, c, ARM) && order(r, c) >= fk ? 1 : 0;
+    const geo = drawQR(bg, MH, QX, QY, QM, { erased, ghost: true, color: (r, c) => inRect(r, c, ARM) && order(r, c) < fk ? "#0E9A6B" : null });
+    // 計算の線：残りのマスから、いま戻るマスへ
+    for (let r = ARM[0]; r < ARM[0] + ARM[2]; r++) for (let c = ARM[1]; c < ARM[1] + ARM[3]; c++) {
+      const o = order(r, c), d = fk - o;
+      if (d < 0 || d > .12) continue;
+      const [x, y] = cellXY(QX, QY, QM, r, c), al = 1 - d / .12;
+      for (let j = 0; j < 3; j++) {
+        const rr = Math.floor(hash(r, c, j + 9) * N), cc = Math.floor(hash(c, r, j + 3) * N);
+        const [sx, sy] = cellXY(QX, QY, QM, rr, cc);
+        ui.strokeStyle = `rgba(32,178,107,${.7 * al})`; ui.lineWidth = 3; ui.beginPath(); ui.moveTo(sx, sy); ui.lineTo(x, y); ui.stroke();
+      }
+      ui.fillStyle = `rgba(255,255,255,${al})`; ui.beginPath(); ui.arc(x, y, 10, 0, 7); ui.fill();
+    }
+    const rs = easeOut(prog(t, CUE.rsname, .4));
+    if (rs > 0) pill(ui, "リード・ソロモン符号", 540, geo.y0 - 110, 50, "#FFFFFF", C.green, rs);
+    if (fk > 0 && fk < 1) text(ui, "残りのマスから計算して戻す", 540, geo.y0 + geo.size + 90, 42, "#0E7A52", { weight: 900, alpha: win(t, CUE.fill, CUE.fill + 2.2, .3, .3) });
+    // オモテの腕が戻る
+    const bk = t >= CUE.back;
+    const o = { expr: bk ? "happy" : "think", talk: S.talk(t, "M"), noArmL: !bk, armL: bk ? 2.7 : .3, armR: bk ? 2.7 : .3, look: [1, -.6] };
+    if (bk) S.omote(ui, 210, 1340, .55, o);
+    else S.omotePixel(ui, 210, 1340, .55, o, 10);
+    if (bk) S.burst(ui, 330, 960, 110, prog(t, CUE.back, .3) * (1 - prog(t, CUE.back + 1.5, .3)), "復元!", { size: 54, fill: "#B8FFD9", stroke: C.green, color: "#0E7A52" });
+    uraWipe(t, "excited");
+  } else if (name === "levels") {
+    levelsScene(t, a, lt);
+  } else if (name === "logo") {
+    wallBG(bg, t);
+    const lg = easeOut(prog(t, a + .1, .5));
+    const geo = drawQR(bg, MH, QX, QY, QM, { logo: lg });
+    resultCard(ui, !!DEC.H.logo, 540, geo.y0 - 100, easeOut(prog(t, CUE.cover, .35)), .85, "ロゴで隠しても（レベル H・試した結果）");
+    if (lg > 0) note(ui, "ロゴを載せる時は、予備の多い設定が勧められています", 540, geo.y0 + geo.size + 80, easeOut(prog(t, CUE.cover + .3, .4)), 28);
+    // オモテが調子に乗って、左上の角へ
+    const gr = t >= CUE.greed;
+    const go = easeInOut(prog(t, CUE.greed + .8, 1.4));
+    const [fx, fy] = cellXY(QX, QY, QM, 3, 3);
+    const ox = lerp(250, fx - 40, go), oy = lerp(1340, fy + 380, go);
+    S.omote(ui, ox, oy, lerp(.6, .55, go), { expr: gr ? "smug" : "shock", talk: S.talk(t, "M"), armR: gr ? 2.4 : .3, elbowR: .3, look: [1, -1] });
+    if (gr) eraser(ui, lerp(ox + 120, fx, go), lerp(oy - 330, fy, go), .9);
+    uraWipe(t, t >= CUE.wait ? "stern" : "smirk");
+  } else if (name === "vanish") {
+    wallBG(bg, t, "#FFF3F3", "#FFD3D3");
+    const geo = drawQR(bg, MH, QX, QY, QM, { erased: (r, c) => inRect(r, c, FINDER) ? 1 : 0, ghost: true });
+    const v = prog(t, a, .5);
+    if (v < 1) S.omotePixel(ui, 320, 900, .55, { expr: "shock", armR: 2.4, alpha: 1 - v }, lerp(8, 40, v));
+    S.glitch(ui, t, .9 * (1 - prog(t, a + .2, .6)), 7);
+    // 読み取り機の画面
+    scanner(ui, t, 540, geo.y0 - 120, false, easeOut(prog(t, a + .5, .4)));
+    if (t >= CUE.dark) { const k = easeOut(prog(t, CUE.dark, .3)); S.burst(ui, 300, 620, 130, k, "（声だけ）", { size: 34, fill: "#FFFFFF", stroke: C.omote, color: C.omote }); }
+    uraWipe(t, "amused");
+  } else if (name === "finder") {
+    finderScene(t, a, lt);
+  } else if (name === "rescue") {
+    wallBG(bg, t, "#E9FBFF", "#BDEBFF");
+    const rd = prog(t, CUE.redraw, 1.0);
+    // 左上の目印を描き直す（外側の枠 → 中の四角の順に現れる）
+    const erased = (r, c) => {
+      if (!inRect(r, c, FINDER)) return 0;
+      const d = Math.max(Math.abs(r - 3), Math.abs(c - 3));
+      return rd >= 1 - d / 4.5 ? 0 : 1;
+    };
+    const geo = drawQR(bg, MH, QX, QY, QM, { erased, ghost: true });
+    if (rd > 0 && rd < 1) { const [px, py] = cellXY(QX, QY, QM, 3 + 3 * Math.cos(rd * 9), 3 + 3 * Math.sin(rd * 9)); penHand(ui, px, py); }
+    const back_ = t >= CUE.redraw + .9;
+    if (back_) {
+      S.omote(ui, 260, 1340, .6, { expr: S.speaking(t, "M") || t > CUE.deadpan ? "deadpan" : "shock", talk: S.talk(t, "M"), armR: .3, look: [1, -.6],
+        sx: back(prog(t, CUE.redraw + .9, .35)), sy: back(prog(t, CUE.redraw + .9, .35)) });
+      resultCard(ui, !!DEC.H.clean, 540, geo.y0 - 100, easeOut(prog(t, CUE.redraw + .9, .35)), .8);
+    }
+    const big = easeOut(prog(t, CUE.punch - .1, .45));
+    uraWipe(t, t >= CUE.punch ? "amused" : "smirk", { x: lerp(930, 720, big), y: lerp(300, 1000, big), r: lerp(105, 210, big), idle: t >= CUE.punch ? "amused" : "smirk" });
+  }
+}
+function penHand(ctx, x, y) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-.6);
+  ctx.fillStyle = C.ura; rrect(ctx, -10, -150, 20, 140, 8); ctx.fill();
+  ctx.fillStyle = "#FFD27A"; ctx.beginPath(); ctx.moveTo(-10, -10); ctx.lineTo(10, -10); ctx.lineTo(0, 12); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#FFE3CF"; ctx.beginPath(); ctx.ellipse(0, -120, 34, 26, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function scanner(ctx, t, cx, cy, ok, k) {
+  if (k <= 0) return;
+  ctx.save(); ctx.globalAlpha = k;
+  ctx.fillStyle = INK; rrect(ctx, cx - 210, cy - 80, 420, 160, 28); ctx.fill();
+  ctx.fillStyle = ok ? C.green : C.red; rrect(ctx, cx - 190, cy - 60, 380, 120, 18); ctx.fill();
+  text(ctx, ok ? "読み取り成功" : "コードが見つかりません", cx, cy, ok ? 44 : 36, "#FFFFFF", { weight: 900 });
+  ctx.restore();
+}
+
+function insideWorld(t, a, lt) {
+  // 巨大なマス（ARM のまわりを拡大）を床として描く
+  S.gradientBG(bg, "#F7F3FF", "#E2D9FF", "#D3C5FF");
+  const mod = 120, cx = 540, cy = 760;
+  const r0 = ARM[0] - 2, c0 = ARM[1] - 2;
+  bg.save(); bg.translate(cx, cy); bg.transform(1, 0, -.25, .55, 0, 0); bg.translate(-cx, -cy);
+  for (let r = r0; r < r0 + 12; r++) for (let c = c0 - 2; c < c0 + 14; c++) {
+    if (r < 0 || c < 0 || r >= N || c >= N) continue;
+    const x = cx + (c - c0 - 5.5) * mod, y = cy + (r - r0 - 5) * mod;
+    const er = inRect(r, c, ARM);
+    bg.fillStyle = er ? "rgba(255,255,255,.6)" : MH[r][c] ? INK : "#FFFFFF";
+    bg.fillRect(x, y, mod - 4, mod - 4);
+    if (er) { bg.strokeStyle = "rgba(255,90,140,.6)"; bg.lineWidth = 4; bg.setLineDash([12, 10]); bg.strokeRect(x + 6, y + 6, mod - 16, mod - 16); bg.setLineDash([]); }
+  }
+  bg.restore();
+  const sc = t >= CUE.scan;
+  if (!sc || t < CUE.scan + .2) {
+    S.omotePixel(ui, 480, 1250, .9, { expr: S.speaking(t, "M") ? "deadpan" : "shock", talk: S.talk(t, "M"), noArmL: true, armR: .3, look: [-1, 0] }, 16);
+    // 欠けた左腕の位置に点線
+    ui.save(); ui.strokeStyle = "rgba(255,90,140,.9)"; ui.lineWidth = 6; ui.setLineDash([14, 10]);
+    ui.beginPath(); ui.moveTo(390, 900); ui.lineTo(300, 1080); ui.stroke(); ui.setLineDash([]); ui.restore();
+    pill(ui, "欠けた部分", 270, 1130, 36, "#FFFFFF", "#FF5A8C", easeOut(prog(t, a + .6, .4)));
+  }
+  if (sc) {
+    // 外から見た QR と読み取り光線 → 結果（実際の読み取り結果）
+    const k = easeOut(prog(t, CUE.scan, .3));
+    ui.save(); ui.globalAlpha = k; ui.fillStyle = "rgba(233,251,255,.96)"; ui.fillRect(0, 0, W, H); ui.restore();
+    const geo = drawQR(ui, MH, QX, 760, 26, { erased: (r, c) => inRect(r, c, ARM) ? 1 : 0, ghost: true });
+    const sy = geo.y0 + geo.size * ((t - CUE.scan) * 1.5 % 1);
+    ui.fillStyle = "rgba(255,60,60,.65)"; ui.fillRect(geo.x0 - 30, sy, geo.size + 60, 8);
+    resultCard(ui, !!DEC.H.arm, 540, geo.y0 + geo.size + 120, easeOut(prog(t, CUE.scan + .5, .35)), 1, `中身：「${DEC.H.arm || "—"}」`);
+    note(ui, "※この QR を OpenCV で実際に読み取った結果", 540, geo.y0 - 70, k, 28);
+    S.omotePixel(ui, 160, 1330, .45, { expr: "shock", talk: S.talk(t, "M"), noArmL: true, armR: .3, look: [1, -.4] }, 8);
+  }
+  uraWipe(t, "smirk");
+}
+
+function block(ctx, x, y, s, val, col, k, erased = 0, label = "") {
+  if (k <= 0) return;
+  const sc = back(k);
+  ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
+  ctx.shadowColor = "rgba(0,0,0,.18)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
+  ctx.fillStyle = erased > .5 ? "rgba(255,255,255,.7)" : col; rrect(ctx, -s / 2, -s / 2, s, s, 26); ctx.fill(); ctx.shadowColor = "transparent";
+  if (erased > .5) { ctx.strokeStyle = "#FF5A8C"; ctx.lineWidth = 6; ctx.setLineDash([14, 10]); rrect(ctx, -s / 2 + 6, -s / 2 + 6, s - 12, s - 12, 22); ctx.stroke(); ctx.setLineDash([]); text(ctx, "?", 0, 6, s * .55, "#FF5A8C", { weight: 900 }); }
+  else text(ctx, String(val), 0, 6, s * .55, "#FFFFFF", { weight: 900 });
+  if (label) text(ctx, label, 0, s / 2 + 40, 32, C.navy2, { weight: 800 });
+  ctx.restore();
+}
+function parityScene(t, a, lt) {
+  wallBG(bg, t, "#FFF8E8", "#FFE8B8");
+  // L09「データと、復元用の予備」
+  const iv = win(t, a + .2, CUE.twice - .1, .35, .3);
+  if (iv > 0) {
+    ui.save(); ui.globalAlpha = iv;
+    ui.fillStyle = "#FFFFFF"; rrect(ui, 110, 470, 860, 420, 40); ui.fill();
+    drawQR(ui, MH, 300, 680, 11);
+    S.arrow(ui, 440, 680, 520, 680, C.navy2, 12, 34);
+    ui.fillStyle = "#3E6FD8"; rrect(ui, 550, 560, 360, 100, 22); ui.fill(); text(ui, "データ", 730, 610, 46, "#FFFFFF", { weight: 900 });
+    ui.fillStyle = C.orange; rrect(ui, 550, 700, 360, 100, 22); ui.fill(); text(ui, "復元用の予備", 730, 750, 42, "#FFFFFF", { weight: 900 });
+    ui.restore();
+  }
+  // L10「同じ内容を 2 回？」→ L11「無駄」
+  const tw = win(t, CUE.twice, CUE.nums - .2, .3, .3);
+  if (tw > 0) {
+    ui.save(); ui.globalAlpha = tw;
+    for (const [x, lab] of [[340, "データ"], [740, "データ（コピー）"]]) { ui.fillStyle = "#FFFFFF"; rrect(ui, x - 170, 520, 340, 240, 30); ui.fill(); drawQR(ui, MH, x, 640, 9); text(ui, lab, x, 800, 34, C.navy2, { weight: 800 }); }
+    text(ui, "＝", 540, 640, 80, C.navy2, { weight: 900 });
+    ui.restore();
+    S.bigX(ui, 540, 640, 160, prog(t, CUE.stingy, .3) * tw);
+    if (t > CUE.stingy) pill(ui, "場所の無駄", 540, 900, 50, "#FFFFFF", C.red, easeOut(prog(t, CUE.stingy + .3, .3)) * tw);
+  }
+  // L12〜L14：3・5・2 と合計 10
+  const nk = (i) => easeOut(prog(t, CUE.nums + i * .35, .35));
+  const lose = prog(t, CUE.lose5, .3), solve = prog(t, CUE.solve + .4, .4);
+  const xs = [190, 400, 610], y = 650;
+  block(ui, xs[0], y, 170, 3, "#3E6FD8", nk(0), 0, "データ");
+  block(ui, xs[1], y, 170, 5, "#3E6FD8", nk(1), lose > .5 && solve < .5 ? 1 : 0, "データ");
+  block(ui, xs[2], y, 170, 2, "#3E6FD8", nk(2), 0, "データ");
+  const sk = easeOut(prog(t, CUE.sum, .35));
+  if (sk > 0) { text(ui, "＋", 750, y, 70, C.navy2, { weight: 900, alpha: sk }); block(ui, 890, y, 170, 10, C.orange, sk, 0, "予備（合計）"); }
+  if (lose > 0 && lose < 1) S.burst(ui, xs[1], y - 140, 80, lose, "消えた!", { size: 34, fill: "#FFFFFF", stroke: "#FF5A8C", color: "#FF5A8C" });
+  if (t >= CUE.solve) {
+    const k = easeOut(prog(t, CUE.solve, .4));
+    ui.save(); ui.globalAlpha = k; ui.fillStyle = "#FFFFFF"; rrect(ui, 140, 880, 800, 150, 34); ui.fill(); ui.restore();
+    text(ui, "10 − 3 − 2 ＝ 5", 540, 955, 86, C.navy2, { weight: 900, alpha: k });
+    if (solve > 0) S.burst(ui, xs[1], y - 150, 90, solve * (1 - prog(t, CUE.solve + 2, .3)), "復元!", { size: 40, fill: "#B8FFD9", stroke: C.green, color: "#0E7A52" });
+  }
+  if (t >= CUE.nums) note(ui, "※たとえ（本物の仕組みはもっと複雑な計算）", 540, 1110, easeOut(prog(t, CUE.nums, .4)), 28);
+  const ex = t >= CUE.solve ? "happy" : t >= CUE.lose5 ? "think" : t >= CUE.twice ? "smug" : "normal";
+  S.omotePixel(ui, 200, 1340, .5, { expr: ex, talk: S.talk(t, "M"), noArmL: true, armR: t >= CUE.solve ? 2.7 : .3, look: [1, -.6] }, 8);
+  uraWipe(t, t >= CUE.jab ? "amused" : "smirk");
+}
+
+function levelsScene(t, a, lt) {
+  wallBG(bg, t, "#F2F8FF", "#D0E6FF");
+  const cmp = prog(t, CUE.compare, .4);
+  // 4 段階の棒グラフ（コード語の約 7・15・25・30%）
+  const bars = [["L", 7], ["M", 15], ["Q", 25], ["H", 30]];
+  const gk = 1 - easeInOut(cmp);
+  if (gk > 0) {
+    ui.save(); ui.globalAlpha = gk;
+    text(ui, "復元できる量（コード語の割合・約）", 540, 380, 44, C.navy2, { weight: 900 });
+    bars.forEach(([n, v], i) => {
+      const x = 240 + i * 200, k = easeOut(prog(t, a + .2 + i * .15, .4)), h = v * 19 * k;
+      ui.fillStyle = i === 3 ? C.orange : "#3E6FD8"; rrect(ui, x - 60, 1050 - h, 120, h, 16); ui.fill();
+      text(ui, `${v}%`, x, 1020 - h, 46, C.navy2, { weight: 900, alpha: k });
+      text(ui, n, x, 1100, 52, C.navy2, { weight: 900 });
+    });
+    note(ui, "誤り訂正レベル（デンソーウェーブの説明）", 540, 1180, 1, 28);
+    ui.restore();
+  }
+  if (cmp > 0) {
+    // 同じ消し方で L と H を比べる（実際の読み取り結果）
+    for (const [x, M, lv] of [[290, ML, "L"], [790, MH, "H"]]) {
+      const k = easeOut(prog(t, CUE.compare + (lv === "H" ? .3 : 0), .4));
+      ui.save(); ui.globalAlpha = k;
+      drawQR(ui, M, x, 760, 19, { erased: (r, c) => inRect(r, c, ARM) ? 1 : 0, ghost: true });
+      text(ui, `レベル ${lv}（予備 ${lv === "L" ? "最少" : "最多"}）`, x, 520, 40, C.navy2, { weight: 900 });
+      ui.restore();
+      resultCard(ui, !!DEC[lv].arm, x, 1040, easeOut(prog(t, CUE.compare + .9 + (lv === "H" ? .4 : 0), .35)), .78);
+    }
+    note(ui, "※同じ場所を消して OpenCV で実際に試した結果", 540, 1180, cmp, 28);
+  }
+  S.omote(ui, 140, 1340, .42, { expr: t > CUE.compare + 1.3 ? "shock" : "think", talk: S.talk(t, "M"), armR: .3, look: [1, -.6] });
+  uraWipe(t, "excited");
+}
+
+function finderScene(t, a, lt) {
+  wallBG(bg, t, "#FFF8F0", "#FFE2C6");
+  const lim = t >= CUE.limit;
+  const shift = easeInOut(prog(t, CUE.limit, .5));
+  const qy = lerp(QY, 620, shift), qm = lerp(QM, 20, shift);
+  const geo = drawQR(bg, MH, QX, qy, qm, { erased: (r, c) => inRect(r, c, FINDER) ? 1 : 0, ghost: true, glow: (.6 + .4 * Math.sin(t * 5)) * (1 - shift * .8) });
+  const lk = easeOut(prog(t, a + .3, .4)) * (1 - shift);
+  if (lk > 0) {
+    const [x1, y1] = cellXY(QX, qy, qm, 3, N - 4), [x2, y2] = cellXY(QX, qy, qm, N - 4, 3);
+    pill(ui, "位置の目印", x1, y1 - 170, 44, "#FFFFFF", C.orange, lk);
+    pill(ui, "位置の目印", x2 + 300, y2, 44, "#FFFFFF", C.orange, lk);
+    pill(ui, "消えた目印", cellXY(QX, qy, qm, 3, 3)[0] + 20, cellXY(QX, qy, qm, 3, 3)[1] - 170, 40, "#FFFFFF", "#FF5A8C", lk);
+  }
+  if (t >= CUE.notfound && !lim) scanner(ui, t, 540, geo.y0 + geo.size + 75, false, easeOut(prog(t, CUE.notfound, .3)));
+  if (lim) {
+    // 限界：最大でも約 3 割（コード語）。場所と量で決まる
+    const k = easeOut(prog(t, CUE.limit + .2, .4));
+    ui.save(); ui.globalAlpha = k;
+    ui.fillStyle = "#FFFFFF"; rrect(ui, 120, 900, 840, 330, 36); ui.fill();
+    text(ui, "復元できるのは", 540, 960, 40, C.navy2, { weight: 800 });
+    text(ui, "最大でも 約3割", 540, 1040, 84, C.orange, { weight: 900 });
+    text(ui, "（コード語の割合。面積ではない）", 540, 1110, 32, C.navy2, { weight: 800 });
+    ui.restore();
+    const wk = easeOut(prog(t, CUE.where + .3, .4));
+    if (wk > 0) { text(ui, "どこを × どれだけ", 540, 1185, 48, "#C2541A", { weight: 900, alpha: wk }); }
+  }
+  // オモテは消えたまま（声だけ）
+  if (S.speaking(t, "M")) S.burst(ui, 230, 600, 110, 1, "（声だけ）", { size: 30, fill: "#FFFFFF", stroke: C.omote, color: C.omote });
+  uraWipe(t, "excited");
+}
+
+// ---------------------------------------------------------------- 1 コマ
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start;
+  if (t >= es) {
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "" });
+    return;
+  }
+  const name = S.sceneAt(t), [a] = S.sceneRange(name);
+  drawScene(t, name);
+  S.header(ui, false);
+  S.subtitles(ui, t);
+  if (SCN.indexOf(name) > 0 && name !== "glitch" && name !== "vanish") S.flash(ui, (1 - prog(t, a, .22)) * .6);
+}
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  drawScene(CUE.suck + 1.2, "glitch");
+  text(ui, "QRコードを消したら", 540, 1360, 92, C.navy, { weight: 900, stroke: "#FFFFFF", sw: 16 });
+  text(ui, "オモテが消えた", 540, 1500, 120, C.ura, { weight: 900, stroke: "#FFFFFF", sw: 16 });
+  S.header(ui, false);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; }
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>

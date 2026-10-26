@@ -25,21 +25,23 @@ EP = {
         "punch": ("L25", 0.0),
     },
     # 効果音：(名前, きっかけ[, 音量])。鳴らしすぎない（毒舌の音は 2 か所だけ）
-    "sfx": [("impact", "gag"), ("whoosh", "gag", 0.8), ("rewind", "rewind"), ("pop", "nothole"),
-            ("boop", "deny"), ("whoosh", "explode"), ("slide", "outer", 0.6), ("slide", "middle", 0.6), ("slide", "inner", 0.6),
-            ("ding", "hole"), ("riser", "arrows", 0.6), ("impact", "fifty", 0.5), ("boing", "rice"),
-            ("sparkle", "flow"), ("ding", "nopush"), ("pop", "standby"),
-            ("impact", "crack", 0.6), ("ok", "backup"), ("tick", "fog"), ("boop", "jab"), ("stab", "punch")],
+    "sfx": [("sweep_up", "t0"), ("alarm", "t0", 0.9, 0.18), ("impact", "t0", 1.0, 0.22), ("glitch", "t0", 0.8, 1.25), ("rewind", "t0", 0.7, 1.2),
+            ("impact", "gag"), ("sweep_up", "gag", 0.7), ("alarm", "gag", 0.6, 0.1), ("rewind", "rewind"), ("tick", "nothole"),
+            ("zap", "deny"), ("sweep_up", "explode"), ("sweep_down", "outer", 0.5), ("sweep_down", "middle", 0.5), ("sweep_down", "inner", 0.5),
+            ("discover", "hole"), ("riser", "arrows", 0.6), ("impact", "fifty", 0.8), ("brake", "rice"),
+            ("discover", "flow"), ("discover", "nopush", 0.8), ("tick", "standby"),
+            ("impact", "crack", 0.7), ("ok", "backup"), ("tick", "fog"), ("zap", "jab"), ("revswell", "punch", 0.8, -0.7), ("stab", "punch")],
     # BGM：sky（136 BPM）。(きっかけ, ずらす秒, モード)。エンディングは自動
-    "music": {"style": "sky", "seed": 6, "sections": [
-        ("hook", -1.0, "hook"), ("gag", -0.05, "chaos"), ("rewind", 0.0, "drop"), ("rewind", 1.3, "banter"),
-        ("explode", 0.0, "reveal"), ("pressure", 0.0, "explain"), ("rice", 0.0, "banter"), ("insight", 0.0, "explain"),
-        ("equal", 0.0, "reveal"), ("standby", 0.0, "banter"), ("outerload", 0.0, "explain"), ("bigrole", 0.0, "banter"),
-        ("fog", 0.0, "explain"), ("outro", 0.0, "banter"), ("punch", -0.35, "drop"), ("punch", 0.9, "banter")]},
+    "music": {"style": "tech_air", "sections": [
+        ("t0", 0.0, "intro"), ("hook", 0.0, "drive"), ("gag", -0.05, "chaos"), ("rewind", 0.0, "drop"), ("rewind", 1.1, "drive"),
+        ("explode", 0.0, "lift"), ("pressure", 0.0, "explain"), ("fifty", -0.3, "drop"), ("fifty", 0.15, "explain"), ("rice", 0.0, "drive"),
+        ("insight", 0.0, "explain"), ("equal", 0.0, "lift"), ("standby", 0.0, "drive"), ("outerload", 0.0, "explain"), ("bigrole", 0.0, "drive"),
+        ("fog", 0.0, "explain"), ("outro", 0.0, "drive"), ("punch", -0.35, "drop"), ("punch", 0.9, "drive")]},
     # 場面ごとに映像を書き出して保存する区切り
-    "segments": ["gag", "hypo", "explode", "pressure", "insight", "standby", "fog", "outro"],
+    "lead_in": 1.5,  # 冒頭 1.5 秒はセリフなしの「つかみ」（cold）
+    "segments": ["hook", "gag", "hypo", "explode", "pressure", "insight", "standby", "fog", "outro"],
     "extra_files": [],
-    "qc_frames": [("hook", 1.5), ("gag", 0.6), ("rewind", 0.5), ("vent", 0.5), ("notout", 0.5), ("outer", 0.6), ("middle", 0.6),
+    "qc_frames": [("t0", 0.3), ("t0", 0.9), ("hook", 0.6), ("gag", 0.6), ("rewind", 0.5), ("vent", 0.5), ("notout", 0.5), ("outer", 0.6), ("middle", 0.6),
                   ("hole", 0.5), ("arrows", 0.8), ("fifty", 0.6), ("flow", 0.8), ("nopush", 0.6), ("outerload", 0.8),
                   ("backup", 0.6), ("fog", 1.0), ("half", 0.4), ("punch", 0.5)],
     "scenes": [
