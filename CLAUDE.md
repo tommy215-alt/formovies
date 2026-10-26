@@ -27,8 +27,10 @@
   検索結果の要約・抜粋で確認したものは、その旨を必ず「確認方法」に書く。
 - 事実・説明・冗談・比喩演出・不確実な情報を分けて記録する（`FACT_CHECK_POLICY.md`）。
 - キャラクター設定（M はアホっぽいが本質を突くこともある／W は知的で毒舌だが人格否定はしない）を全動画で一貫させる。
-- 台本を直したら `python3 anatomy_room/tools/check_scripts.py` と
-  `python3 anatomy_room/tools/build_chatgpt_review.py` を実行し、レビュー資料を作り直す。
+- 台本を直したら `python3 anatomy_room/tools/check_scripts.py`、
+  `python3 anatomy_room/tools/build_chatgpt_review.py`、`python3 anatomy_room/tools/build_copy_page.py` を順に実行し、
+  レビュー資料とスマホ用コピーページを作り直す。コピーページは Artifact（https://claude.ai/artifact/MrxPiW8hLtaEUJDx5sDkSZ）としても公開しているので、同じファイルを再公開して更新する。
+- チャンネルのアイコン・ヘッダーは `anatomy_room/branding/`（`node anatomy_room/branding/render.js` で再生成）。
 
 ## 現在の状態（2026-10-26 時点）
 

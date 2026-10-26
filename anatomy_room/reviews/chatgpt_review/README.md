@@ -1,5 +1,7 @@
 # ChatGPT レビュー資料
 
+**スマホからは** `copy_page.html`（公開版：https://claude.ai/artifact/MrxPiW8hLtaEUJDx5sDkSZ）を開き、「全文をコピー」を押して ChatGPT に貼り付けてください。
+
 1 ファイル＝1 シナリオ。**ファイルの中身をすべてコピーして、そのまま ChatGPT に貼り付けてください。**
 冒頭に ChatGPT への依頼文と前提情報（チャンネル・キャラクター・ラベルの定義・調査環境の制約）が入っているので、追加の説明は不要です。
 

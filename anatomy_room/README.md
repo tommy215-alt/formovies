@@ -39,9 +39,11 @@ anatomy_room/
 │   └── chatgpt_review/           # ChatGPT にそのまま貼れるレビュー資料（自動生成）
 ├── templates/
 │   └── script_template.md        # 新しいシナリオのひな形
+├── branding/                     # チャンネルのアイコン・ヘッダー（render.js で生成）
 ├── tools/
 │   ├── check_scripts.py          # 台本の書式・話速・事実 ID の整合チェック
-│   └── build_chatgpt_review.py   # ChatGPT レビュー資料の生成
+│   ├── build_chatgpt_review.py   # ChatGPT レビュー資料の生成
+│   └── build_copy_page.py        # スマホ用コピーページ（copy_page.html）の生成
 └── output/                       # 完成動画の書き出し先（現在は空）
 ```
 
@@ -56,6 +58,8 @@ anatomy_room/
 ```bash
 python3 anatomy_room/tools/check_scripts.py         # 台本の機械チェック
 python3 anatomy_room/tools/build_chatgpt_review.py  # ChatGPT レビュー資料を作り直す
+python3 anatomy_room/tools/build_copy_page.py       # スマホ用コピーページを作り直す
+node anatomy_room/branding/render.js                # アイコン・ヘッダーを作り直す（要 Noto Sans CJK JP）
 ```
 
 ## 次にやること（ユーザー）
