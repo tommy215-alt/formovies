@@ -11,6 +11,7 @@ YouTube Shorts チャンネルの制作プロジェクトです。
 
 - 完成動画：`production/pilot_005/world_anatomy_pilot_005.mp4`（制作方法は `production/pilot_005/production_notes.md`）
 - 監査：`audit/summary.md`
+- **運営者向けマニュアル（PDF）**：`docs/manual/shorts_manual.pdf`（元は `docs/manual/manual.html`。`node anatomy_room/docs/manual/build_manual.js` で再生成）
 
 | ID | タイトル | 分野 | 判定 |
 |----|---------|------|------|

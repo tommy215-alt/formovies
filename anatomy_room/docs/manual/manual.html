@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>世界の解剖室 Shorts 制作マニュアル</title>
+<style>
+@page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+@page cover { margin: 0; }
+.cover-page { page: cover; }
+:root { --navy:#0A1424; --navy2:#13284A; --cyan:#1596B8; --cyanL:#E3F5FA; --ink:#1B2433; --muted:#5A6779;
+  --line:#D6DEE8; --m:#D9822B; --w:#1596B8; --ok:#1F7A4D; --warn:#A15C00; --bad:#B23A48; }
+* { box-sizing: border-box; }
+body { margin:0; font-family:"Noto Sans CJK JP",sans-serif; color:var(--ink); font-size:9.9pt; line-height:1.65; }
+h1,h2,h3 { line-height:1.35; margin:0; }
+.page { break-after: page; }
+.page:last-child { break-after: auto; }
+/* 表紙 */
+.cover { height: 296mm; overflow: hidden; background: var(--navy); color:#EEF4FA; padding: 44mm 24mm 22mm;
+  display:flex; flex-direction:column; }
+.cover img { width: 46mm; }
+.cover .eyebrow { margin-top: 14mm; font-size: 11pt; letter-spacing:.3em; color:#7FD7EC; }
+.cover h1 { font-size: 30pt; margin-top: 4mm; }
+.cover .sub { font-size: 13pt; color:#9FC3D9; margin-top: 3mm; }
+.cover .toc { margin-top: auto; font-size: 10pt; color:#C9DAE8; border-top:1px solid #2A4468; padding-top: 6mm; columns: 2; }
+.cover .toc div { break-inside: avoid; }
+.cover .meta { font-size: 9pt; color:#7F97B0; margin-top: 6mm; }
+/* 見出し */
+h2 { font-size: 16pt; color: var(--navy); padding-bottom: 2mm; border-bottom: 2.5px solid var(--cyan); margin-bottom: 5mm; }
+h2 .num { color: var(--cyan); margin-right: 3mm; font-family:"Noto Sans Mono CJK JP",monospace; }
+h3 { font-size: 11.5pt; color: var(--navy2); margin: 6mm 0 2.5mm; }
+p { margin: 0 0 3mm; }
+.lead { font-size: 10.8pt; color: var(--muted); margin-bottom: 5mm; }
+table { width:100%; border-collapse: collapse; margin: 1mm 0 4mm; font-size: 9.4pt; }
+th, td { border: 1px solid var(--line); padding: 1.4mm 2.4mm; vertical-align: top; text-align:left; }
+th { background: #F1F5F9; color: var(--navy2); font-weight: 700; }
+code, .mono { font-family:"Noto Sans Mono CJK JP",monospace; font-size: 8.8pt; background:#F1F5F9; padding: .2mm 1.2mm; border-radius: 1mm; }
+/* 工程図 */
+.flow { display:grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin: 2mm 0 5mm; }
+.step { border:1.5px solid var(--line); border-radius: 3mm; padding: 3mm; position:relative; break-inside: avoid; }
+.step .n { font-family:"Noto Sans Mono CJK JP",monospace; color: var(--cyan); font-weight:700; font-size: 9pt; }
+.step b { display:block; font-size: 10.5pt; margin: .5mm 0 1mm; }
+.step small { color: var(--muted); font-size: 8.6pt; line-height:1.5; display:block; }
+.who { display:inline-block; font-size: 7.8pt; font-weight:700; padding: .2mm 2mm; border-radius: 9mm; margin-top: 1.5mm; }
+.who.you { background:#FFF1E2; color: var(--m); }
+.who.ai { background: var(--cyanL); color: var(--cyan); }
+.step.you { border-color:#F0C9A0; }
+.step.gate { border-color: var(--warn); background:#FFF8EC; }
+/* 指示文の例 */
+.prompt { border-left: 4px solid var(--cyan); background: #F5FAFC; padding: 3mm 4mm; margin: 2mm 0 4mm; break-inside: avoid; }
+.prompt .label { font-size: 8.4pt; font-weight:700; color: var(--cyan); letter-spacing:.05em; }
+.prompt .text { font-size: 10pt; margin-top: 1mm; white-space: pre-wrap; }
+.prompt .note { font-size: 8.6pt; color: var(--muted); margin-top: 1.5mm; }
+.box { border:1.5px solid var(--line); border-radius: 3mm; padding: 3mm 4mm; margin: 2mm 0 4mm; break-inside: avoid; }
+.box.warn { border-color:#E8C48A; background:#FFF9EF; }
+.box.ok { border-color:#A9D8BE; background:#F3FBF6; }
+.box h4 { margin: 0 0 1.5mm; font-size: 10.2pt; }
+.check { list-style:none; padding:0; margin: 0; }
+.check li { padding-left: 7mm; position:relative; margin-bottom: 1.6mm; }
+.check li::before { content:""; position:absolute; left:0; top:1.2mm; width:3.6mm; height:3.6mm; border:1.5px solid var(--navy2); border-radius: .8mm; }
+.two { display:grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.chip { display:inline-block; font-size: 8.4pt; font-weight:700; padding: .1mm 2mm; border-radius: 9mm; border:1px solid currentColor; }
+.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); } .chip.q { color:#6B4FA0; }
+ul { margin: 0 0 3mm; padding-left: 5mm; }
+li { margin-bottom: 1mm; }
+.footer-note { font-size: 8.4pt; color: var(--muted); margin-top: 4mm; }
+</style>
+</head><body>
+
+<!-- 表紙 -->
+<section class="page cover-page">
+  <div class="cover">
+    <img src="../../branding/icon_800.png" alt="">
+    <div class="eyebrow">THE ANATOMY ROOM</div>
+    <h1>世界の解剖室<br>Shorts 制作マニュアル</h1>
+    <div class="sub">見えない仕組みを、CGで解き明かす。<br>— 台本づくりから完成動画、修正、公開前チェックまで —</div>
+    <div class="toc">
+      <div>1　全体の流れ（誰が何をするか）</div>
+      <div>2　チャンネルの基本ルール</div>
+      <div>3　Claude への頼み方（そのまま使える指示文）</div>
+      <div>4　修正のしかたと所要時間</div>
+      <div>5　ChatGPT レビューの回し方</div>
+      <div>6　公開前チェックリスト</div>
+      <div>7　判定ラベルの意味</div>
+      <div>8　ファイルの場所</div>
+      <div>9　困ったとき（Q&amp;A）</div>
+    </div>
+    <div class="meta">2026 年 10 月版　／　対象：チャンネル運営者（あなた）　／　制作担当：Claude</div>
+  </div>
+</section>
+
+<!-- 1 全体の流れ -->
+<section class="page">
+  <h2><span class="num">1</span>全体の流れ（誰が何をするか）</h2>
+  <p class="lead">1 本の Shorts は、次の 8 段階で作ります。<b>あなたの判断が必要なのは橙色の段階だけ</b>で、それ以外は Claude に任せられます。黄色の枠は「あなたの指示がないと先に進まない」関所です。</p>
+  <div class="flow">
+    <div class="step"><span class="n">STEP 1</span><b>テーマ選び・調査</b><small>題材を決め、公的資料などで事実を調べる</small><span class="who ai">Claude</span></div>
+    <div class="step"><span class="n">STEP 2</span><b>台本を書く</b><small>M と W の掛け合い。60〜90 秒</small><span class="who ai">Claude</span></div>
+    <div class="step"><span class="n">STEP 3</span><b>事実確認・自己監査</b><small>主張ごとに出典と判定ラベルを付ける。実際の音声で尺を測る</small><span class="who ai">Claude</span></div>
+    <div class="step you"><span class="n">STEP 4</span><b>ChatGPT でレビュー</b><small>コピーページから貼り付けて、別の AI に確認してもらう</small><span class="who you">あなた</span></div>
+    <div class="step gate"><span class="n">STEP 5</span><b>採用するシナリオを指定</b><small>「pilot_00N を動画にして」と伝える。<b>これがないと動画制作は始まらない</b></small><span class="who you">あなた</span></div>
+    <div class="step"><span class="n">STEP 6</span><b>動画を作る</b><small>音声合成・CG・字幕・BGM を作って書き出し、品質検証まで</small><span class="who ai">Claude</span></div>
+    <div class="step you"><span class="n">STEP 7</span><b>見て確認・修正指示</b><small>スマホで通して見る。直したい所はセリフ番号で伝える</small><span class="who you">あなた</span></div>
+    <div class="step gate"><span class="n">STEP 8</span><b>公開前チェック・公開</b><small>出典の本文、クレジット、権利を確認して投稿。<b>公開は必ずあなたの判断で</b></small><span class="who you">あなた</span></div>
+  </div>
+
+  <h3>現在の進み具合</h3>
+  <table>
+    <tr><th style="width:16%">ID</th><th>タイトル</th><th style="width:22%">状態</th></tr>
+    <tr><td>pilot_001</td><td>送ったメッセージは、空を飛んでいるのか？</td><td><span class="chip ok">PASS</span> 台本完成</td></tr>
+    <tr><td>pilot_002</td><td>蛇口の水は、誰が押している？</td><td><span class="chip ok">PASS</span> 台本完成</td></tr>
+    <tr><td>pilot_003</td><td>コンビニおにぎりの海苔は、なぜパリパリなのか？</td><td><span class="chip warn">要修正</span> 包装の実物確認待ち</td></tr>
+    <tr><td>pilot_004</td><td>エレベーターのロープが切れたら、落ちる？</td><td><span class="chip ok">PASS</span> 台本完成</td></tr>
+    <tr><td>pilot_005</td><td>マイナス×マイナスは、なぜプラスになる？</td><td><span class="chip ok">PASS</span> <b>動画完成（第 1 話）</b></td></tr>
+  </table>
+
+  <div class="box warn">
+    <h4>Claude が自分からはやらないこと</h4>
+    <ul style="margin:0">
+      <li>あなたの指定なしに動画を作る／YouTube にアップロード・公開する</li>
+      <li>有料サービスの契約・課金、パスワードや API キーなど認証情報の要求・保存</li>
+      <li>確認していない資料を「確認済み」と書くこと</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 2 基本ルール -->
+<section class="page">
+  <h2><span class="num">2</span>チャンネルの基本ルール</h2>
+  <p class="lead">指示を出すときの前提です。ここに書いてあることは Claude が毎回守るので、指示文で繰り返す必要はありません。</p>
+  <table>
+    <tr><th style="width:24%">項目</th><th>決まりごと</th></tr>
+    <tr><td>コンセプト</td><td>日常の「当たり前すぎて考えたことのない仕組み」を、CG と会話で解き明かす。<b>1 本 1 疑問</b>、冒頭で疑問を出し最後に回収する</td></tr>
+    <tr><td>形式</td><td>YouTube Shorts、縦型 9:16（1080×1920）、30fps、<b>60〜90 秒</b>、顔出しなし</td></tr>
+    <tr><td>映像</td><td>CG・数式・図解のアニメーションが中心。比喩の絵は「現実そのもの」に見えないよう描き分ける</td></tr>
+    <tr><td>字幕</td><td>日本語、1 画面 2 行まで。数式と重ねない。Shorts のボタン（右側）と説明欄（下部）を避けて配置</td></tr>
+    <tr><td>音声</td><td>VOICEVOX（無料・ローカル）。M＝白上虎太郎、W＝冥鳴ひまり。<b>クレジット表記が必要</b></td></tr>
+    <tr><td>正確性</td><td>面白さと同じくらい重視。根拠のない数字・言い切りを避け、不確かなことは「〜と言われている」と言う</td></tr>
+  </table>
+
+  <h3>2 人のキャラクター</h3>
+  <div class="two">
+    <div class="box"><h4 style="color:var(--m)">● M（男性役）</h4>
+      アホっぽい・好奇心旺盛・思い込みが激しい。視聴者の素朴な疑問や勘違いを代弁する。<br>
+      <b>ただし、ときどき本質を突く</b>（例：「それ、パターンが続いただけじゃね？」）。単なる愚か者にはしない。</div>
+    <div class="box"><h4 style="color:var(--w)">⬢ W（女性役）</h4>
+      知的・論理的・落ち着いている・毒舌。短く鋭いツッコミで誤解を正し、要点をまとめる。<br>
+      <b>人格否定はしない</b>。M の良い発想は素直に認める。一方的に講義するだけにしない。</div>
+  </div>
+
+  <h3>1 本の流れ（型）</h3>
+  <table>
+    <tr><th style="width:26%">段階</th><th>内容</th></tr>
+    <tr><td>① 冒頭のフック（0〜3 秒）</td><td>M の思い込みと W の短い返しで「えっ？」を作る</td></tr>
+    <tr><td>② 疑問の提示</td><td>この動画で解く疑問をタイトルとして画面に出す</td></tr>
+    <tr><td>③ 仕組みの可視化</td><td>CG で順番に見せる（1 カット 1 情報）</td></tr>
+    <tr><td>④ 掛け合いで理解</td><td>M の疑問 → W の説明。M が自分で気づく場面を入れる</td></tr>
+    <tr><td>⑤ 意外な発見</td><td>直感では気づきにくい核心</td></tr>
+    <tr><td>⑥ 結論とオチ</td><td>冒頭の疑問に答え、M のボケを回収して締める</td></tr>
+  </table>
+</section>
+
+<!-- 3 頼み方 -->
+<section class="page">
+  <h2><span class="num">3</span>Claude への頼み方（そのまま使える指示文）</h2>
+  <p class="lead">下の例をコピーして、〇〇の部分だけ書き換えて送れば十分です。長い説明は不要です（ルールはプロジェクトに保存済み）。</p>
+
+  <div class="prompt"><div class="label">新しい台本を作ってほしい</div>
+    <div class="text">「〇〇はなぜ〇〇なのか？」をテーマに、pilot_006 の台本を作って。事実確認と ChatGPT レビュー資料まで。</div>
+    <div class="note">テーマが決まっていなければ「新しいテーマの候補を 5 つ出して」でも OK。</div></div>
+
+  <div class="prompt"><div class="label">ChatGPT のレビュー結果を反映してほしい</div>
+    <div class="text">pilot_00N の ChatGPT レビュー結果です。妥当な指摘は反映して。
+（ここに ChatGPT の回答を貼り付け）</div>
+    <div class="note">Claude は指摘を鵜呑みにせず、根拠を確かめてから反映します。反映しなかった指摘には理由を付けます。</div></div>
+
+  <div class="prompt"><div class="label">動画にしてほしい（STEP 5 の関所）</div>
+    <div class="text">pilot_00N を採用。完成動画まで作って。</div>
+    <div class="note">これが「動画制作を始めてよい」という合図になります。</div></div>
+
+  <div class="prompt"><div class="label">動画のセリフ・字幕を直したい</div>
+    <div class="text">pilot_005 の L01 のセリフを「〇〇〇」に変えて。
+L13 の字幕を「〇〇〇」に。</div>
+    <div class="note">セリフ番号（L01〜）は <span class="mono">production/pilot_00N/final_script.md</span> の「ID」列で確認できます。番号で伝えると最も速く、手間（トークン）も少なく済みます。</div></div>
+
+  <div class="prompt"><div class="label">雰囲気や構成をざっくり直したい</div>
+    <div class="text">pilot_005 の冒頭（L01〜L03）を、もっと引きが強い感じに書き直して。案を 3 つ出してから決めたい。</div></div>
+
+  <div class="prompt"><div class="label">声や速さを変えたい</div>
+    <div class="text">W の声を少しゆっくりに。／W も男性の声にして。</div>
+    <div class="note">全行の音声が変わるため、ほぼ全編の作り直しになります（約 9〜10 分）。</div></div>
+
+  <div class="prompt"><div class="label">動画ファイルを受け取りたい</div>
+    <div class="text">pilot_005 の動画をここに出して。</div></div>
+</section>
+
+<!-- 4 修正 -->
+<section class="page">
+  <h2><span class="num">4</span>修正のしかたと所要時間</h2>
+  <p class="lead">完成した動画は、<b>直した部分だけ</b>作り直せます。動画は 11 の場面に分けて保存してあり、中身が変わった場面だけを書き出してつなぎ直します。</p>
+  <table>
+    <tr><th style="width:38%">修正の内容</th><th>作り直す範囲</th><th style="width:20%">目安の時間</th></tr>
+    <tr><td>セリフを 1 行変える</td><td>その行の音声と、その行を含む場面の映像だけ</td><td><b>約 3 分</b></td></tr>
+    <tr><td>字幕だけ変える</td><td>その字幕が出る場面の映像だけ（音声はそのまま）</td><td>約 1〜3 分</td></tr>
+    <tr><td>間（セリフの後の空白）を変える</td><td>音声のミックスと、その場面の映像</td><td>約 1〜3 分</td></tr>
+    <tr><td>変更を元に戻す</td><td>保存してある前の版を使うので書き出しなし</td><td>約 1 分</td></tr>
+    <tr><td>声の種類・話す速さを全体で変える</td><td>全行の音声と、長さが変わった場面</td><td>約 9〜10 分</td></tr>
+    <tr><td>映像のデザインを変える</td><td>全場面の映像</td><td>約 9 分</td></tr>
+  </table>
+  <p class="footer-note">時間は今のクラウド環境（GPU なし）での実測。毎回、書き出し後に自動の品質検証（尺・音量・デコード・抽出コマ）まで行います。</p>
+
+  <h3>11 の場面（第 1 話の場合）</h3>
+  <table>
+    <tr><th>場面</th><th>セリフ</th><th>場面</th><th>セリフ</th></tr>
+    <tr><td>冒頭の疑問</td><td>L01〜L02</td><td>導出（核心）</td><td>L18〜L21</td></tr>
+    <tr><td>タイトル</td><td>L03</td><td>一般化</td><td>L22</td></tr>
+    <tr><td>計算パターン</td><td>L05〜L11</td><td>数直線</td><td>L23〜L26</td></tr>
+    <tr><td>反論</td><td>L12〜L13</td><td>締め</td><td>L27〜L28</td></tr>
+    <tr><td>分配法則</td><td>L14〜L15</td><td>エンドカード</td><td>—</td></tr>
+    <tr><td>負の数への橋渡し</td><td>L17</td><td></td><td></td></tr>
+  </table>
+
+  <div class="box warn">
+    <h4>注意</h4>
+    <ul style="margin:0">
+      <li>新しい作業環境（セッション）では保存した場面が消えるため、<b>最初の 1 回だけ全編の書き出し（約 9 分）</b>が入ります。</li>
+      <li>セリフを変えて事実関係が変わる場合は、Claude が事実確認リストと監査も合わせて更新します。</li>
+      <li>読み間違いを防ぐため、セリフには「読み上げ用の文」と「字幕」が別々にあります（例：読み「ふのかず」／字幕「負の数」）。普段は気にしなくて大丈夫です。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 5 ChatGPT -->
+<section class="page">
+  <h2><span class="num">5</span>ChatGPT レビューの回し方</h2>
+  <p class="lead">Claude とは別の AI に確認してもらうことで、思い込みや見落としを減らします。スマホからでもできます。</p>
+  <h3>手順</h3>
+  <table>
+    <tr><th style="width:8%">#</th><th>やること</th></tr>
+    <tr><td>1</td><td>コピーページ（claude.ai/artifact/MrxPiW8hLtaEUJDx5sDkSZ）を開く</td></tr>
+    <tr><td>2</td><td>レビューしたいシナリオの「全文をコピー」を押す</td></tr>
+    <tr><td>3</td><td>ChatGPT の入力欄に貼り付けて送信（依頼文が入っているので説明は不要）</td></tr>
+    <tr><td>4</td><td>長すぎて貼れないときは「パートごとにコピー」で、上から順に別のメッセージで送る</td></tr>
+    <tr><td>5</td><td>ChatGPT の回答を Claude に貼り付けて「反映して」と伝える（3 章の指示文）</td></tr>
+  </table>
+  <div class="box ok">
+    <h4>レビュー資料に入っているもの</h4>
+    依頼文と前提情報 → A. 台本全文 → B. 事実確認リストと出典 URL → C. 自己レビュー結果 → D. 特に確認してほしい点。最後に ChatGPT が PASS / 要修正 / 保留 の判定を出します。
+  </div>
+  <p class="footer-note">コピーページは台本を直すたびに Claude が更新します（同じ URL のまま）。</p>
+</section>
+
+<!-- 6 チェックリスト -->
+<section class="page">
+  <h2><span class="num">6</span>公開前チェックリスト</h2>
+  <p class="lead">投稿の前に、あなたが確認することです。Claude の環境ではできない確認（耳で聴く、出典サイトを開く）が含まれます。</p>
+  <h3>動画そのもの</h3>
+  <ul class="check">
+    <li>スマホで通して再生し、音声が聞き取れる（ミュート・マナーモードを解除して確認）</li>
+    <li>話す速さ、声の割り振り（M・W）に違和感がない</li>
+    <li>字幕と数式が読める速さで、画面からはみ出していない</li>
+    <li>最後に「世界の解剖室」とクレジットが表示される</li>
+  </ul>
+  <h3>権利・表記</h3>
+  <ul class="check">
+    <li>概要欄に音声クレジットを書く：<span class="mono">VOICEVOX:白上虎太郎</span>　<span class="mono">VOICEVOX:冥鳴ひまり</span></li>
+    <li>各話者の利用規約の本文を一度読む（Claude の環境からは開けなかった）</li>
+    <li>実在の企業ロゴ・商品を映していない（BGM・効果音・ロゴはすべて自作）</li>
+  </ul>
+  <h3>事実確認（出典の本文）</h3>
+  <ul class="check">
+    <li>各 <span class="mono">fact_check.md</span> の出典 URL を開き、主張が本文に書かれていることを確認する（Claude は検索結果の抜粋でしか確認できていない）</li>
+    <li>pilot_002 を出すとき：水道法施行規則 17 条の現行条文を e-Gov で確認</li>
+    <li>pilot_001 を出すとき：総務省・ドコモの資料の該当ページを確認</li>
+    <li>pilot_003 を出すとき：コンビニおにぎりの包装を 2〜3 種類分解して、構造が映像と合うか確認</li>
+  </ul>
+  <div class="box warn"><h4>公開について</h4>YouTube へのアップロードと公開は、あなたが行うか、あなたの明確な指示があったときだけ Claude が行います。</div>
+</section>
+
+<!-- 7・8 -->
+<section class="page">
+  <h2><span class="num">7</span>判定ラベルの意味</h2>
+  <h3>主張ごと（事実確認リスト）</h3>
+  <table>
+    <tr><th style="width:22%">ラベル</th><th>意味</th></tr>
+    <tr><td><span class="chip ok">VERIFIED</span></td><td>出典で主張を直接確認できた（ただし今は検索抜粋での確認）</td></tr>
+    <tr><td><span class="chip warn">QUALIFIED</span></td><td>趣旨は正しいが、条件・例外・言い方の工夫が必要</td></tr>
+    <tr><td><span class="chip q">UNVERIFIED</span></td><td>根拠が足りない。台本では使わないか、不確かさを明示する</td></tr>
+    <tr><td><span class="chip bad">INCORRECT</span></td><td>誤り。台本から削除・修正する</td></tr>
+  </table>
+  <h3>台本ごと</h3>
+  <table>
+    <tr><th style="width:22%">判定</th><th>意味</th></tr>
+    <tr><td><span class="chip ok">PASS</span></td><td>重大な問題がなく、制作に進める（絶対に正しいという保証ではない）</td></tr>
+    <tr><td><span class="chip warn">NEEDS_REVISION</span></td><td>修正や追加の確認をすれば制作できる</td></tr>
+    <tr><td><span class="chip bad">HOLD</span></td><td>大事な事実を確認できない。調べ直しや作り直しが必要</td></tr>
+  </table>
+
+  <h2 style="margin-top:8mm"><span class="num">8</span>ファイルの場所</h2>
+  <p class="lead">すべて GitHub の <span class="mono">tommy215-alt/formovies</span>（ブランチ <span class="mono">claude/jolly-knuth-5nlxei</span>）の <span class="mono">anatomy_room/</span> 以下にあります。</p>
+  <table>
+    <tr><th style="width:44%">場所</th><th>中身</th></tr>
+    <tr><td><span class="mono">production/pilot_005/world_anatomy_pilot_005.mp4</span></td><td>第 1 話の完成動画</td></tr>
+    <tr><td><span class="mono">production/pilot_005/final_script.md</span></td><td>完成台本（セリフ番号つき）</td></tr>
+    <tr><td><span class="mono">production/pilot_005/EDITING.md</span></td><td>修正のしかた</td></tr>
+    <tr><td><span class="mono">production/pilot_005/thumbnail.png</span></td><td>サムネイル</td></tr>
+    <tr><td><span class="mono">scripts/pilot_00N/</span></td><td>各台本と事実確認リスト（古い版は versions/）</td></tr>
+    <tr><td><span class="mono">audit/</span></td><td>監査報告書（なぜ直したか）</td></tr>
+    <tr><td><span class="mono">reviews/chatgpt_review/</span></td><td>ChatGPT に貼るレビュー資料</td></tr>
+    <tr><td><span class="mono">branding/</span></td><td>チャンネルのアイコン・ヘッダー画像</td></tr>
+    <tr><td><span class="mono">docs/</span></td><td>チャンネル方針・キャラクター設定などのルール集（このマニュアルもここ）</td></tr>
+  </table>
+</section>
+
+<!-- 9 Q&A -->
+<section class="page">
+  <h2><span class="num">9</span>困ったとき（Q&amp;A）</h2>
+  <h3>Q. 動画の音が聞こえない</h3>
+  <p>ファイルには音声が入っています。プレビューのミュート表示、スマホのマナーモード、Bluetooth の接続先を確認してください。ダウンロードして写真アプリやファイルアプリで開くと確実です。それでも出なければ Claude に伝えれば、互換性の高い形式で書き出し直します。</p>
+  <h3>Q. お金はかかる？</h3>
+  <p>かかりません。音声合成（VOICEVOX）、映像の書き出し、BGM・効果音はすべて無料のソフトと自作で、外部の有料サービスは使っていません。</p>
+  <h3>Q. 1 本作るのにどれくらいかかる？</h3>
+  <p>台本と事実確認は、やり取り 1 回分。動画は、全編の書き出しが約 9 分＋検証。修正は 1 行なら約 3 分です（4 章）。</p>
+  <h3>Q. 修正を頼むときにトークンや時間を節約したい</h3>
+  <p>セリフ番号（L01 など）と、変えたい文をそのまま伝えるのがいちばん効率的です。「全体的に〜」のような曖昧な指示は、案出しや確認が増えるぶん時間がかかります。</p>
+  <h3>Q. 数字や事実が心配</h3>
+  <p>Claude は主張ごとに出典と判定を記録し、確認できない数字は台本から外しています（例：「約 99%」→「大部分」）。ただし出典の本文はまだ人の目で確認されていないので、公開前に 6 章のチェックをお願いします。</p>
+  <h3>Q. 声を変えたい・キャラクターの見た目を付けたい</h3>
+  <p>声は VOICEVOX の話者一覧から選べます（約 40 名）。見た目（立ち絵など）は未定で、決まれば映像に組み込めます。どちらも「〇〇に変えたい」と伝えてください。</p>
+  <div class="box ok" style="margin-top:6mm"><h4>迷ったら</h4>「次に何をすればいい？」と聞けば、今の進み具合から次の一手を提案します。</div>
+</section>
+
+</body></html>
