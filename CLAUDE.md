@@ -18,6 +18,7 @@
 5. `anatomy_room/docs/PRODUCTION_WORKFLOW.md` — 工程と、各工程の開始条件
 6. `anatomy_room/docs/RESEARCH_ENVIRONMENT.md` — 調査環境の制約（ネットワーク制限）
 7. `anatomy_room/docs/ENDING_SPEC.md` — 全動画共通のエンディング
+8. **`anatomy_room/templates/MASTER_VIDEO_TEMPLATE.md` — ショート動画の標準仕様（固定ルール／可変ルール）。新作は `templates/VIDEO_PRODUCTION_PROMPT.md` から始め、完成前に `templates/VIDEO_QA_CHECKLIST.md` と `python3 anatomy_room/tools/video_qa.py pilot_00N --sheets` で検査する**
 
 ## 絶対に守ること
 

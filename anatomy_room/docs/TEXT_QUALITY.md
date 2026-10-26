@@ -38,6 +38,8 @@
 
 ## 3. 目視チェック（書き出した動画で毎回）
 
+`python3 anatomy_room/tools/video_qa.py pilot_00N --sheets` で、字幕の欠落・最初のコマ（自動のサムネイル）の自動検査と、目視用の一覧 `qa/sheet_*.jpg` を作る。記入は `templates/VIDEO_QA_CHECKLIST.md`。
+
 1 秒ごとのコマを並べた一覧（`ffmpeg -vf fps=1`）で全編を見る。冒頭・途中・終盤のすべてで：
 
 - [ ] 吹き出し・札・字幕の内側に文字が収まっている／上下左右が切れていない
