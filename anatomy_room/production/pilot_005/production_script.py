@@ -529,7 +529,7 @@ def step_qc():
              tl["cues"]["end1"] + .5, tl["cues"]["end2"] + 1.2]
     for i, t in enumerate(times):
         run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(OUT), "-frames:v", "1", "-q:v", "3", str(qdir / f"f{i:02d}_{t:05.1f}.jpg")])
-    run(["montage", *sorted(str(p) for p in qdir.glob("f*.jpg")), "-tile", "6x3", "-geometry", "300x533+4+4",
+    run(["montage", *sorted(str(p) for p in qdir.glob("f*.jpg")), "-tile", "6x4", "-geometry", "300x533+4+4",
          "-background", "#222", str(qdir / "contact_sheet.jpg")])
     rep += ["## 抽出フレーム", "", f"`qc/` に {len(times)} 枚、一覧は `qc/contact_sheet.jpg`。", ""]
     rep += qc_ending(tl, a)
