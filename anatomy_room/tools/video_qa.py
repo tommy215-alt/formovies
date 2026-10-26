@@ -6,7 +6,7 @@
     python3 anatomy_room/tools/video_qa.py pilot_006 --sheets   # 目視用の 1 秒ごとの一覧も作る
 
 調べること（書き出した mp4 と、制作データ work/timeline.json・work/textcheck.json から）:
-  1. 基本仕様：1080×1920・30fps・H.264／AAC 48kHz、尺（90 秒以内）
+  1. 基本仕様：1080×1920・30fps・H.264／AAC 48kHz、尺（90 秒以内。lines.json の max_duration で回ごとに変えられる）
   2. 字幕の欠落：各セリフの途中のコマで、字幕の帯（暗い帯）が画面に出ているか
   3. 最初のコマ：自動のサムネイルになるため、白飛び・ぼやけていないか
   4. 文字の自動検査の結果（textcheck）：0.3 秒を超えて続く問題が 0 件か、フォントにない文字がないか
@@ -23,7 +23,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent / "production"
 W, H = 1080, 1920
-SUB_BAND = (1380, 1580, 200, 780)  # 字幕の帯が来る範囲（y0, y1, x0, x1）。stage.js の subtitles2（中心 x 490・y 1475〜1495）
+SUB_BAND = (1380, 1580, 400, 580)  # 字幕の帯が来る範囲（y0, y1, x0, x1）。stage.js の subtitles2（中心 x 490・y 1475〜1495）。
+# 横は中心の 180px だけ見る（「PHP」のような 3 文字の短い字幕でも帯の幅は約 240px あり、この範囲を覆う）
 
 
 def run(cmd):
@@ -56,11 +57,13 @@ def main():
     v = next(s for s in pr["streams"] if s["codec_type"] == "video")
     a = next((s for s in pr["streams"] if s["codec_type"] == "audio"), None)
     dur = float(pr["format"]["duration"])
+    # 長さの上限：既定は MASTER の 90 秒。ユーザーが長さを指定した回は lines.json の max_duration（可変ルール）
+    max_dur = float(json.loads((ep / "lines.json").read_text(encoding="utf-8")).get("max_duration", 90.0))
     spec = [("解像度 1080×1920", v["width"] == W and v["height"] == H, f"{v['width']}×{v['height']}"),
             ("30fps", v["r_frame_rate"] == "30/1", v["r_frame_rate"]),
             ("映像 H.264", v["codec_name"] == "h264", v["codec_name"]),
             ("音声 AAC 48kHz", bool(a) and a["codec_name"] == "aac" and a.get("sample_rate") == "48000", f"{a and a['codec_name']} {a and a.get('sample_rate')}"),
-            ("尺 90 秒以内", dur <= 90.0, f"{dur:.2f} 秒")]
+            (f"尺 {max_dur:.0f} 秒以内", dur <= max_dur, f"{dur:.2f} 秒")]
     rep += ["## 1. 基本仕様", "", "| 項目 | 結果 | 値 |", "|---|---|---|"]
     for name, ok, val in spec:
         rep.append(f"| {name} | {'OK' if ok else '**NG**'} | {val} |")
@@ -80,7 +83,7 @@ def main():
         dark = float(np.mean(g[y0:y1, x0:x1] < 70))
         if dark < 0.2:
             miss.append((x["id"], f"暗い帯 {dark:.0%}"))
-    rep += ["## 2. 字幕の欠落", "", f"- セリフ {len(body)} 行の途中のコマで、字幕の帯が出ているかを調べた（帯の範囲の 20% 以上が暗い色なら「出ている」）。",
+    rep += ["## 2. 字幕の欠落", "", f"- セリフ {len(body)} 行の途中のコマで、字幕の帯が出ているかを調べた（帯の中心 180px の 20% 以上が暗い色なら「出ている」）。",
             f"- 見つからなかった行：{'なし' if not miss else '、'.join(f'{i}（{why}）' for i, why in miss)}", ""]
     if miss:
         ng.append("字幕の欠落")

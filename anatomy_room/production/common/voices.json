@@ -139,5 +139,40 @@
    "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
    "speed_mul": 1.26
   }
+ },
+ "v5": {
+  "from_episode": "pilot_009（PHP 騒動の回）",
+  "note": "v4 と同じ声（オモテ＝青山龍星、ウラ＝冥鳴ひまり）。聞き取りやすさのため、話速を v4 の約 0.9 倍に（speed_mul 1.26 → 1.13）。セリフの間（gap 0.03 秒）は短いまま、説明の量で情報を増やす。",
+  "M": {
+   "name": "青山龍星",
+   "display": "オモテ",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13,
+    "dry": 82,
+    "hot": 81,
+    "whisper": 86
+   },
+   "default_style": "normal",
+   "speed": 1.22,
+   "pitch": 0.0,
+   "inton": 1.0,
+   "license_note": "個人利用はクレジットで商用・非商用可。企業が携わる形で利用する場合は、ななはぴへの事前確認が必要（エンジン内蔵の規約）",
+   "speed_mul": 1.13
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
+   "speed_mul": 1.13
+  }
  }
 }

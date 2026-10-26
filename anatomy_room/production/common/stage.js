@@ -64,7 +64,8 @@
     for (const o of OBSLOG) for (let i = 0; i < L.length; i++) { // 声の波形・大きな × など、文字を隠すもの
       const e = L[i]; if (e.small_sub || (o.before && i >= o.n)) continue;
       const area = (e.box[2] - e.box[0]) * (e.box[3] - e.box[1]);
-      if (area > 0 && ov(e.box, o.box) / area > .05) out.push({ t, kind: o.kind, s: e.s });
+      const lim = o.kind === "over_wave" ? .02 : .05; // 声の波形は、端が触れる程度（2%）でも拾う
+      if (area > 0 && ov(e.box, o.box) / area > lim) out.push({ t, kind: o.kind, s: e.s });
     }
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
       const a = L[i], b = L[j];

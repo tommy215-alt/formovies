@@ -28,12 +28,14 @@ def build(pid):
     body = [x for x in tl["lines"] if not x.get("ending")]
     names = {"M": v["M"]["display"], "W": v["W"]["display"]}
     bounds = [0] + [round(x["start"]) for x in body[1:]] + [round(tl["ending_start"])]
+    for i in range(1, len(bounds)):  # 1 秒より短いセリフでも、行の時間が 0 秒にならないように
+        bounds[i] = max(bounds[i], bounds[i - 1] + 1)
     rows = []
     for i, x in enumerate(body):
         subs = x["sub"] if isinstance(x["sub"], list) else [x["sub"]]
         style = x["voice"]["style"]
         who = f"{names[x['who']]}（{x['who']}）" + (f"・{style}" if style != "normal" else "")
-        rows.append(f"| {mmss(bounds[i])}-{mmss(bounds[i + 1])} | {who} | {x['speech']} | {by[x['id']].get('cg', '')} | {' ／ '.join(subs)} | {x['fact']} |")
+        rows.append(f"| {mmss(bounds[i])}-{mmss(bounds[i + 1])} | {who} | {x['speech']} | {by[x['id']].get('cg', '')} | {' ／ '.join(subs)} | {by[x['id']].get('fact', x['fact'])} |")
     rows.append(f"| {mmss(bounds[-1])}-{mmss(tl['duration'])} | ウラ（W）・共通エンディング | リバース。世界の仕組みを、はじめから。 | "
                 f"全動画共通のエンディング（docs/ENDING_SPEC.md）：白い閃光 → 明るい背景に巻き戻しの円弧、大きな「リバース」、タグライン | リバース ／ 世界の仕組みを、はじめから | — |")
     md = [f"# {pid}：{data['title']}", "",
