@@ -4,3 +4,6 @@ work/
 __pycache__/
 assets/audio/mix.wav
 preview_*.mp4
+
+# 音声の切り分け用の一時ファイル（production_script.py の成果物ではない）
+anatomy_room/output/*/audio_check.*
