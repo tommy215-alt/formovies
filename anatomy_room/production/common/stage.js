@@ -58,7 +58,8 @@
     for (const e of L) for (const c of CHARLOG) { // 文字がキャラクター（オモテ）にかぶっていないか
       if (e.small_sub) continue;
       const area = (e.box[2] - e.box[0]) * (e.box[3] - e.box[1]);
-      if (area > 0 && ov(e.box, c) / area > .1) out.push({ t, kind: "over_character", s: e.s });
+      const bh = e.box[3] - e.box[1], o = ov(e.box, c); // 文字の 10% 以上、または 1 文字の半分ほど以上が隠れたら
+      if (area > 0 && (o / area > .1 || o > .5 * bh * bh)) out.push({ t, kind: "over_character", s: e.s });
     }
     for (const o of OBSLOG) for (let i = 0; i < L.length; i++) { // 声の波形・大きな × など、文字を隠すもの
       const e = L[i]; if (e.small_sub || (o.before && i >= o.n)) continue;
@@ -442,6 +443,8 @@
       ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr * .8);
     }
     ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 10; ctx.strokeStyle = stroke; ctx.lineJoin = "round"; ctx.stroke();
+    if (s >= .85 && !ctx.__noCheck && ctx.globalAlpha >= .35) // ギザギザの本体（内側の円）が、先に描いた文字を隠していないか
+      OBSLOG.push({ kind: "under_mark", box: screenBox(ctx, -r * .72, -r * .8 * .72, r * .72, r * .8 * .72), before: true, n: TEXTLOG.filter(e => !e.ignore).length });
     if (label) { // 飛び出す途中（小さいうち）は検査しない
       const inner = screenBox(ctx, -r * .72, -r * .8 * .72, r * .72, r * .8 * .72), nc = ctx.__noCheck; ctx.__noCheck = nc || s < .85;
       group(() => text(ctx, label, 0, 4, size, color, { weight: 900 }), inner); ctx.__noCheck = nc;

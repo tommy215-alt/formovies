@@ -172,7 +172,7 @@ function drawScene(t, name) {
     ui.fillStyle = "rgba(255,255,255,.25)"; ui.fill(); ui.lineWidth = 28; ui.lineCap = "round";
     ui.beginPath(); ui.moveTo(mx + 85, 865); ui.lineTo(mx + 190, 980); ui.stroke(); ui.restore();
     pill(ui, "左端だけじゃなく、最後の桁まで", 495, 1080, 46, "#FFFFFF", C.green, easeOut(prog(t, a + .4, .4)));
-    om(t, 180, 1360, .5, { expr: "think", armR: .3, look: [1, -.6] });
+    om(t, 930, 1360, .5, { expr: "think", armL: .3, look: [-1, -.6] }); // 下の札（x 130〜860）にかからない右側
     uraWipe(t, "excited");
   } else if (name === "final") {
     finalScene(t, a, lt);
@@ -247,7 +247,7 @@ function sameScene(t, a, lt) {
   meter(ui, 540, 960, v, "298円が「安く感じる」度", easeOut(prog(t, CUE.flat - .3, .4)));
   if (t >= CUE.flat && !cross) pill(ui, "左端が同じ → ほぼ差なし", 540, 1130, 46, "#FFFFFF", "#3E6FD8", easeOut(prog(t, CUE.flat + .2, .3)));
   if (cross) pill(ui, "左端が変わる → 効く", 540, 1130, 46, "#FFFFFF", TAG, ck);
-  note(ui, "※メーターは演出上のイメージ（研究の測定値ではありません）", 540, 1215, easeOut(prog(t, CUE.flat - .3, .4)), 26);
+  note(ui, "※メーターはイメージ（研究の測定値ではない）", 540, 1215, easeOut(prog(t, CUE.flat - .3, .4)), 26);
   // 桁をまたぐ 2 円
   const ins = easeOut(prog(t, CUE.insight, .4));
   if (ins > 0) pill(ui, "2円で、左端が 3 → 2 に", 540, 330, 44, "#FFFFFF", C.orange, ins);
@@ -281,19 +281,19 @@ function menuScene(t, a, lt) {
   if (rv > 0) {
     const x = lerp(540, 285, sk) + lerp(330, 225, sk);
     S.arrow(ui, x, lerp(560, 580, sk), x, lerp(1030, 920, sk), C.ura, 16, 44, rv);
-    pill(ui, "高い順", x - 10, lerp(500, 520, sk), 44, "#FFFFFF", C.ura, rv);
+    pill(ui, "高い順", lerp(x - 95, 285, sk), lerp(500, 470, sk), 44, "#FFFFFF", C.ura, rv);
   }
   if (st) {
     menuCard(ui, 735, 720, .68, [...MENU].reverse(), sk, -1, "MENU");
     pill(ui, "安い順", 735, 470, 40, "#FFFFFF", "#3E6FD8", sk);
     text(ui, "高めが選ばれやすい", 285, 1020, 38, C.ura, { weight: 900, alpha: easeOut(prog(t, CUE.study + 1.0, .4)) });
     text(ui, "安めが選ばれやすい", 735, 1020, 38, "#3E6FD8", { weight: 900, alpha: easeOut(prog(t, CUE.study + 1.6, .4)) });
-    note(ui, "※研究の一例（Suk ほか 2012）。商品や条件で変わります", 540, 1110, sk, 26);
+    note(ui, "※研究の一例（Suk ほか 2012）。条件で変わる", 600, 1110, sk, 26);
   }
   // オモテ：指さし → 論文どおり
   const pp = t >= CUE.paper, jb = t >= CUE.jab;
   om(t, 160, 1360, .5, { expr: jb ? "deadpan" : pp ? "deadpan" : t >= CUE.reveal ? "shock" : "think", armR: t >= CUE.pick && !st ? 2.0 : .3, look: [1, -.6] });
-  if (pp) S.burst(ui, 330, 1150, 120, prog(t, CUE.paper, .3), "論文どおり", { size: 38, fill: "#FFFFFF", stroke: C.ura, color: C.ura, rot: .08 });
+  if (pp) S.burst(ui, 420, 1250, 110, prog(t, CUE.paper, .3), "論文どおり", { size: 32, fill: "#FFFFFF", stroke: C.ura, color: C.ura, rot: .08 });
   uraWipe(t, jb ? "amused" : "smirk");
 }
 
@@ -314,11 +314,11 @@ function caveatScene(t, a, lt) {
   });
   const nk = easeOut(prog(t, CUE.nine, .4));
   if (nk > 0) {
-    ui.save(); ui.globalAlpha = nk; ui.fillStyle = "#FFFFFF"; rrect(ui, 110, 1040, 860, 170, 30); ui.fill(); ui.restore();
-    text(ui, "9 で終わる値段で売上が伸びた実験も", 540, 1095, 40, C.navy2, { weight: 900, alpha: nk });
-    text(ui, "Anderson & Simester（2003）。効き方は状況しだい", 540, 1160, 30, "#4A5B70", { weight: 800, alpha: nk });
+    ui.save(); ui.globalAlpha = nk; ui.fillStyle = "#FFFFFF"; rrect(ui, 90, 1040, 840, 170, 30); ui.fill(); ui.restore();
+    text(ui, "9 で終わる値段で売上が伸びた実験も", 510, 1095, 40, C.navy2, { weight: 900, alpha: nk });
+    text(ui, "Anderson & Simester（2003）。効き方は状況しだい", 510, 1160, 28, "#4A5B70", { weight: 800, alpha: nk });
   }
-  om(t, 950, 1360, .42, { expr: t >= CUE.notalways ? "shock" : "smug", armL: t < CUE.notalways ? 2.3 : .3, look: [-1, -.6] });
+  om(t, 975, 1360, .42, { expr: t >= CUE.notalways ? "shock" : "smug", armL: t < CUE.notalways ? 2.3 : .3, look: [-1, -.6] });
   uraWipe(t, "stern");
 }
 

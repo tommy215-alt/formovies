@@ -322,7 +322,7 @@ class Episode:
             by.setdefault((e["kind"], e["s"]), []).append(e["t"])
         names = {"safe": "安全領域の外", "right_ui": "右側のボタン列と重なる", "small": "文字が小さい（26px 未満）", "overflow": "入れ物からはみ出し",
                  "overlap": "文字どうしの重なり", "small_subtitle": "字幕が小さい（44px 未満）", "over_character": "文字がオモテにかぶる",
-                 "over_wave": "文字がウラの声の波形と重なる", "under_mark": "文字が大きな × に隠れる"}
+                 "over_wave": "文字がウラの声の波形と重なる", "under_mark": "文字が大きな ×・吹き出しに隠れる"}
         rows = [f"| {names.get(k, k)}{'（一時的：0.3 秒以下）' if len(ts) <= 3 else ''} | {s_[:40]} | {ts[0]:.1f}〜{ts[-1]:.1f}s（{len(ts)} コマ） |"
                 for (k, s_), ts in sorted(by.items(), key=lambda kv: kv[1][0])]
         real = sum(1 for ts in by.values() if len(ts) > 3)
