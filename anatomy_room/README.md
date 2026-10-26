@@ -12,6 +12,11 @@ YouTube Shorts チャンネルの制作プロジェクトです。
 - 第 1 話：`production/pilot_005/world_anatomy_pilot_005.mp4`（制作方法は `production/pilot_005/production_notes.md`）
 - 第 2 話：`production/pilot_003/world_anatomy_pilot_003.mp4`（制作方法は `production/pilot_003/production_notes.md`、改善点は `production/pilot_003/IMPROVEMENTS_FROM_EP1.md`）
 - 全動画共通のエンディング：`docs/ENDING_SPEC.md`
+- **チャンネル名は「リバース」に変更（2026-10-26）。第 3〜5 話（新構成：オモテとウラ）**：
+  - pilot_006 飛行機の窓 `production/pilot_006/reverse_006_airplane_window.mp4`
+  - pilot_007 QR コード `production/pilot_007/reverse_007_qr_code.mp4`
+  - pilot_008 298 円 `production/pilot_008/reverse_008_price_298.mp4`
+  - 制作のまとめ：`production/REVERSE_NEW_FORMAT.md`
 - 監査：`audit/summary.md`
 - **運営者向けマニュアル（PDF）**：`docs/manual/shorts_manual.pdf`（元は `docs/manual/manual.html`。`node anatomy_room/docs/manual/build_manual.js` で再生成）
 
@@ -22,6 +27,9 @@ YouTube Shorts チャンネルの制作プロジェクトです。
 | pilot_003 | コンビニおにぎりの海苔は、なぜパリパリなのか？ | 日常・食品包装 | v3 に改訂・**動画化済み**（第 2 話。開封手順は模式図と明記） |
 | pilot_004 | エレベーターのロープが切れたら、落ちる？ | 機械・安全・歴史 | PASS |
 | pilot_005 | マイナス×マイナスは、なぜプラスになる？ | 数学 | PASS・**動画化済み** |
+| pilot_006 | 飛行機の窓、穴が開いてるんだけど!? | 乗り物・構造 | 新構成・**動画化済み** |
+| pilot_007 | QRコードを消したら、オモテが消えた | 情報技術 | 新構成・**動画化済み** |
+| pilot_008 | 298円と300円。その2円に騙されるな | 心理・価格 | 新構成・**動画化済み** |
 
 ## ファイル構成
 
@@ -44,7 +52,8 @@ anatomy_room/
 │   ├── internal_review/          # 自己レビュー（pilot_00N_review.md, SUMMARY.md）
 │   └── chatgpt_review/           # ChatGPT にそのまま貼れるレビュー資料（自動生成）
 ├── audit/                        # 第 2 回監査の報告書（pilot_00N_audit.md, summary.md）
-├── production/common/            # 全話共通：声の設定 voices.json、エンディング ending.js、three.js
+├── production/common/            # 全話共通：声の設定 voices.json、エンディング ending.js、three.js、
+│                                 #   新構成のパイプライン pipeline.py・描画部品 stage.js・BGM music.py
 ├── production/pilot_005/         # 第 1 話の制作物（完成動画・制作スクリプト・完成台本・検証記録）
 ├── production/pilot_003/         # 第 2 話の制作物（3D・明るい画面・新しい声）
 ├── templates/

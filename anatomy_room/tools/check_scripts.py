@@ -80,7 +80,9 @@ def check(pilot_dir):
             errors.append(f"行 {i} ({time}): 終了が開始より前")
         prev_end = end
         # 「W（queen）」のように声のスタイルが付いていても話者として数える（共通エンディングは除く）
-        who = who[:1] if who[:1] in ("M", "W") and "エンディング" not in who else who
+        # 新構成（pilot_006〜）は「オモテ（M）」「ウラ（W）」と書く
+        if "エンディング" not in who:
+            who = "M" if (who[:1] == "M" or "（M）" in who) else "W" if (who[:1] == "W" or "（W）" in who) else who
         if who in ("M", "W"):
             n = spoken_chars(line)
             total_chars[who] += n

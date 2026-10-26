@@ -2,7 +2,7 @@
 //   drawEnding(ctx, t, opts)
 //     t    : エンディング開始からの秒（0 = 本編からの切り替え）
 //     opts : { end1, end2 : 「リバース。」「世界の仕組みを、はじめから。」の音声の開始（エンディング開始からの秒）,
-//              credits : ["VOICEVOX:…", …], W, H : 画面の大きさ（既定 1080×1920） }
+//              credits : ["VOICEVOX:…", …], brand : 下部のブランド名（省略時「世界の解剖室」）, W, H : 画面の大きさ（既定 1080×1920） }
 // 毎回同じ基本演出を使う（変えてよいのはクレジットだけ）。
 (function (root) {
   const C = { navy: "#0A1424", navy2: "#13284A", cyan: "#1AA7CF", cyanL: "#8FDDF2", orange: "#FF8A2A", white: "#FFFFFF" };
@@ -93,8 +93,14 @@
 
     // ブランドとクレジット（小さく）
     const k3 = easeOut(prog(t, 0.6, 0.6));
-    cubeMark(ctx, cx - 150, H * 0.80, 30, k3);
-    text(ctx, "世界の解剖室", cx - 105, H * 0.80, 40, C.navy2, { weight: 700, align: "left", alpha: k3 });
+    // ブランド名（opts.brand。省略時は第 1・2 話と同じ「世界の解剖室」、空文字なら出さない）
+    const brand = opts.brand ?? "世界の解剖室";
+    if (brand) {
+      ctx.save(); ctx.font = `700 40px ${FONT}`; const bw = ctx.measureText(brand).width; ctx.restore();
+      const x0 = brand === "世界の解剖室" ? cx - 180 : cx - (bw + 75) / 2; // 第 1・2 話と同じ位置を保つ
+      cubeMark(ctx, x0 + 30, H * 0.80, 30, k3);
+      text(ctx, brand, x0 + 75, H * 0.80, 40, C.navy2, { weight: 700, align: "left", alpha: k3 });
+    }
     if (opts.credits && opts.credits.length)
       text(ctx, "音声：" + opts.credits.join("／"), cx, H * 0.80 + 70, 28, "#4A5B70", { weight: 500, alpha: k3 });
 
