@@ -9,10 +9,12 @@ lines.json（セリフ・字幕・シーン）から、音声・BGM・効果音�
   python3 production_script.py mux      # 映像と音声を合成 → world_anatomy_pilot_005.mp4
   python3 production_script.py docs     # final_script.md と subtitles.srt を書き出す
   python3 production_script.py qc       # 書き出した MP4 の検証（尺・解像度・デコード・音量・フレーム抽出）
-  python3 production_script.py all      # 上をすべて順に実行
+  python3 production_script.py all      # 上をすべて順に実行（docs・qc も含む）
+  python3 production_script.py update   # 修正後の作り直し（変えた行の音声と、変わった場面の映像だけ作り直す）
 
 前提：VOICEVOX ENGINE 0.24.1 を 127.0.0.1:50021 で起動（production_notes.md）。ffmpeg、Node.js + Playwright、Noto Sans CJK JP。
 """
+import hashlib
 import json
 import math
 import subprocess
@@ -65,24 +67,38 @@ def step_voice():
     vdir.mkdir(parents=True, exist_ok=True)
     t = LEAD_IN
     timeline = []
+    cache = WORK / "voice_cache"
+    cache.mkdir(exist_ok=True)
+    fresh = 0
     for ln in data["lines"]:
-        q = vv_query(ln["speech"], ln["who"])
-        wav = vv_synth(q, ln["who"])
+        # 読み上げ文と声の設定が同じなら、前回の合成結果を使う（変えた行だけ合成し直す）
+        key = hashlib.sha256(json.dumps([ln["speech"], VOICES[ln["who"]], SR], ensure_ascii=False).encode()).hexdigest()[:16]
+        cw, cq = cache / f"{key}.wav", cache / f"{key}.json"
+        if cw.exists() and cq.exists():
+            wav, q = cw.read_bytes(), json.loads(cq.read_text(encoding="utf-8"))
+        else:
+            q = vv_query(ln["speech"], ln["who"])
+            wav = vv_synth(q, ln["who"])
+            cw.write_bytes(wav); cq.write_text(json.dumps(q, ensure_ascii=False), encoding="utf-8")
+            fresh += 1
         path = vdir / f"{ln['id']}.wav"
         path.write_bytes(wav)
+        # 開始時刻をコマの区切りにそろえる。前の行の長さが変わっても後ろはコマ単位でずれるだけなので、
+        # 場面ごとに書き出した映像を使い回せる（step_render の segment_key）
+        t = math.ceil(t * FPS - 1e-6) / FPS
         with wave.open(str(path)) as w:
             dur = w.getnframes() / w.getframerate()
-        timeline.append({**ln, "start": round(t, 3), "end": round(t + dur, 3), "kana": q["kana"]})
+        timeline.append({**ln, "start": round(t, 5), "end": round(t + dur, 5), "dur": round(dur, 5), "kana": q["kana"]})
         t += dur + data["gap"] + ln.get("pause", 0.0)
     end_speech = timeline[-1]["end"]
     total = end_speech + data.get("endcard", 3.0)
     for x in timeline:
         x["env"] = envelope(vdir / f"{x['id']}.wav")
-    tl = {"fps": FPS, "duration": round(total, 3), "endcard_start": round(end_speech + 0.3, 3),
+    tl = {"fps": FPS, "duration": round(total, 5), "endcard_start": round(end_speech + 0.3, 5),
           "credits": [v["credit"] for v in VOICES.values()], "cues": build_cues(timeline), "lines": timeline}
     (WORK / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1), encoding="utf-8")
     speech = sum(x["end"] - x["start"] for x in timeline)
-    print(f"voice: {len(timeline)} 行, セリフ合計 {speech:.1f}s, 全体 {total:.1f}s")
+    print(f"voice: {len(timeline)} 行（新しく合成 {fresh} 行）, セリフ合計 {speech:.1f}s, 全体 {total:.1f}s")
     for x in timeline:
         print(f"  {x['start']:6.2f}-{x['end']:6.2f} {x['who']} {x['kana']}", flush=True)
 
@@ -109,7 +125,7 @@ def build_cues(timeline):
     cues = {}
     for name, (lid, frac) in CUE_DEFS.items():
         x = by[lid]
-        cues[name] = round(x["start"] + frac * (x["end"] - x["start"]), 3)
+        cues[name] = round(x["start"] + frac * (x["end"] - x["start"]), 5)
     return cues
 
 
@@ -264,8 +280,65 @@ def step_audio():
 
 
 # ---------------------------------------------------------------- render / mux
+# 場面の切れ目（ここで映像を区切って、場面ごとに書き出して保存する）
+SEG_CUES = ["title", "pattern", "freeze", "dist", "bridge", "eq1", "general", "numline", "outro", "endcard"]
+WORKERS = 3  # 同時に書き出すブラウザの数（CPU 4 コアで 3 が目安）
+
+
+def segment_key(tl, a, b, code):
+    """場面の内容を表すハッシュ。場面の中身（前後の余白を含む）とレンダラーのコードが同じなら、
+    場面の開始時刻がずれても前回の映像をそのまま使える。"""
+    fps = tl["fps"]
+    t0, t1 = a / fps, b / fps
+    lo, hi = t0 - 1.5, t1 + 1.5  # 場面の切り替え（フェード）と字幕の持ち越しを含む余白
+    # 場面の先頭からのコマ数。丸め誤差で判定が揺れないよう 0.1 コマ単位にし、-0.0 は 0.0 にそろえる
+    rel = lambda v: round((v - t0) * fps, 1) + 0.0
+    lines = [{"who": x["who"], "sub": x["sub"], "env": x["env"], "s": round((x["start"] - t0) * fps), "d": x["dur"]}
+             for x in tl["lines"] if x["end"] > lo and x["start"] < hi]
+    cues = sorted((k, rel(v)) for k, v in tl["cues"].items() if lo <= v <= hi)
+    extra = [rel(tl["endcard_start"])] if lo <= tl["endcard_start"] <= hi else []
+    blob = json.dumps([code, fps, b - a, lines, cues, extra, tl["credits"]], ensure_ascii=False)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
 def step_render():
-    subprocess.run(["node", str(HERE / "render_frames.js")], check=True)
+    tl = json.loads((WORK / "timeline.json").read_text(encoding="utf-8"))
+    fps, n = tl["fps"], math.ceil(tl["duration"] * tl["fps"])
+    cues = {**tl["cues"], "endcard": tl["endcard_start"]}
+    bounds = [0] + [round(cues[c] * fps) for c in SEG_CUES] + [n]
+    code = hashlib.sha256((HERE / "renderer.html").read_bytes() + (HERE / "render_frames.js").read_bytes()).hexdigest()
+    sdir = WORK / "segments"
+    sdir.mkdir(parents=True, exist_ok=True)
+    segs = []
+    for a, b in zip(bounds, bounds[1:]):
+        if b > a:
+            segs.append({"a": a, "b": b, "out": str(sdir / f"{segment_key(tl, a, b, code)}.mp4")})
+    todo = [s for s in segs if not Path(s["out"]).exists()]
+    print(f"render: 場面 {len(segs)} 個のうち、書き出しが必要なのは {len(todo)} 個"
+          f"（{sum(s['b'] - s['a'] for s in todo)} / {n} コマ）", flush=True)
+    if todo:
+        # 書き出すコマ数がなるべく均等になるように、ブラウザごとに振り分ける
+        jobs = [[] for _ in range(min(WORKERS, len(todo)))]
+        for s in sorted(todo, key=lambda s: s["a"] - s["b"]):
+            min(jobs, key=lambda j: sum(x["b"] - x["a"] for x in j)).append(s)
+        procs = []
+        for i, j in enumerate(jobs):
+            jf = WORK / f"job{i}.json"
+            jf.write_text(json.dumps(j), encoding="utf-8")
+            procs.append(subprocess.Popen(["node", str(HERE / "render_frames.js"), "--segments", str(jf)]))
+        if any(p.wait() for p in procs):
+            sys.exit("render: 書き出しに失敗した場面がある")
+    lst = WORK / "concat.txt"
+    lst.write_text("".join(f"file '{s['out']}'\n" for s in segs), encoding="utf-8")
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(lst),
+                    "-c", "copy", "-movflags", "+faststart", str(WORK / "video.mp4")], check=True)
+    print(f"render: {len(segs)} 場面をつないで work/video.mp4（{n} コマ）")
+
+
+def step_update():
+    """修正後の作り直し：変えた行の音声だけ合成し、変わった場面だけ映像を書き出して、つなぎ直す。"""
+    for s in (step_voice, step_audio, step_render, step_mux, step_docs, step_qc):
+        s()
 
 
 def step_mux():
@@ -321,10 +394,10 @@ def step_docs():
             k += 1
     (HERE / "subtitles.srt").write_text("\n".join(srt), encoding="utf-8")
     # 完成台本
-    rows = ["| 時間 | 話者 | セリフ（読み上げ文） | 画面字幕 | 事実確認ID |", "|------|------|------------------|----------|-----------|"]
+    rows = ["| ID | 時間 | 話者 | セリフ（読み上げ文） | 画面字幕 | 事実確認ID |", "|----|------|------|------------------|----------|-----------|"]
     for x in lines:
         subs = x["sub"] if isinstance(x["sub"], list) else [x["sub"]]
-        rows.append(f"| {fmt(x['start'])}–{fmt(x['end'])} | {x['who']} | {x['speech']} | {' ／ '.join(subs)} | {x['fact']} |")
+        rows.append(f"| {x['id']} | {fmt(x['start'])}–{fmt(x['end'])} | {x['who']} | {x['speech']} | {' ／ '.join(subs)} | {x['fact']} |")
     data = load_lines()
     md = [f"# pilot_005 完成台本：{data['title']}", "",
           "`production_script.py docs` が `lines.json` と実際の音声の長さ（`work/timeline.json`）から生成。手で編集しない。", "",
@@ -419,11 +492,12 @@ def step_qc():
 
 
 # ---------------------------------------------------------------- main
-STEPS = {"voice": step_voice, "audio": step_audio, "render": step_render, "mux": step_mux, "docs": step_docs, "qc": step_qc}
+STEPS = {"voice": step_voice, "audio": step_audio, "render": step_render, "mux": step_mux, "docs": step_docs, "qc": step_qc,
+         "update": step_update}
 
 if __name__ == "__main__":
     names = sys.argv[1:] or ["all"]
     if names == ["all"]:
-        names = list(STEPS)
+        names = ["voice", "audio", "render", "mux", "docs", "qc"]
     for n in names:
         STEPS[n]()

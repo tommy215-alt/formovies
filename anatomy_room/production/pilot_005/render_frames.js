@@ -2,6 +2,7 @@
 //   node render_frames.js                  全コマを書き出す
 //   node render_frames.js --stills 3,40.5  指定した秒のコマを work/stills/ に PNG で保存（確認用）
 //   node render_frames.js --thumb          サムネイル thumbnail.png を書き出す
+//   node render_frames.js --segments job.json  指定したコマの範囲を場面ごとの mp4 に（production_script.py render が使う）
 const { chromium } = require("playwright");
 const { spawn } = require("child_process");
 const fs = require("fs");
@@ -36,6 +37,25 @@ async function open(browser) {
       await canvas.screenshot({ path: path.join(WORK, "stills", `t${parseFloat(s).toFixed(2).padStart(6, "0")}.png`) });
     }
     console.log("stills:", args[1]);
+  } else if (args[0] === "--segments") {
+    // 指定されたコマの範囲を、場面ごとに別の mp4 に書き出す（production_script.py render から呼ばれる）
+    const jobs = JSON.parse(fs.readFileSync(args[1], "utf8"));
+    for (const s of jobs) {
+      const tmp = s.out + ".part.mp4";
+      const ff = spawn("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(tl.fps),
+        "-c:v", "png", "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+        "-r", String(tl.fps), tmp], { stdio: ["pipe", "inherit", "inherit"] });
+      const t0 = Date.now();
+      for (let i = s.a; i < s.b; i++) {
+        await page.evaluate(t => window.renderFrame(t), i / tl.fps);
+        const buf = await canvas.screenshot({ type: "png" });
+        if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once("drain", r));
+      }
+      ff.stdin.end();
+      await new Promise((res, rej) => ff.on("close", c => c === 0 ? res() : rej(new Error("ffmpeg " + c))));
+      fs.renameSync(tmp, s.out); // 書き終わってから名前を付ける（途中で止まっても壊れた場面を再利用しない）
+      console.log(`segment ${s.a}-${s.b} (${s.b - s.a} frames) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    }
   } else if (args[0] === "--thumb") {
     await page.evaluate(() => window.renderThumb());
     await canvas.screenshot({ path: path.join(HERE, "thumbnail.png") });

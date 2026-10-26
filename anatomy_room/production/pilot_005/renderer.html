@@ -66,7 +66,8 @@ function background(t) {
   g.addColorStop(0, C.bg2); g.addColorStop(.55, C.bg); g.addColorStop(1, "#070E1A");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = hexA("#1C3150", .9);
-  const off = (t * 8) % 48;
+  // 背景は時刻に依存させない（場面ごとに書き出した映像を、位置がずれても使い回せるように）
+  const off = 0;
   for (let y = -48 + off; y < 1250; y += 48)
     for (let x = 24; x < W; x += 48) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
   // 床：消失点 (540, 1150) に向かう線と、手前へ流れる横線
@@ -76,7 +77,7 @@ function background(t) {
   ctx.strokeStyle = fade; ctx.lineWidth = 2;
   for (let i = -12; i <= 12; i++) { ctx.beginPath(); ctx.moveTo(540, vy); ctx.lineTo(540 + i * 160, H); ctx.stroke(); }
   for (let k = 0; k < 14; k++) {
-    const z = ((k + (t * .6) % 1) / 14); const y = vy + (H - vy) * z * z;
+    const z = (k + .5) / 14; const y = vy + (H - vy) * z * z;
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
   ctx.restore();
