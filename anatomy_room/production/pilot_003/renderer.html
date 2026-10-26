@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_003 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="gl" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../common/ending.js"></script>
+<script>
+// 第 2 話のレンダラー。renderFrame(t) が時刻 t 秒の 1 コマを描く（決定的：同じ t なら同じ絵）。
+// 3 層：bg（2D の背景）→ gl（three.js の 3D、背景は透明）→ ui（2D の文字・ラベル・字幕）。
+const W = 1080, H = 1920;
+const C = {
+  navy: "#0A1424", navy2: "#13284A", ink: "#1B2433", cyan: "#1AA7CF", orange: "#FF7A2A", yellow: "#FFC83D",
+  M: "#2F6FAD", Wc: "#FF6B3D", nori: "#16261C", rice: "#FBF8F1", water: "#3FA9F5", red: "#E8432E",
+};
+const FONT = '"Noto Sans CJK JP", sans-serif';
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+let TL = null, CUE = {};
+
+// ---------- ユーティリティ
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = k => 1 - Math.pow(1 - clamp(k), 3);
+const easeInOut = k => { k = clamp(k); return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
+const back = k => { k = clamp(k); const s = 1.7; return 1 + (s + 1) * Math.pow(k - 1, 3) + s * Math.pow(k - 1, 2); };
+const prog = (t, a, d) => clamp((t - a) / d);
+const win = (t, a, b, fi = .35, fo = .35) => Math.min(prog(t, a, fi), 1 - prog(t, b - fo, fo));
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+
+// 場面の区切り（cue 名）。各場面の開始・終了の時刻
+const SCN = ["hook", "xray", "title", "explode", "moisture", "opening", "payoff", "conclusion"];
+function sceneRange(name) {
+  const i = SCN.indexOf(name);
+  const a = i === 0 ? 0 : CUE[name];
+  const b = i + 1 < SCN.length ? CUE[SCN[i + 1]] : TL.ending_start;
+  return [a, b];
+}
+function sceneAt(t) {
+  for (let i = SCN.length - 1; i >= 0; i--) if (t >= sceneRange(SCN[i])[0]) return SCN[i];
+  return "hook";
+}
+
+// ---------- 2D の文字
+function text(ctx, s, x, y, size, color, { weight = 800, align = "center", alpha = 1, base = "middle", stroke = null, sw = 10 } = {}) {
+  if (alpha <= 0) return;
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.font = `${weight} ${size}px ${FONT}`;
+  ctx.textAlign = align; ctx.textBaseline = base;
+  if (stroke) { ctx.lineJoin = "round"; ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.strokeText(s, x, y); }
+  ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+}
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function pill(ctx, s, x, y, size, fg, bgc, alpha = 1, pad = 26) {
+  if (alpha <= 0) return;
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.font = `800 ${size}px ${FONT}`;
+  const w = ctx.measureText(s).width + pad * 2, h = size * 1.55;
+  ctx.shadowColor = "rgba(0,0,0,.18)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+  rrect(ctx, x - w / 2, y - h / 2, w, h, h / 2); ctx.fillStyle = bgc; ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.fillStyle = fg; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y + 2);
+  ctx.restore();
+  return w;
+}
+// **強調** を色分けして 1 行を中央揃え
+function rich(ctx, s, cx, y, size, base, emph) {
+  const parts = s.split("**");
+  ctx.font = `800 ${size}px ${FONT}`;
+  const ws = parts.map(p => ctx.measureText(p).width), tot = ws.reduce((a, b) => a + b, 0);
+  let x = cx - tot / 2;
+  parts.forEach((p, i) => { text(ctx, p, x, y, size, i % 2 ? emph : base, { align: "left" }); x += ws[i]; });
+}
+
+// ---------- テクスチャ（固定の乱数で生成：毎回同じ）
+function riceTexture() {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 1024;
+  const g = cv.getContext("2d"), r = rng(11);
+  g.fillStyle = "#CFC4AE"; g.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 5200; i++) {
+    const x = r() * 1024, y = r() * 1024, a = r() * Math.PI, rx = 15 + r() * 7, ry = 7 + r() * 3;
+    g.save(); g.translate(x, y); g.rotate(a);
+    const gr = g.createRadialGradient(-rx * .25, -ry * .3, 1, 0, 0, rx);
+    gr.addColorStop(0, "#FFFFFF"); gr.addColorStop(.55, "#F6F1E6"); gr.addColorStop(1, "#B9AC93");
+    g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 7); g.fill(); g.restore();
+  }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(.9, .9);
+  t.encoding = THREE.sRGBEncoding; return t;
+}
+function noriTexture() {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 1024;
+  const g = cv.getContext("2d"), r = rng(5);
+  g.fillStyle = "#14241A"; g.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 2600; i++) {
+    const x = r() * 1024, y = r() * 1024, l = 20 + r() * 60, a = r() * Math.PI;
+    g.strokeStyle = ["#1F3A28", "#0B150F", "#24452F", "#101C14"][i % 4]; g.lineWidth = 1 + r() * 2.5; g.globalAlpha = .55;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+  g.globalAlpha = .5;
+  for (let i = 0; i < 900; i++) { g.fillStyle = r() < .5 ? "#2E5B3D" : "#3B6E4A"; g.fillRect(r() * 1024, r() * 1024, 2, 2); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.3, 1.3);
+  t.encoding = THREE.sRGBEncoding; return t;
+}
+
+// ---------- 3D
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
+renderer.setClearColor(0x000000, 0);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd9c7b0, 0.85));
+const key = new THREE.DirectionalLight(0xffffff, 1.35); key.position.set(3.5, 6, 6); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024); key.shadow.camera.left = key.shadow.camera.bottom = -4; key.shadow.camera.right = key.shadow.camera.top = 4;
+key.shadow.radius = 6; scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfe6ff, 0.7); rim.position.set(-5, 2, -4); scene.add(rim);
+const fill = new THREE.PointLight(0xffe2c4, 0.5, 30); fill.position.set(-3, -1, 6); scene.add(fill);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.ShadowMaterial({ opacity: 0.18 }));
+floor.rotation.x = -Math.PI / 2; floor.position.y = -1.45; floor.receiveShadow = true; scene.add(floor);
+
+// 角の丸い三角形（おにぎりの形）
+function roundedTriangle(R, rad) {
+  const pts = [0, 1, 2].map(i => { const a = Math.PI / 2 + i * 2 * Math.PI / 3; return new THREE.Vector2(Math.cos(a) * R, Math.sin(a) * R - R * .12); });
+  const s = new THREE.Shape();
+  for (let i = 0; i < 3; i++) {
+    const p = pts[i], prev = pts[(i + 2) % 3], next = pts[(i + 1) % 3];
+    const a = p.clone().add(prev.clone().sub(p).setLength(rad)), b = p.clone().add(next.clone().sub(p).setLength(rad));
+    if (i === 0) s.moveTo(a.x, a.y); else s.lineTo(a.x, a.y);
+    s.quadraticCurveTo(p.x, p.y, b.x, b.y);
+  }
+  s.closePath(); return s;
+}
+function shellGeo(scale, depth) {
+  const g = new THREE.ExtrudeGeometry(roundedTriangle(1.35 * scale, .55 * scale), {
+    depth: depth * scale, bevelEnabled: true, bevelThickness: .28 * scale, bevelSize: .24 * scale, bevelSegments: 8, curveSegments: 28 });
+  g.translate(0, 0, -depth * scale / 2); g.computeVertexNormals(); return g;
+}
+const riceTex = riceTexture(), noriTex = noriTexture();
+const matRice = new THREE.MeshStandardMaterial({ color: 0xffffff, map: riceTex, bumpMap: riceTex, bumpScale: 0.06, roughness: 0.78 });
+function makeNoriMat() { return new THREE.MeshStandardMaterial({ color: 0xffffff, map: noriTex, roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide }); }
+function makeFilmMat(opacity) {
+  return new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity, roughness: 0.06, metalness: 0,
+    clearcoat: 1, clearcoatRoughness: 0.05, side: THREE.DoubleSide, depthWrite: false, emissive: 0xff7a2a, emissiveIntensity: 0 });
+}
+
+// おにぎり 1 個（ごはん・海苔・内フィルム・外フィルム（左右）・開封テープ）
+function makeOnigiri() {
+  const g = new THREE.Group();
+  const rice = new THREE.Mesh(shellGeo(1, .82), matRice); rice.castShadow = true; g.add(rice);
+  const noriMat = makeNoriMat();
+  const nori = new THREE.Mesh(shellGeo(1.025, .82), noriMat); nori.castShadow = true; g.add(nori);
+  const films = {};
+  for (const [name, sc, op] of [["inner", 1.06, .16], ["outer", 1.1, .2]]) {
+    for (const side of ["L", "R"]) {
+      const m = new THREE.Mesh(shellGeo(sc, .82), makeFilmMat(op)); m.renderOrder = 2; g.add(m);
+      films[name + side] = m;
+    }
+  }
+  const tab = new THREE.Mesh(new THREE.BoxGeometry(.16, 1, .02), new THREE.MeshStandardMaterial({ color: C.red, roughness: .5 }));
+  g.add(tab);
+  // 局所座標のクリップ面（毎フレーム世界座標に直す）
+  const clips = [
+    { mesh: nori, local: new THREE.Plane(new THREE.Vector3(0, -1, 0), -0.05) },   // 海苔は下側だけ（帯）
+    ...["outer", "inner"].flatMap(n => [
+      { mesh: films[n + "L"], local: new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0) },
+      { mesh: films[n + "R"], local: new THREE.Plane(new THREE.Vector3(1, 0, 0), 0) }]),
+  ];
+  clips.forEach(c => { c.world = new THREE.Plane(); c.mesh.material.clippingPlanes = [c.world]; });
+  scene.add(g);
+  return { g, rice, nori, noriMat, films, tab, clips };
+}
+const O = makeOnigiri();          // 主役
+const O2 = makeOnigiri();         // 比較用（水分の場面の右：フィルムあり）
+// 水の粒
+const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(.075, 14, 10),
+  new THREE.MeshStandardMaterial({ color: 0x1677d2, roughness: .1, metalness: 0, emissive: 0x0b4f9c, emissiveIntensity: .6 }), 120);
+scene.add(drops);
+const DR = rng(7), DROP = Array.from({ length: 120 }, () => ({ a: DR() * Math.PI * 2, r: DR(), d: DR(), side: DR() < .5 ? 0 : 1 }));
+const dummy = new THREE.Object3D();
+
+function updateClips(o) {
+  o.g.updateMatrixWorld(true);
+  o.clips.forEach(c => { c.world.copy(c.local).applyMatrix4(c.mesh.matrixWorld); });
+}
+function resetOnigiri(o) {
+  o.g.visible = true; o.g.position.set(0, 0, 0); o.g.rotation.set(0, 0, 0); o.g.scale.setScalar(1);
+  o.rice.visible = o.nori.visible = o.tab.visible = true;
+  o.rice.position.set(0, 0, 0); o.nori.position.set(0, 0, 0); o.nori.scale.set(1, 1, 1);
+  o.noriMat.color.set(0xffffff);
+  for (const k in o.films) { const m = o.films[k]; m.visible = true; m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.material.opacity = k.startsWith("outer") ? .2 : .16; m.material.emissiveIntensity = 0; }
+  o.tab.position.set(0, .05, .41 * 1.1 + .3); o.tab.scale.set(1, 2.3, 1);
+}
+function setCam(p, target) { camera.position.set(...p); camera.lookAt(...target); camera.updateMatrixWorld(); }
+// 距離 d から見る。主役を字幕より上（画面の y≈780 付近）に置くため、注視点を少し下げる
+function camAt(d, yaw = 0, elev = .06, ty = 0, tx = 0, shake = 0) {
+  const tyy = ty - .05 * d;
+  setCam([tx + shake + Math.sin(yaw) * d * Math.cos(elev), tyy + Math.sin(elev) * d, Math.cos(yaw) * d * Math.cos(elev)], [tx + shake, tyy, 0]);
+}
+function project(v) { const p = v.clone().project(camera); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H]; }
+
+// ---------- 背景（場面ごとに色・明るさを変える）
+const BG = {
+  hook: ["#FFE3C2", "#FFF6EA", "#FFB97A"],
+  xray: ["#2A6F93", "#5DB7D9", "#9EE3F5"],
+  title: ["#FFFFFF", "#FFF4E6", "#FFC98F"],
+  explode: ["#EEF3F8", "#DCE6EF", "#BFD9EA"],
+  moisture: ["#E4F3FF", "#FFF4E2", "#FFFFFF"],
+  opening: ["#FFE7C9", "#FFD9A8", "#FFF3E0"],
+  payoff: ["#FFD27A", "#FFF0C8", "#FFFFFF"],
+  conclusion: ["#FFFFFF", "#F2FAFD", "#E2F4FA"],
+};
+function drawBackground(t, name, alpha) {
+  if (alpha <= 0) return;
+  const [c0, c1, c2] = BG[name];
+  bg.save(); bg.globalAlpha = alpha;
+  if (name === "moisture") { // 左右に分けた比較
+    bg.fillStyle = "#E4F3FF"; bg.fillRect(0, 0, W / 2, H); bg.fillStyle = "#FFF4E2"; bg.fillRect(W / 2, 0, W / 2, H);
+    bg.fillStyle = "#FFFFFF"; bg.fillRect(W / 2 - 4, 300, 8, 1000);
+  } else {
+    const g = bg.createLinearGradient(0, 0, 0, H); g.addColorStop(0, c0); g.addColorStop(.55, c1); g.addColorStop(1, c0);
+    bg.fillStyle = g; bg.fillRect(0, 0, W, H);
+    const rg = bg.createRadialGradient(W / 2, 760, 60, W / 2, 760, 760); rg.addColorStop(0, hexA(c2, .75)); rg.addColorStop(1, hexA(c2, 0));
+    bg.fillStyle = rg; bg.fillRect(0, 0, W, H);
+  }
+  if (name === "opening") { // 「見どころ」でスポットライト（周りを少し落とし、主役は明るいまま）
+    const k = easeInOut(prog(t, CUE.spot, .4)) * (1 - easeInOut(prog(t, CUE.land + .2, .6)));
+    if (k > 0) {
+      const sp = bg.createRadialGradient(W / 2, 800, 220, W / 2, 800, 900);
+      sp.addColorStop(0, "rgba(40,24,10,0)"); sp.addColorStop(1, `rgba(40,24,10,${.55 * k})`);
+      bg.fillStyle = sp; bg.fillRect(0, 0, W, H);
+    }
+  }
+  if (name === "title" || name === "payoff") { // 放射状の光
+    bg.save(); bg.translate(W / 2, 820); bg.rotate(t * .05);
+    for (let i = 0; i < 16; i++) { bg.rotate(Math.PI / 8); bg.fillStyle = hexA(c2, .18); bg.beginPath(); bg.moveTo(0, 0); bg.lineTo(-60, -1400); bg.lineTo(60, -1400); bg.closePath(); bg.fill(); }
+    bg.restore();
+  }
+  bg.restore();
+}
+
+// ---------- 場面ごとの 3D の状態
+function filmsVisible(o, v) { for (const k in o.films) o.films[k].visible = v; o.tab.visible = v; }
+function state3d(t, name) {
+  resetOnigiri(O); O2.g.visible = false; drops.visible = false; floor.visible = true; floor.position.y = -1.45;
+  const [a, b] = sceneRange(name), lt = t - a;
+  if (name === "hook") {
+    const d = lerp(21, 15, easeOut(lt / 4.5));
+    const punch = Math.sin(Math.PI * prog(t, CUE.crunch - .15, .7));
+    O.g.rotation.set(.12, -.7 + lt * .18, 0);
+    camAt(d - 3.8 * punch, 0, .06, -.4 * punch);
+  } else if (name === "xray") {
+    const rv = easeInOut(prog(t, CUE.reveal, .6)), two = easeOut(prog(t, CUE.two, .5));
+    O.g.rotation.set(.1, -.2 + lt * .14, 0);
+    O.rice.material = matRice;
+    for (const k in O.films) {
+      const m = O.films[k];
+      m.material.opacity = (k.startsWith("outer") ? .2 : .16) + .3 * rv;
+      m.material.emissiveIntensity = .9 * two * (.75 + .25 * Math.sin(t * 6));
+      if (k.startsWith("outer")) m.scale.setScalar(1 + .06 * two);
+    }
+    O.nori.material.opacity = 1;
+    camAt(14.5, lt * .1, .1);
+  } else if (name === "title") {
+    O.g.position.set(0, -2.3, 0); O.g.scale.setScalar(.8); O.g.rotation.set(.15, lt * .9, 0);
+    floor.position.y = -3.4;
+    camAt(15, 0, .05, .2);
+  } else if (name === "explode") {
+    const k = easeInOut(prog(t, CUE.split, 1.0)), spin = lt * .1;
+    O.g.rotation.set(0, -.55 + spin, 0);
+    O.films.outerL.position.z = O.films.outerR.position.z = 2.9 * k;
+    O.nori.position.z = 1.95 * k;
+    O.films.innerL.position.z = O.films.innerR.position.z = 1.0 * k;
+    O.tab.position.z += 2.9 * k;
+    const bar = easeOut(prog(t, CUE.barrier, .5));
+    O.films.innerL.material.emissiveIntensity = O.films.innerR.material.emissiveIntensity = bar * (.7 + .3 * Math.sin(t * 7));
+    for (const s of ["outerL", "outerR", "innerL", "innerR"]) O.films[s].material.opacity = .32;
+    setCam([10.8, 5.0, 19.5], [.35, -1.35, 1.45]);
+  } else if (name === "moisture") {
+    floor.position.y = -1.0;
+    for (const [o, x, film] of [[O, -1.35, false], [O2, 1.35, true]]) {
+      if (o === O2) resetOnigiri(O2);
+      o.g.visible = true; o.g.position.set(x, -.1, 0); o.g.scale.setScalar(.52); o.g.rotation.set(.08, x < 0 ? .25 : -.25, 0);
+      filmsVisible(o, film);
+    }
+    // フィルムなし：海苔がしなびて色があせる
+    const soggy = easeInOut(prog(t, CUE.flow + .4, 3.2));
+    O.noriMat.color.setRGB(1 + .9 * soggy, 1 + .7 * soggy, 1 + .55 * soggy);
+    O.nori.scale.set(1 + .015 * soggy, 1 - .05 * soggy, 1 + .01 * soggy);
+    O.nori.position.y = -.05 * soggy;
+    drops.visible = t > CUE.flow - .3;
+    const fk = prog(t, CUE.flow - .3, .5);
+    DROP.forEach((d, i) => {
+      const ph = ((t * .55 + d.d) % 1);
+      const left = d.side === 0;
+      const x0 = left ? -1.35 : 1.35;
+      const ang = -Math.PI * (.15 + .7 * d.r);           // 下半分（海苔のある側）へ
+      const r0 = .3, r1 = left ? .9 : .82;
+      let rr = lerp(r0, r1, left ? ph : Math.min(ph * 1.6, 1) - Math.max(0, ph * 1.6 - 1) * 1.2);
+      if (!left && ph > .62) rr = lerp(r1, r0 + .2, (ph - .62) / .38); // フィルムで跳ね返る
+      dummy.position.set(x0 + Math.cos(ang + d.a * .2) * rr * .55, -.1 + Math.sin(ang) * rr * .55, .5);
+      dummy.scale.setScalar(fk * (left && ph > .9 ? (1 - ph) * 10 : 1));
+      dummy.updateMatrix(); drops.setMatrixAt(i, dummy.matrix);
+    });
+    drops.instanceMatrix.needsUpdate = true;
+    camAt(15.5, 0, .05);
+    updateClips(O2);
+  } else if (name === "opening") {
+    const tab = easeInOut(prog(t, CUE.tab, 1.1)), pull = easeInOut(prog(t, CUE.pull, 1.3)), land = prog(t, CUE.land, .5);
+    O.g.rotation.set(.1, .0 + .06 * Math.sin(lt * .6), 0);
+    // ①：テープを上から下へ引く（テープが短くなりながら下へ）
+    O.tab.scale.y = 2.3 * (1 - tab) + .02; O.tab.position.y = .05 - 1.2 * tab + (1 - tab) * 0;
+    // ②③：左右のフィルムを引き抜く
+    for (const s of ["L", "R"]) {
+      const dir = s === "L" ? -1 : 1;
+      for (const n of ["outer", "inner"]) {
+        const m = O.films[n + s];
+        m.position.x = dir * 3.2 * pull * (n === "outer" ? 1 : .95); m.position.z = .25 * pull; m.rotation.y = dir * .5 * pull;
+        m.material.opacity = (n === "outer" ? .2 : .16) * (1 - prog(t, CUE.pull + .9, .4));
+      }
+    }
+    // 着地：海苔が少し浮いた位置からご飯に重なる
+    O.nori.scale.setScalar(1 + .05 * (1 - easeOut(land)) * (t > CUE.pull ? 1 : 0));
+    const sh = (t > CUE.land && t < CUE.land + .25) ? Math.sin((t - CUE.land) * 80) * .03 : 0;
+    const dz = lerp(14, 11.5, easeInOut(prog(t, CUE.spot, 1.2)));
+    camAt(dz, 0, .04, 0, 0, sh);
+  } else if (name === "payoff") {
+    filmsVisible(O, false);
+    O.g.rotation.set(.12, lt * .5, 0);
+    const shake = (t > CUE.tease && t < CUE.tease + .3) ? Math.sin((t - CUE.tease) * 70) * .05 : 0;
+    O.g.position.set(0, -.2, 0);
+    camAt(14.5, 0, .08, 0, 0, shake);
+  } else if (name === "conclusion") {
+    const fk = easeOut(prog(t, CUE.film, .6));
+    O.g.position.set(0, -.2, 0); O.g.rotation.set(.15, -.4 + lt * .35, 0);
+    for (const k in O.films) { O.films[k].material.emissiveIntensity = .8 * fk * (.7 + .3 * Math.sin(t * 5)); O.films[k].material.opacity = .3; }
+    const cb = easeInOut(prog(t, CUE.callback, .8));
+    O.nori.scale.setScalar(1 + .012 * Math.sin(Math.PI * cb));
+    camAt(14.5, 0, .06);
+  }
+  updateClips(O);
+}
+
+// ---------- 場面ごとの文字・ラベル
+function labelAt(v3, s, dx, dy, alpha, col = C.navy) {
+  if (alpha <= 0) return;
+  const [x, y] = project(v3);
+  ui.save(); ui.globalAlpha = alpha; ui.strokeStyle = col; ui.lineWidth = 4;
+  ui.beginPath(); ui.arc(x, y, 9, 0, 7); ui.fillStyle = col; ui.fill();
+  // ラベルは画面内に収める（左右 150px の余白）
+  const px = clamp(x + dx + (dx > 0 ? 1 : -1) * 120, 150, W - 150), ex = px - (dx > 0 ? 1 : -1) * 120;
+  ui.beginPath(); ui.moveTo(x, y); ui.lineTo(ex, y + dy); ui.stroke(); ui.restore();
+  pill(ui, s, px, y + dy, 50, "#FFFFFF", col, alpha);
+}
+function overlay(t, name) {
+  const [a, b] = sceneRange(name);
+  if (name === "hook") {
+    const k = prog(t, CUE.crunch, .7);
+    if (k > 0 && k < 1) {
+      const s = back(prog(t, CUE.crunch, .25));
+      ui.save(); ui.translate(760, 1020); ui.rotate(-.12); ui.scale(s, s);
+      text(ui, "パリッ", 0, 0, 150, C.yellow, { weight: 900, stroke: C.navy, sw: 16, alpha: 1 - prog(t, CUE.crunch + .45, .25) });
+      ui.restore();
+    }
+  } else if (name === "xray") {
+    const rv = prog(t, CUE.reveal - .1, .9);
+    if (rv > 0 && rv < 1) { // 走査線
+      const y = lerp(300, 1250, rv);
+      const g = ui.createLinearGradient(0, y - 60, 0, y + 60); g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(.5, "rgba(255,255,255,.75)"); g.addColorStop(1, "rgba(255,255,255,0)");
+      ui.fillStyle = g; ui.fillRect(0, y - 60, W, 120);
+    }
+    text(ui, "X-RAY", 150, 300, 40, "#FFFFFF", { weight: 800, alpha: easeOut(prog(t, CUE.reveal, .4)) * .9 });
+    const q = back(prog(t, CUE.doubt, .4)) * (1 - prog(t, CUE.two - .3, .3));
+    text(ui, "？", 860, 470, 180 * clamp(q), "#FFFFFF", { weight: 900, stroke: C.navy2, sw: 12, alpha: clamp(q) });
+    const two = easeOut(prog(t, CUE.two, .45));
+    pill(ui, "1 枚目", 250, 520, 56, "#FFFFFF", C.orange, two);
+    pill(ui, "2 枚目", 830, 520, 56, "#FFFFFF", C.orange, easeOut(prog(t, CUE.two + .3, .45)));
+  } else if (name === "title") {
+    const k = easeOut(prog(t, a, .45)), k2 = easeOut(prog(t, a + .25, .45));
+    text(ui, "コンビニおにぎりの", 540, 470 - 30 * (1 - k), 74, C.navy, { alpha: k, weight: 800 });
+    text(ui, "海苔は、", 540, 600 - 30 * (1 - k), 120, C.navy, { alpha: k, weight: 900 });
+    text(ui, "なぜパリパリ？", 540, 760 - 30 * (1 - k2), 132, C.orange, { alpha: k2, weight: 900, stroke: "#FFFFFF", sw: 14 });
+  } else if (name === "explode") {
+    const k = easeOut(prog(t, CUE.split + .5, .6));
+    const g = O.g;
+    const p = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(g.matrixWorld);
+    labelAt(p(-.9, 1.0, 2.9 + .55), "外フィルム", -150, -170, k, C.cyan);
+    labelAt(p(.9, -.7, 1.95 + .5), "海苔", 170, 40, easeOut(prog(t, CUE.split + .7, .6)), C.nori);
+    labelAt(p(-1.0, -.4, 1.0 + .55), "内フィルム", -170, 170, easeOut(prog(t, CUE.split + .9, .6)), C.cyan);
+    labelAt(p(.6, .6, -.3), "ごはん", 200, -110, easeOut(prog(t, CUE.split + 1.1, .6)), "#A07A3C");
+    const bar = back(prog(t, CUE.barrier, .4));
+    if (bar > 0) pill(ui, "海苔とごはんは触れない", 540, 330, 58, "#FFFFFF", C.orange, clamp(bar));
+    const sk = easeOut(prog(t, CUE.skeptic, .35));
+    text(ui, "隔離!?", 540, 1180, 96, C.navy2, { alpha: sk, weight: 900, stroke: "#FFFFFF", sw: 12 });
+  } else if (name === "moisture") {
+    const k = easeOut(prog(t, a, .45));
+    pill(ui, "フィルムなし", 270, 330, 56, "#FFFFFF", C.water, k);
+    pill(ui, "フィルムあり", 810, 330, 56, "#FFFFFF", C.orange, k);
+    const fl = easeOut(prog(t, CUE.flow, .5));
+    text(ui, "水分　ごはん → 海苔", 270, 430, 44, C.navy2, { alpha: fl, weight: 800 });
+    text(ui, "フィルムがブロック", 810, 430, 44, C.navy2, { alpha: fl, weight: 800 });
+    const so = back(prog(t, CUE.soggy, .4));
+    text(ui, "しなしな…", 270, 1150, 84, "#6B7C8F", { alpha: clamp(so), weight: 900, stroke: "#FFFFFF", sw: 10 });
+    text(ui, "パリパリ！", 810, 1150, 84, C.orange, { alpha: clamp(so), weight: 900, stroke: "#FFFFFF", sw: 10 });
+  } else if (name === "opening") {
+    const note = easeOut(prog(t, CUE.tab - .3, .5));
+    if (note > 0) {
+      ui.save(); ui.globalAlpha = note; rrect(ui, 120, 250, 840, 64, 32); ui.fillStyle = "rgba(255,255,255,.85)"; ui.fill(); ui.restore();
+      text(ui, "※模式図。構造・開け方は商品により異なります", 540, 283, 34, C.ink, { alpha: note, weight: 700 });
+    }
+    const n1 = back(prog(t, CUE.tab - .2, .4));
+    const pull = prog(t, CUE.pull, 1.3);
+    const circ = (s, x, y, k, col) => { if (k <= 0) return; ui.save(); ui.globalAlpha = clamp(k); ui.beginPath(); ui.arc(x, y, 62 * clamp(k, 0, 1.2), 0, 7); ui.fillStyle = col; ui.fill(); ui.restore(); text(ui, s, x, y + 3, 76 * clamp(k, 0, 1.2), "#FFFFFF", { weight: 900, alpha: clamp(k) }); };
+    circ("①", 540, 420, n1 * (1 - prog(t, CUE.pull, .3)), C.red);
+    const n2 = back(prog(t, CUE.pull - .25, .4)) * (1 - prog(t, CUE.land, .3));
+    circ("②", 200 - 120 * pull, 820, n2, C.orange); circ("③", 880 + 120 * pull, 820, n2, C.orange);
+    if (t > CUE.tab && t < CUE.pull + .2) { // テープの矢印
+      const k = prog(t, CUE.tab, 1.1);
+      ui.save(); ui.strokeStyle = C.red; ui.lineWidth = 10; ui.lineCap = "round"; ui.globalAlpha = .9;
+      ui.beginPath(); ui.moveTo(640, 560); ui.lineTo(640, 560 + 360 * k); ui.lineTo(620, 530 + 360 * k); ui.moveTo(640, 560 + 360 * k); ui.lineTo(660, 530 + 360 * k); ui.stroke(); ui.restore();
+    }
+    const land = prog(t, CUE.land, .9);
+    if (land > 0 && land < 1) { // 着地の光の輪
+      for (let i = 0; i < 3; i++) {
+        const k = clamp(land * 1.4 - i * .18);
+        ui.save(); ui.globalAlpha = (1 - k) * .9; ui.strokeStyle = i === 1 ? C.yellow : C.orange; ui.lineWidth = 14 - i * 3;
+        ui.beginPath(); ui.arc(540, 860, 200 + 420 * k, 0, 7); ui.stroke(); ui.restore();
+      }
+    }
+    const tk = back(prog(t, CUE.land, .35));
+    text(ui, "着地！", 540, 400, 130 * clamp(tk, 0, 1.2), C.orange, { weight: 900, stroke: "#FFFFFF", sw: 16, alpha: clamp(tk) * (1 - prog(t, CUE.payoff - .3, .3)) });
+  } else if (name === "payoff") {
+    const k = easeOut(prog(t, a + .2, .5));
+    text(ui, "開ける手順", 540, 330, 90, C.navy, { alpha: k, weight: 900 });
+    text(ui, "＝ 合体の手順", 540, 450, 90, C.orange, { alpha: easeOut(prog(t, a + .6, .5)), weight: 900, stroke: "#FFFFFF", sw: 12 });
+    const ok = back(prog(t, CUE.correct, .35));
+    text(ui, "正解", 860, 600, 84 * clamp(ok, 0, 1.2), "#FFFFFF", { weight: 900, stroke: C.orange, sw: 18, alpha: clamp(ok) * (1 - prog(t, CUE.tear, .3)) });
+    const tr = easeOut(prog(t, CUE.tear, .45));
+    if (tr > 0) {
+      ui.save(); ui.globalAlpha = tr; rrect(ui, 120, 960, 840, 210, 30); ui.fillStyle = "rgba(255,255,255,.94)"; ui.fill();
+      ui.strokeStyle = C.red; ui.lineWidth = 6; ui.stroke(); ui.restore();
+      text(ui, "⚠ 順番を飛ばすと", 540, 1022, 54, C.red, { alpha: tr, weight: 900 });
+      text(ui, "海苔が破れやすい", 540, 1110, 66, C.navy, { alpha: tr, weight: 900 });
+    }
+  } else if (name === "conclusion") {
+    const k = easeOut(prog(t, a + .1, .5));
+    text(ui, "パリパリを", 540, 330, 80, C.navy, { alpha: k, weight: 900 });
+    text(ui, "守っていたのは…", 540, 440, 80, C.navy, { alpha: easeOut(prog(t, a + .4, .5)), weight: 900 });
+    const fk = back(prog(t, CUE.film, .45));
+    text(ui, "フィルム", 540, 1130, 170 * clamp(fk, 0, 1.2), C.orange, { weight: 900, stroke: "#FFFFFF", sw: 18, alpha: clamp(fk) * (1 - prog(t, CUE.callback, .3)) });
+    const cb = back(prog(t, CUE.callback + .5, .4));
+    if (cb > 0) {
+      ui.save(); ui.translate(540, 1130); ui.rotate(-.08); ui.scale(clamp(cb, 0, 1.2), clamp(cb, 0, 1.2));
+      ui.strokeStyle = C.red; ui.lineWidth = 10; rrect(ui, -210, -85, 420, 170, 24); ui.stroke();
+      text(ui, "別居中", 0, 6, 110, C.red, { weight: 900 });
+      ui.restore();
+    }
+  }
+}
+
+// ---------- 字幕と話者表示
+function plain(s) { return s.replace(/\*\*/g, "").replace(/ \/ /g, ""); }
+function currentLine(t) {
+  const L = TL.lines.filter(x => !x.ending);
+  for (let i = 0; i < L.length; i++) {
+    const nextStart = i + 1 < L.length ? L[i + 1].start : Infinity;
+    if (t >= L[i].start - .05 && t < Math.min(nextStart - .02, L[i].end + .45)) return L[i];
+  }
+  return null;
+}
+function subChunk(line, t) {
+  if (!Array.isArray(line.sub)) return line.sub;
+  const lens = line.sub.map(s => plain(s).length), tot = lens.reduce((a, b) => a + b, 0);
+  const k = clamp((t - line.start) / (line.end - line.start)) * tot;
+  let acc = 0;
+  for (let i = 0; i < lens.length; i++) { acc += lens[i]; if (k < acc) return line.sub[i]; }
+  return line.sub[line.sub.length - 1];
+}
+function subtitles(t) {
+  const line = currentLine(t);
+  if (!line || t >= TL.ending_start) return;
+  const rows = subChunk(line, t).split(" / ");
+  let size = 64;
+  const cx = 510, cy = 1395;
+  ui.font = `800 ${size}px ${FONT}`;
+  let wmax = Math.max(...rows.map(r => ui.measureText(r.replace(/\*\*/g, "")).width));
+  if (wmax > 860) { size = Math.floor(size * 860 / wmax); ui.font = `800 ${size}px ${FONT}`; wmax = 860; } // 枠からはみ出さないよう縮める
+  const lh = size * 1.38;
+  const bw = Math.min(930, wmax + 70), bh = rows.length * lh + 36;
+  const k = easeOut(prog(t, line.start - .05, .16));
+  const col = line.who === "M" ? C.M : C.Wc;
+  ui.save(); ui.globalAlpha = k;
+  ui.shadowColor = "rgba(0,0,0,.25)"; ui.shadowBlur = 24; ui.shadowOffsetY = 8;
+  rrect(ui, cx - bw / 2, cy - bh / 2, bw, bh, 26); ui.fillStyle = "rgba(10,20,36,.86)"; ui.fill();
+  ui.shadowColor = "transparent";
+  ui.fillStyle = col; rrect(ui, cx - bw / 2, cy - bh / 2, 12, bh, 6); ui.fill();
+  rows.forEach((r, i) => rich(ui, r, cx, cy - (rows.length - 1) * lh / 2 + i * lh + 2, size, "#FFFFFF", C.yellow));
+  // 話者タグ：M＝青の丸、W＝橙の六角形。声の大きさで動くバー
+  const tx = cx - bw / 2, ty = cy - bh / 2 - 66;
+  rrect(ui, tx, ty, 210, 54, 27); ui.fillStyle = col; ui.fill();
+  ui.fillStyle = "#FFFFFF";
+  if (line.who === "M") { ui.beginPath(); ui.arc(tx + 30, ty + 27, 14, 0, 7); ui.fill(); }
+  else { ui.beginPath(); for (let i = 0; i < 6; i++) { const an = Math.PI / 3 * i + Math.PI / 6; ui[i ? "lineTo" : "moveTo"](tx + 30 + 15 * Math.cos(an), ty + 27 + 15 * Math.sin(an)); } ui.closePath(); ui.fill(); }
+  text(ui, line.who, tx + 62, ty + 28, 32, "#FFFFFF", { align: "left", weight: 900 });
+  const fi = Math.floor((t - line.start) * TL.fps), env = line.env || [];
+  for (let bI = 0; bI < 5; bI++) {
+    const e = fi >= 0 && fi < env.length ? env[Math.max(0, Math.min(env.length - 1, fi - bI))] : 0;
+    const h = 8 + 28 * e * (.6 + .4 * Math.sin(bI * 1.7 + 1));
+    ui.fillStyle = "#FFFFFF"; ui.fillRect(tx + 108 + bI * 18, ty + 27 - h / 2, 10, h);
+  }
+  ui.restore();
+}
+
+function header(name) {
+  const dark = name === "xray";
+  ui.save(); rrect(ui, 40, 92, 300, 60, 30); ui.fillStyle = dark ? "rgba(10,20,36,.35)" : "rgba(255,255,255,.75)"; ui.fill(); ui.restore();
+  text(ui, "世界の解剖室", 190, 123, 32, dark ? "#FFFFFF" : C.navy2, { weight: 700 });
+}
+
+// ---------- 1 コマ
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start;
+  if (t >= es) { // 共通エンディング（2D だけで描く）
+    renderer.clear();
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits });
+    return;
+  }
+  const name = sceneAt(t), [a, b] = sceneRange(name);
+  // 背景：前の場面からクロスフェード
+  const i = SCN.indexOf(name);
+  const fade = prog(t, a, .35);
+  if (i > 0 && fade < 1) drawBackground(t, SCN[i - 1], 1);
+  drawBackground(t, name, fade < 1 && i > 0 ? fade : 1);
+  state3d(t, name);
+  renderer.render(scene, camera);
+  overlay(t, name);
+  header(name);
+  subtitles(t);
+  // 場面の切り替え：短い白のフラッシュ（エンディング直前は除く）
+  const fl = 1 - prog(t, a, .22);
+  if (i > 0 && fl > 0) { ui.fillStyle = `rgba(255,255,255,${fl * .55})`; ui.fillRect(0, 0, W, H); }
+}
+
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  drawBackground(0, "payoff", 1);
+  resetOnigiri(O); O2.g.visible = false; drops.visible = false; floor.visible = true; floor.position.y = -1.45;
+  O.g.position.set(0, -.55, 0); O.g.rotation.set(.12, -.5, 0);
+  O.films.outerL.position.x = -1.1; O.films.innerL.position.x = -1.0; O.films.outerL.rotation.y = -.35; O.films.innerL.rotation.y = -.3;
+  O.films.outerR.position.x = 1.1; O.films.innerR.position.x = 1.0; O.films.outerR.rotation.y = .35; O.films.innerR.rotation.y = .3;
+  for (const k in O.films) O.films[k].material.emissiveIntensity = .6;
+  setCam([0, .3, 8.4], [0, -.3, 0]); updateClips(O); renderer.render(scene, camera);
+  text(ui, "コンビニおにぎりの", 540, 300, 76, C.navy, { weight: 800 });
+  text(ui, "海苔は、", 540, 430, 124, C.navy, { weight: 900 });
+  text(ui, "なぜパリパリ？", 540, 1380, 140, C.orange, { weight: 900, stroke: "#FFFFFF", sw: 16 });
+  header("payoff");
+}
+
+function setTimeline(tl) { TL = tl; CUE = { ...tl.cues, endcard: tl.ending_start }; }
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>

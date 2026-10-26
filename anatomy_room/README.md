@@ -7,9 +7,11 @@ YouTube Shorts チャンネルの制作プロジェクトです。
 
 ## 現在の状態
 
-**パイロット 5 本は第 2 回監査を経て v2 に改訂済み。第 1 話（pilot_005）の完成動画を制作しました。**
+**パイロット 5 本は第 2 回監査を経て v2 に改訂済み。第 1 話（pilot_005）と第 2 話（pilot_003、演出刷新版）の完成動画を制作しました。**
 
-- 完成動画：`production/pilot_005/world_anatomy_pilot_005.mp4`（制作方法は `production/pilot_005/production_notes.md`）
+- 第 1 話：`production/pilot_005/world_anatomy_pilot_005.mp4`（制作方法は `production/pilot_005/production_notes.md`）
+- 第 2 話：`production/pilot_003/world_anatomy_pilot_003.mp4`（制作方法は `production/pilot_003/production_notes.md`、改善点は `production/pilot_003/IMPROVEMENTS_FROM_EP1.md`）
+- 全動画共通のエンディング：`docs/ENDING_SPEC.md`
 - 監査：`audit/summary.md`
 - **運営者向けマニュアル（PDF）**：`docs/manual/shorts_manual.pdf`（元は `docs/manual/manual.html`。`node anatomy_room/docs/manual/build_manual.js` で再生成）
 
@@ -17,7 +19,7 @@ YouTube Shorts チャンネルの制作プロジェクトです。
 |----|---------|------|------|
 | pilot_001 | 送ったメッセージは、空を飛んでいるのか？ | インターネット | PASS |
 | pilot_002 | 蛇口の水は、誰が押している？ | インフラ（水道） | PASS |
-| pilot_003 | コンビニおにぎりの海苔は、なぜパリパリなのか？ | 日常・食品包装 | NEEDS_REVISION |
+| pilot_003 | コンビニおにぎりの海苔は、なぜパリパリなのか？ | 日常・食品包装 | v3 に改訂・**動画化済み**（第 2 話。開封手順は模式図と明記） |
 | pilot_004 | エレベーターのロープが切れたら、落ちる？ | 機械・安全・歴史 | PASS |
 | pilot_005 | マイナス×マイナスは、なぜプラスになる？ | 数学 | PASS・**動画化済み** |
 
@@ -32,7 +34,8 @@ anatomy_room/
 │   ├── SCRIPT_RULES.md           # 台本の構成・書式・字幕
 │   ├── FACT_CHECK_POLICY.md      # 事実確認・出典管理・判定ラベル
 │   ├── PRODUCTION_WORKFLOW.md    # 工程と開始条件
-│   └── RESEARCH_ENVIRONMENT.md   # 調査環境の制約（ネットワーク制限）
+│   ├── RESEARCH_ENVIRONMENT.md   # 調査環境の制約（ネットワーク制限）
+│   └── ENDING_SPEC.md            # 全動画共通のエンディング
 ├── scripts/                      # シナリオ（※動画のプログラムではなく「台本」）
 │   └── pilot_00N/
 │       ├── script.md             # 基本情報・フック・完全な台本
@@ -41,7 +44,9 @@ anatomy_room/
 │   ├── internal_review/          # 自己レビュー（pilot_00N_review.md, SUMMARY.md）
 │   └── chatgpt_review/           # ChatGPT にそのまま貼れるレビュー資料（自動生成）
 ├── audit/                        # 第 2 回監査の報告書（pilot_00N_audit.md, summary.md）
+├── production/common/            # 全話共通：声の設定 voices.json、エンディング ending.js、three.js
 ├── production/pilot_005/         # 第 1 話の制作物（完成動画・制作スクリプト・完成台本・検証記録）
+├── production/pilot_003/         # 第 2 話の制作物（3D・明るい画面・新しい声）
 ├── templates/
 │   └── script_template.md        # 新しいシナリオのひな形
 ├── branding/                     # チャンネルのアイコン・ヘッダー（render.js で生成）

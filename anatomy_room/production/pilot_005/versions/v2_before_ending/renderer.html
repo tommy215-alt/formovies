@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_005 renderer</title>
+<style>html,body{margin:0;background:#0A1424}canvas{display:block}</style>
+</head><body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// pilot_005 の映像を描くレンダラー。renderFrame(t) が時刻 t 秒の 1 コマを描く（決定的：同じ t なら同じ絵）。
+// タイミングは work/timeline.json（セリフの開始・終了と、きっかけ cues）から取る。
+const W = 1080, H = 1920;
+const C = {
+  bg: "#0A1424", bg2: "#10203A", grid: "#1C3150", cyan: "#46D3F0", white: "#EEF4FA", sub: "#9FC3D9",
+  neg: "#FF7A85", pos: "#5FE3A1", M: "#FFB547", W: "#46D3F0", emph: "#FFD166", paper: "#F3E9D6", ink: "#3A2E22",
+};
+const FONT = '"Noto Sans CJK JP", sans-serif';
+const MONO = '"Noto Sans Mono CJK JP", monospace';
+const ctx = document.getElementById("c").getContext("2d");
+let TL = null, CUE = {};
+
+// ---------- 数学ユーティリティ
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = k => 1 - Math.pow(1 - clamp(k), 3);
+const easeInOut = k => { k = clamp(k); return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
+const prog = (t, a, d) => clamp((t - a) / d);
+// [a, b) の区間で、入り fi 秒・出 fo 秒のフェード
+const win = (t, a, b, fi = .35, fo = .35) => Math.min(prog(t, a, fi), 1 - prog(t, b - fo, fo));
+const back = k => { k = clamp(k); const s = 1.7; return 1 + (s + 1) * Math.pow(k - 1, 3) + s * Math.pow(k - 1, 2); };
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+function font(size, weight = 700, fam = FONT) { return `${weight} ${size}px ${fam}`; }
+function text(s, x, y, size, color, { weight = 700, align = "center", alpha = 1, fam = FONT, base = "middle" } = {}) {
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.font = font(size, weight, fam); ctx.fillStyle = color;
+  ctx.textAlign = align; ctx.textBaseline = base; ctx.fillText(s, x, y); ctx.restore();
+}
+function rrect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+// 色付きトークン列の数式。tokens: [[文字列, 色], ...]。中央揃えで描き、各トークンの位置を返す
+function measureTokens(tokens, size) {
+  ctx.font = font(size, 700);
+  return tokens.map(([s]) => ctx.measureText(s).width);
+}
+function drawTokens(tokens, cx, y, size, { alpha = 1, alphas = null } = {}) {
+  const ws = measureTokens(tokens, size);
+  const total = ws.reduce((a, b) => a + b, 0);
+  let x = cx - total / 2;
+  const boxes = [];
+  tokens.forEach(([s, col], i) => {
+    const a = alpha * (alphas ? alphas[i] : 1);
+    if (a > 0) text(s, x, y, size, col, { align: "left", alpha: a });
+    boxes.push({ x, w: ws[i] }); x += ws[i];
+  });
+  return boxes;
+}
+const N = (s) => [s, C.neg], P = (s) => [s, C.pos], Wt = (s) => [s, C.white], Cy = (s) => [s, C.cyan];
+
+// ---------- 背景（ドット格子と、遠近の床グリッド）
+function background(t) {
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, C.bg2); g.addColorStop(.55, C.bg); g.addColorStop(1, "#070E1A");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = hexA("#1C3150", .9);
+  // 背景は時刻に依存させない（場面ごとに書き出した映像を、位置がずれても使い回せるように）
+  const off = 0;
+  for (let y = -48 + off; y < 1250; y += 48)
+    for (let x = 24; x < W; x += 48) { ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
+  // 床：消失点 (540, 1150) に向かう線と、手前へ流れる横線
+  ctx.save();
+  const vy = 1150, fade = ctx.createLinearGradient(0, vy, 0, H);
+  fade.addColorStop(0, hexA(C.cyan, 0)); fade.addColorStop(1, hexA(C.cyan, .22));
+  ctx.strokeStyle = fade; ctx.lineWidth = 2;
+  for (let i = -12; i <= 12; i++) { ctx.beginPath(); ctx.moveTo(540, vy); ctx.lineTo(540 + i * 160, H); ctx.stroke(); }
+  for (let k = 0; k < 14; k++) {
+    const z = (k + .5) / 14; const y = vy + (H - vy) * z * z;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.restore();
+  // 周辺減光
+  const v = ctx.createRadialGradient(540, 820, 300, 540, 900, 1250);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.45)");
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+}
+
+// ---------- ブランドの「解剖された立方体」マーク（branding/mark.js と同じ形）
+function cubeMark(cx, cy, s, alpha = 1) {
+  ctx.save(); ctx.globalAlpha *= alpha;
+  const k = .8660254, P = (x, y) => [cx + x, cy + y];
+  const top = P(0, -s), ur = P(k * s, -s / 2), bot = P(0, s), ll = P(-k * s, s / 2), ul = P(-k * s, -s / 2), c = P(0, 0);
+  const poly = (pts, fill) => { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); };
+  poly([top, ur, c, ul], "#EAF1F8"); poly([ul, c, bot, ll], "#A9BDD3");
+  const dx = s * .1, dy = s * .058;
+  const R = (u, v) => [c[0] + dx + u * (ur[0] - c[0]) + v * (bot[0] - c[0]), c[1] + dy + u * (ur[1] - c[1]) + v * (bot[1] - c[1])];
+  ctx.strokeStyle = C.cyan; ctx.lineWidth = s * .028 * 1.4; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(...c); ctx.lineTo(...bot); ctx.moveTo(...c); ctx.lineTo(...ur); ctx.stroke();
+  ctx.lineWidth = s * .028;
+  ctx.beginPath(); [R(0, 0), R(1, 0), R(1, 1), R(0, 1)].forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath();
+  ctx.fillStyle = hexA(C.cyan, .08); ctx.fill(); ctx.stroke();
+  const tr = [[[.18, .2], [.5, .2], [.5, .45], [.82, .45]], [[.18, .55], [.32, .55], [.32, .82], [.68, .82]], [[.5, .45], [.5, .65], [.82, .65]]];
+  tr.forEach(l => { ctx.beginPath(); l.forEach(([u, v], i) => i ? ctx.lineTo(...R(u, v)) : ctx.moveTo(...R(u, v))); ctx.stroke(); });
+  [[.18, .2], [.82, .45], [.18, .55], [.68, .82], [.82, .65], [.5, .45]].forEach(([u, v]) => {
+    ctx.beginPath(); ctx.arc(...R(u, v), s * .045, 0, 7); ctx.fillStyle = C.bg; ctx.fill(); ctx.stroke(); });
+  ctx.restore();
+}
+
+function header(t, alpha) {
+  if (alpha <= 0) return;
+  cubeMark(84, 118, 26, alpha);
+  text("世界の解剖室", 126, 120, 30, C.sub, { align: "left", alpha, weight: 500 });
+}
+
+// ---------- 借金の紙（冒頭と締め）
+function bill(x, y, w, h, rot, label, alpha = 1) {
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.translate(x, y); ctx.rotate(rot);
+  ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12;
+  rrect(-w / 2, -h / 2, w, h, w * .04); ctx.fillStyle = C.paper; ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.strokeStyle = hexA(C.ink, .35); ctx.lineWidth = w * .008; rrect(-w / 2 + w * .04, -h / 2 + h * .07, w * .92, h * .86, w * .03); ctx.stroke();
+  text("借用書", -w * .38, -h * .26, w * .09, C.ink, { align: "left" });
+  for (let i = 0; i < 3; i++) { ctx.fillStyle = hexA(C.ink, .25); ctx.fillRect(-w * .38, -h * .05 + i * h * .13, w * .4, h * .04); }
+  // 赤いマイナスの判
+  ctx.strokeStyle = "#D8434F"; ctx.lineWidth = w * .02; ctx.beginPath(); ctx.arc(w * .24, h * .05, h * .28, 0, 7); ctx.stroke();
+  text(label, w * .24, h * .07, h * .36, "#D8434F");
+  ctx.restore();
+}
+
+// ---------- 各シーン
+function sceneHook(t) {
+  const a0 = CUE.bills_in, ac = CUE.collide, ag = CUE.giant, ad = CUE.deflate, end = CUE.title;
+  const A = win(t, 0, end + .2, .01, .4);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  const k = easeOut(prog(t, a0, ac - a0));
+  const big = easeOut(prog(t, ag, .5)), shrink = easeInOut(prog(t, ad, .6));
+  if (t < ag + .25) {
+    // 2 枚の借用書が左右から飛んできてぶつかる
+    const sep = lerp(700, 170, k) * (1 - big);
+    const al = 1 - prog(t, ag, .25);
+    bill(540 - sep, 720 + (1 - k) * 80, 330, 210, lerp(-.5, -.12, k), "−", al);
+    bill(540 + sep, 720 - (1 - k) * 80, 330, 210, lerp(.5, .12, k), "−", al);
+    const fx = prog(t, ac, .35);
+    if (fx > 0 && fx < 1) { // 衝突の閃光と「×」
+      ctx.save(); ctx.globalAlpha *= 1 - fx;
+      const g = ctx.createRadialGradient(540, 720, 0, 540, 720, 260 * (.5 + fx));
+      g.addColorStop(0, "rgba(255,255,255,.85)"); g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 400, W, 650); ctx.restore();
+    }
+    if (t > ac) text("×", 540, 720, 140, C.white, { alpha: 1 - prog(t, ag, .2) });
+  }
+  if (t >= ag) {
+    // 合体して巨大な「大借金」に（ゆれる）→ しぼんで「？」になる
+    const shake = (1 - shrink) * Math.sin(t * 40) * 6 * (1 - prog(t, ag + .4, .6));
+    const s = lerp(.6, 1.0, back(prog(t, ag, .45))) * (1 - shrink * .85);
+    bill(540 + shake, 720, 760 * s, 480 * s, -.04, "−−", 1 - shrink);
+    text("大借金！？", 540 + shake, 1040, 92 * (1 - shrink * .6), C.neg, { alpha: (1 - shrink) * big });
+    const q = back(prog(t, ad + .3, .5));
+    if (q > 0) text("？", 540, 730, 300 * q, C.cyan, { alpha: clamp(q) });
+  }
+  ctx.restore();
+}
+
+function sceneTitle(t) {
+  const A = win(t, CUE.title, CUE.pattern + .3, .2, .45);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  const r = easeOut(prog(t, CUE.title, .7));
+  // 走査線で上から現れる
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 380, W, 600 * r); ctx.clip();
+  text("マイナス × マイナス は", 540, 560, 84, C.white);
+  drawTokens([Wt("なぜ"), P("プラス？")], 540, 720, 120);
+  drawTokens([N("(−)"), Wt(" × "), N("(−)"), Wt(" = "), P("(+)")], 540, 900, 96);
+  ctx.restore();
+  if (r < 1) { ctx.fillStyle = C.cyan; ctx.globalAlpha *= .9; ctx.fillRect(80, 380 + 600 * r, 920, 4); }
+  ctx.restore();
+}
+
+// パターン：左に式の表、右に縦の数直線
+const ROWS = [["3", "−6", C.neg], ["2", "−4", C.neg], ["1", "−2", C.neg], ["0", "0", C.white]];
+const NL = { x: 840, y0: 730, s: 58 }; // 縦の数直線：y = y0 − v·s
+const vy = v => NL.y0 - v * NL.s;
+
+function scenePattern(t) {
+  const A = win(t, CUE.pattern, CUE.dist + .1, .35, .45);
+  if (A <= 0) return;
+  const frozen = prog(t, CUE.freeze, .4);
+  ctx.save(); ctx.globalAlpha = A * (1 - .62 * frozen);
+  text("かけ算を下に延ばすと…", 360, 380, 50, C.sub, { alpha: easeOut(prog(t, CUE.pattern, .5)), weight: 500 });
+  const rowT = [CUE.row0, CUE.row1, CUE.row2, CUE.row3];
+  ROWS.forEach(([a, r, col], i) => {
+    const k = easeOut(prog(t, rowT[i], .4));
+    if (k <= 0) return;
+    const y = 520 + i * 120;
+    ctx.save(); ctx.globalAlpha *= k; ctx.translate(-60 * (1 - k), 0);
+    drawTokens([Wt(a), Wt(" × "), N("(−2)"), Wt(" = "), [r, col]], 360, y, 72);
+    ctx.restore();
+  });
+  // ? の行
+  const kq = easeOut(prog(t, CUE.rowq, .4));
+  if (kq > 0) {
+    const y = 520 + 4 * 120;
+    ctx.save(); ctx.globalAlpha *= kq;
+    const ghost = prog(t, CUE.ghost, .3);
+    const bx = drawTokens([N("(−1)"), Wt(" × "), N("(−2)"), Wt(" = "), Wt("　　　")], 360, y, 72);
+    const b = bx[4], blink = .6 + .4 * Math.sin(t * 6);
+    ctx.setLineDash([10, 8]); ctx.lineWidth = 4; ctx.strokeStyle = ghost > 0 ? C.pos : hexA(C.white, blink);
+    rrect(b.x + 14, y - 48, b.w - 14, 96, 14); ctx.stroke(); ctx.setLineDash([]);
+    text(ghost > 0 ? "+2？" : "？", b.x + 7 + b.w / 2, y, 60, ghost > 0 ? C.pos : C.white, { alpha: ghost > 0 ? ghost : 1 });
+    ctx.restore();
+  }
+  // 縦の数直線
+  ctx.strokeStyle = hexA(C.white, .7); ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(NL.x, vy(3.4)); ctx.lineTo(NL.x, vy(-7.2)); ctx.stroke();
+  for (let v = -7; v <= 3; v++) {
+    const major = v % 2 === 0;
+    ctx.beginPath(); ctx.moveTo(NL.x - (major ? 16 : 9), vy(v)); ctx.lineTo(NL.x + (major ? 16 : 9), vy(v)); ctx.stroke();
+    if (major) text(v > 0 ? `+${v}` : v === 0 ? "0" : `−${-v}`, NL.x + 34, vy(v), 34, v < 0 ? C.neg : v > 0 ? C.pos : C.white, { align: "left", weight: 500 });
+  }
+  // 点の位置：行が出るたびに −6 → −4 → −2 → 0（＋2 ずつ）
+  const vals = [-6, -4, -2, 0];
+  let v = null;
+  rowT.forEach((ct, i) => {
+    if (t >= ct) v = i === 0 ? vals[0] : lerp(vals[i - 1], vals[i], easeInOut(prog(t, ct, .45)));
+  });
+  // ＋2 の弧
+  const pulse = 1 + .6 * Math.max(0, Math.sin((t - CUE.plus2) * 5)) * (t > CUE.plus2 && t < CUE.plus2 + 2 ? 1 : 0);
+  for (let i = 1; i < 4; i++) {
+    const k = easeOut(prog(t, rowT[i], .45));
+    if (k <= 0) continue;
+    const ya = vy(vals[i - 1]), yb = vy(vals[i]);
+    ctx.save(); ctx.strokeStyle = hexA(C.pos, .8); ctx.lineWidth = 4 * Math.min(pulse, 1.6);
+    ctx.beginPath(); ctx.arc(NL.x - 4, (ya + yb) / 2, (ya - yb) / 2, Math.PI / 2, Math.PI / 2 + Math.PI * k); ctx.stroke(); ctx.restore();
+    text("+2", NL.x - 90, (ya + yb) / 2, 34 * Math.min(pulse, 1.4), C.pos, { alpha: k });
+  }
+  if (v !== null) { ctx.beginPath(); ctx.arc(NL.x, vy(v), 15, 0, 7); ctx.fillStyle = C.cyan; ctx.shadowColor = C.cyan; ctx.shadowBlur = 24; ctx.fill(); ctx.shadowBlur = 0; }
+  const gk = easeOut(prog(t, CUE.ghost, .5));
+  if (gk > 0) { // 予想した位置（点線）
+    const ya = vy(0), yb = vy(2);
+    ctx.save(); ctx.setLineDash([8, 8]); ctx.strokeStyle = hexA(C.pos, .8); ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(NL.x - 4, (ya + yb) / 2, (ya - yb) / 2, Math.PI / 2, Math.PI / 2 + Math.PI * gk); ctx.stroke();
+    ctx.beginPath(); ctx.arc(NL.x, vy(2), 16, 0, 7); ctx.stroke(); ctx.restore();
+    text("？", NL.x - 90, vy(1), 40, C.pos, { alpha: gk });
+  }
+  ctx.restore();
+  sceneDoubt(t, A);
+}
+
+function sceneDoubt(t, A) {
+  const k = prog(t, CUE.freeze, .3);
+  if (k <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  const b1 = easeOut(prog(t, CUE.badge1, .4)), b2 = easeOut(prog(t, CUE.badge2, .4));
+  // M の疑問：大きな「？」→ 右上へ小さく
+  const move = easeInOut(prog(t, CUE.badge1, .6));
+  const qs = back(prog(t, CUE.freeze, .45));
+  text("？", lerp(540, 900, move), lerp(780, 420, move), lerp(340, 120, move) * qs, C.M, { alpha: clamp(qs) });
+  // 判定のバッジ
+  const badge = (y, kk, icon, iconCol, label, sub) => {
+    if (kk <= 0) return;
+    ctx.save(); ctx.globalAlpha *= kk; ctx.translate(0, 30 * (1 - kk));
+    rrect(110, y - 80, 860, 160, 26); ctx.fillStyle = "rgba(8,18,34,.92)"; ctx.fill();
+    ctx.strokeStyle = hexA(iconCol, .9); ctx.lineWidth = 4; ctx.stroke();
+    text(icon, 200, y, 80, iconCol);
+    text(label, 270, y - 22, 52, C.white, { align: "left" });
+    text(sub, 270, y + 40, 36, C.sub, { align: "left", weight: 500 });
+    ctx.restore();
+  };
+  badge(700, b1, "✓", C.pos, "パターン ＝ 予想のヒント", "答えの見当をつけるのに役立つ");
+  badge(900, b2, "✕", C.neg, "それだけでは証明にならない", "続く理由を、ルールから示す必要がある");
+  ctx.restore();
+}
+
+// 分配法則：公式カード → 面積図（正の数の例）
+const U = 78;
+function formulaCard(y, size, alpha, abc = null) {
+  const a = abc ? abc[0] : Cy("a"), b = abc ? abc[1] : Cy("b"), c = abc ? abc[2] : Cy("c");
+  drawTokens([a, Wt(" × ("), b, Wt(" + "), c, Wt(") = "), a, Wt(" × "), b, Wt(" + "), a, Wt(" × "), c], 540, y, size, { alpha });
+}
+function sceneDist(t) {
+  const A = win(t, CUE.dist, CUE.eq1 + .2, .35, .5);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  const toTop = easeInOut(prog(t, CUE.eq1 - .2, .5));
+  text("分配法則", 540, 380, 64, C.cyan, { alpha: easeOut(prog(t, CUE.dist, .5)) * (1 - toTop) });
+  const fk = easeOut(prog(t, CUE.formula, .5));
+  const bridge = easeInOut(prog(t, CUE.bridge, .6));
+  if (fk > 0) formulaCard(lerp(500, 470, bridge), 58, fk * (1 - .3 * bridge));
+  // 面積図（bridge で完全に消す：負の数の導出とは別物）
+  const ak = easeOut(prog(t, CUE.area, .5)) * (1 - easeInOut(prog(t, CUE.bridge, .45)));
+  if (ak > 0) {
+    ctx.save(); ctx.globalAlpha *= ak;
+    const sp = easeInOut(prog(t, CUE.split, .6));
+    const x0 = (W - 7 * U) / 2 - 30 * sp, y0 = 720, gap = 60 * sp;
+    const part = (x, w, col) => {
+      ctx.fillStyle = hexA(col, .22); ctx.fillRect(x, y0, w * U, 2 * U);
+      ctx.strokeStyle = hexA(col, .5); ctx.lineWidth = 2;
+      for (let i = 1; i < w; i++) { ctx.beginPath(); ctx.moveTo(x + i * U, y0); ctx.lineTo(x + i * U, y0 + 2 * U); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(x, y0 + U); ctx.lineTo(x + w * U, y0 + U); ctx.stroke();
+      ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.strokeRect(x, y0, w * U, 2 * U);
+    };
+    part(x0, 3, C.cyan); part(x0 + 3 * U + gap, 4, C.pos);
+    text("2", x0 - 34, y0 + U, 44, C.white);
+    text("3", x0 + 1.5 * U, y0 + 2 * U + 40, 44, C.cyan);
+    text("4", x0 + 3 * U + gap + 2 * U, y0 + 2 * U + 40, 44, C.pos);
+    text("※ 正の数での例", 120, 650, 34, C.emph, { align: "left", weight: 500 });
+    drawTokens([Wt("2 × (3 + 4) = "), Wt("14")], 540, 1010, 58, { alpha: 1 - sp });
+    drawTokens([Cy("2 × 3"), Wt(" + "), P("2 × 4"), Wt(" = 6 + 8 = 14")], 540, 1010, 58, { alpha: sp });
+    ctx.restore();
+  }
+  // マイナスを当てはめる
+  if (bridge > 0) {
+    const sub = easeOut(prog(t, CUE.bridge + .3, .5));
+    drawTokens([Cy("a"), Wt(" = "), N("−2"), Wt("　 "), Cy("b"), Wt(" = "), Wt("3"), Wt("　 "), Cy("c"), Wt(" = "), N("−3")], 540, 640, 54, { alpha: sub });
+    ctx.save(); ctx.globalAlpha *= sub;
+    ctx.font = font(40, 500);
+    const cw = ctx.measureText("負の数でも同じルールが成り立つなら？").width + 80;
+    rrect(540 - cw / 2, 760, cw, 100, 50); ctx.strokeStyle = C.cyan; ctx.lineWidth = 3; ctx.stroke();
+    text("負の数でも同じルールが成り立つなら？", 540, 810, 40, C.cyan, { weight: 500 });
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// 核心の導出
+function sceneDerive(t) {
+  const A = win(t, CUE.eq1, CUE.general + .1, .3, .45);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  formulaCard(380, 40, .55);
+  const focus = 1 - .55 * easeOut(prog(t, CUE.eq3, .5));
+  // eq1: (−2) × (3 + (−3)) = 0
+  const k1 = easeOut(prog(t, CUE.eq1, .45)), kz = easeOut(prog(t, CUE.zero, .4)), kd = easeOut(prog(t, CUE.eq1done, .4));
+  if (k1 > 0) {
+    const toks = [N("(−2)"), Wt(" × "), Wt("(3 + "), N("(−3)"), Wt(")"), Wt(" = "), Cy("0")];
+    const bx = drawTokens(toks, 540, 540, 68, { alpha: k1 * focus, alphas: [1, 1, 1, 1, 1, kd, kd] });
+    if (kz > 0) {
+      const x = bx[2].x - 8, w = bx[4].x + bx[4].w - bx[2].x + 16;
+      ctx.save(); ctx.globalAlpha *= kz * focus; ctx.strokeStyle = C.cyan; ctx.lineWidth = 4;
+      rrect(x, 540 - 52, w, 104, 18); ctx.stroke();
+      text("かっこの中 ＝ 0", x + w / 2, 540 + 92, 38, C.cyan, { weight: 500 });
+      ctx.restore();
+    }
+  }
+  // eq2: (−2) × 3 + (−2) × (−3) = 0
+  const k2 = easeOut(prog(t, CUE.eq2, .45));
+  if (k2 > 0) drawTokens([N("(−2)"), Wt(" × 3 + "), N("(−2)"), Wt(" × "), N("(−3)"), Wt(" = 0")], 540, 760, 62, { alpha: k2 * focus });
+  // eq3: −6 + ? = 0（大きく）
+  const k3 = easeOut(prog(t, CUE.eq3, .5)), ks = prog(t, CUE.solve, .5);
+  if (k3 > 0) {
+    ctx.save(); ctx.globalAlpha *= k3; ctx.translate(0, 40 * (1 - k3));
+    const bx = drawTokens([N("−6"), Wt(" + "), Wt("　 　"), Wt(" = 0")], 540, 980, 120);
+    const b = bx[2];
+    if (ks >= .5) { // ひらめきの光（枠のまわりだけ、数式より先に描く）
+      const burst = prog(t, CUE.solve + .25, .8), bxc = b.x + b.w / 2;
+      ctx.save(); ctx.globalAlpha *= 1 - burst; ctx.strokeStyle = C.pos; ctx.lineWidth = 5;
+      for (let i = 0; i < 12; i++) {
+        const an = i * Math.PI / 6 + Math.PI / 12, r0 = 105 + 55 * burst, r1 = r0 + 32;
+        if (Math.abs(Math.sin(an)) < .45) continue; // 左右の「+」「=」に重ねない
+        ctx.beginPath(); ctx.moveTo(bxc + Math.cos(an) * r0 * 1.15, 980 + Math.sin(an) * r0 * .8);
+        ctx.lineTo(bxc + Math.cos(an) * r1 * 1.15, 980 + Math.sin(an) * r1 * .8); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    const flip = Math.abs(Math.cos(Math.PI * clamp(ks)));
+    const solved = ks >= .5;
+    ctx.save(); ctx.translate(b.x + b.w / 2, 980); ctx.scale(1, Math.max(.02, flip));
+    ctx.lineWidth = 6; ctx.strokeStyle = solved ? C.pos : hexA(C.white, .7 + .3 * Math.sin(t * 6));
+    if (!solved) ctx.setLineDash([14, 10]);
+    rrect(-b.w / 2 + 6, -78, b.w - 12, 156, 22); ctx.stroke(); ctx.setLineDash([]);
+    text(solved ? "+6" : "？", 0, 0, 112, solved ? C.pos : C.white);
+    ctx.restore();
+    ctx.restore();
+  }
+  // 結論：(−2) × (−3) = +6
+  const kf = easeOut(prog(t, CUE.final, .5));
+  if (kf > 0) {
+    const bx = drawTokens([N("(−2)"), Wt(" × "), N("(−3)"), Wt(" = "), P("+6")], 540, 1150, 80, { alpha: kf });
+    ctx.fillStyle = hexA(C.pos, kf); const l = bx[0].x, r = bx[4].x + bx[4].w;
+    ctx.fillRect(l, 1150 + 54, (r - l) * easeOut(prog(t, CUE.final + .2, .6)), 6);
+  }
+  ctx.restore();
+}
+
+function sceneGeneral(t) {
+  const A = win(t, CUE.general, CUE.numline + .1, .35, .45);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  text("負の数でも", 540, 560, 64, C.white, { alpha: easeOut(prog(t, CUE.general, .4)) });
+  text("同じ計算ルールを保つなら", 540, 650, 64, C.white, { alpha: easeOut(prog(t, CUE.general + .3, .4)) });
+  const ka = easeOut(prog(t, CUE.general + 1.0, .5));
+  ctx.save(); ctx.globalAlpha *= ka; ctx.strokeStyle = C.cyan; ctx.lineWidth = 6; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(540, 720); ctx.lineTo(540, 720 + 90 * ka); ctx.moveTo(515, 785 * 1 + 0); ctx.lineTo(540, 812); ctx.lineTo(565, 785); ctx.stroke(); ctx.restore();
+  const kb = back(prog(t, CUE.general + 1.4, .5));
+  if (kb > 0) drawTokens([N("(−)"), Wt(" × "), N("(−)"), Wt(" = "), P("(+)")], 540, 930, 120 * clamp(kb, .3, 1.2), { alpha: clamp(kb) });
+  const k2 = easeOut(prog(t, CUE.general2, .5));
+  text("ルールを決めたら、答えは論理で決まる", 540, 1100, 40, C.sub, { alpha: k2, weight: 500 });
+  ctx.restore();
+}
+
+// 数直線の反転（3D）
+function sceneNumline(t) {
+  const A = win(t, CUE.numline, CUE.outro + .1, .35, .45);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  const cx = 540, cy = 820, u = 130;
+  text("数直線で見ると", 540, 400, 52, C.sub, { weight: 500, alpha: easeOut(prog(t, CUE.numline, .4)) });
+  // 数直線（奥行きのある板の上）
+  ctx.save();
+  ctx.fillStyle = hexA(C.cyan, .05); ctx.beginPath();
+  ctx.moveTo(cx - 470, cy + 60); ctx.lineTo(cx + 470, cy + 60); ctx.lineTo(cx + 380, cy - 90); ctx.lineTo(cx - 380, cy - 90); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = hexA(C.white, .75); ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(cx - 3.5 * u, cy); ctx.lineTo(cx + 3.5 * u, cy); ctx.stroke();
+  for (let v = -3; v <= 3; v++) {
+    ctx.beginPath(); ctx.moveTo(cx + v * u, cy - 14); ctx.lineTo(cx + v * u, cy + 14); ctx.stroke();
+    text(v > 0 ? `+${v}` : v === 0 ? "0" : `−${-v}`, cx + v * u, cy + 56, 38, v < 0 ? C.neg : v > 0 ? C.pos : C.white, { weight: 500 });
+  }
+  ctx.beginPath(); ctx.arc(cx, cy, 10, 0, 7); ctx.fillStyle = C.white; ctx.fill();
+  // 角度：0 → π（1 回目の反転）→ 2π（2 回目）
+  const f1 = easeInOut(prog(t, CUE.flip1, 1.1)), f2 = easeInOut(prog(t, CUE.flip2, 1.1));
+  const th = Math.PI * f1 + Math.PI * f2;
+  const grow = easeOut(prog(t, CUE.numline + .3, .6));
+  const r = 2 * u * grow;
+  // 回転は原点を通る縦軸のまわり。奥（上）へ回り込み、2 回目は手前（下）を通って戻る
+  const tipX = cx + r * Math.cos(th), tipY = cy - r * Math.sin(th) * .45, depth = 1 - .25 * Math.sin(th);
+  // 軌跡（Uターン）
+  const drawTrail = (a0, a1, alpha) => {
+    if (alpha <= 0) return;
+    ctx.save(); ctx.globalAlpha *= alpha; ctx.setLineDash([10, 10]); ctx.strokeStyle = C.cyan; ctx.lineWidth = 4;
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i++) { const a = a0 + (a1 - a0) * i / 40; const x = cx + 2 * u * Math.cos(a), y = cy - 2 * u * Math.sin(a) * .45; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke(); ctx.restore();
+  };
+  drawTrail(0, Math.PI * f1, f1 > 0 ? .8 : 0);
+  drawTrail(Math.PI, Math.PI + Math.PI * f2, f2 > 0 ? .8 : 0);
+  // 矢印
+  const col = Math.cos(th) >= 0 ? C.pos : C.neg;
+  if (r > 1) {
+    ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 12 * depth; ctx.lineCap = "round";
+    ctx.shadowColor = col; ctx.shadowBlur = 20;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(tipX, tipY); ctx.stroke();
+    const an = Math.atan2(tipY - cy, tipX - cx), hs = 34 * depth;
+    ctx.beginPath(); ctx.moveTo(tipX + Math.cos(an) * 10, tipY + Math.sin(an) * 10);
+    ctx.lineTo(tipX - Math.cos(an - .5) * hs, tipY - Math.sin(an - .5) * hs);
+    ctx.lineTo(tipX - Math.cos(an + .5) * hs, tipY - Math.sin(an + .5) * hs); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  // ×(−1) のラベル
+  const lab = (c0, k) => { if (k <= 0 || k >= 1) return; text("× (−1)", cx, cy - 200, 64, C.neg, { alpha: Math.sin(Math.PI * k) }); };
+  lab(CUE.flip1, prog(t, CUE.flip1 - .2, 1.6)); lab(CUE.flip2, prog(t, CUE.flip2 - .2, 1.6));
+  const vLabel = (Math.cos(th) >= 0 ? "+2" : "−2");
+  if (r > 1 && Math.abs(Math.sin(th)) < .2) text(vLabel, tipX, cy - 70, 52, col);
+  // 2 回反転したら元の向き
+  const kr = easeOut(prog(t, CUE.restore, .5));
+  if (kr > 0) {
+    drawTokens([N("(−1)"), Wt(" × "), N("(−1)"), Wt(" = "), P("+1")], 540, 1060, 64, { alpha: kr });
+    text("2 回反転すると、元の向き", 540, 1150, 40, C.sub, { alpha: kr, weight: 500 });
+  }
+  ctx.restore();
+}
+
+function sceneOutro(t) {
+  const A = win(t, CUE.outro, TL.endcard_start + .2, .3, .5);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  const k = back(prog(t, CUE.outro, .5)), f = easeInOut(prog(t, CUE.fold, .7));
+  const s = .8 * clamp(k, 0, 1.2) * (1 - .7 * f);
+  bill(540, 760, 620 * s * (1 - .6 * f), 400 * s, -.04 + f * .8, "−−", 1 - f);
+  text("大借金！？", 540, 1040, 80, C.neg, { alpha: clamp(k) * (1 - f) });
+  ctx.restore();
+}
+
+function sceneEnd(t) {
+  const a = TL.endcard_start, A = prog(t, a, .6);
+  if (A <= 0) return;
+  ctx.save(); ctx.globalAlpha = A;
+  cubeMark(540, 760, 150 * lerp(.85, 1, easeOut(prog(t, a, .8))));
+  text("世界の解剖室", 540, 1030, 96, C.white);
+  text("見えない仕組みを、CGで解き明かす。", 540, 1120, 40, C.cyan, { weight: 500 });
+  text("音声：" + TL.credits.join("／"), 540, 1260, 28, C.sub, { weight: 400 });
+  ctx.restore();
+}
+
+// ---------- 字幕と話者表示
+function plain(s) { return s.replace(/\*\*/g, "").replace(/ \/ /g, ""); }
+function currentLine(t) {
+  const L = TL.lines;
+  for (let i = 0; i < L.length; i++) {
+    const nextStart = i + 1 < L.length ? L[i + 1].start : Infinity;
+    if (t >= L[i].start - .05 && t < Math.min(nextStart - .02, L[i].end + .45)) return L[i];
+  }
+  return null;
+}
+function subChunk(line, t) {
+  if (!Array.isArray(line.sub)) return line.sub;
+  const lens = line.sub.map(s => plain(s).length), tot = lens.reduce((a, b) => a + b, 0);
+  const k = clamp((t - line.start) / (line.end - line.start)) * tot;
+  let acc = 0;
+  for (let i = 0; i < lens.length; i++) { acc += lens[i]; if (k < acc) return line.sub[i]; }
+  return line.sub[line.sub.length - 1];
+}
+function drawRich(s, cx, y, size) {
+  // **強調** を色分けして 1 行を中央揃えで描く
+  const parts = s.split("**");
+  ctx.font = font(size, 700);
+  const ws = parts.map(p => ctx.measureText(p).width), tot = ws.reduce((a, b) => a + b, 0);
+  let x = cx - tot / 2;
+  parts.forEach((p, i) => { text(p, x, y, size, i % 2 ? C.emph : C.white, { align: "left" }); x += ws[i]; });
+  return tot;
+}
+function subtitles(t) {
+  const line = currentLine(t);
+  if (!line || t > TL.endcard_start) return;
+  const rows = subChunk(line, t).split(" / ");
+  const size = 52, lh = 74, cx = 500, cy = 1350;
+  ctx.font = font(size, 700);
+  const wmax = Math.max(...rows.map(r => ctx.measureText(r.replace(/\*\*/g, "")).width));
+  const bw = Math.min(900, wmax + 64), bh = rows.length * lh + 34;
+  const k = easeOut(prog(t, line.start - .05, .18));
+  ctx.save(); ctx.globalAlpha = k;
+  rrect(cx - bw / 2, cy - bh / 2, bw, bh, 22); ctx.fillStyle = "rgba(5,12,24,.78)"; ctx.fill();
+  const col = line.who === "M" ? C.M : C.W;
+  ctx.strokeStyle = hexA(col, .55); ctx.lineWidth = 3; ctx.stroke();
+  rows.forEach((r, i) => drawRich(r, cx, cy - (rows.length - 1) * lh / 2 + i * lh, size));
+  // 話者タグ（声の大きさで動くバー付き）
+  const tx = cx - bw / 2, ty = cy - bh / 2 - 58;
+  rrect(tx, ty, 190, 48, 24); ctx.fillStyle = hexA(col, .16); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+  if (line.who === "M") { ctx.beginPath(); ctx.arc(tx + 26, ty + 24, 13, 0, 7); ctx.fillStyle = col; ctx.fill(); }
+  else { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i + Math.PI / 6; ctx[i ? "lineTo" : "moveTo"](tx + 26 + 14 * Math.cos(a), ty + 24 + 14 * Math.sin(a)); } ctx.closePath(); ctx.fillStyle = col; ctx.fill(); }
+  text(line.who, tx + 56, ty + 25, 30, col, { align: "left" });
+  const fi = Math.floor((t - line.start) * TL.fps), env = line.env || [];
+  for (let b = 0; b < 5; b++) {
+    const e = fi >= 0 && fi < env.length ? env[Math.max(0, Math.min(env.length - 1, fi - b))] : 0;
+    const h = 6 + 26 * e * (.6 + .4 * Math.sin(b * 1.7 + 1));
+    ctx.fillStyle = col; ctx.fillRect(tx + 98 + b * 16, ty + 24 - h / 2, 9, h);
+  }
+  ctx.restore();
+}
+
+// ---------- 1 コマ
+function renderFrame(t) {
+  background(t);
+  header(t, t < TL.endcard_start ? 1 : 1 - prog(t, TL.endcard_start, .4));
+  sceneHook(t); sceneTitle(t); scenePattern(t); sceneDist(t); sceneDerive(t);
+  sceneGeneral(t); sceneNumline(t); sceneOutro(t); sceneEnd(t);
+  subtitles(t);
+}
+
+// サムネイル（9:16）
+function renderThumb() {
+  background(2);
+  cubeMark(150, 230, 60);
+  text("世界の解剖室", 240, 232, 50, C.sub, { align: "left", weight: 500 });
+  text("マイナス", 540, 560, 170, C.neg);
+  text("×", 540, 730, 130, C.white);
+  text("マイナス", 540, 900, 170, C.neg);
+  drawTokens([Wt("なぜ"), P("プラス？")], 540, 1150, 150);
+  drawTokens([N("(−2)"), Wt(" × "), N("(−3)"), Wt(" = "), P("+6")], 540, 1400, 96);
+}
+
+function setTimeline(tl) { TL = tl; CUE = tl.cues; }
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>

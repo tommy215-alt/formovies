@@ -38,6 +38,9 @@ VOICES = {
     "W": {"speaker": 14, "credit": "VOICEVOX:冥鳴ひまり", "speed": 1.13, "pitch": 0.0},
 }
 LEAD_IN = 0.4  # 最初のセリフまでの間
+COMMON = HERE.parent / "common"
+# 全動画共通のエンディング（docs/ENDING_SPEC.md）。声は本編と同じ W（冥鳴ひまり）
+ENDING = json.loads((COMMON / "voices.json").read_text(encoding="utf-8"))["ending"]
 
 
 def load_lines():
@@ -45,12 +48,12 @@ def load_lines():
 
 
 # ---------------------------------------------------------------- voice
-def vv_query(text, who):
+def vv_query(text, who, speed=None, inton=1.0):
     v = VOICES[who]
     req = urllib.request.Request(
         f"{ENGINE}/audio_query?text={urllib.parse.quote(text)}&speaker={v['speaker']}", method="POST")
     q = json.loads(urllib.request.urlopen(req, timeout=60).read())
-    q.update(speedScale=v["speed"], pitchScale=v["pitch"], prePhonemeLength=0.05,
+    q.update(speedScale=speed or v["speed"], pitchScale=v["pitch"], intonationScale=inton, prePhonemeLength=0.05,
              postPhonemeLength=0.08, outputSamplingRate=SR, outputStereo=False)
     return q
 
@@ -91,10 +94,32 @@ def step_voice():
         timeline.append({**ln, "start": round(t, 5), "end": round(t + dur, 5), "dur": round(dur, 5), "kana": q["kana"]})
         t += dur + data["gap"] + ln.get("pause", 0.0)
     end_speech = timeline[-1]["end"]
-    total = end_speech + data.get("endcard", 3.0)
+    # 共通エンディング：本編と同じ W の声で決めゼリフを 2 つに分けて合成し、間を入れる（docs/ENDING_SPEC.md）
+    ending_start = math.ceil((end_speech + ENDING["gap_after_last_line"]) * FPS) / FPS
+    t = ending_start + 0.35  # 白いワイプの後に声
+    for i, part in enumerate(ENDING["parts"]):
+        key = hashlib.sha256(json.dumps([part["speech"], VOICES["W"], part, SR], ensure_ascii=False).encode()).hexdigest()[:16]
+        cw, cq = cache / f"{key}.wav", cache / f"{key}.json"
+        if cw.exists() and cq.exists():
+            wav, q = cw.read_bytes(), json.loads(cq.read_text(encoding="utf-8"))
+        else:
+            q = vv_query(part["speech"], "W", part["speed"], part["inton_mul"])
+            wav = vv_synth(q, "W")
+            cw.write_bytes(wav); cq.write_text(json.dumps(q, ensure_ascii=False), encoding="utf-8")
+            fresh += 1
+        lid = f"END{i + 1}"
+        path = vdir / f"{lid}.wav"
+        path.write_bytes(wav)
+        t = math.ceil(t * FPS - 1e-6) / FPS
+        with wave.open(str(path)) as w:
+            dur = w.getnframes() / w.getframerate()
+        timeline.append({"id": lid, "who": "W", "speech": part["speech"], "sub": part["speech"], "fact": "—", "ending": True,
+                         "start": round(t, 5), "end": round(t + dur, 5), "dur": round(dur, 5), "kana": q["kana"]})
+        t += dur + ENDING["pause_between"]
+    total = timeline[-1]["end"] + ENDING["tail"]
     for x in timeline:
         x["env"] = envelope(vdir / f"{x['id']}.wav")
-    tl = {"fps": FPS, "duration": round(total, 5), "endcard_start": round(end_speech + 0.3, 5),
+    tl = {"fps": FPS, "duration": round(total, 5), "endcard_start": round(ending_start, 5), "ending_start": round(ending_start, 5),
           "credits": [v["credit"] for v in VOICES.values()], "cues": build_cues(timeline), "lines": timeline}
     (WORK / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1), encoding="utf-8")
     speech = sum(x["end"] - x["start"] for x in timeline)
@@ -117,6 +142,7 @@ CUE_DEFS = {
     "general": ("L22", 0.0), "general2": ("L22", 0.62),
     "numline": ("L23", 0.0), "flip1": ("L23", 0.50), "uturn": ("L24", 0.0), "flip2": ("L24", 0.55),
     "restore": ("L26", 0.0), "outro": ("L27", 0.0), "fold": ("L28", 0.75),
+    "end1": ("END1", 0.0), "end2": ("END2", 0.0),
 }
 
 
@@ -231,6 +257,7 @@ def bgm(total, cues):
     out *= 0.85 + 0.15 * pulse
     bright = np.clip((t - cues["solve"]) / 1.5, 0, 1) * (t < cues["endcard"])
     out *= 1 + 0.35 * bright
+    out *= 1 - 0.65 * np.clip((t - cues["endcard"]) / 0.4, 0, 1)  # エンディング中は BGM をさらに下げる
     fade = np.clip((total - t) / 2.0, 0, 1) * np.clip(t / 0.6, 0, 1)
     return out * fade
 
@@ -261,7 +288,7 @@ def step_audio():
     music *= 1 - 0.55 * talk
     sfx = np.zeros(n)
     bank = sfx_bank()
-    for name, cue in SFX_AT + [("end", "endcard")]:
+    for name, cue in SFX_AT + [("whoosh", "endcard"), ("end", "end2")]:
         s = bank[name]
         i = int(cues[cue] * SR)
         sfx[i:i + len(s)] += s[: max(0, n - i)]
@@ -306,7 +333,8 @@ def step_render():
     fps, n = tl["fps"], math.ceil(tl["duration"] * tl["fps"])
     cues = {**tl["cues"], "endcard": tl["endcard_start"]}
     bounds = [0] + [round(cues[c] * fps) for c in SEG_CUES] + [n]
-    code = hashlib.sha256((HERE / "renderer.html").read_bytes() + (HERE / "render_frames.js").read_bytes()).hexdigest()
+    code = hashlib.sha256((HERE / "renderer.html").read_bytes() + (HERE / "render_frames.js").read_bytes()
+                          + (COMMON / "ending.js").read_bytes()).hexdigest()
     sdir = WORK / "segments"
     sdir.mkdir(parents=True, exist_ok=True)
     segs = []
@@ -360,7 +388,7 @@ SCENES = [  # (名前, 開始 cue, 終了 cue, 映像, 音)
     ("5b 一般化", "general", "numline", "「負の数でも同じ計算ルールを保つなら ↓ (−)×(−)=(+)」「ルールを決めたら、答えは論理で決まる」", "BGM が少し明るくなる"),
     ("6 数直線", "numline", "outro", "奥行きのある数直線。0→+2 の矢印が ×(−1) で縦軸のまわりに半回転して −2 へ（奥を通る）。2 回目は手前を通って +2 に戻る。軌跡を点線で残し、(−1)×(−1)=+1", "反転の風切り音 ×2"),
     ("7 締め", "outro", "endcard", "冒頭の「大借金！？」の借用書が戻り、M の一言で折りたたまれて消える", "風切り音"),
-    ("7b エンドカード", "endcard", None, "解剖された立方体のマーク、「世界の解剖室」、キャッチコピー、音声クレジット", "終わりのチャイム、BGM フェードアウト"),
+    ("8 共通エンディング", "endcard", None, "白い閃光 → 明るい背景に反時計回りの円弧、「リバース」「世界の仕組みを、はじめから」、小さくブランドと音声クレジット（docs/ENDING_SPEC.md）", "風切り音、決めゼリフ（W）、終わりの和音、BGM を下げてフェードアウト"),
 ]
 
 
@@ -401,11 +429,11 @@ def step_docs():
     data = load_lines()
     md = [f"# pilot_005 完成台本：{data['title']}", "",
           "`production_script.py docs` が `lines.json` と実際の音声の長さ（`work/timeline.json`）から生成。手で編集しない。", "",
-          f"- 尺：**{tl['duration']:.1f} 秒**（セリフ {sum(x['end'] - x['start'] for x in lines):.1f} 秒、エンドカード {tl['duration'] - tl['endcard_start']:.1f} 秒）",
+          f"- 尺：**{tl['duration']:.1f} 秒**（本編 {tl['endcard_start']:.1f} 秒＋共通エンディング {tl['duration'] - tl['endcard_start']:.1f} 秒）",
           f"- 音声：M＝{VOICES['M']['credit']}（話速 {VOICES['M']['speed']}）、W＝{VOICES['W']['credit']}（話速 {VOICES['W']['speed']}）",
           "- 読み上げ文の数字やかな書きは、音声合成の読み間違いを防ぐため。字幕は記号（−、×、＝）で表示する。",
-          "- 事実確認 ID は `anatomy_room/scripts/pilot_005/fact_check.md` に対応。", "", *rows, "",
-          "## エンドカード", "", f"{fmt(tl['endcard_start'])}– 「世界の解剖室」／見えない仕組みを、CGで解き明かす。／音声：{'／'.join(tl['credits'])}", ""]
+          "- 事実確認 ID は `anatomy_room/scripts/pilot_005/fact_check.md` に対応。END1・END2 は全動画共通のエンディング（`docs/ENDING_SPEC.md`、W と同じ声）。", "", *rows, "",
+          "## 共通エンディング", "", f"{fmt(tl['endcard_start'])}– 「リバース」「世界の仕組みを、はじめから」／世界の解剖室／音声：{'／'.join(tl['credits'])}", ""]
     (HERE / "final_script.md").write_text("\n".join(md), encoding="utf-8")
     # シーン設計
     rows = ["| シーン | 時間 | 映像・CG | 音（BGM 以外） | セリフ |", "|-------|------|---------|---------------|-------|"]
@@ -434,6 +462,23 @@ def step_docs():
 # ---------------------------------------------------------------- qc
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def qc_ending(tl, astream):
+    """共通エンディングが完成動画に入っているか。"""
+    body = [x for x in tl["lines"] if not x.get("ending")]
+    ends = [x for x in tl["lines"] if x.get("ending")]
+    out = ["## 共通エンディング（docs/ENDING_SPEC.md）", ""]
+    out.append(f"- 本編の最後のセリフの終わり {body[-1]['end']:.2f}s → 決めゼリフの始まり {ends[0]['start']:.2f}s"
+               f"（間 {ends[0]['start'] - body[-1]['end']:.2f}s、重なり{'なし' if ends[0]['start'] > body[-1]['end'] else 'あり'}）")
+    out.append(f"- 「リバース。」と「世界の仕組みを、はじめから。」の間：{ends[1]['start'] - ends[0]['end']:.2f}s")
+    for x in ends:
+        r = run(["ffmpeg", "-hide_banner", "-nostats", "-ss", str(x["start"]), "-t", str(x["end"] - x["start"]), "-i", str(OUT),
+                 "-af", "volumedetect", "-f", "null", "-"]).stderr
+        out.append(f"- {x['id']}「{x['speech']}」（{VOICES['W']['credit']}）：完成動画の該当区間の平均 "
+                   f"{r.split('mean_volume:')[1].split('dB')[0].strip()} dB、最大 {r.split('max_volume:')[1].split('dB')[0].strip()} dB")
+    out.append(f"- 音声トラックの長さ {float(astream['duration']):.2f}s ／ 決めゼリフの終わり {ends[-1]['end']:.2f}s ／ 動画の長さ {tl['duration']:.2f}s")
+    return out + [""]
 
 
 def step_qc():
@@ -481,12 +526,13 @@ def step_qc():
     # 確認用フレーム
     times = [0.5, *[tl["cues"][k] + .6 for k in ("collide", "giant", "title", "row3", "ghost", "badge2", "split", "bridge",
                                                    "zero", "eq3", "solve", "final", "general2", "flip1", "restore", "fold")],
-             tl["endcard_start"] + 1.2]
+             tl["cues"]["end1"] + .5, tl["cues"]["end2"] + 1.2]
     for i, t in enumerate(times):
         run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(OUT), "-frames:v", "1", "-q:v", "3", str(qdir / f"f{i:02d}_{t:05.1f}.jpg")])
     run(["montage", *sorted(str(p) for p in qdir.glob("f*.jpg")), "-tile", "6x3", "-geometry", "300x533+4+4",
          "-background", "#222", str(qdir / "contact_sheet.jpg")])
     rep += ["## 抽出フレーム", "", f"`qc/` に {len(times)} 枚、一覧は `qc/contact_sheet.jpg`。", ""]
+    rep += qc_ending(tl, a)
     (HERE / "qc_report.md").write_text("\n".join(rep), encoding="utf-8")
     print("\n".join(rep[:22]))
 

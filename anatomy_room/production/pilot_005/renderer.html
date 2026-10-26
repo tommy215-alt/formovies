@@ -4,6 +4,7 @@
 <style>html,body{margin:0;background:#0A1424}canvas{display:block}</style>
 </head><body>
 <canvas id="c" width="1080" height="1920"></canvas>
+<script src="../common/ending.js"></script>
 <script>
 // pilot_005 の映像を描くレンダラー。renderFrame(t) が時刻 t 秒の 1 コマを描く（決定的：同じ t なら同じ絵）。
 // タイミングは work/timeline.json（セリフの開始・終了と、きっかけ cues）から取る。
@@ -543,6 +544,12 @@ function subtitles(t) {
 
 // ---------- 1 コマ
 function renderFrame(t) {
+  const es = TL.endcard_start;
+  if (t >= es) { // 全動画共通のエンディング（docs/ENDING_SPEC.md）
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ctx, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits });
+    return;
+  }
   background(t);
   header(t, t < TL.endcard_start ? 1 : 1 - prog(t, TL.endcard_start, .4));
   sceneHook(t); sceneTitle(t); scenePattern(t); sceneDist(t); sceneDerive(t);
