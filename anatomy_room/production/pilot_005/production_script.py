@@ -100,7 +100,7 @@ CUE_DEFS = {
     "eq2": ("L19", 0.0), "eq3": ("L19", 0.42), "solve": ("L20", 0.52), "final": ("L21", 0.0),
     "general": ("L22", 0.0), "general2": ("L22", 0.62),
     "numline": ("L23", 0.0), "flip1": ("L23", 0.50), "uturn": ("L24", 0.0), "flip2": ("L24", 0.55),
-    "restore": ("L26", 0.0), "outro": ("L27", 0.0), "fold": ("L28", 0.35),
+    "restore": ("L26", 0.0), "outro": ("L27", 0.0), "fold": ("L28", 0.75),
 }
 
 
@@ -251,12 +251,12 @@ def step_audio():
         sfx[i:i + len(s)] += s[: max(0, n - i)]
     mix = voice + 0.9 * music + 0.55 * sfx
     write_wav(WORK / "mix_raw.wav", mix[: int(total * SR)])
-    # ラウドネスを -14 LUFS（YouTube の基準付近）、ピーク -1.5 dBTP に
+    # ラウドネスを -14 LUFS（YouTube の基準付近）、ピーク -2.0 dBTP に（AAC 変換での上振れを見込む）
     m = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(WORK / "mix_raw.wav"), "-af",
-                        "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
+                        "loudnorm=I=-14:TP=-2.0:LRA=11:print_format=json", "-f", "null", "-"],
                        capture_output=True, text=True).stderr
     st = json.loads(m[m.rindex("{"):m.rindex("}") + 1])
-    af = (f"loudnorm=I=-14:TP=-1.5:LRA=11:measured_I={st['input_i']}:measured_TP={st['input_tp']}:"
+    af = (f"loudnorm=I=-14:TP=-2.0:LRA=11:measured_I={st['input_i']}:measured_TP={st['input_tp']}:"
           f"measured_LRA={st['input_lra']}:measured_thresh={st['input_thresh']}:offset={st['target_offset']}:linear=true")
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(WORK / "mix_raw.wav"),
                     "-af", af, "-ar", str(SR), str(WORK / "mix.wav")], check=True)
@@ -271,7 +271,7 @@ def step_render():
 def step_mux():
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(WORK / "video.mp4"),
                     "-i", str(WORK / "mix.wav"), "-map", "0:v", "-map", "1:a", "-c:v", "copy",
-                    "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(OUT)], check=True)
+                    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(OUT)], check=True)
     print("mux:", OUT.name, f"{OUT.stat().st_size / 1e6:.1f} MB")
 
 
@@ -366,6 +366,8 @@ def run(cmd):
 def step_qc():
     qdir = HERE / "qc"
     qdir.mkdir(exist_ok=True)
+    for old in qdir.glob("*.jpg"):  # 前回の抽出フレームを消す
+        old.unlink()
     tl = json.loads((WORK / "timeline.json").read_text(encoding="utf-8"))
     rep = ["# pilot_005 品質検証の記録", "", f"対象：`{OUT.name}`（{OUT.stat().st_size / 1e6:.1f} MB）", ""]
     pr = json.loads(run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(OUT)]).stdout)
@@ -383,7 +385,7 @@ def step_qc():
     summ = lo[lo.rindex("Summary:"):]
     pick = lambda key: summ.split(key)[1].split("\n")[0].strip()
     rep += ["## 音量", "", f"- 積分ラウドネス：{pick('I:')}（目標 −14 LUFS）", f"- ラウドネスレンジ：{pick('LRA:')}",
-            f"- トゥルーピーク：{pick('Peak:')}（目標 −1.5 dBTP 以下）", ""]
+            f"- トゥルーピーク：{pick('Peak:')}（目標 −1.0 dBTP 以下。ミックスは −2.0 で余裕を取る）", ""]
     si = run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(OUT), "-af", "silencedetect=n=-45dB:d=0.8", "-f", "null", "-"]).stderr
     sil = [ln.split("]")[1].strip() for ln in si.splitlines() if "silence_end" in ln]
     rep += ["## 無音区間（−45 dB 未満が 0.8 秒以上）", "", *(f"- {s}" for s in sil), "- なし" if not sil else "", ""]
@@ -396,6 +398,13 @@ def step_qc():
         peak = r.split("max_volume:")[1].split("dB")[0].strip()
         rows.append(f"| {x['id']} | {x['who']} | {fmt(x['start'])} | {mean} | {peak} |")
     rep += ["## セリフごとの音量（dB）", "", "| ID | 話者 | 開始 | 平均 | 最大 |", "|----|------|------|------|------|", *rows, ""]
+    # 字幕 1 枚あたりの表示時間（短すぎると読めない）
+    short = [(x["id"], s, b - a) for x in tl["lines"] for a, b, s in sub_chunks(x) if b - a < 0.8]
+    rep += ["## 字幕の表示時間", "", f"- 字幕 {sum(len(sub_chunks(x)) for x in tl['lines'])} 枚。0.8 秒未満の字幕："
+            + ("なし" if not short else "、".join(f"{i}「{s.replace('**', '')}」{d:.2f}s" for i, s, d in short)), ""]
+    # 読み（音声合成が実際に使ったカナ）と字幕の照合用
+    rep += ["## 読み上げの照合（VOICEVOX が使った読み）", "", "| ID | 字幕 | 読み（カナ） |", "|----|------|------------|",
+            *[f"| {x['id']} | {' ／ '.join(x['sub'] if isinstance(x['sub'], list) else [x['sub']]).replace('**', '')} | {x['kana']} |" for x in tl["lines"]], ""]
     # 確認用フレーム
     times = [0.5, *[tl["cues"][k] + .6 for k in ("collide", "giant", "title", "row3", "ghost", "badge2", "split", "bridge",
                                                    "zero", "eq3", "solve", "final", "general2", "flip1", "restore", "fold")],

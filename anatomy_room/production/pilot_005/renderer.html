@@ -315,7 +315,9 @@ function sceneDist(t) {
     const sub = easeOut(prog(t, CUE.bridge + .3, .5));
     drawTokens([Cy("a"), Wt(" = "), N("−2"), Wt("　 "), Cy("b"), Wt(" = "), Wt("3"), Wt("　 "), Cy("c"), Wt(" = "), N("−3")], 540, 640, 54, { alpha: sub });
     ctx.save(); ctx.globalAlpha *= sub;
-    rrect(190, 760, 700, 100, 50); ctx.strokeStyle = C.cyan; ctx.lineWidth = 3; ctx.stroke();
+    ctx.font = font(40, 500);
+    const cw = ctx.measureText("負の数でも同じルールが成り立つなら？").width + 80;
+    rrect(540 - cw / 2, 760, cw, 100, 50); ctx.strokeStyle = C.cyan; ctx.lineWidth = 3; ctx.stroke();
     text("負の数でも同じルールが成り立つなら？", 540, 810, 40, C.cyan, { weight: 500 });
     ctx.restore();
   }
