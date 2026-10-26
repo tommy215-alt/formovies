@@ -59,6 +59,21 @@ async function open(browser) {
       fs.renameSync(tmp, s.out); // 書き終わってから名前を付ける（途中で止まっても壊れた場面を再利用しない）
       console.log(`segment ${s.a}-${s.b} (${s.b - s.a} frames) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     }
+  } else if (args[0] === "--textcheck") {
+    // 文字の自動検査：step 秒ごとに 1 コマ描き、stage.js の checkText() の結果と、使った文字の一覧を work/textcheck.json に保存
+    const step = parseFloat(args[1] || "0.1"), n = Math.floor(tl.duration / step);
+    const res = await page.evaluate(({ n, step }) => {
+      const issues = [], chars = new Set();
+      for (let i = 0; i <= n; i++) {
+        const t = +(i * step).toFixed(3);
+        Stage.clearTextLog(); window.renderFrame(t);
+        for (const e of Stage.TEXTLOG) for (const ch of e.s) chars.add(ch);
+        issues.push(...Stage.checkText(t));
+      }
+      return { issues, chars: [...chars].join("") };
+    }, { n, step });
+    fs.writeFileSync(path.join(WORK, "textcheck.json"), JSON.stringify({ step, frames: n + 1, ...res }, null, 1));
+    console.log(`textcheck: ${n + 1} コマ、問題 ${res.issues.length} 件`);
   } else if (args[0] === "--thumb") {
     await page.evaluate(() => window.renderThumb());
     await canvas.screenshot({ path: path.join(HERE, "thumbnail.png") });

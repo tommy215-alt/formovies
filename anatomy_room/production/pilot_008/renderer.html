@@ -46,7 +46,7 @@ function bag(ctx, x, y, s, col, label = "さくさくチップ") {
   ctx.fillStyle = "rgba(0,0,0,.12)"; ctx.fillRect(-110, -150, 220, 26); ctx.fillRect(-120, 124, 240, 26);
   ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.ellipse(0, 10, 80, 58, 0, 0, 7); ctx.fill();
   ctx.fillStyle = "#FFC83D"; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(-36 + i * 18, 14 + (i % 2) * 10, 20, 12, i, 0, 7); ctx.fill(); }
-  text(ctx, label, 0, -90, 30, "#FFFFFF", { weight: 900 });
+  text(ctx, label, 0, -90, 36, "#FFFFFF", { weight: 900 });
   ctx.restore();
 }
 function tag(ctx, x, y, s, price, k = 1, rot = 0, col = TAG) {
@@ -55,7 +55,7 @@ function tag(ctx, x, y, s, price, k = 1, rot = 0, col = TAG) {
   ctx.shadowColor = "rgba(0,0,0,.2)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 6;
   ctx.fillStyle = "#FFFFFF"; rrect(ctx, -150, -70, 300, 140, 18); ctx.fill(); ctx.shadowColor = "transparent";
   ctx.fillStyle = col; rrect(ctx, -150, -70, 300, 36, 18); ctx.fill(); ctx.fillRect(-150, -50, 300, 16);
-  text(ctx, "税込", -110, -52, 22, "#FFFFFF", { weight: 800 });
+  S.group(() => text(ctx, "税込", -100, -52, 30, "#FFFFFF", { weight: 800 }));
   ctx.font = `900 82px ${S.FONT}`; const pw = ctx.measureText(price).width;
   text(ctx, price, -14, 22, 82, col, { weight: 900 });
   text(ctx, "円", -14 + pw / 2 + 26, 36, 40, col, { weight: 900 });
@@ -75,6 +75,9 @@ function uraWipe(t, expr, extra = {}) {
 function om(t, x, y, s, o) { S.omote(ui, x, y, s, { talk: S.talk(t, "M"), ...o }); }
 // 大きな数字（左端の桁を強調できる）
 function bigNumber(ctx, str, cx, cy, size, col, emphK = 0, fadeK = 0) {
+  S.group(() => bigNumber_(ctx, str, cx, cy, size, col, emphK, fadeK)); // 1 つの数字（桁ごとに描くが、ひとまとまりとして検査する）
+}
+function bigNumber_(ctx, str, cx, cy, size, col, emphK, fadeK) {
   ctx.save(); ctx.font = `900 ${size}px ${S.FONT}`;
   const ws = [...str].map(ch => ctx.measureText(ch).width), tot = ws.reduce((a, b) => a + b, 0);
   let x = cx - tot / 2;
@@ -114,13 +117,13 @@ function drawScene(t, name) {
     const inBasket = easeInOut(prog(t, CUE.basket, .6));
     if (inBasket < 1) tag(ui, 420, 1110, .9, "298", k1);
     tag(ui, 800, 1110, .9, "300", k2);
-    text(ui, "たった 2 円の差", 540, 600, 64, C.navy2, { weight: 900, alpha: easeOut(prog(t, CUE.basket - .1, .4)) * (1 - prog(t, CUE.dare, .3)), stroke: "#FFFFFF", sw: 12 });
+    text(ui, "たった 2 円の差", 540, 600, 64, C.navy2, { weight: 900, alpha: easeOut(prog(t, CUE.basket + .15, .4)) * (1 - prog(t, CUE.dare, .3)), stroke: "#FFFFFF", sw: 12 });
     // オモテ：298 円をカゴへ
     const ox = 150;
     om(t, ox, 1335, .5, { expr: t > CUE.jab0 ? (S.speaking(t, "M") ? "smug" : "shock") : t > CUE.basket ? "happy" : "think",
       armR: lerp(1.0, 2.2, inBasket), elbowR: .4, look: [1, -.4] });
     basket(ui, ox + 105, 1190, .42);
-    if (inBasket > 0) { ui.save(); ui.translate(lerp(420, ox + 105, inBasket), lerp(900, 1150, inBasket)); bag(ui, 0, 0, lerp(.8, .28, inBasket), "#FF7A2A"); ui.restore(); }
+    if (inBasket > 0) { ui.save(); ui.__noCheck = true; ui.translate(lerp(420, ox + 105, inBasket), lerp(900, 1150, inBasket)); bag(ui, 0, 0, lerp(.8, .28, inBasket), "#FF7A2A"); ui.__noCheck = false; ui.restore(); }
     // ウラが指を鳴らす → 「ウラ商店（実験中）」の看板
     const sg = easeOut(prog(t, CUE.dare + .1, .5));
     if (sg > 0) {
@@ -136,6 +139,7 @@ function drawScene(t, name) {
     const calm = easeOut(prog(t, CUE.calm, .5));
     const prices = ["298", "498", "980", "1,980", "198", "2,980", "398", "98", "4,980"];
     const r = S.rng(21);
+    ui.__noCheck = true; // 降ってくる値札は背景の飾り（主要な文字はこの上に描く）
     for (let i = 0; i < 26; i++) {
       const x = 60 + r() * 960, sp = 500 + r() * 500, ph = r() * 3, rot = (r() - .5) * 1.4;
       const y = ((lt + ph) * sp) % 2200 - 200;
@@ -144,6 +148,7 @@ function drawScene(t, name) {
       tag(ui, x, y, .55 + r() * .2, prices[(pi + i) % prices.length], 1, rot + Math.sin(lt * 4 + i) * .3);
       ui.restore();
     }
+    ui.__noCheck = false;
     const spin = Math.sin(lt * 7) * .25 * (1 - calm);
     om(t, 540, 1360, .75, { expr: calm > .5 ? "deadpan" : "dizzy", rot: spin, armL: 2.4 * (1 - calm) + .3, armR: 2.4 * (1 - calm) + .3, sweat: calm < .5 });
     if (t >= CUE.flip && calm < 1) S.burst(ui, 540, 520, 200, prog(t, CUE.flip, .3) * (1 - calm), "全部安い!?", { size: 64 });
@@ -166,7 +171,7 @@ function drawScene(t, name) {
     ui.save(); ui.strokeStyle = C.navy2; ui.lineWidth = 18; ui.beginPath(); ui.arc(mx, 780, 120, 0, 7); ui.stroke();
     ui.fillStyle = "rgba(255,255,255,.25)"; ui.fill(); ui.lineWidth = 28; ui.lineCap = "round";
     ui.beginPath(); ui.moveTo(mx + 85, 865); ui.lineTo(mx + 190, 980); ui.stroke(); ui.restore();
-    pill(ui, "左端だけじゃなく、最後の桁まで", 540, 1080, 52, "#FFFFFF", C.green, easeOut(prog(t, a + .4, .4)));
+    pill(ui, "左端だけじゃなく、最後の桁まで", 495, 1080, 46, "#FFFFFF", C.green, easeOut(prog(t, a + .4, .4)));
     om(t, 180, 1360, .5, { expr: "think", armR: .3, look: [1, -.6] });
     uraWipe(t, "excited");
   } else if (name === "final") {
@@ -180,18 +185,19 @@ function coldScene(t) {
   const k = back(prog(t, .02, .22));
   const shake = 18 * Math.exp(-Math.max(0, t - .05) / .12);
   ui.save(); ui.translate(540 + shake * Math.sin(t * 90), 620); ui.scale(k * lerp(1.25, 1, easeOut(prog(t, .05, .5))), k * lerp(1.25, 1, easeOut(prog(t, .05, .5))));
-  text(ui, "298", 0, 0, 380, TAG, { weight: 900, stroke: "#FFFFFF", sw: 26 });
-  text(ui, "円", 330, 80, 120, TAG, { weight: 900, stroke: "#FFFFFF", sw: 14 });
+  S.group(() => { text(ui, "298", 0, 0, 380, TAG, { weight: 900, stroke: "#FFFFFF", sw: 26 }); text(ui, "円", 330, 80, 120, TAG, { weight: 900, stroke: "#FFFFFF", sw: 14 }); });
   ui.restore();
   // 値札が噴き出して、オモテのまわりに集まる
   const r = S.rng(31), prices = ["298", "498", "980", "1,980", "198", "2,980", "398", "98"];
   const ox = lerp(760, 880, easeOut(prog(t, .4, .6)));
+  ui.__noCheck = true; // 噴き出す値札は飾り
   for (let i = 0; i < 26; i++) {
     const d = .35 + r() * .25, kk = easeOut(prog(t, d, .7)), an = r() * 6.28, rr = 120 + r() * 160;
     if (kk <= 0) continue;
     const x = lerp(540, ox + Math.cos(an + t * 2) * rr, kk), y = lerp(620, 1080 + Math.sin(an + t * 2) * rr * .7, kk);
     tag(ui, x, y, .5, prices[i % prices.length], 1, Math.sin(t * 6 + i) * .5);
   }
+  ui.__noCheck = false;
   om(t, ox, 1335, .58, { expr: t > .4 ? "panic" : "shock", armL: 2.4, armR: 2.4, sx: lerp(1, .9, prog(t, .6, .4)), sweat: t > .5, look: [-1, -.6] });
   S.speedLines(ui, 540, 620, t, "rgba(255,255,255,.7)", 48, 300);
   S.flash(ui, .6 * (1 - prog(t, 0, .12)));
@@ -203,11 +209,11 @@ function leftScene(t, a, lt) {
   const key = easeOut(prog(t, CUE.key, .4)), scan = prog(t, CUE.scanline, 1.4), bk = easeInOut(prog(t, CUE.bucket, 1.0));
   const emph = easeOut(prog(t, CUE.scanline + .5, .5));
   // 2 つの数字（298 / 300）。bucket で箱へ落ちる
-  const y1 = lerp(560, 1020, bk), y2 = lerp(860, 1020, bk), x1 = lerp(540, 300, bk), x2 = lerp(540, 780, bk), sz = lerp(240, 140, bk);
+  const y1 = lerp(500, 1060, bk), y2 = lerp(900, 1060, bk), x1 = lerp(540, 300, bk), x2 = lerp(540, 760, bk), sz = lerp(240, 130, bk);
   if (bk > 0) {
-    for (const [x, lab, col] of [[300, "200円台", "#3E6FD8"], [780, "300円台", TAG]]) {
-      ui.fillStyle = "#FFFFFF"; rrect(ui, x - 200, 900, 400, 300, 36); ui.fill(); ui.strokeStyle = col; ui.lineWidth = 10; ui.stroke();
-      pill(ui, lab, x, 900, 50, "#FFFFFF", col, bk);
+    for (const [x, lab, col] of [[300, "200円台", "#3E6FD8"], [760, "300円台", TAG]]) {
+      ui.fillStyle = "#FFFFFF"; rrect(ui, x - 190, 900, 380, 300, 36); ui.fill(); ui.strokeStyle = col; ui.lineWidth = 10; ui.stroke();
+      pill(ui, lab, x, 880, 46, "#FFFFFF", col, bk);
     }
   }
   bigNumber(ui, "298", x1, y1, sz, "#3E6FD8", emph, emph * (1 - bk));
@@ -215,7 +221,7 @@ function leftScene(t, a, lt) {
   if (key > 0 && bk < .3) {
     ui.save(); ui.globalAlpha = key * (1 - bk / .3); ui.strokeStyle = C.orange; ui.lineWidth = 10;
     rrect(ui, 540 - 220, 420, 160, 600, 30); ui.stroke(); ui.restore();
-    pill(ui, "いちばん左の数字", 400, 1080, 42, "#FFFFFF", C.orange, key * (1 - bk / .3));
+    pill(ui, "いちばん左の数字", 400, 1200, 42, "#FFFFFF", C.orange, key * (1 - bk / .3));
   }
   // 視線（左 → 右）
   if (scan > 0 && scan < 1) {
@@ -227,7 +233,7 @@ function leftScene(t, a, lt) {
   }
   const nm = easeOut(prog(t, CUE.name, .4));
   if (nm > 0) { pill(ui, "左端の数字効果", 540, 560, 74, "#FFFFFF", C.ura, nm); note(ui, "Thomas & Morwitz（2005）ほか", 540, 660, nm, 30); }
-  om(t, 160, 1360, .48, { expr: t > CUE.bucket ? "happy" : t > CUE.key ? "shock" : "smug", armR: t > CUE.bucket ? 2.6 : .3, look: [1, -.6] });
+  om(t, 950, 1360, .44, { expr: t > CUE.bucket ? "happy" : t > CUE.key ? "shock" : "smug", armL: t > CUE.bucket ? 2.6 : .3, look: [-1, -.6] });
   uraWipe(t, t > CUE.name ? "excited" : "smirk");
 }
 
@@ -270,18 +276,18 @@ function menuScene(t, a, lt) {
   const st = t >= CUE.study, sk = easeInOut(prog(t, CUE.study, .6));
   const pick = t >= CUE.pick ? 1 : -1;
   // メニュー（高い順）。study で左に縮み、安い順と並べる
-  menuCard(ui, lerp(540, 290, sk), lerp(760, 720, sk), lerp(1, .72, sk), MENU, easeOut(prog(t, a + .1, .4)), pick, "MENU");
+  menuCard(ui, lerp(540, 285, sk), lerp(760, 720, sk), lerp(1, .68, sk), MENU, easeOut(prog(t, a + .1, .4)), pick, "MENU");
   const rv = easeOut(prog(t, CUE.reveal, .35));
   if (rv > 0) {
-    const x = lerp(540, 290, sk) + lerp(330, 240, sk);
+    const x = lerp(540, 285, sk) + lerp(330, 225, sk);
     S.arrow(ui, x, lerp(560, 580, sk), x, lerp(1030, 920, sk), C.ura, 16, 44, rv);
     pill(ui, "高い順", x - 10, lerp(500, 520, sk), 44, "#FFFFFF", C.ura, rv);
   }
   if (st) {
-    menuCard(ui, 790, 720, .72, [...MENU].reverse(), sk, -1, "MENU");
-    pill(ui, "安い順", 790 + 30, 470, 40, "#FFFFFF", "#3E6FD8", sk);
-    text(ui, "高めが選ばれやすい", 290, 1020, 40, C.ura, { weight: 900, alpha: easeOut(prog(t, CUE.study + 1.0, .4)) });
-    text(ui, "安めが選ばれやすい", 790, 1020, 40, "#3E6FD8", { weight: 900, alpha: easeOut(prog(t, CUE.study + 1.6, .4)) });
+    menuCard(ui, 735, 720, .68, [...MENU].reverse(), sk, -1, "MENU");
+    pill(ui, "安い順", 735, 470, 40, "#FFFFFF", "#3E6FD8", sk);
+    text(ui, "高めが選ばれやすい", 285, 1020, 38, C.ura, { weight: 900, alpha: easeOut(prog(t, CUE.study + 1.0, .4)) });
+    text(ui, "安めが選ばれやすい", 735, 1020, 38, "#3E6FD8", { weight: 900, alpha: easeOut(prog(t, CUE.study + 1.6, .4)) });
     note(ui, "※研究の一例（Suk ほか 2012）。商品や条件で変わります", 540, 1110, sk, 26);
   }
   // オモテ：指さし → 論文どおり
@@ -332,8 +338,8 @@ function finalScene(t, a, lt) {
   }
   if (al) {
     ui.save(); ui.globalAlpha = ak * .5; ui.fillStyle = "#FFFFFF"; ui.fillRect(0, 0, W, H); ui.restore();
-    text(ui, "ほぼ", 540, 640, 90, C.navy2, { weight: 900, alpha: ak });
-    text(ui, "2,000円", 540, 790, 190, TAG, { weight: 900, alpha: ak, stroke: "#FFFFFF", sw: 18 });
+    text(ui, "ほぼ", 470, 300, 80, C.navy2, { weight: 900, alpha: ak, stroke: "#FFFFFF", sw: 12 });
+    text(ui, "2,000円", 470, 450, 170, TAG, { weight: 900, alpha: ak, stroke: "#FFFFFF", sw: 18 });
   }
   // 財布が飛んでいく
   if (t >= CUE.wallet) {
@@ -365,7 +371,7 @@ function renderFrame(t) {
   S.resetCam([bg, ui]);
   S.hud(ui, t);
   S.header(ui, false);
-  S.subtitles(ui, t);
+  S.subtitles(ui, t, 1495);
   const i = SCN.indexOf(name);
   if (i > 1) S.whip(ui, 1 - prog(t, a, .2), i);
 }

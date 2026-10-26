@@ -25,10 +25,54 @@
   function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
 
   // ---------------------------------------------------------------- 文字
+  // ---------------------------------------------------------------- 文字の自動検査（2026-10-26）
+  // text() で描いた文字の画面上の範囲を記録し、checkText() で「安全領域の外」「文字どうしの重なり」「小さすぎる文字」「入れ物からのはみ出し」を調べる。
+  const TEXTLOG = [], CHARLOG = []; let GROUP = 0, CONTAINER = null, NOCHAR = false;
+  const SAFE = { x0: 40, x1: 1040, y0: 170, y1: 1650 };       // 縦型ショートの安全領域（上：検索・メニュー、下：タイトル・説明欄）
+  const RIGHT_UI = { x0: 950, y0: 880, y1: 1650 };              // 右側のボタン列（いいね・コメントなど）
+  function screenBox(ctx, x0, y0, x1, y1) {
+    const m = ctx.getTransform(), pts = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+    return [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
+  }
+  function logText(ctx, s, x, y, size, align, base) {
+    if (ctx.globalAlpha < .35 || !s.trim()) return;
+    const w = ctx.measureText(s).width, h = size * 1.15;
+    const x0 = align === "left" ? x : align === "right" ? x - w : x - w / 2;
+    const y0 = base === "middle" ? y - h / 2 : base === "top" ? y : y - h;
+    const m = ctx.getTransform(), scale = Math.hypot(m.a, m.b);
+    TEXTLOG.push({ s, box: screenBox(ctx, x0, y0, x0 + w, y0 + h), size: size * scale, group: GROUP, container: CONTAINER, ignore: !!ctx.__noCheck });
+  }
+  function group(fn, container = null) { const g = GROUP, c = CONTAINER; GROUP = ++GROUP_SEQ; CONTAINER = container; try { fn(); } finally { GROUP = g; CONTAINER = c; } }
+  let GROUP_SEQ = 0;
+  function checkText(t) {
+    const out = [], L = TEXTLOG.filter(e => !e.ignore);
+    const ov = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+    for (const e of L) {
+      if (e.small_sub) { out.push({ t, kind: "small_subtitle", s: e.s, size: Math.round(e.size) }); continue; }
+      const [x0, y0, x1, y1] = e.box;
+      if (x0 < SAFE.x0 - 1 || x1 > SAFE.x1 + 1 || y0 < SAFE.y0 - 1 || y1 > SAFE.y1 + 1) out.push({ t, kind: "safe", s: e.s, box: e.box.map(Math.round) });
+      else if (x1 > RIGHT_UI.x0 && y1 > RIGHT_UI.y0 && y0 < RIGHT_UI.y1) out.push({ t, kind: "right_ui", s: e.s, box: e.box.map(Math.round) });
+      if (e.size < 26) out.push({ t, kind: "small", s: e.s, size: Math.round(e.size) });
+      if (e.container) { const c = e.container; if (x0 < c[0] - 1 || x1 > c[2] + 1 || y0 < c[1] - 1 || y1 > c[3] + 1) out.push({ t, kind: "overflow", s: e.s, box: e.box.map(Math.round), container: c.map(Math.round) }); }
+    }
+    for (const e of L) for (const c of CHARLOG) { // 文字がキャラクター（オモテ）にかぶっていないか
+      if (e.small_sub) continue;
+      const area = (e.box[2] - e.box[0]) * (e.box[3] - e.box[1]);
+      if (area > 0 && ov(e.box, c) / area > .1) out.push({ t, kind: "over_character", s: e.s });
+    }
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+      const a = L[i], b = L[j];
+      if (a.group && a.group === b.group) continue;
+      const o = ov(a.box, b.box), m = Math.min((a.box[2] - a.box[0]) * (a.box[3] - a.box[1]), (b.box[2] - b.box[0]) * (b.box[3] - b.box[1]));
+      if (m > 0 && o / m > .12) out.push({ t, kind: "overlap", s: a.s + " ／ " + b.s });
+    }
+    return out;
+  }
   function text(ctx, s, x, y, size, color, { weight = 800, align = "center", alpha = 1, base = "middle", stroke = null, sw = 10, shadow = false } = {}) {
     if (alpha <= 0 || size <= 0) return;
     ctx.save(); ctx.globalAlpha *= alpha; ctx.font = `${weight} ${size}px ${FONT}`;
     ctx.textAlign = align; ctx.textBaseline = base;
+    logText(ctx, s, x, y, size, align, base);
     if (shadow) { ctx.shadowColor = "rgba(0,0,0,.25)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6; }
     if (stroke) { ctx.lineJoin = "round"; ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.strokeText(s, x, y); ctx.shadowColor = "transparent"; }
     ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
@@ -42,6 +86,7 @@
     if (alpha <= 0) return 0;
     ctx.save(); ctx.globalAlpha *= alpha; ctx.font = `${weight} ${size}px ${FONT}`;
     const w = ctx.measureText(s).width + pad * 2, h = size * 1.55;
+    if (ctx.globalAlpha >= .35) TEXTLOG.push({ s, box: screenBox(ctx, x - w / 2, y - h / 2, x + w / 2, y + h / 2), size: size * Math.hypot(ctx.getTransform().a, ctx.getTransform().b), group: ++GROUP_SEQ, container: null, ignore: !!ctx.__noCheck });
     ctx.shadowColor = "rgba(0,0,0,.18)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
     rrect(ctx, x - w / 2, y - h / 2, w, h, h / 2); ctx.fillStyle = bgc; ctx.fill();
     ctx.shadowColor = "transparent";
@@ -63,6 +108,7 @@
     if (alpha <= 0) return;
     ctx.save(); ctx.globalAlpha *= alpha; ctx.font = `700 ${size}px ${FONT}`;
     const w = ctx.measureText(s).width + 36, h = size * 1.6;
+    if (ctx.globalAlpha >= .35) TEXTLOG.push({ s, box: screenBox(ctx, x - w / 2, y - h / 2, x + w / 2, y + h / 2), size, group: ++GROUP_SEQ, container: null, ignore: !!ctx.__noCheck });
     rrect(ctx, x - w / 2, y - h / 2, w, h, 12); ctx.fillStyle = dark ? "rgba(14,26,48,.78)" : "rgba(255,255,255,.88)"; ctx.fill();
     ctx.fillStyle = dark ? "#FFFFFF" : C.navy2; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y + 1);
     ctx.restore();
@@ -289,7 +335,8 @@
     pixCan.width = w; pixCan.height = h;
     const p = pixCan.getContext("2d");
     p.clearRect(0, 0, w, h);
-    omote3(p, w / 2, h - 30, 1, { ...o, noShadow: true });
+    NOCHAR = true; omote3(p, w / 2, h - 30, 1, { ...o, noShadow: true }); NOCHAR = false;
+    if ((o.alpha ?? 1) > .35) CHARLOG.push(screenBox(ctx, x - 110 * s, y - 560 * s, x + 110 * s, y));
     const bs = Math.max(1, block / s);
     smallCan.width = Math.ceil(w / bs); smallCan.height = Math.ceil(h / bs);
     const q = smallCan.getContext("2d");
@@ -379,6 +426,10 @@
   function burst(ctx, x, y, r, k, label, { fill = C.yellow, stroke = C.navy, size = 96, color = C.navy, rot = -.08, spikes = 14 } = {}) {
     if (k <= 0) return;
     const s = back(k);
+    if (label) { // 文字が必ずギザギザの内側に収まるよう、大きさを文字に合わせる
+      ctx.save(); ctx.font = `900 ${size}px ${FONT}`; const lw = ctx.measureText(label).width; ctx.restore();
+      r = Math.max(r, lw / (2 * .72 * .82), size * .75 / (.8 * .72 * .82));
+    }
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
     ctx.beginPath();
     for (let i = 0; i < spikes * 2; i++) {
@@ -386,7 +437,26 @@
       ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr * .8);
     }
     ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 10; ctx.strokeStyle = stroke; ctx.lineJoin = "round"; ctx.stroke();
-    if (label) text(ctx, label, 0, 4, size, color, { weight: 900 });
+    if (label) { // 飛び出す途中（小さいうち）は検査しない
+      const inner = screenBox(ctx, -r * .72, -r * .8 * .72, r * .72, r * .8 * .72), nc = ctx.__noCheck; ctx.__noCheck = nc || s < .85;
+      group(() => text(ctx, label, 0, 4, size, color, { weight: 900 }), inner); ctx.__noCheck = nc;
+    }
+    ctx.restore();
+  }
+  // 複数行の札（自動で大きさを決める）：lines = [[文字, 大きさ, 色], ...]
+  function panel(ctx, lines, x, y, k = 1, { bgc = "rgba(255,255,255,.95)", edge = C.orange, pad = 34, gap = 14 } = {}) {
+    if (k <= 0) return;
+    ctx.save(); ctx.globalAlpha *= clamp(k);
+    const ws = lines.map(([s, sz]) => { ctx.font = `900 ${sz}px ${FONT}`; return ctx.measureText(s).width; });
+    const w = Math.max(...ws) + pad * 2, h = lines.reduce((a, [, sz]) => a + sz * 1.2, 0) + gap * (lines.length - 1) + pad * 1.4;
+    const sc = back(k);
+    ctx.translate(x, y); ctx.scale(sc, sc);
+    ctx.shadowColor = "rgba(0,0,0,.2)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 8;
+    rrect(ctx, -w / 2, -h / 2, w, h, 26); ctx.fillStyle = bgc; ctx.fill(); ctx.shadowColor = "transparent";
+    ctx.strokeStyle = edge; ctx.lineWidth = 6; ctx.stroke();
+    const box = screenBox(ctx, -w / 2, -h / 2, w / 2, h / 2);
+    let yy = -h / 2 + pad * .7;
+    group(() => lines.forEach(([s, sz, col, opt]) => { text(ctx, s, 0, yy + sz * .6, sz, col, { weight: 900, ...(opt || {}) }); yy += sz * 1.2 + gap; }), box);
     ctx.restore();
   }
   function bigX(ctx, x, y, r, k, col = C.red) {
@@ -561,6 +631,7 @@
     ctx.save(); ctx.globalAlpha *= (o.alpha ?? 1);
     if (!o.noShadow) { ctx.fillStyle = "rgba(10,30,60,.16)"; ctx.beginPath(); ctx.ellipse(x, y + 4 * s, 120 * s * (o.sx || 1), 18 * s, 0, 0, 7); ctx.fill(); }
     ctx.drawImage(Q.can, x - fx * s, y - fy * s, O3W * s, O3H * s);
+    if (!NOCHAR && (o.alpha ?? 1) > .35) CHARLOG.push(screenBox(ctx, x - 110 * s * (o.sx || 1), y - 560 * s * (o.sy || 1), x + 110 * s * (o.sx || 1), y));
     ctx.restore();
   }
 
@@ -639,30 +710,35 @@
     ctx.restore();
   }
   // 字幕（テクノ版）：暗いガラスの帯に、話者の色の細い発光線
-  function subtitles2(ctx, t, cy = 1440) {
+  function subtitles2(ctx, t, cy = 1475) {  // オモテの足もと（y≈1330）と重ならない高さ
     const line = currentLine(t);
     if (!line || t >= TL.ending_start) return;
     const rows = subChunk(line, t).split(" / ");
     let size = 58;
-    const cx = 505;
+    const cx = 490, maxW = 780; // 右側のボタン列（x≥950）と画面の端を避ける
     ctx.font = `800 ${size}px ${FONT}`;
     let wmax = Math.max(...rows.map(r => ctx.measureText(r.replace(/\*\*/g, "")).width));
-    if (wmax > 860) { size = Math.floor(size * 860 / wmax); ctx.font = `800 ${size}px ${FONT}`; wmax = 860; }
-    const lh = size * 1.34, bw = Math.min(930, wmax + 64), bh = rows.length * lh + 30;
+    if (wmax > maxW) { size = Math.floor(size * maxW / wmax); ctx.font = `800 ${size}px ${FONT}`; wmax = maxW; }
+    if (size < 44) TEXTLOG.push({ s: rows.join(""), box: [0, 0, 0, 0], size, group: -1, container: null, ignore: false, small_sub: true });
+    const lh = size * 1.34, bw = Math.min(850, wmax + 64), bh = rows.length * lh + 30;
     const k = easeOut(prog(t, line.start - .04, .1));
     const col = line.who === "M" ? C.omote : "#8C74FF";
     ctx.save(); ctx.globalAlpha = k; ctx.translate(0, 12 * (1 - k));
     ctx.shadowColor = hexA(col, .55); ctx.shadowBlur = 26;
     rrect(ctx, cx - bw / 2, cy - bh / 2, bw, bh, 18); ctx.fillStyle = "rgba(10,16,34,.86)"; ctx.fill();
     ctx.shadowColor = "transparent"; ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
-    rows.forEach((r, i) => rich(ctx, r, cx, cy - (rows.length - 1) * lh / 2 + i * lh + 2, size, "#FFFFFF", "#3FF0FF"));
+    group(() => rows.forEach((r, i) => rich(ctx, r, cx, cy - (rows.length - 1) * lh / 2 + i * lh + 2, size, "#FFFFFF", "#3FF0FF")),
+      screenBox(ctx, cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2));
     const name = (TL.names || {})[line.who] || line.who;
     ctx.font = `900 30px ${FONT}`; const tw = ctx.measureText(name).width + 40;
     rrect(ctx, cx - bw / 2 + 18, cy - bh / 2 - 22, tw, 44, 10); ctx.fillStyle = col; ctx.fill();
-    text(ctx, name, cx - bw / 2 + 18 + tw / 2, cy - bh / 2 + 1, 30, "#FFFFFF", { weight: 900 });
+    group(() => text(ctx, name, cx - bw / 2 + 18 + tw / 2, cy - bh / 2 + 1, 30, "#FFFFFF", { weight: 900 }));
     ctx.restore();
   }
   function header2(ctx) {
+    ctx.__noCheck = true; try { header2_(ctx); } finally { ctx.__noCheck = false; }
+  }
+  function header2_(ctx) {
     ctx.save(); rrect(ctx, 40, 92, 250, 62, 14); ctx.fillStyle = "rgba(10,16,34,.78)"; ctx.fill();
     ctx.strokeStyle = "#3FF0FF"; ctx.lineWidth = 2.5; ctx.stroke(); ctx.restore();
     rewindIcon(ctx, 82, 123, 17, "#3FF0FF");
@@ -673,7 +749,7 @@
     W, H, FONT, C, clamp, lerp, easeOut, easeIn, easeInOut, back, elastic, prog, win, rng, hexA,
     text, rrect, pill, rich, note, setup, sceneRange, sceneAt, currentLine, talk, speaking, subtitles: subtitles2, header: header2, rewindIcon,
     omote: omote3, omote2d: omote, omotePixel, uraBust, wipe: wipe2, speedLines, burst, bigX, bigO, arrow, vhs, glitch, flash, gradientBG: techBG, dots, rays,
-    techBG, hud, camera, resetCam, whip, mixHex, subtitlesOld: subtitles, headerOld: header, gradientOld: gradientBG,
+    techBG, hud, camera, resetCam, whip, mixHex, panel, group, checkText, TEXTLOG, CHARLOG, clearTextLog: () => { TEXTLOG.length = 0; CHARLOG.length = 0; }, subtitlesOld: subtitles, headerOld: header, gradientOld: gradientBG,
     get TL() { return TL; }, get CUE() { return CUE; },
   };
 })(typeof window !== "undefined" ? window : globalThis);

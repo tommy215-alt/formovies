@@ -188,7 +188,8 @@ class Episode:
                               capture_output=True, text=True).stderr
         st = json.loads(meas[meas.rindex("{"):meas.rindex("}") + 1])
         af = (f"loudnorm=I=-14:TP=-2.0:LRA=11:measured_I={st['input_i']}:measured_TP={st['input_tp']}:"
-              f"measured_LRA={st['input_lra']}:measured_thresh={st['input_thresh']}:offset={st['target_offset']}:linear=true")
+              f"measured_LRA={st['input_lra']}:measured_thresh={st['input_thresh']}:offset={st['target_offset']}:linear=true,"
+              "alimiter=limit=0.79:attack=3:release=60:level=disabled")  # ピークを −2 dBFS 以下に（AAC での上振れを見込む）
         subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(self.work / "mix_raw.wav"),
                         "-af", af, "-ar", str(SR), str(self.work / "mix.wav")], check=True)
         print(f"audio: {total:.1f}s, BGM {m['style']}（{bpm_of(m['style'])} BPM）, "
@@ -290,6 +291,46 @@ class Episode:
         (self.here / "scene_plan.md").write_text("\n".join(plan), encoding="utf-8")
         print("docs: final_script.md, scene_plan.md, subtitles.srt")
 
+    # ------------------------------------------------------------ 文字の自動検査
+    def step_textcheck(self):
+        """全編を 0.1 秒ごとに描いて、文字の安全領域・重なり・はみ出し・大きさを調べ、使った文字がフォントにあるかを確かめる。"""
+        subprocess.run(["node", str(COMMON / "render_frames.js"), "--dir", str(self.here), "--textcheck", "0.1"], check=True)
+        res = json.loads((self.work / "textcheck.json").read_text(encoding="utf-8"))
+        # フォント（Noto Sans CJK JP）に含まれる文字の範囲（fontconfig の charset）
+        fontfile = run(["fc-match", "Noto Sans CJK JP", "-f", "%{file}"]).stdout.strip()
+        cs = run(["fc-query", "--index", "0", "--format", "%{charset}", fontfile]).stdout.split()
+        ranges = [tuple(int(v, 16) for v in (r.split("-") * 2)[:2]) for r in cs]
+        missing = sorted({ch for ch in res["chars"] if not any(a <= ord(ch) <= b for a, b in ranges)})
+        res["missing_glyphs"] = missing
+        (self.work / "textcheck.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+        by = {}
+        for e in res["issues"]:
+            by.setdefault((e["kind"], e["s"]), []).append(e["t"])
+        real = {k: v for k, v in by.items() if len(v) > 3}   # 0.3 秒以下（3 コマ以下）は飛び出し・切り替えの途中の一時的なもの
+        print(f"textcheck: {res['frames']} コマ、問題 {len(real)} 種類（ほかに一時的なもの {len(by) - len(real)} 種類）、フォントにない文字 {missing or 'なし'}")
+        for (k, s_), ts in sorted(by.items(), key=lambda kv: kv[1][0]):
+            print(f"  [{k}]{'（一時的）' if len(ts) <= 3 else ''} {s_[:40]}  {ts[0]:.1f}〜{ts[-1]:.1f}s（{len(ts)} コマ）")
+        return res, by
+
+    def qc_text(self):
+        f = self.work / "textcheck.json"
+        if not f.exists():
+            return ["## 文字の自動検査", "", "- 未実施", ""]
+        res = json.loads(f.read_text(encoding="utf-8"))
+        by = {}
+        for e in res["issues"]:
+            by.setdefault((e["kind"], e["s"]), []).append(e["t"])
+        names = {"safe": "安全領域の外", "right_ui": "右側のボタン列と重なる", "small": "文字が小さい（26px 未満）", "overflow": "入れ物からはみ出し",
+                 "overlap": "文字どうしの重なり", "small_subtitle": "字幕が小さい（44px 未満）", "over_character": "文字がオモテにかぶる"}
+        rows = [f"| {names.get(k, k)}{'（一時的：0.3 秒以下）' if len(ts) <= 3 else ''} | {s_[:40]} | {ts[0]:.1f}〜{ts[-1]:.1f}s（{len(ts)} コマ） |"
+                for (k, s_), ts in sorted(by.items(), key=lambda kv: kv[1][0])]
+        real = sum(1 for ts in by.values() if len(ts) > 3)
+        return ["## 文字の自動検査（`render_frames.js --textcheck`、0.1 秒ごと）", "",
+                f"- 検査したコマ：{res['frames']}。安全領域 x 40〜1040・y 170〜1650、右側のボタン列（x≥950・y 880〜1650）を避ける。文字の面積の 10% 以上がオモテにかぶるものも検出",
+                f"- 使った文字 {len(res['chars'])} 種類のうち、フォント（Noto Sans CJK JP）にない文字：{''.join(res.get('missing_glyphs', [])) or 'なし'}",
+                f"- 見つかった問題：{real} 種類（ほかに 0.3 秒以下の一時的なもの {len(by) - real} 種類）", "",
+                *(["| 種類 | 文字 | 時間 |", "|------|------|------|", *rows, ""] if rows else [""])]
+
     # ------------------------------------------------------------ qc
     def step_qc(self):
         out = self.out
@@ -329,7 +370,7 @@ class Episode:
         rep += ["## 読み上げの照合（VOICEVOX が使った読み）", "", "| ID | 字幕 | 読み（カナ） |", "|----|------|------------|",
                 *[f"| {x['id']} | {' ／ '.join(x['sub'] if isinstance(x['sub'], list) else [x['sub']]).replace('**', '')} | {x['kana']} |"
                   for x in tl["lines"]], ""]
-        rep += self.qc_voice(tl) + self.qc_music(tl) + self.qc_ending(tl, a) + self.qc_picture()
+        rep += self.qc_voice(tl) + self.qc_music(tl) + self.qc_ending(tl, a) + self.qc_picture() + self.qc_text()
         times = [0.5] + [tl["cues"][k] + d for k, d in self.cfg["qc_frames"]] + [tl["cues"]["end1"] + 0.4, tl["cues"]["end2"] + 1.0]
         for i, t in enumerate(times):
             run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(out), "-frames:v", "1", "-q:v", "3",
@@ -500,11 +541,11 @@ def f0_track(a, sr=SR):
 def main(here, cfg):
     ep = Episode(here, cfg)
     steps = {"voice": ep.step_voice, "audio": ep.step_audio, "render": ep.step_render, "mux": ep.step_mux,
-             "docs": ep.step_docs, "qc": ep.step_qc}
+             "docs": ep.step_docs, "qc": ep.step_qc, "textcheck": ep.step_textcheck}
     names = sys.argv[1:] or ["all"]
     if names == ["all"]:
-        names = ["voice", "audio", "render", "mux", "docs", "qc"]
+        names = ["voice", "audio", "textcheck", "render", "mux", "docs", "qc"]
     if names == ["update"]:
-        names = ["voice", "audio", "render", "mux", "docs", "qc"]
+        names = ["voice", "audio", "textcheck", "render", "mux", "docs", "qc"]
     for n in names:
         steps[n]()

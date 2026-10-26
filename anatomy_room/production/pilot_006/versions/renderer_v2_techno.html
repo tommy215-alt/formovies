@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_006 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="gl" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/ending.js"></script>
+<script>
+// pilot_006「飛行機の窓、穴が開いてるんだけど!?」のレンダラー。renderFrame(t) が時刻 t の 1 コマを描く（決定的）。
+// 3 層：bg（2D の背景・機内）→ gl（three.js の 3D の窓）→ ui（2D のキャラクター・文字・字幕）。
+const S = Stage, { W, H, C, clamp, lerp, easeOut, easeIn, easeInOut, back, prog, win, text, pill, note, rrect } = Stage;
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["cold", "hook", "gag", "rewind", "hypo", "explode", "pressure", "insight", "standby", "fog", "outro"];
+let TL, CUE;
+
+// ---------------------------------------------------------------- 機内（2D）
+const WIN = { x: 560, y: 650, w: 360, h: 500, r: 150 }; // 窓の位置（画面上）
+function sky(ctx, t, x, y, w, h) {
+  const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, "#2F8FE8"); g.addColorStop(.6, "#7CC8FF"); g.addColorStop(1, "#D8F0FF");
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  const r = S.rng(4);
+  for (let i = 0; i < 7; i++) { // 流れる雲
+    const cy = y + h * (.25 + r() * .7), sp = 40 + r() * 60, cw = 120 + r() * 160;
+    const cx = x + ((r() * 1000 - t * sp) % (w + 400) + w + 400) % (w + 400) - 200;
+    ctx.fillStyle = "rgba(255,255,255,.92)";
+    ctx.beginPath(); ctx.ellipse(cx, cy, cw * .5, cw * .18, 0, 0, 7); ctx.ellipse(cx - cw * .2, cy - cw * .1, cw * .22, cw * .16, 0, 0, 7);
+    ctx.ellipse(cx + cw * .15, cy - cw * .13, cw * .26, cw * .2, 0, 0, 7); ctx.fill();
+  }
+}
+// 機内の壁と窓。pane：窓の板が抜けた割合（0＝はまっている、1＝飛んでいった）
+function cabin(ctx, t, { zoom = 1, shake = 0, pane = 0, holeHL = 0 } = {}) {
+  ctx.save();
+  ctx.translate(W / 2 + shake * Math.sin(t * 80) * 10, 700 + shake * Math.cos(t * 67) * 8); ctx.scale(zoom, zoom); ctx.translate(-W / 2, -700);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#F4F1EC"); g.addColorStop(1, "#E3DDD3");
+  ctx.fillStyle = g; ctx.fillRect(-200, -200, W + 400, H + 400);
+  ctx.strokeStyle = "rgba(120,110,95,.18)"; ctx.lineWidth = 4;
+  for (const x of [120, 990]) { ctx.beginPath(); ctx.moveTo(x, -200); ctx.lineTo(x, H + 200); ctx.stroke(); }
+  // 荷物棚と座席の背もたれ（明るい色）
+  ctx.fillStyle = "#FFFFFF"; rrect(ctx, -100, 110, W + 200, 150, 40); ctx.fill();
+  ctx.fillStyle = "#D7E3EF"; ctx.fillRect(-100, 230, W + 200, 18);
+  ctx.fillStyle = "#3D6FB6"; rrect(ctx, 760, 1010, 380, 520, 60); ctx.fill(); ctx.fillStyle = "#5B8BD0"; rrect(ctx, 780, 1030, 340, 120, 40); ctx.fill();
+  // 窓の枠（白い内装パネル）
+  const { x, y, w, h, r } = WIN;
+  ctx.fillStyle = "#FFFFFF"; ctx.shadowColor = "rgba(0,0,0,.12)"; ctx.shadowBlur = 30;
+  rrect(ctx, x - w / 2 - 60, y - h / 2 - 60, w + 120, h + 120, r + 60); ctx.fill(); ctx.shadowColor = "transparent";
+  ctx.save(); rrect(ctx, x - w / 2, y - h / 2, w, h, r); ctx.clip();
+  sky(ctx, t, x - w / 2, y - h / 2, w, h);
+  // 窓の板（はまっていればガラスの反射と穴）
+  if (pane < 1) {
+    ctx.save(); ctx.translate(x, y); const k = easeIn(pane); ctx.scale(1 - .7 * k, 1 - .7 * k); ctx.rotate(k * 2.4); ctx.translate(-x, -y + -260 * k);
+    ctx.globalAlpha = 1 - k * .8;
+    ctx.fillStyle = "rgba(255,255,255,.12)"; rrect(ctx, x - w / 2 + 12, y - h / 2 + 12, w - 24, h - 24, r - 10); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 6; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.beginPath(); ctx.moveTo(x - w / 2 + 40, y - 120); ctx.lineTo(x - w / 2 + 120, y - h / 2 + 40);
+    ctx.lineTo(x - w / 2 + 160, y - h / 2 + 40); ctx.lineTo(x - w / 2 + 70, y - 80); ctx.closePath(); ctx.fill();
+    // 穴（真ん中の板の下の方）
+    ctx.fillStyle = "#1B2433"; ctx.beginPath(); ctx.arc(x, y + h / 2 - 70, 7, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.strokeStyle = "#CFC8BC"; ctx.lineWidth = 10; rrect(ctx, x - w / 2, y - h / 2, w, h, r); ctx.stroke();
+  // 日よけ
+  ctx.fillStyle = "#EFEAE2"; rrect(ctx, x - w / 2 + 6, y - h / 2 - 50, w - 12, 60, 18); ctx.fill();
+  if (holeHL > 0) { // 穴に丸
+    const s = back(holeHL);
+    ctx.strokeStyle = C.red; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(x, y + h / 2 - 70, 46 * s, 0, 7); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------- 3D の窓
+const glc = document.getElementById("gl");
+const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false); renderer.setClearColor(0x000000, 0);
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(34, W / H, .1, 100);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb8c8dc, .95));
+const key = new THREE.DirectionalLight(0xffffff, .8); key.position.set(4, 6, 8); scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfe6ff, .5); rim.position.set(-6, 3, -5); scene.add(rim);
+
+function rr(w, h, r) {
+  const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r);
+  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s;
+}
+function pane(w, h, r, depth, color, opacity, edge) {
+  const geo = new THREE.ExtrudeGeometry(rr(w, h, r), { depth, bevelEnabled: true, bevelThickness: .015, bevelSize: .015, bevelSegments: 2, curveSegments: 18 });
+  geo.translate(0, 0, -depth / 2);
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, transparent: true, opacity, roughness: .08, metalness: .1,
+    emissive: new THREE.Color(color), emissiveIntensity: .0, depthWrite: false, side: THREE.DoubleSide }));
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: edge, transparent: true, opacity: .95 }));
+  const g = new THREE.Group(); g.add(m); g.add(e); g.userData = { mesh: m, edge: e };
+  return g;
+}
+const P = {
+  outer: pane(2.2, 3.0, .85, .16, 0x3d9df0, .42, 0x1565c0),
+  middle: pane(2.1, 2.9, .82, .09, 0x19b4e0, .38, 0x0b7fa3),
+  inner: pane(2.15, 2.95, .84, .04, 0x9aa9bd, .32, 0x5a6b82),
+};
+for (const k in P) scene.add(P[k]);
+// 穴（真ん中の板の下の方）：暗い輪と、光る輪
+const holeY = -1.18;
+const hole = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, .12, 24), new THREE.MeshBasicMaterial({ color: 0x1b2433 }));
+hole.rotation.x = Math.PI / 2; hole.position.set(0, holeY, 0); P.middle.add(hole);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(.14, .02, 10, 40), new THREE.MeshBasicMaterial({ color: 0xff7a2a, transparent: true, opacity: 0 }));
+ring.position.set(0, holeY, .08); P.middle.add(ring);
+// 機体の外板（窓のまわり）：側面図で「外」と「内」の向きが分かるように
+const skin = new THREE.Mesh(new THREE.TorusGeometry(1.75, .12, 8, 60), new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: .5 }));
+skin.scale.set(1, 1.36, 1); scene.add(skin);
+
+function setCam(pos, look) { camera.position.set(...pos); camera.lookAt(new THREE.Vector3(...look)); camera.updateMatrixWorld(); }
+function project(v) { const p = v.clone().project(camera); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H]; }
+function wpos(obj, x = 0, y = 0, z = 0) { return obj.localToWorld(new THREE.Vector3(x, y, z)); }
+// 板の位置（z）：cabin 側が +z（内側の板）、外が -z（外側の板）
+function layout(sep) {
+  P.outer.position.set(0, 0, lerp(-.16, -1.8, sep)); P.middle.position.set(0, 0, 0); P.inner.position.set(0, 0, lerp(.12, 1.7, sep));
+}
+function resetPanes() {
+  for (const k in P) { const m = P[k].userData.mesh.material; m.emissiveIntensity = 0; P[k].visible = true; P[k].rotation.set(0, 0, 0); }
+  P.outer.userData.mesh.material.opacity = .42; P.middle.userData.mesh.material.opacity = .38; P.inner.userData.mesh.material.opacity = .32;
+  ring.material.opacity = 0; skin.visible = false;
+}
+
+// ---------------------------------------------------------------- 2D 用の補助
+function studioBG(ctx, t, c1, c2) {
+  S.gradientBG(ctx, c1, c2, c2);
+  ctx.strokeStyle = "rgba(25,180,224,.10)"; ctx.lineWidth = 2;
+  for (let x = 0; x <= W; x += 90) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y <= H; y += 90) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+}
+function label(ctx, from, s, dx, dy, col, k) {
+  if (k <= 0) return;
+  const [x, y] = from;
+  ctx.save(); ctx.globalAlpha *= clamp(k); ctx.strokeStyle = col; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(x, y, 10, 0, 7); ctx.fillStyle = col; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx, y + dy); ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.font = `800 46px ${S.FONT}`; const w = ctx.measureText(s).width + 52; ctx.restore();
+  const px = clamp(x + dx + (dx >= 0 ? w / 2 : -w / 2), w / 2 + 30, W - w / 2 - 30);
+  pill(ctx, s, px, y + dy, 46, "#FFFFFF", col, clamp(k));
+}
+// 空気の粒（側面図）：密度で気圧の高さを見せる
+function airDots(ctx, x0, x1, y0, y1, n, t, col, seed, speed = 18) {
+  const r = S.rng(seed);
+  ctx.fillStyle = col;
+  for (let i = 0; i < n; i++) {
+    const bx = r(), by = r(), ph = r() * 6.28;
+    const x = x0 + (x1 - x0) * ((bx + .04 * Math.sin(t * 1.3 + ph)) % 1), y = y0 + (y1 - y0) * ((by + t * speed / 1000 * (r() - .5)) % 1 + 1) % 1;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill();
+  }
+}
+
+// ---------------------------------------------------------------- 場面
+function omoteCabin(t, o) { S.omote(ui, o.x ?? 250, o.y ?? 1330, o.s ?? .95, { talk: S.talk(t, "M"), ...o }); }
+function uraWipe(t, expr, extra = {}) {
+  const sp = S.speaking(t, "W");
+  S.wipe(ui, t, "W", extra.x ?? 905, extra.y ?? 345, extra.r ?? 118, { expr: sp ? expr : (extra.idle || "smirk"), pop: extra.pop ?? 1, alpha: extra.alpha ?? 1 });
+}
+
+function drawScene(t, name) {
+  const [a, b] = S.sceneRange(name), lt = t - a;
+  resetPanes();
+  let use3d = false;
+  if (name === "cold") {
+    coldScene(t);
+  } else if (name === "hook") {
+    const z = lerp(1.0, 1.1, easeInOut(lt / 8));
+    cabin(bg, t, { zoom: z });
+    const pt = easeOut(prog(t, a + .4, .6));
+    const dare = prog(t, CUE.dare, .3);
+    omoteCabin(t, { expr: t > CUE.dare + .4 ? (S.speaking(t, "M") ? "deadpan" : "shock") : "think", armR: lerp(.3, 2.05, pt), elbowR: .1, look: [1, -.5] });
+    if (t < CUE.dare) S.arrow(ui, 470, 1010, 548, 932, C.orange, 12, 34, pt);
+    uraWipe(t, "smirk");
+    note(ui, "飛行中の機内（イメージ）", 540, 1180, easeOut(prog(t, a + .2, .4)) * (1 - prog(t, CUE.dare, .4)));
+    // 疑問を叩きつける（冒頭 1.5〜3 秒）
+    const q = back(prog(t, a, .25)) * (1 - prog(t, CUE.dare - .2, .3));
+    if (q > 0) { ui.save(); ui.translate(540, 300); ui.scale(q, q); text(ui, "なんで窓に穴!?", 0, 0, 104, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
+  } else if (name === "gag") {
+    gagFrame(t, lt, 1);
+  } else if (name === "rewind") {
+    // 巻き戻し：ギャグの動きを逆再生してから、穴に丸
+    const rwDur = 1.3, back_ = clamp((t - a) / rwDur);
+    const gagLen = CUE.rewind - CUE.gag;
+    if (back_ < 1) {
+      gagFrame(t, gagLen * (1 - easeInOut(back_)), 1 - back_);
+      S.vhs(ui, t, 1 - prog(t, a + rwDur - .15, .2));
+    } else {
+      cabin(bg, t, { zoom: 1.08, holeHL: prog(t, CUE.nothole, .4) });
+      omoteCabin(t, { expr: S.speaking(t, "M") ? "deadpan" : "dizzy", armR: .3, look: [1, -.3] });
+      const k = easeOut(prog(t, CUE.nothole + .15, .4));
+      if (k > 0) { pill(ui, "この穴が原因 → ✕", 560, 1010, 46, "#FFFFFF", C.red, k); }
+      uraWipe(t, "smirk");
+    }
+    if (back_ >= 1) note(ui, "※ギャグ演出：実際の窓はこうなりません", 540, 260, 1 - prog(t, a + rwDur, .4)); // 巻き戻し中は gagFrame が表示
+  } else if (name === "hypo") {
+    cabin(bg, t, { zoom: 1.08 });
+    const deny = t >= CUE.deny;
+    omoteCabin(t, { expr: deny ? (S.speaking(t, "M") ? "deadpan" : "shock") : "smug", armR: deny ? .3 : 2.3, elbowR: deny ? .2 : 2.4, look: [-.5, -1] });
+    // 想像の吹き出し：穴から空気が外へ（オモテの仮説）
+    const k = easeOut(prog(t, CUE.vent - .3, .4));
+    if (k > 0) {
+      ui.save(); ui.globalAlpha = k;
+      ui.fillStyle = "rgba(255,255,255,.95)"; ui.strokeStyle = C.omote; ui.lineWidth = 6;
+      for (const [cx, cy, r] of [[330, 980, 14], [300, 930, 22]]) { ui.beginPath(); ui.arc(cx, cy, r, 0, 7); ui.fill(); ui.stroke(); }
+      rrect(ui, 120, 380, 620, 500, 60); ui.fill(); ui.stroke();
+      text(ui, "オモテの仮説：換気口", 430, 440, 40, C.omote, { weight: 900 });
+      // 小さな窓と、外へ出ていく空気
+      ui.fillStyle = "#D8EEFF"; rrect(ui, 330, 500, 200, 300, 80); ui.fill(); ui.strokeStyle = "#9BB0C4"; ui.lineWidth = 6; ui.stroke();
+      ui.fillStyle = C.ink; ui.beginPath(); ui.arc(430, 760, 8, 0, 7); ui.fill();
+      for (let i = 0; i < 4; i++) {
+        const ph = ((t * 1.2 + i * .25) % 1);
+        S.arrow(ui, 300 - 40 + ph * 40, 760 - i * 4, 560 + ph * 140, 700 - i * 30 - ph * 40, "#5DB9FF", 9, 26, (1 - ph) * k);
+      }
+      text(ui, "機内 → 外？", 430, 845, 34, C.navy2, { weight: 800 });
+      ui.restore();
+    }
+    S.bigX(ui, 430, 630, 170, prog(t, CUE.deny, .3));
+    const no = easeOut(prog(t, CUE.notout, .35));
+    if (no > 0) pill(ui, "穴は外につながっていない", 540, 1010, 50, "#FFFFFF", C.navy2, no);
+    uraWipe(t, deny ? "amused" : "smirk");
+  } else if (name === "explode") {
+    use3d = true;
+    studioBG(bg, t, "#F2FAFF", "#C9E8FF");
+    const sep = easeInOut(prog(t, a + .2, 1.1));
+    layout(sep);
+    // 回り込み → 穴へ寄る
+    const orbit = lerp(.55, 1.1, easeInOut(prog(t, a, 4.5)));
+    const toHole = easeInOut(prog(t, CUE.hole - .2, 1.0));
+    const d = lerp(13, 5.0, toHole);
+    const target = [0, lerp(-.2, holeY, toHole), lerp(0, .1, toHole)];
+    setCam([Math.sin(orbit) * d, lerp(1.6, .2, toHole) + target[1], Math.cos(orbit) * d], target);
+    ring.material.opacity = toHole * (.6 + .4 * Math.sin(t * 8));
+    for (const [k, cue] of [["outer", "outer"], ["middle", "middle"], ["inner", "inner"]]) P[k].userData.mesh.material.emissiveIntensity = .35 * win(t, CUE[cue], CUE[cue] + 1.6, .2, .4);
+    renderer.render(scene, camera);
+    const lo = 1 - toHole;
+    label(ui, project(wpos(P.outer, -.9, .9, 0)), "外側：本命（力を受ける）", -60, -180, C.orange, easeOut(prog(t, CUE.outer, .4)) * lo);
+    label(ui, project(wpos(P.middle, .95, .4, 0)), "真ん中：予備", 120, -60, C.cyan, easeOut(prog(t, CUE.middle, .4)) * lo);
+    label(ui, project(wpos(P.inner, .9, -.7, 0)), "内側：傷よけ", 90, 90, "#6B7C93", easeOut(prog(t, CUE.inner, .4)) * lo);
+    if (toHole > .6) label(ui, project(wpos(P.middle, 0, holeY, 0)), "小さな穴", 160, -160, C.orange, (toHole - .6) / .4);
+    note(ui, "※模式図。構造は機種により異なります", 540, 1180, 1);
+    S.omote(ui, 170, 1290, .45, { expr: t < CUE.hole ? "shock" : "smug", talk: S.talk(t, "M"), armR: 2.2, armL: .3, look: [1, -1] });
+    uraWipe(t, "excited");
+  } else if (name === "pressure" || name === "insight" || name === "standby") {
+    sideView(t, name, a, lt);
+  } else if (name === "fog") {
+    fogScene(t, a, lt);
+  } else if (name === "outro") {
+    cabin(bg, t, { zoom: 1.04 });
+    const half = easeOut(prog(t, CUE.half, .35));
+    const jab = t >= CUE.jab, dp = t >= CUE.deadpan, pu = t >= CUE.punch;
+    omoteCabin(t, { expr: pu ? "deadpan" : dp ? "deadpan" : jab ? "shock" : "smug", armR: jab ? .3 : 2.3, elbowR: jab ? .2 : .3, look: [1, -.6] });
+    if (half > 0 && !dp) S.burst(ui, 640, 520, 160, half, "50%", { fill: "#FFFFFF", stroke: C.omote, color: C.omote, size: 90, rot: .1 });
+    if (jab) S.bigX(ui, 640, 520, 110, prog(t, CUE.jab + .6, .3) * (1 - prog(t, CUE.deadpan, .2)));
+    // オチ：ウラのワイプが大きくなる
+    const big = easeOut(prog(t, CUE.punch - .1, .45));
+    uraWipe(t, pu ? "amused" : jab ? "smirk" : "smirk", { x: lerp(905, 700, big), y: lerp(345, 560, big), r: lerp(118, 230, big), idle: pu ? "amused" : "smirk" });
+  }
+  if (!use3d) renderer.clear();
+}
+
+// 冒頭のつかみ（0〜1.5 秒、セリフなし）：指が穴に触れた瞬間、警告音とともに窓が抜け、オモテが吸い寄せられる → 巻き戻しノイズ
+function coldScene(t) {
+  if (t < .2) {
+    cabin(bg, t, { zoom: lerp(1.75, 1.1, easeOut(prog(t, 0, .2))) });
+    omoteCabin(t, { expr: "smug", armR: 2.05, elbowR: .1, look: [1, -.5] });
+    S.speedLines(ui, WIN.x, WIN.y, t, "rgba(255,255,255,.85)", 60, 200);
+    S.flash(ui, .5 * (1 - prog(t, 0, .12)));
+  } else {
+    gagFrame(t, (t - .2) * 1.7, 1);
+  }
+  // 警告：画面の縁が赤く点滅（暗くしない）
+  const al = t > .18 ? .5 + .5 * Math.sin(t * 40) : 0;
+  if (al > 0) { ui.save(); ui.strokeStyle = `rgba(255,50,70,${.75 * al})`; ui.lineWidth = 46; ui.strokeRect(0, 0, W, H); ui.restore();
+    pill(ui, "⚠ WARNING", 540, 360, 56, "#FFFFFF", "rgba(255,50,70,.92)", al); }
+  S.burst(ui, 760, 1020, 150, prog(t, .25, .2), "!?", { size: 120, fill: C.yellow });
+  const rw = prog(t, 1.25, .25);
+  if (rw > 0) { S.vhs(ui, t, rw); S.glitch(ui, t, rw, 5); }
+}
+// ギャグ：窓が抜けて、オモテが吸い寄せられる（gt＝ギャグの経過秒、amp＝強さ）
+function gagFrame(t, gt, amp) {
+  const pop = clamp(gt / .5);
+  const suck = easeOut(clamp((gt - .2) / .6)) * amp;
+  cabin(bg, t, { zoom: 1.08 + .04 * suck, shake: suck * .9, pane: pop });
+  S.speedLines(ui, WIN.x, WIN.y, t, "rgba(255,255,255,.8)", 52, 260);
+  // 飛んでいく小物（紙コップ・雑誌・ナプキン）
+  const items = [["#FFFFFF", 820, 1200, 0], ["#FFC83D", 900, 900, .15], ["#7FD3FF", 180, 820, .3], ["#FFFFFF", 960, 600, .45]];
+  for (const [col, x0, y0, d] of items) {
+    const k = easeIn(clamp((gt - .3 - d) / .9));
+    if (k <= 0 || k >= 1) continue;
+    const x = lerp(x0, WIN.x, k), y = lerp(y0, WIN.y, k);
+    ui.save(); ui.translate(x, y); ui.rotate(k * 9); ui.scale(1 - k * .7, 1 - k * .7); ui.fillStyle = col; rrect(ui, -40, -26, 80, 52, 10); ui.fill();
+    ui.strokeStyle = "rgba(0,0,0,.2)"; ui.lineWidth = 4; ui.stroke(); ui.restore();
+  }
+  S.omote(ui, lerp(250, 360, suck), 1330 - 60 * suck, .95, { expr: "panic", talk: S.talk(t, "M"), sx: 1 - .12 * suck, sy: 1 + .12 * suck,
+    rot: .22 * suck, lean: .12 * suck, armL: lerp(.3, 2.9, suck), armR: lerp(.3, 1.6, suck), elbowR: .2, wind: 1.6 * suck, sweat: suck > .3, look: [1, -1] });
+  S.burst(ui, 690, 470, 150, prog(gt, 0, .25) * (1 - prog(gt, .8, .3)), "ポンッ!", { size: 78 });
+  uraWipe(t, "smirk", { idle: "smirk" });
+  note(ui, "※ギャグ演出：実際の窓はこうなりません", 540, 260, 1);
+}
+
+// 側面図（2D の断面）：左＝機内（気圧が高い）、右＝外（上空・空気が薄い）。3 枚の板を縦の帯で描く
+const SV = { xIn: 420, xMid: 560, xOut: 700, top: 470, bot: 1080, holeY: 1000 };
+function paneBar(ctx, x, w, col, edge, alpha = 1, glow = 0, holeGap = false) {
+  const { top, bot, holeY } = SV;
+  ctx.save(); ctx.globalAlpha *= alpha;
+  if (glow > 0) { ctx.shadowColor = col; ctx.shadowBlur = 40 * glow; }
+  ctx.fillStyle = col; ctx.strokeStyle = edge; ctx.lineWidth = 5;
+  const seg = (y0, y1) => { rrect(ctx, x - w / 2, y0, w, y1 - y0, w / 2); ctx.fill(); ctx.stroke(); };
+  if (holeGap) { seg(top, holeY - 16); seg(holeY + 16, bot); } else seg(top, bot);
+  ctx.restore();
+}
+function sideBase(t, fill, crackK) {
+  const g = bg.createLinearGradient(0, 0, W, 0);
+  g.addColorStop(0, "#FFF2E2"); g.addColorStop(.6, "#FFE3C4"); g.addColorStop(.66, "#BFE6FF"); g.addColorStop(1, "#7CC6FF");
+  bg.fillStyle = g; bg.fillRect(0, 0, W, H);
+  const { xIn, xMid, xOut, top, bot } = SV;
+  airDots(bg, 50, xIn - 30, top + 20, bot - 20, 46, t, "rgba(255,122,42,.6)", 11);
+  airDots(bg, xIn + 22, xMid - 26, top + 20, bot - 20, 10, t, "rgba(255,122,42,.6)", 14, 8);
+  airDots(bg, xOut + 40, W - 40, top + 20, bot - 20, 9, t, "rgba(31,94,156,.5)", 12);
+  airDots(bg, xMid + 24, xOut - 34, top + 20, bot - 20, Math.round(2 + 9 * fill), t, "rgba(255,122,42,.6)", 13, 8);
+  // 機体の外板（上下）
+  bg.fillStyle = "#C9D3DF"; rrect(bg, xOut - 30, top - 14, 110, 34, 14); bg.fill(); rrect(bg, xOut - 30, bot - 20, 110, 34, 14); bg.fill();
+  paneBar(bg, xIn, 18, "rgba(154,169,189,.85)", "#5A6B82");
+  paneBar(bg, xMid, 26, "rgba(25,180,224,.85)", "#0B7FA3", 1, 0, true);
+  paneBar(bg, xOut, 40, "rgba(61,157,240,.9)", "#1565C0");
+  text(bg, "内側", xIn, top - 40, 34, "#5A6B82", { weight: 900 });
+  text(bg, "真ん中", xMid, top - 40, 34, "#0B7FA3", { weight: 900 });
+  text(bg, "外側", xOut, top - 40, 34, "#1565C0", { weight: 900 });
+  text(bg, "機内", 200, 560, 66, "#C2541A", { weight: 900 });
+  text(bg, "気圧が高い", 200, 630, 36, "#C2541A", { weight: 800 });
+  text(bg, "上空", 890, 740, 66, "#1F5E9C", { weight: 900 });
+  text(bg, "空気が薄い", 890, 810, 36, "#1F5E9C", { weight: 800 });
+  note(bg, "※断面の模式図（厚み・すき間は誇張）", 540, 1130, 1, 26);
+}
+function pushArrows(x, k, col, w = 22) {
+  for (let i = 0; i < 4; i++) {
+    const y = lerp(SV.top + 90, SV.bot - 90, i / 3), wob = 6 * Math.sin(Stage.TL ? i : 0);
+    S.arrow(ui, x - 120 + wob, y, x - 18 + wob, y, col, w, 52, k);
+  }
+}
+function sideView(t, name, a, lt) {
+  const { xIn, xMid, xOut, top, bot, holeY } = SV;
+  const fill = name === "pressure" ? 0 : name === "insight" ? easeInOut(prog(t, CUE.flow, 2.2)) : 1;
+  sideBase(t, fill);
+  const crack = name === "standby" ? prog(t, CUE.crack, .25) : 0;
+  const backup = name === "standby" ? easeOut(prog(t, CUE.backup, .4)) : 0;
+  if (name === "pressure") {
+    // 窓全体が内側から外へ押される（どの板が受けるかは、まだ言わない）
+    const ar = easeOut(prog(t, CUE.arrows, .5));
+    for (let i = 0; i < 4; i++) {
+      const y = lerp(top + 90, bot - 90, i / 3), ph = (t * 1.5 + i * .3) % 1;
+      S.arrow(ui, 150 + ph * 30, y, xIn - 30 + ph * 30, y, "#FF4D2E", 26, 60, ar);
+    }
+    if (ar > 0) pill(ui, "内側から外へ押される", 430, 330, 44, "#FFFFFF", "#FF4D2E", ar);
+    const f = easeOut(prog(t, CUE.fifty, .35));
+    if (f > 0) {
+      S.burst(ui, 540, 860, 250, f, "", { fill: "#FFFFFF", stroke: C.orange, spikes: 16 });
+      text(ui, "手のひら大（10cm 四方）で", 540, 790, 44, C.navy2, { alpha: f, weight: 900 });
+      text(ui, "約50kg分", 540, 880, 110, C.orange, { alpha: f, weight: 900, stroke: "#FFFFFF", sw: 12 });
+      note(ui, "※概算：機内高度 8,000ft・上空 35,000ft の標準大気", 540, 975, f, 26);
+    }
+    const rk = prog(t, CUE.rice, .8);
+    if (rk > 0) {
+      for (let i = 0; i < 5; i++) {
+        const k = back(prog(t, CUE.rice + i * .09, .3));
+        ui.save(); ui.translate(300 + i * 120, 1060 - 40 * (1 - k)); ui.scale(k, k);
+        ui.fillStyle = "#FFFFFF"; rrect(ui, -50, -70, 100, 140, 26); ui.fill(); ui.strokeStyle = "#C9B48A"; ui.lineWidth = 6; ui.stroke();
+        text(ui, "米", 0, -8, 52, "#B0812E", { weight: 900 }); text(ui, "10kg", 0, 44, 24, "#7A5A20", { weight: 800 });
+        ui.restore();
+      }
+    }
+    S.omote(ui, 930, 1330, .48, { expr: t > CUE.rice ? "panic" : t > CUE.howmuch ? "think" : "normal", talk: S.talk(t, "M"),
+      armL: t > CUE.rice ? 2.6 : .3, armR: t > CUE.rice ? 2.6 : .3, sweat: t > CUE.rice, look: [-1, -.4] });
+  }
+  if (name === "insight") {
+    const hl = win(t, CUE.flow - .6, CUE.equal + 1.2, .3, .4);
+    if (hl > 0) { ui.strokeStyle = C.orange; ui.lineWidth = 8; ui.globalAlpha = hl; ui.beginPath(); ui.arc(xMid, holeY, 44 + 6 * Math.sin(t * 8), 0, 7); ui.stroke(); ui.globalAlpha = 1;
+      label(ui, [xMid, holeY], "穴", -170, 110, C.orange, hl); }
+    // 機内の空気が、内側の板のまわり → 穴 → すき間へ
+    const fl = win(t, CUE.flow - .3, CUE.equal + 1.5, .3, .5);
+    for (let i = 0; i < 9; i++) {
+      const ph = (t * .8 + i / 9) % 1;
+      let x, y;
+      if (ph < .45) { const k = ph / .45; x = lerp(xIn + 20, xMid - 14, k); y = lerp(holeY - 160, holeY, k); }
+      else { const k = (ph - .45) / .55; x = lerp(xMid, (xMid + xOut) / 2, Math.min(1, k * 2)); y = lerp(holeY, top + 80, k); }
+      ui.fillStyle = `rgba(255,122,42,${.95 * fl})`; ui.beginPath(); ui.arc(x, y, 11, 0, 7); ui.fill();
+    }
+    const eq = easeOut(prog(t, CUE.equal + .2, .5));
+    // 押されるのは外側（すき間と外の気圧差）
+    pushArrows(xOut, Math.max(eq, .0), "#FF4D2E", 24);
+    if (eq > 0) pill(ui, "すき間 ＝ 機内と同じ気圧", 430, 330, 44, "#FFFFFF", C.orange, eq);
+    const np = easeOut(prog(t, CUE.nopush, .4));
+    if (np > 0) { pill(ui, "真ん中：両側が同じ気圧 → 押されない", 470, 1200, 38, "#FFFFFF", "#0B7FA3", np); }
+    S.omote(ui, 930, 1330, .48, { expr: t > CUE.equal ? "happy" : "think", talk: S.talk(t, "M"),
+      armR: t > CUE.equal ? 2.7 : 2.2, elbowR: t > CUE.equal ? .1 : 2.3, look: [-1, -.4] });
+  }
+  if (name === "standby") {
+    pushArrows(xOut, 1 - backup, "#FF4D2E", 24);
+    pushArrows(xMid, backup, C.green, 24);
+    const sb = easeOut(prog(t, CUE.outerload, .4)) * (1 - backup);
+    if (sb > 0) pill(ui, "真ん中：待機中", 430, 330, 44, "#FFFFFF", "#0B7FA3", sb);
+    if (crack > 0) {
+      ui.save(); ui.strokeStyle = "#FFFFFF"; ui.lineWidth = 7; ui.globalAlpha = crack;
+      const cy = 760;
+      for (let i = 0; i < 7; i++) { const an = i * .9; ui.beginPath(); ui.moveTo(xOut, cy); ui.lineTo(xOut + Math.cos(an) * 26, cy + Math.sin(an) * 190); ui.stroke(); }
+      ui.restore();
+      pill(ui, "もし外側が割れたら（想定）", 430, 250, 38, "#FFFFFF", C.red, crack);
+    }
+    if (backup > 0) pill(ui, "真ん中が代わりに受け止める", 470, 1200, 40, "#FFFFFF", C.green, backup);
+    note(ui, "※安全は窓全体と機体の設計で確保されています", 470, 1200, easeOut(prog(t, CUE.outerload, .5)) * (1 - backup), 26);
+    const br = t > CUE.bigrole;
+    S.omote(ui, 930, 1330, .48, { expr: br ? "shock" : "normal", talk: S.talk(t, "M"), armL: br ? 2.5 : .3, armR: br ? 2.5 : .3, look: [-1, -.4] });
+    if (br) S.burst(ui, 800, 960, 120, prog(t, CUE.bigrole, .3), "大役!?", { size: 60 });
+  }
+  uraWipe(t, name === "insight" ? "excited" : "smirk");
+}
+
+// 曇り止め（2D）：正面の窓。すき間の曇りが、穴から湿気が抜けると晴れる
+function fogScene(t, a, lt) {
+  studioBG(bg, t, "#F3FBFF", "#D3EEFF");
+  const cx = 540, cy = 720, w = 560, h = 780, r = 220;
+  bg.fillStyle = "#FFFFFF"; bg.shadowColor = "rgba(0,0,0,.12)"; bg.shadowBlur = 30;
+  rrect(bg, cx - w / 2 - 50, cy - h / 2 - 50, w + 100, h + 100, r + 50); bg.fill(); bg.shadowColor = "transparent";
+  const clear = easeInOut(prog(t, a + 1.0, 2.2));
+  bg.save(); rrect(bg, cx - w / 2, cy - h / 2, w, h, r); bg.clip();
+  sky(bg, t, cx - w / 2, cy - h / 2, w, h);
+  bg.fillStyle = `rgba(255,255,255,${.8 * (1 - clear)})`; bg.fillRect(cx - w / 2, cy - h / 2, w, h);
+  const rr_ = S.rng(9);
+  for (let i = 0; i < 40; i++) { bg.fillStyle = `rgba(255,255,255,${.6 * (1 - clear)})`; bg.beginPath(); bg.arc(cx - w / 2 + rr_() * w, cy - h / 2 + rr_() * h, 10 + rr_() * 30, 0, 7); bg.fill(); }
+  bg.restore();
+  bg.strokeStyle = "#CFD8E3"; bg.lineWidth = 14; rrect(bg, cx - w / 2, cy - h / 2, w, h, r); bg.stroke();
+  const hx = cx, hy = cy + h / 2 - 80;
+  for (let i = 0; i < 10; i++) {
+    const ph = (t * .8 + i / 10) % 1, k = win(t, a + .6, a + 3.4, .3, .5);
+    const x0 = hx + Math.sin(i * 2.1) * 200, y0 = hy - 420 + (i % 3) * 90;
+    ui.fillStyle = `rgba(60,150,255,${.85 * k})`; ui.beginPath(); ui.arc(lerp(x0, hx, ph), lerp(y0, hy + 50, ph), 10, 0, 7); ui.fill();
+  }
+  ui.fillStyle = C.ink; ui.beginPath(); ui.arc(hx, hy, 9, 0, 7); ui.fill();
+  ui.strokeStyle = C.orange; ui.lineWidth = 7; ui.beginPath(); ui.arc(hx, hy, 34, 0, 7); ui.stroke();
+  pill(ui, "湿気が抜けて、曇りにくく", 540, 1200, 50, "#FFFFFF", "#0B7FA3", easeOut(prog(t, a + 1.2, .4)));
+  note(ui, "※ボーイングの技術者の説明として報道されている役割", 540, 1290, easeOut(prog(t, a + 1.4, .4)), 26);
+  S.omote(ui, 150, 1330, .45, { expr: "think", talk: S.talk(t, "M"), armR: .3, look: [1, -.5] });
+  uraWipe(t, "excited");
+}
+
+// ---------------------------------------------------------------- 1 コマ
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start;
+  if (t >= es) {
+    renderer.clear();
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
+    return;
+  }
+  window.__t = t;
+  const name = S.sceneAt(t), [a, b] = S.sceneRange(name);
+  // カメラ：場面ごとの寄り＋衝撃のパンチズーム（3D の窓の場面は 3D のカメラが動くので 2D 側は動かさない）
+  if (name !== "explode") S.camera([bg, ui], t, a, b, [.22, CUE.gag, CUE.fifty, CUE.crack, CUE.rice, CUE.punch], [560, 800]);
+  drawScene(t, name);
+  S.resetCam([bg, ui]);
+  S.hud(ui, t);
+  S.header(ui, false);
+  S.subtitles(ui, t);
+  const i = SCN.indexOf(name);
+  if (i > 1 && name !== "rewind") S.whip(ui, 1 - prog(t, a, .2), i);
+}
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); renderer.clear();
+  gagFrame(CUE.gag + .9, .9, 1);
+  text(ui, "飛行機の窓、", 540, 1380, 110, C.navy, { weight: 900, stroke: "#FFFFFF", sw: 16 });
+  text(ui, "穴が開いてる!?", 540, 1520, 120, C.orange, { weight: 900, stroke: "#FFFFFF", sw: 16 });
+  S.header(ui, false);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; }
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>
