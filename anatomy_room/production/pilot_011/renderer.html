@@ -724,6 +724,7 @@ function drawHall(t) {             // 審理の部屋：長い机の手前にナ
     setCam(V3(1.05 - .15 * u, 2.7, 3.3 - .3 * u), V3(-.05, .7, -.2), 44); fitB([P_(knight), P_(annan)]); draw3D(null);
   } else if (t < CUE.evidence) {     // アナンの主張：奥のアナンへ寄る（ナイトはカメラの後ろ）
     const u = easeInOut(prog(t, CUE.quote, CUE.evidence - CUE.quote));
+    knight.g.visible = false;            // カメラの後ろにいる（映らない）。画面外の範囲が検査で誤って数えられないように隠す
     setCam(V3(.35, 1.5, .9 - .3 * u), V3(0, 1.0, -1.75), 34); fitB([P_(annan)]);
     draw3D({ focus: cam.position.distanceTo(V3(0, 1.15, -1.75)), slab: .6, far: 3, near: 7 });
   } else if (t < CUE.witness) {      // 机の上：設計図・日誌・模型（上から。人物は映さない）
