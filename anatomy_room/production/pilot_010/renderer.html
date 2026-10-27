@@ -528,7 +528,9 @@ function guardBox(b) { if (b && b[2] > 0 && b[0] < W && b[3] > 0 && b[1] < H && 
 
 // ---------------------------------------------------------------- 場面
 function omoteAt(rig, t, o) { rig.pose(o); }
+let extraDip = 0;   // 場面の途中のつなぎの暗転（0〜1）
 function drawScene(t, name) {
+  extraDip = 0;
   const [a, b] = S.sceneRange(name), lt = t - a;
   let dof = null;
   scene.fog.density = .0004; R.toneMappingExposure = 1.15;
@@ -557,13 +559,23 @@ function drawScene(t, name) {
         const u2 = easeInOut(prog(t, CUE.glimpse + .55, CUE.globe - CUE.glimpse - .55));
         const lookEnd = OM_TOP.clone().addScaledVector(TAN, 260).addScaledVector(out, 420).add(V3(0, -90, 0));
         const vd = lookEnd.clone().sub(OM_TOP).setY(0).normalize(), right = V3(-vd.z, 0, vd.x);
-        const camEnd = OM_TOP.clone().addScaledVector(vd, -7).addScaledVector(right, 1.5).add(V3(0, 1.6, 0));
-        const lift = sstep(0, .7, u2);
-        pos = lerpV(V3(P2.x, 14, P2.z), camEnd, sstep(.25, 1, u2)); pos.y = lerp(14, camEnd.y, lift);
-        look = lerpV(V3(P_TOP.x, P_TOP.y * .6, P_TOP.z), lookEnd, sstep(.45, 1, u2));
-        if (u2 > .5) omoteBig.g.visible = true;
+        const camEnd = OM_TOP.clone().addScaledVector(vd, -7).addScaledVector(right, .6).add(V3(0, 1.6, 0));
+        // 2 つのショットを短い暗転でつなぐ：崖の壁を見上げて上昇 → 崖の上のオモテの背中越し
+        // （1 本の動きで 180 度振り返ると、途中で海と空しか映らないコマが続くため）
+        const CUT = .42;
+        if (u2 < CUT) {
+          const v = easeInOut(u2 / CUT);
+          pos = lerpV(V3(P2.x, 14, P2.z), P_TOP.clone().addScaledVector(out, 260).setY(P_TOP.y + 25), v);
+          look = lerpV(V3(P_TOP.x, P_TOP.y * .6, P_TOP.z), P_TOP.clone().addScaledVector(out, -120).setY(P_TOP.y), sstep(.2, 1, v));
+        } else {
+          const v = (u2 - CUT) / (1 - CUT);
+          pos = camEnd.clone().addScaledVector(vd, -3.5 * (1 - v)).add(V3(0, .8 * (1 - v), 0));
+          look = lerpV(lookEnd, OM_TOP.clone().add(V3(0, 1.0, 0)), .985).addScaledVector(right, 1.2);   // オモテを画面のやや左に置き、その先に海
+          omoteBig.g.visible = true;
+        }
+        const dd = Math.abs(u2 - CUT); if (dd < .07) extraDip = Math.max(extraDip, 1 - dd / .07);
       }
-      pos.add(shake(t, .5));
+      pos.add(shake(t, omoteBig.g.visible ? .04 : .5));   // オモテに近いショットでは揺れを小さく（7 m 先のオモテが画面の端へ跳ぶため）
       setCam(pos, look, 42, .3, 90000);
       // オモテ：崖の上の岩に立ち、海岸線と島を見下ろして、少しずつ乗り出す
       const lean = k_(t, "lean", 1.4);
@@ -820,6 +832,7 @@ function renderFrame(t) {
   // 場面のつなぎ：短い暗転（白い閃光は使わない）
   const [a] = S.sceneRange(name), i = SCN.indexOf(name);
   if (i > 0) { const k = 1 - prog(t, a, .35); if (k > 0) { bg.fillStyle = `rgba(4,8,14,${.85 * k})`; bg.fillRect(0, 0, W, H); } }
+  if (extraDip > 0) { bg.fillStyle = `rgba(4,8,14,${.9 * extraDip})`; bg.fillRect(0, 0, W, H); }
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
 }
 function renderThumb() {
