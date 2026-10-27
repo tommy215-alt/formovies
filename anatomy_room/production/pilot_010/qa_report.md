@@ -21,7 +21,7 @@
 ## 3. 最初のコマ（自動のサムネイルになる）
 
 - 平均輝度 33（225 以下）、くっきり度 0.9（本編の中央値 2.6 の 60% 以上）：**要確認**（白飛び・ぼやけ。サムネは thumbnail.png を使うか、最初のコマを止め絵にする）
-- サムネイル画像 `thumbnail.png`：なし（node ../common/render_frames.js --dir . --thumb で作る）
+- サムネイル画像 `thumbnail.png`：あり
 
 ## 4. 文字の自動検査（textcheck）
 
