@@ -47,7 +47,7 @@ def build(pid):
           f"| 尺 | 約 {tl['duration']:.0f} 秒（本編 {tl['ending_start']:.1f} 秒＋共通エンディング {tl['duration'] - tl['ending_start']:.1f} 秒） |",
           f"| この動画の面白さ | {meta['fun']} |", f"| 想定する視聴者の疑問 | {meta['question']} |",
           f"| オモテが巻き込まれる出来事 | {meta['incident']} |", f"| 主な CG 表現 | {meta['cg']} |",
-          f"| 声 | オモテ＝{v['M']['credit']}、ウラ＝{v['W']['credit']}（`voices.json` の `{data['voices']}`） |", "",
+          f"| 声 | {v['M'].get('display', 'オモテ')}＝{v['M']['credit']}、{v['W'].get('display', 'ウラ')}＝{v['W']['credit']}（`voices.json` の `{data['voices']}`） |", "",
           "## 2. フック（冒頭 3 秒）", "", f"- {meta['hook']}", "",
           "## 3. 完全な台本", "",
           "| 時間 | キャラクター・音声 | セリフ | 映像・CGの指示 | 画面字幕 | 事実確認ID |",

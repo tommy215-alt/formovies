@@ -174,5 +174,37 @@
    "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
    "speed_mul": 1.13
   }
+ },
+ "v6": {
+  "from_episode": "pilot_010（イナクセシブルクイナの回）",
+  "note": "ドキュメンタリー形式：M＝男性ナレーション（VOICEVOX:玄野武宏、ノーマル。落ち着いた声、f0 中央値 約 130 Hz）。オモテは顔のないピクトグラムで話さない。W（冥鳴ひまり）は共通エンディングだけに使う。",
+  "M": {
+   "name": "玄野武宏",
+   "display": "ナレーション",
+   "credit": "VOICEVOX:玄野武宏",
+   "styles": {
+    "normal": 11
+   },
+   "default_style": "normal",
+   "speed": 1.06,
+   "pitch": 0.0,
+   "inton": 1.05,
+   "speed_mul": 1.0,
+   "license_note": "「VOICEVOX:玄野武宏」とクレジットを記載すれば商用・非商用で利用可能（エンジン内蔵の規約）"
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
+   "speed_mul": 1.0
+  }
  }
 }

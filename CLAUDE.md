@@ -50,5 +50,6 @@
   台本 `scripts/pilot_00N/script.md` は `python3 anatomy_room/tools/build_script_md.py pilot_00N` で制作データから作る。
 - **第 7 弾（仮） pilot_009「結局、今回のPHP騒動は何だったの？」はユーザーの指示で動画化済み**（2026年10月のPHPの脆弱性とサービス停止。約 115 秒（v2：冒頭の問い・やわらかい効果音 sfx_bank_soft）、声は `v5`＝v4 の約 0.9 倍の速さ）：
   `production/pilot_009/reverse_009_php.mp4`。事実確認は `scripts/pilot_009/fact_check.md`（すべて検索抜粋。公式の本文は未確認）、自己レビューは `reviews/internal_review/pilot_009_review.md`。
+- **pilot_010「世界の果てに、空を飛べない小さな鳥がいる」（イナクセシブルクイナ）はユーザーの指示で動画化**：科学ドキュメンタリー形式（男性ナレーション `v6`＝VOICEVOX:玄野武宏、暗い 3DCG）。オモテは**顔のない、もちもちした人型ピクトグラム**（`stage.js` の `mochi3D`、`CHARACTER_GUIDE.md` v3.2）に統一。`production/pilot_010/`。
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
 - YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。

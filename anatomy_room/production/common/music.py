@@ -282,6 +282,9 @@ TECH_STYLES = {
                                           (43.65, [349.23, 440.00, 523.25]), (49.00, [392.00, 493.88, 587.33])], "seed": 2},
     "tech_price": {"bpm": 128, "chords": [(73.42, [293.66, 349.23, 440.00]), (58.27, [293.66, 349.23, 466.16]),
                                           (43.65, [349.23, 440.00, 523.25]), (65.41, [329.63, 392.00, 523.25])], "seed": 3},
+    # イナクセシブルクイナの回：深く暗いシネマティック（ニ短調 Dm–B♭–F–C、ゆったり）
+    "tech_deep":  {"bpm": 100, "chords": [(36.71, [293.66, 349.23, 440.00]), (58.27, [233.08, 293.66, 349.23]),
+                                          (43.65, [261.63, 349.23, 440.00]), (65.41, [261.63, 329.63, 392.00])], "seed": 5},
     # PHP 騒動の回：緊張感と未来感（ホ短調。ふざけた印象にしない）
     "tech_net":   {"bpm": 134, "chords": [(41.20, [329.63, 392.00, 493.88]), (65.41, [261.63, 329.63, 392.00]),
                                           (55.00, [329.63, 440.00, 523.25]), (61.74, [311.13, 369.99, 493.88])], "seed": 4},
@@ -297,6 +300,11 @@ TECH_MODES = {
     "ending":  {"kick": 0.0, "clap": 0.0, "hat": 0.25, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.45, "stab": 0.0, "arp": 0.45, "pad": 0.9},
 }
 TECH_MODES.update(hook=TECH_MODES["intro"], banter=TECH_MODES["drive"], reveal=TECH_MODES["lift"])
+# ドキュメンタリー向け（2026-10-27）：ambient＝パッドと低音だけの空間、pulse＝控えめな電子パルス、rise＝発見の瞬間のゆるやかな盛り上がり
+TECH_MODES.update(
+    ambient={"kick": 0.0, "clap": 0.0, "hat": 0.0, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.55, "stab": 0.0, "arp": 0.0, "pad": 1.0},
+    pulse={"kick": 0.35, "clap": 0.0, "hat": 0.2, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.75, "stab": 0.0, "arp": 0.35, "pad": 0.85},
+    rise={"kick": 0.6, "clap": 0.0, "hat": 0.35, "ohat": 0.15, "bass": 0.4, "bass_dark": 0.6, "stab": 0.0, "arp": 0.6, "pad": 1.0})
 
 
 def _supersaw(f, dur, amp, n=5, spread=0.012, attack=0.004, decay=0.25, seed=0):
@@ -508,6 +516,18 @@ def sfx_bank_soft():
         "cash": _add(_bell(1046.5, 0.4, 0.25, 0.14), _bell(1318.5, 0.35, 0.18, 0.12)),
         "rain": _add(*[np.concatenate([np.zeros(int(k * 0.06 * SR)), _bell(f, 0.05, 0.3, 0.015)]) for k, f in enumerate([600, 450, 750, 550, 850, 500])]),
     }
-    level = {"impact": 0.11, "hit": 0.08, "alarm": 0.08, "stab": 0.08, "brake": 0.06, "rewind": 0.06, "revswell": 0.05,
+    # 自然の音（ドキュメンタリー向け）：波・風・草のそよぎ・小さな足音
+    n6 = _noise(int(6 * SR), 81)
+    swell = 0.55 + 0.45 * np.sin(2 * np.pi * t(6) / 3.0 - np.pi / 2) ** 2
+    bank["waves"] = _lp(n6 - _lp(n6, 120), 900) * swell * np.sin(np.pi * t(6) / 6) ** 0.3
+    n4 = _noise(int(4 * SR), 82)
+    bank["wind"] = (_lp(n4, 700) - _lp(n4, 180)) * (0.6 + 0.4 * np.sin(2 * np.pi * t(4) / 2.7)) * np.sin(np.pi * t(4) / 4) ** 0.5
+    n1 = _noise(int(0.6 * SR), 83)
+    bank["rustle"] = (_lp(n1, 1500) - _lp(n1, 400)) * np.sin(np.pi * t(0.6) / 0.6) ** 2 * (0.6 + 0.4 * np.sin(2 * np.pi * 9 * t(0.6)))
+    bank["step"] = _add(*[np.concatenate([np.zeros(int(k * 0.11 * SR)), _bell(330 - 40 * k, 0.04, 0.4, 0.008, 0.002)]) for k in range(4)])
+    bank["deep"] = _add(np.sin(2 * np.pi * np.cumsum(55 * np.exp(-t(1.6) / 1.2) + 28) / SR) * np.exp(-t(1.6) / 0.7) * np.minimum(1, t(1.6) / 0.05),
+                        _lp(_noise(int(1.6 * SR), 84), 400) * np.exp(-t(1.6) / 0.4) * 0.3)   # 空間の広がりを感じる低い音
+    level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09,
+             "impact": 0.11, "hit": 0.08, "alarm": 0.08, "stab": 0.08, "brake": 0.06, "rewind": 0.06, "revswell": 0.05,
              "sweep_up": 0.045, "sweep_down": 0.045, "riser": 0.04, "tick": 0.05, "scan": 0.04}
     return {k: _soften(v, rms=level.get(k, 0.06)) for k, v in bank.items()}

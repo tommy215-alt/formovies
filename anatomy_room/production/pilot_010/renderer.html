@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_010 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/ending.js"></script>
+<script>
+// pilot_010「世界の果てに、空を飛べない小さな鳥がいる」のレンダラー（科学ドキュメンタリー形式、暗い 3DCG）。
+// renderFrame(t) が時刻 t の 1 コマを描く（決定的：乱数はすべて種つき）。
+// 3D は画面外の WebGL キャンバスに描き、bg（2D）に重ねる。被写界深度は「奥／焦点／手前」を別々に描いてぼかして重ねる。ui（2D）は文字・字幕。
+const S = Stage, { W, H, clamp, lerp, easeOut, easeIn, easeInOut, prog, win, text, rrect } = Stage;
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["hook", "globe", "aerial", "ground", "bird", "evo", "wing", "alone", "outro"];
+let TL, CUE;
+const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
+const sstep = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const lerpV = (a, b, k) => a.clone().lerp(b, k);
+
+// ---------------------------------------------------------------- 種つきの乱数・ノイズ
+function hash2(x, y, s = 0) { let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+function vnoise(x, y, s = 0) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s), c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
+  return lerp(lerp(a, b, u), lerp(c, d, u), v);
+}
+function fbm(x, y, oct = 4, s = 0) { let a = 0, f = 1, w = .5, n = 0; for (let i = 0; i < oct; i++) { a += w * vnoise(x * f, y * f, s + i * 17); n += w; f *= 2; w *= .5; } return a / n; }
+
+// ---------------------------------------------------------------- WebGL
+const glc = document.createElement("canvas"); glc.width = W; glc.height = H;
+const R = new THREE.WebGLRenderer({ canvas: glc, antialias: true, alpha: true, preserveDrawingBuffer: true });
+R.setPixelRatio(1); R.setSize(W, H, false); R.outputEncoding = THREE.sRGBEncoding;
+R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.45;
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(40, W / H, .01, 90000);
+const C = c => new THREE.Color(c).convertSRGBToLinear();
+const FOGC = C(0x2a3644);
+scene.fog = new THREE.FogExp2(FOGC, .0004);
+const hemi = new THREE.HemisphereLight(C(0x8ea2bd), C(0x1c2418), .55); scene.add(hemi);
+const key = new THREE.DirectionalLight(C(0xdfe7f0), 1.1); key.castShadow = true; scene.add(key); scene.add(key.target);
+key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -.0006; key.shadow.normalBias = .02;
+const rim = new THREE.DirectionalLight(C(0x9fd4ff), 1.0); scene.add(rim); scene.add(rim.target);
+const sets = {};
+function set(name) { const g = new THREE.Group(); g.visible = false; scene.add(g); sets[name] = g; return g; }
+function show(...names) { for (const k in sets) sets[k].visible = names.includes(k); }
+
+// 空：地平線は暗いスレート、上は濃紺
+const skyGeo = new THREE.SphereGeometry(80000, 32, 16), skyCol = [];
+for (let i = 0; i < skyGeo.attributes.position.count; i++) {
+  const y = skyGeo.attributes.position.getY(i) / 80000, k = sstep(-.05, .5, y);
+  const c = C(0x3c4b5e).lerp(C(0x0c1320), k); skyCol.push(c.r, c.g, c.b);
+}
+skyGeo.setAttribute("color", new THREE.Float32BufferAttribute(skyCol, 3));
+const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+scene.add(sky);
+function softSprite(inner = "rgba(255,255,255,1)") {
+  const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d");
+  const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, inner); g.addColorStop(1, "rgba(255,255,255,0)");
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128); const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; return tx;
+}
+const SPRITE = softSprite();
+
+// ---------------------------------------------------------------- 島（実寸に近い地形：東西 約 4.6 km、崖 約 300 m、最高点 約 570 m）
+const IA = 2300, IB = 1900;
+function islandD(x, z) {
+  const th = Math.atan2(z / IB, x / IA), r = Math.hypot(x / IA, z / IB);
+  const Rr = 1 + .2 * (fbm(Math.cos(th) * 1.6 + 7, Math.sin(th) * 1.6 + 7, 3, 3) - .5) + .035 * (fbm(Math.cos(th) * 16 + 3, Math.sin(th) * 16 + 3, 3, 4) - .5);
+  return Rr - r;
+}
+function islandH(x, z) {
+  const d = islandD(x, z);
+  if (d < 0) return -25 - 220 * Math.min(1, -d * 4);
+  const cliff = 290 * sstep(0, .035, d), rise = 150 * sstep(.04, .85, d);
+  const peak = 125 * Math.exp(-(((x + 700) / 650) ** 2 + ((z - 250) / 560) ** 2));
+  const n = 30 * (fbm(x / 380 + 3, z / 380 + 9, 5, 5) - .5) * sstep(.02, .12, d);
+  const gully = -40 * Math.max(0, fbm(x / 160, z / 160, 2, 9) - .6) * sstep(.05, .2, d);
+  return cliff + rise + peak + n + gully;
+}
+const island = set("island");
+{
+  const g = new THREE.PlaneGeometry(5600, 4800, 600, 514); g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setY(i, islandH(p.getX(i), p.getZ(i)));
+  window.__grid = { w: 5600, d: 4800, nx: 600, nz: 514, ys: Float32Array.from({ length: p.count }, (_, i) => p.getY(i)) };
+  g.computeVertexNormals();
+  const n = g.attributes.normal, cols = [];
+  const rock = C(0x4a443d), rock2 = C(0x2b2925), grass = C(0x23391f), grass2 = C(0x324626), peat = C(0x3a3022), foam = C(0x55616b), deep = C(0x0b1621);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), slope = 1 - n.getY(i);
+    const nn = fbm(x / 90, z / 90, 3, 11);
+    let c = grass.clone().lerp(grass2, sstep(.35, .75, nn)).lerp(peat, sstep(.62, .9, fbm(x / 240, z / 240, 2, 13)) * .6);
+    const strata = fbm(x / 60 + z / 60, y / 9, 3, 15); // 崖の縦の筋と層
+    c.lerp(rock.clone().lerp(rock2, strata), sstep(.16, .38, slope));
+    if (y < 3 && y > -3) c.lerp(foam, .5 * (1 - Math.abs(y) / 3));
+    if (y < -6) c = deep.clone();
+    cols.push(c.r, c.g, c.b);
+  }
+  g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+  const rt = (() => { const c = document.createElement("canvas"); c.width = c.height = 512; const x = c.getContext("2d"), d = x.createImageData(512, 512);
+    for (let j = 0; j < 512; j++) for (let i = 0; i < 512; i++) { const v = .7 * fbm(i / 26, j / 26, 5, 21) + .3 * fbm(i / 6, j / 6, 2, 22); const q = 165 + 90 * v;
+      const k = (j * 512 + i) * 4; d.data[k] = d.data[k + 1] = d.data[k + 2] = q; d.data[k + 3] = 255; } x.putImageData(d, 0, 0);
+    const tx = new THREE.CanvasTexture(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(90, 77); tx.anisotropy = 8; return tx; })();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: rt, bumpMap: rt, bumpScale: 3, roughness: .95, metalness: 0 }));
+  m.receiveShadow = true; island.add(m); window.__islandMesh = m;
+  // 崖のまわりの霧（やわらかい板）
+  const r = S.rng(41);
+  for (let i = 0; i < 70; i++) {
+    const th = r() * Math.PI * 2, rr = 1.0 + r() * .22;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SPRITE, color: C(0x9aa9b8), transparent: true, opacity: .1 + r() * .12, depthWrite: false, fog: true }));
+    s.position.set(Math.cos(th) * IA * rr, 60 + r() * 380, Math.sin(th) * IB * rr); const sc = 500 + r() * 900; s.scale.set(sc, sc * .45, 1); island.add(s);
+  }
+}
+// 海：近くは細かい波（カメラについて動く）、遠くは平ら
+const seaMat = new THREE.MeshLambertMaterial({ color: C(0x1d3448) });   // 鏡のような反射はつけない（白い照り返しで画面が飛ぶため）。波の陰影だけ
+const seaNear = new THREE.Mesh(new THREE.PlaneGeometry(3600, 3600, 220, 220).rotateX(-Math.PI / 2), seaMat); island.add(seaNear);
+const seaFar = new THREE.Mesh(new THREE.PlaneGeometry(180000, 180000, 4, 4).rotateX(-Math.PI / 2), seaMat); seaFar.position.y = -2.5; island.add(seaFar);
+const seaBase = Float32Array.from(seaNear.geometry.attributes.position.array);
+function waves(t, cx, cz) {
+  const sx = Math.round(cx / 16) * 16, sz = Math.round(cz / 16) * 16; seaNear.position.set(sx, 0, sz);
+  const p = seaNear.geometry.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = seaBase[i * 3] + sx, z = seaBase[i * 3 + 2] + sz;
+    const y = 1.6 * Math.sin(x * .021 + t * 1.1) + 1.1 * Math.sin(z * .033 - t * 1.4 + 1.3) + .6 * Math.sin((x + z) * .06 + t * 2.1) + .35 * Math.sin((x - z) * .11 - t * 2.7);
+    p.setY(i, y);
+  }
+  p.needsUpdate = true; seaNear.geometry.computeVertexNormals();
+}
+// 遠くの船の影（※イメージ）
+const boat = new THREE.Group(); island.add(boat);
+{ const m = new THREE.MeshStandardMaterial({ color: C(0x151b22), roughness: .8 });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(34, 6, 9), m); hull.position.y = 2; boat.add(hull);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 7), m); cab.position.set(-5, 8, 0); boat.add(cab); }
+
+function mist(on) { island.children.forEach(o => { if (o.isSprite) o.visible = on; }); }
+// オモテを島の崖の上に置く場所（南の崖の縁の少し内側）
+function rimPoint(th, inset) {
+  let lo = .5, hi = 1.4; // 半径方向に二分探索して、d = inset になる点
+  for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2, x = Math.cos(th) * IA * m, z = Math.sin(th) * IB * m; if (islandD(x, z) > inset) lo = m; else hi = m; }
+  const x = Math.cos(th) * IA * lo, z = Math.sin(th) * IB * lo; return V3(x, islandH(x, z), z);
+}
+const TH0 = -Math.PI / 2 - .25;                 // 冒頭でカメラが近づく崖
+const P_TOP = rimPoint(TH0, .04), P_EDGE = rimPoint(TH0 + .9, .038);   // 崖の縁のすぐ内側
+const rockMat = new THREE.MeshStandardMaterial({ color: C(0x34312d), roughness: .95 });
+const ledge = new THREE.Mesh(new THREE.DodecahedronGeometry(1.6, 1), rockMat); ledge.scale.set(1.4, .55, 1.2); ledge.position.copy(P_TOP).add(V3(0, .1, 0));
+ledge.castShadow = ledge.receiveShadow = true; ledge.visible = false;
+const omoteBig = S.mochi3D(THREE); island.add(omoteBig.g);
+const TAN = rimPoint(TH0 + .03, .06).sub(rimPoint(TH0 - .03, .06)).setY(0).normalize();   // 崖の縁に沿う向き
+// 描画される地形の高さ（格子の三角形を補間。PlaneGeometry の分割と同じ）
+function groundAt(x, z) {
+  const { w, d, nx, nz, ys } = window.__grid, fx = (x + w / 2) / w * nx, fz = (z + d / 2) / d * nz;
+  const ix = Math.max(0, Math.min(nx - 1, Math.floor(fx))), iz = Math.max(0, Math.min(nz - 1, Math.floor(fz))), u = fx - ix, v = fz - iz;
+  const Hh = (i, j) => ys[j * (nx + 1) + i];
+  const a = Hh(ix, iz), b = Hh(ix, iz + 1), c = Hh(ix + 1, iz + 1), dd = Hh(ix + 1, iz);
+  return u + v <= 1 ? a + (dd - a) * u + (b - a) * v : c + (b - c) * (1 - u) + (dd - c) * (1 - v);
+}
+const OM_TOP = V3(P_TOP.x, groundAt(P_TOP.x, P_TOP.z), P_TOP.z), OM_EDGE = V3(P_EDGE.x, groundAt(P_EDGE.x, P_EDGE.z), P_EDGE.z);
+// 崖の上の草の株（空撮で降りていく場所のまわりだけ。株の大きさは実寸）
+const TH_LAND = TH0 + 1.28, LAND = rimPoint(TH_LAND, .14);
+const topTus = (() => { const r = S.rng(55), list = [];
+  for (let i = 0; i < 14000 && list.length < 6500; i++) { const ang = r() * 6.28, rr = Math.pow(r(), .9) * 85, x = LAND.x + Math.cos(ang) * rr, z = LAND.z + Math.sin(ang) * rr;
+    if (islandD(x, z) < .05) continue; list.push({ x, z, y: groundAt(x, z), s: 1.5 + r() * 1.1, a: r() * 6.28 }); }
+  // オモテが立つ崖の上のまわり（足もとと、カメラからオモテまでの見通しは空ける）
+  const outA = V3(Math.cos(TH0) * IA, 0, Math.sin(TH0) * IB).normalize(), outB = V3(Math.cos(TH0 + .9) * IA, 0, Math.sin(TH0 + .9) * IB).normalize();
+  const lookA = OM_TOP.clone().addScaledVector(TAN, 260).addScaledVector(outA, 420), vdA = lookA.sub(OM_TOP).setY(0).normalize(), rtA = V3(-vdA.z, 0, vdA.x);
+  const camA = OM_TOP.clone().addScaledVector(vdA, -7).addScaledVector(rtA, 1.5), camB = OM_EDGE.clone().addScaledVector(outB, -8.5).add(V3(-outB.z * .5, 0, outB.x * .5));
+  const seg = (x, z, A, B) => { const vx = B.x - A.x, vz = B.z - A.z, k = clamp(((x - A.x) * vx + (z - A.z) * vz) / (vx * vx + vz * vz), -.3, 1); return Math.hypot(x - A.x - vx * k, z - A.z - vz * k); };
+  for (const [P, Cm] of [[OM_TOP, camA], [OM_EDGE, camB]]) for (let i = 0; i < 2600; i++) {
+    const ang = r() * 6.28, rr = 1.3 + Math.pow(r(), 1.3) * 40, x = P.x + Math.cos(ang) * rr, z = P.z + Math.sin(ang) * rr;
+    if (islandD(x, z) < .012 || seg(x, z, P, Cm) < 1.1) continue; list.push({ x, z, y: groundAt(x, z), s: .9 + r() * .8, a: r() * 6.28 }); }
+  // 足もとの短い草（地面の格子が見えないように、崖の上の地面を覆う）
+  window.__short = [];
+  for (const [P, Cm] of [[OM_TOP, camA], [OM_EDGE, camB]]) for (let i = 0; i < 4200; i++) {
+    const ang = r() * 6.28, rr = .45 + Math.pow(r(), 1.1) * 26, x = P.x + Math.cos(ang) * rr, z = P.z + Math.sin(ang) * rr;
+    if (islandD(x, z) < .008 || Math.hypot(x - Cm.x, z - Cm.z) < .9) continue; window.__short.push({ x, z, y: groundAt(x, z), s: 1.2 + r() * 1.2, a: r() * 6.28 }); }
+  return list; })();
+
+// ---------------------------------------------------------------- 草の根もと（1 m 前後の草の株・シダ・岩・湿った土。小さな鳥の目線）
+const ground = set("ground");
+function peatTexture() {
+  const c = document.createElement("canvas"); c.width = c.height = 1024; const x = c.getContext("2d");
+  x.fillStyle = "#241b13"; x.fillRect(0, 0, 1024, 1024);
+  const r = S.rng(7);
+  for (let i = 0; i < 9000; i++) { const px = r() * 1024, py = r() * 1024, s = 1 + r() * 7; const v = r();
+    x.fillStyle = v < .55 ? `rgba(${50 + r() * 30},${38 + r() * 20},${24 + r() * 14},.55)` : v < .85 ? `rgba(${36 + r() * 16},${48 + r() * 22},${26 + r() * 12},.5)` : `rgba(${70 + r() * 30},${66 + r() * 25},${58 + r() * 20},.6)`;
+    x.beginPath(); x.ellipse(px, py, s, s * (.5 + r()), r() * 3, 0, 7); x.fill(); }
+  for (let i = 0; i < 300; i++) { x.strokeStyle = `rgba(${80 + r() * 30},${70 + r() * 20},${40},.35)`; x.lineWidth = 1 + r() * 1.5; x.beginPath();
+    const px = r() * 1024, py = r() * 1024, a = r() * 6.28; x.moveTo(px, py); x.lineTo(px + Math.cos(a) * 30, py + Math.sin(a) * 30); x.stroke(); } // 枯れ草の切れはし
+  const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(10, 10); tx.anisotropy = 4; return tx;
+}
+const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: peatTexture(), roughness: .92 }));
+groundMesh.receiveShadow = true; ground.add(groundMesh);
+function bladeGeo(n, hMin, hMax, seed, wBase = .02, colors) {
+  const r = S.rng(seed), pos = [], col = [], idx = []; let v = 0;
+  for (let i = 0; i < n; i++) {
+    const a = r() * Math.PI * 2, r0 = r() * .09, h = hMin + r() * (hMax - hMin), L = (.15 + r() * .45) * h, w = wBase * (.7 + r() * .6);
+    const dir = V3(Math.cos(a), 0, Math.sin(a)), side = V3(-Math.sin(a), 0, Math.cos(a)), dead = r() < .14;
+    const c0 = C(colors[0]), c1 = C(dead ? colors[3] : colors[1]), c2 = C(dead ? colors[3] : colors[2]);
+    for (let s = 0; s <= 5; s++) {
+      const u = s / 5, base = dir.clone().multiplyScalar(r0 + L * u ** 1.8).add(V3(0, h * u * (1 - .18 * u), 0)), ww = w * (1 - u * .92);
+      const pa = base.clone().addScaledVector(side, ww / 2), pb = base.clone().addScaledVector(side, -ww / 2);
+      pos.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
+      const c = u < .5 ? c0.clone().lerp(c1, u * 2) : c1.clone().lerp(c2, (u - .5) * 2); col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      if (s) idx.push(v - 2, v - 1, v, v - 1, v + 1, v);
+      v += 2;
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+function fernGeo(seed) {
+  const r = S.rng(seed), pos = [], col = [], idx = []; let v = 0; const cg = C(0x2c5531), cd = C(0x1e3b24);
+  for (let f = 0; f < 7; f++) {
+    const a = f / 7 * Math.PI * 2 + r() * .5, len = .45 + r() * .3, dir = V3(Math.cos(a), 0, Math.sin(a)), side = V3(-Math.sin(a), 0, Math.cos(a));
+    for (let s = 1; s <= 12; s++) {
+      const u = s / 12, p = dir.clone().multiplyScalar(len * u).add(V3(0, len * (.9 * u - .75 * u * u), 0)), lw = .085 * Math.sin(Math.PI * Math.min(1, u * 1.15));
+      for (const sd of [-1, 1]) {
+        const tip = p.clone().addScaledVector(side, sd * lw).add(V3(0, -.02, 0)).addScaledVector(dir, .03), b2 = p.clone().addScaledVector(dir, .035);
+        pos.push(p.x, p.y, p.z, tip.x, tip.y, tip.z, b2.x, b2.y, b2.z);
+        const c = cd.clone().lerp(cg, u); for (let k = 0; k < 3; k++) col.push(c.r, c.g, c.b);
+        idx.push(v, v + 1, v + 2); v += 3;
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+const dummy0 = new THREE.Object3D();
+const plantMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .8, side: THREE.DoubleSide });
+// 鳥の通り道（この近くには株を置かない）
+const pathX = z => .35 * Math.sin(z * .55) + .1 * Math.sin(z * 1.7);
+const tussocks = [], ferns = [];
+{
+  const r = S.rng(77);
+  const segD = (x, z, ax, az, bx, bz) => { const vx = bx - ax, vz = bz - az, k = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)); return Math.hypot(x - ax - vx * k, z - az - vz * k); };
+  const ok = (x, z, m) => Math.abs(x - pathX(z)) > m && segD(x, z, 1.1, 2.9, .2, -.2) > m + .25 && Math.hypot(x - .5, z - .9) > .6 && Math.hypot(x - 1.1, z - 2.4) > .7
+    && Math.hypot(x - pathX(-1), z + 1) > .7 && Math.hypot(x - pathX(-.3), z + .3) > .6 && Math.hypot(x - .78, z + .45) > .55;
+  window.__okPlant = ok;
+  for (let i = 0; i < 2600 && tussocks.length < 430; i++) {
+    const x = -7 + r() * 14, z = -12 + r() * 16;
+    if (!ok(x, z, .42) || tussocks.some(q => Math.hypot(q.x - x, q.z - z) < .55)) continue;
+    tussocks.push({ x, z, s: .75 + r() * .55, a: r() * 6.28, ph: r() * 6.28 });
+  }
+  for (let i = 0; i < 1500 && ferns.length < 110; i++) {
+    const x = -7 + r() * 14, z = -12 + r() * 16;
+    if (!ok(x, z, .3) || tussocks.some(q => Math.hypot(q.x - x, q.z - z) < .35)) continue;
+    ferns.push({ x, z, s: .6 + r() * .6, a: r() * 6.28, ph: r() * 6.28 });
+  }
+}
+const TUS_GEO = bladeGeo(54, .55, 1.1, 5, .022, [0x2e2a1c, 0x3c5a2c, 0x6f7a44, 0x6b5a3a]);
+const topMesh = new THREE.InstancedMesh(bladeGeo(30, .6, 1.15, 15, .03, [0x2a2619, 0x35502a, 0x5f6c3c, 0x5e4f33]), plantMat, topTus.length);
+topTus.forEach((q, i) => { dummy0.position.set(q.x, q.y - .05, q.z); dummy0.rotation.set(0, q.a, 0); dummy0.scale.setScalar(q.s); dummy0.updateMatrix(); topMesh.setMatrixAt(i, dummy0.matrix); });
+island.add(topMesh);
+const shortMesh = new THREE.InstancedMesh(bladeGeo(26, .14, .32, 16, .012, [0x262418, 0x324a27, 0x56653a, 0x5a4c32]), plantMat, window.__short.length);
+window.__short.forEach((q, i) => { dummy0.position.set(q.x, q.y - .02, q.z); dummy0.rotation.set(0, q.a, 0); dummy0.scale.setScalar(q.s); dummy0.updateMatrix(); shortMesh.setMatrixAt(i, dummy0.matrix); });
+shortMesh.receiveShadow = true; island.add(shortMesh);
+const tusMesh = new THREE.InstancedMesh(TUS_GEO, plantMat, tussocks.length);
+const fernMesh = new THREE.InstancedMesh(fernGeo(9), plantMat, ferns.length);
+const sedgeMesh = new THREE.InstancedMesh(bladeGeo(22, .12, .26, 6, .01, [0x2b2a1d, 0x3f5b2f, 0x5e6e3d, 0x5d5035]), plantMat, 260);
+for (const m of [tusMesh, fernMesh, sedgeMesh]) { m.castShadow = true; m.receiveShadow = true; ground.add(m); }
+const sedges = []; { const r = S.rng(78); for (let i = 0; i < 1200 && sedges.length < 260; i++) { const x = -7 + r() * 14, z = -12 + r() * 16; if (window.__okPlant(x, z, .3)) sedges.push({ x, z, s: .7 + r() * .8, a: r() * 6.28 }); } }
+const rocks = []; { const r = S.rng(79); const g = new THREE.DodecahedronGeometry(1, 1); const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const k = .8 + .35 * hash2(Math.round(p.getX(i) * 50), Math.round(p.getZ(i) * 50), 3); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * .6, p.getZ(i) * k); }
+  g.computeVertexNormals();
+  for (let i = 0; i < 26; i++) { const m = new THREE.Mesh(g, rockMat); const s = .05 + r() * .18; m.scale.set(s, s, s); let x = -6 + r() * 12, z = -11 + r() * 14;
+    if (!window.__okPlant(x, z, .3)) continue; m.position.set(x, s * .15, z); m.rotation.y = r() * 6; m.castShadow = m.receiveShadow = true; ground.add(m); rocks.push(m); } }
+const dummy = new THREE.Object3D();
+function swayPlants(t) {
+  tussocks.forEach((q, i) => { const w = .035 * Math.sin(t * 1.3 + q.ph) + .015 * Math.sin(t * 3.1 + q.ph * 2);
+    dummy.position.set(q.x, 0, q.z); dummy.rotation.set(w, q.a, w * .6); dummy.scale.setScalar(q.s); dummy.updateMatrix(); tusMesh.setMatrixAt(i, dummy.matrix); });
+  ferns.forEach((q, i) => { const w = .03 * Math.sin(t * 1.1 + q.ph);
+    dummy.position.set(q.x, 0, q.z); dummy.rotation.set(w, q.a, -w); dummy.scale.setScalar(q.s); dummy.updateMatrix(); fernMesh.setMatrixAt(i, dummy.matrix); });
+  sedges.forEach((q, i) => { dummy.position.set(q.x, 0, q.z); dummy.rotation.set(0, q.a, 0); dummy.scale.setScalar(q.s); dummy.updateMatrix(); sedgeMesh.setMatrixAt(i, dummy.matrix); });
+  tusMesh.instanceMatrix.needsUpdate = fernMesh.instanceMatrix.needsUpdate = sedgeMesh.instanceMatrix.needsUpdate = true;
+}
+// 空気中の細かい粒（湿気）
+const motes = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ map: SPRITE, color: C(0xb9c8d6), size: .025, transparent: true, opacity: .35, depthWrite: false }));
+{ const r = S.rng(80), a = []; for (let i = 0; i < 600; i++) a.push(-5 + r() * 10, r() * 1.6, -10 + r() * 13); motes.geometry.setAttribute("position", new THREE.Float32BufferAttribute(a, 3)); }
+ground.add(motes);
+const omoteG = S.mochi3D(THREE); ground.add(omoteG.g);
+
+// ---------------------------------------------------------------- イナクセシブルクイナ（再現 CG。体長 約 14.5 cm）
+// 資料の記述：上面は暗い栗色、下面は暗い灰色で脇腹と腹に白く細い横じま、赤い目、黒いくちばしと脚、小さく弱い翼、毛のような羽。
+function birdTexture() {
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 512; const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, 0, 512); g.addColorStop(0, "#4a2f20"); g.addColorStop(.42, "#4b3123"); g.addColorStop(.56, "#3c3a3c"); g.addColorStop(1, "#34363a");
+  x.fillStyle = g; x.fillRect(0, 0, 1024, 512);
+  const r = S.rng(12);
+  for (let i = 0; i < 5000; i++) { const px = r() * 1024, py = r() * 512, up = py < 260; // 羽の流れ（短い筋）
+    x.strokeStyle = up ? `rgba(${90 + r() * 40},${55 + r() * 25},${35 + r() * 15},.35)` : `rgba(${80 + r() * 30},${80 + r() * 30},${86 + r() * 30},.3)`;
+    x.lineWidth = 1 + r() * 1.5; x.beginPath(); x.moveTo(px, py); x.lineTo(px + 6 + r() * 10, py + (r() - .5) * 4); x.stroke(); }
+  for (let y = 360; y < 470; y += 15) { x.strokeStyle = "rgba(215,218,222,.42)"; x.lineWidth = 2.2; x.beginPath(); // 脇腹・腹の白く細い横じま
+    for (let px = 0; px <= 1024; px += 8) { const yy = y + 2.5 * Math.sin(px * .05 + y); px ? x.lineTo(px, yy) : x.moveTo(px, yy); } x.stroke(); }
+  const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; tx.anisotropy = 4; return tx;
+}
+function fuzzTexture() { // 毛のような羽の輪郭（透明度で表現）
+  const c = document.createElement("canvas"); c.width = 512; c.height = 256; const x = c.getContext("2d"); x.fillStyle = "#000"; x.fillRect(0, 0, 512, 256);
+  const r = S.rng(13); for (let i = 0; i < 2600; i++) { x.fillStyle = `rgba(255,255,255,${.5 + r() * .5})`; x.fillRect(r() * 512, r() * 256, 1.2, 2 + r() * 3); }
+  return new THREE.CanvasTexture(c);
+}
+const bird = new THREE.Group(); ground.add(bird);
+const birdParts = {};
+{
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: C(c), roughness: .7, metalness: 0, ...o });
+  const bodyMat = new THREE.MeshStandardMaterial({ map: birdTexture(), roughness: .78 });
+  const b = new THREE.Group(); b.position.y = .043; bird.add(b); birdParts.b = b;
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), bodyMat); body.scale.set(.056, .029, .027); body.rotation.z = -.12; body.castShadow = true; b.add(body);
+  const breast = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 24), bodyMat); breast.scale.set(.03, .026, .025); breast.position.set(.022, .004, 0); breast.castShadow = true; b.add(breast);
+  const fuzz = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.MeshStandardMaterial({ color: C(0x4a3326), roughness: .9, alphaMap: fuzzTexture(), transparent: true, depthWrite: false }));
+  fuzz.scale.set(.059, .032, .03); fuzz.rotation.z = -.12; b.add(fuzz);
+  const wing = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), M(0x4a3021, { roughness: .8 })); wing.scale.set(.024, .011, .005);
+  for (const sd of [-1, 1]) { const w = wing.clone(); w.position.set(-.004, .008, sd * .025); w.rotation.set(0, 0, -.25); b.add(w); (birdParts.wings ||= []).push(w); }
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(.011, .024, 12), M(0x2e2018)); tail.rotation.z = Math.PI / 2 + .8; tail.position.set(-.056, .014, 0); tail.scale.set(.8, .8, .45); b.add(tail); birdParts.tail = tail;
+  const headMat = new THREE.MeshStandardMaterial({ map: (() => { const c = document.createElement("canvas"); c.width = 256; c.height = 128; const x = c.getContext("2d");
+    x.fillStyle = "#3a3434"; x.fillRect(0, 0, 256, 128); const r = S.rng(14);
+    for (let i = 0; i < 1400; i++) { x.strokeStyle = `rgba(${70 + r() * 30},${62 + r() * 25},${60 + r() * 25},.4)`; x.lineWidth = 1; const px = r() * 256, py = r() * 128; x.beginPath(); x.moveTo(px, py); x.lineTo(px + 3 + r() * 4, py + (r() - .5) * 2); x.stroke(); }
+    const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; return tx; })(), roughness: .82 });
+  const neck = new THREE.Mesh(new THREE.CapsuleGeometry(.0125, .02, 6, 16), headMat); neck.position.set(.04, .022, 0); neck.rotation.z = -.45; b.add(neck);
+  const head = new THREE.Group(); head.position.set(.048, .038, 0); b.add(head); birdParts.head = head;
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(.0155, 32, 24), headMat); skull.scale.set(1.15, .95, .9); head.add(skull);
+  const bill = new THREE.Mesh(new THREE.ConeGeometry(.0036, .021, 14), M(0x0c0c0e, { roughness: .4 })); bill.rotation.z = -Math.PI / 2 - .1; bill.position.set(.024, -.003, 0); bill.scale.set(1.15, .9, 1.15); head.add(bill);
+  for (const sd of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.0023, 16, 12), M(0x8a121a, { roughness: .35 })); eye.position.set(.008, .004, sd * .0128); head.add(eye);
+    const pu = new THREE.Mesh(new THREE.SphereGeometry(.0011, 10, 8), M(0x050505, { roughness: .1 })); pu.position.set(.0092, .004, sd * .0143); head.add(pu);
+  }
+  const legMat = M(0x101012, { roughness: .5 });
+  birdParts.legs = [];
+  for (const sd of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(.004, -.02, sd * .011); b.add(hip);
+    const tar = new THREE.Mesh(new THREE.CylinderGeometry(.0021, .0019, .024, 8), legMat); tar.position.y = -.012; hip.add(tar);
+    const foot = new THREE.Group(); foot.position.y = -.023; hip.add(foot);
+    for (const [a, l] of [[0, .02], [.45, .018], [-.45, .018], [Math.PI, .011]]) {
+      const toe = new THREE.Mesh(new THREE.CylinderGeometry(.0013, .0013, l, 6), legMat); toe.rotation.z = Math.PI / 2; toe.position.set(l / 2, 0, 0);
+      const tg = new THREE.Group(); tg.rotation.y = a; tg.add(toe); foot.add(tg);
+    }
+    hip.traverse(o => o.castShadow = true); birdParts.legs.push({ hip, foot });
+  }
+}
+// 鳥の歩き：通り道に沿って進む（足は地面＝y 0）。s：道のりの位置（m）
+function birdAt(t, z, o = {}) {
+  const x = pathX(z), dir = o.dir ?? 1, dz = .01;                     // dir：+1 なら +z の向きへ、-1 なら -z の向きへ歩く
+  const hx = (pathX(z + dz * dir) - x) / dz, hz = dir;                     // 進む向き（体の正面は +x）
+  bird.position.set(x, 0, z); bird.rotation.set(0, Math.atan2(-hz, hx) + (o.turn || 0), 0);
+  const ph = (o.walk ?? 0);
+  birdParts.legs.forEach((L, i) => { const s = Math.sin(ph + i * Math.PI); L.hip.rotation.z = s * .45; L.hip.position.y = -.02 + Math.max(0, -s) * .004; });
+  birdParts.b.position.y = .043 + .002 * Math.abs(Math.sin(ph));
+  birdParts.head.position.x = .05 + .005 * Math.sin(ph * 2) * (o.bob ?? 1);      // クイナらしい首の前後の動き
+  birdParts.tail.rotation.z = Math.PI / 2 + .8 + .25 * Math.max(0, Math.sin(ph * 2 + 1)) * (o.flick ?? 1);
+  birdParts.head.rotation.set(0, o.look || 0, o.tilt || 0);
+  birdParts.wings.forEach((w, i) => { w.rotation.x = (i ? 1 : -1) * (o.wing || 0); });
+}
+function birdBox() {
+  const pts = [[.07, .1, 0], [-.06, .03, 0], [0, 0, .03], [0, .09, -.03], [.08, .08, 0]], v = V3(0, 0, 0); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  bird.updateMatrixWorld(true);
+  for (const p of pts) { v.set(...p).applyMatrix4(bird.matrixWorld).project(cam); if (v.z > 1) return null; const x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H;
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  return [x0, y0, x1, y1];
+}
+
+// ---------------------------------------------------------------- 地球儀（暗い観測室）
+const lab = set("lab"), globeSet = set("globe");
+function latlon(lat, lon, r = 1) { const a = lat * Math.PI / 180, b = lon * Math.PI / 180; return V3(r * Math.cos(a) * Math.sin(b), r * Math.sin(a), r * Math.cos(a) * Math.cos(b)); }
+const LANDS = [
+  [[-80,10],[-75,11],[-62,10.5],[-52,5],[-50,0],[-35,-5],[-35,-9],[-39,-15],[-41,-22],[-48,-28],[-53,-34],[-58,-38],[-62,-41],[-65,-45],[-68,-50],[-69,-55],[-72,-53],[-75,-47],[-73,-37],[-71,-28],[-70,-18],[-76,-14],[-81,-5],[-80,0],[-77,7]],
+  [[-17,21],[-16,15],[-17,13],[-12,8],[-8,4.5],[-3,5],[5,6],[9,4],[9,-1],[12,-6],[13,-12],[12,-17],[15,-27],[18,-34],[20,-35],[25,-34],[31,-29],[35,-24],[40,-15],[40,-10],[39,-5],[43,0],[51,11],[43,12],[39,16],[35,24],[32,31],[25,32],[20,31],[11,37],[10,34],[-1,35],[-6,36],[-10,31],[-13,27]],
+  [[-9,37],[-9,43],[-1,44],[-4,48],[2,51],[8,54],[10,58],[5,61],[15,69],[28,71],[40,67],[40,45],[28,41],[23,36],[20,40],[15,38],[12,44],[8,44],[3,42],[-2,37]],
+  [[-168,66],[-140,70],[-95,72],[-80,63],[-60,55],[-66,45],[-75,38],[-81,31],[-80,25],[-90,30],[-97,26],[-97,20],[-87,21],[-83,10],[-79,8],[-92,15],[-105,20],[-117,32],[-124,40],[-125,49],[-135,58],[-150,60],[-165,62]],
+  [[-73,78],[-60,82],[-30,83],[-20,70],[-42,60],[-52,64]],
+  [[40,67],[70,73],[110,77],[140,72],[180,68],[180,62],[160,60],[140,55],[135,43],[122,40],[122,30],[110,20],[106,10],[100,13],[98,8],[92,22],[80,15],[77,8],[72,20],[60,25],[50,30],[48,15],[43,12],[35,30],[28,41],[40,45]],
+  [[114,-22],[114,-34],[118,-35],[130,-32],[138,-35],[146,-39],[150,-37],[153,-28],[146,-19],[142,-11],[136,-12],[130,-12],[122,-17]],
+  [[166,-46],[172,-41],[178,-38],[174,-36],[170,-44]],
+];
+function globeTexture() {
+  const c = document.createElement("canvas"); c.width = 2048; c.height = 1024; const x = c.getContext("2d");
+  const P = ([lon, lat]) => [(lon + 180) / 360 * 2048, (90 - lat) / 180 * 1024];
+  x.fillStyle = "#10233a"; x.fillRect(0, 0, 2048, 1024);
+  x.fillStyle = "#4a5f78"; x.strokeStyle = "#8fb0cf"; x.lineWidth = 3;
+  for (const L of LANDS) { x.beginPath(); L.forEach((p, i) => { const [px, py] = P(p); i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.closePath(); x.fill(); x.stroke(); }
+  x.fillStyle = "#56697f"; x.fillRect(0, (90 + 68) / 180 * 1024, 2048, 1024);              // 南極
+  x.strokeStyle = "rgba(140,205,255,.13)"; x.lineWidth = 1.5;
+  for (let lon = -180; lon <= 180; lon += 15) { const [px] = P([lon, 0]); x.beginPath(); x.moveTo(px, 0); x.lineTo(px, 1024); x.stroke(); }
+  for (let lat = -75; lat <= 75; lat += 15) { const [, py] = P([0, lat]); x.beginPath(); x.moveTo(0, py); x.lineTo(2048, py); x.stroke(); }
+  const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; tx.anisotropy = 4; return tx;
+}
+const globe = new THREE.Group(); globeSet.add(globe);
+const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.MeshStandardMaterial({ map: globeTexture(), roughness: .75, metalness: .05 }));
+earth.rotation.y = -Math.PI / 2; globe.add(earth);  // テクスチャの経度 0 を latlon() の +z にそろえる
+const atmo = new THREE.Mesh(new THREE.SphereGeometry(1.035, 64, 48), new THREE.MeshBasicMaterial({ color: C(0x5fb8ff), transparent: true, opacity: .12, side: THREE.BackSide, depthWrite: false, fog: false }));
+globe.add(atmo);
+const ISL = { lat: -37.3, lon: -12.7 };
+const pin = new THREE.Group(); globe.add(pin);
+const pinRing = new THREE.Mesh(new THREE.RingGeometry(.008, .011, 48), new THREE.MeshBasicMaterial({ color: C(0x9fe6ff), transparent: true, side: THREE.DoubleSide, fog: false }));
+const pinDot = new THREE.Mesh(new THREE.SphereGeometry(.0035, 16, 12), new THREE.MeshBasicMaterial({ color: C(0xdff6ff), fog: false }));
+pin.add(pinRing); pin.add(pinDot);
+{ const p = latlon(ISL.lat, ISL.lon, 1.002); pin.position.copy(p); pin.lookAt(p.clone().multiplyScalar(2)); }
+// 南アメリカから島への弧（※経路はイメージ）
+const arcPts = []; { const a = latlon(-34, -58), b = latlon(ISL.lat, ISL.lon); for (let i = 0; i <= 80; i++) { const u = i / 80; arcPts.push(a.clone().lerp(b, u).normalize().multiplyScalar(1.004 + .12 * Math.sin(Math.PI * u))); } }
+const arcSegs = []; for (let i = 0; i < 80; i++) { const g = new THREE.BufferGeometry().setFromPoints([arcPts[i], arcPts[i + 1]]);
+  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: C(0x9fe6ff), transparent: true, fog: false })); globe.add(l); arcSegs.push(l); }
+const islandDots = [[25.77, -171.73], [-9.42, 46.35], [-41, 174], [-31.55, 159.08], [13.4, 144.8], [ISL.lat, ISL.lon]].map(([la, lo]) => {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.012, 16, 12), new THREE.MeshBasicMaterial({ color: C(0xbfeaff), transparent: true, fog: false }));
+  m.position.copy(latlon(la, lo, 1.004)); globe.add(m); return m; });
+// 観測室：暗い床、上からの柔らかい光、DNA のらせん（※イメージ）
+const floor = new THREE.Mesh(new THREE.CircleGeometry(14, 64).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: C(0x10161f), roughness: .55, metalness: .2 }));
+floor.receiveShadow = true; lab.add(floor);
+const spot = new THREE.SpotLight(C(0xcfe3f5), 2.2, 20, .55, .7, 1.5); spot.position.set(0, 7, 2); spot.castShadow = true; lab.add(spot); lab.add(spot.target);
+const helix = new THREE.Group(); lab.add(helix);
+{ const mA = new THREE.MeshStandardMaterial({ color: C(0x7fc8ee), roughness: .35, emissive: C(0x0d2a3a) }), mB = new THREE.MeshStandardMaterial({ color: C(0xc7d3de), roughness: .4 });
+  const sg = new THREE.SphereGeometry(.045, 16, 12), rg = new THREE.CylinderGeometry(.012, .012, 1, 8);
+  for (let i = 0; i < 26; i++) { const a = i * .5, y = i * .085; const p1 = V3(Math.cos(a) * .32, y, Math.sin(a) * .32), p2 = V3(-Math.cos(a) * .32, y, -Math.sin(a) * .32);
+    const s1 = new THREE.Mesh(sg, mA); s1.position.copy(p1); helix.add(s1); const s2 = new THREE.Mesh(sg, mA); s2.position.copy(p2); helix.add(s2);
+    const rung = new THREE.Mesh(rg, mB); rung.position.copy(p1.clone().add(p2).multiplyScalar(.5)); rung.scale.y = .64; rung.lookAt(p2); rung.rotateX(Math.PI / 2); helix.add(rung); }
+  helix.position.set(-1.75, .35, -.6); }
+const omoteLab = S.mochi3D(THREE); lab.add(omoteLab.g);
+
+// ---------------------------------------------------------------- 描画（被写界深度つき）
+function setCam(pos, look, fov = 40, near = .05, far = 90000) {
+  cam.position.copy(pos); cam.fov = fov; cam.near = near; cam.far = far; cam.lookAt(look); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+}
+function shake(t, amp) { return V3(amp * (Math.sin(t * 1.7) + .5 * Math.sin(t * 4.3)), amp * (Math.sin(t * 2.3 + 1) + .5 * Math.sin(t * 3.7)), 0); }
+function draw3D(dof) {
+  R.shadowMap.needsUpdate = true;
+  const n0 = cam.near, f0 = cam.far;
+  if (!dof) { R.setClearColor(FOGC, 1); R.render(scene, cam); bg.drawImage(glc, 0, 0); return; }
+  const { focus, slab, far: bf, near: bn } = dof;
+  const pass = (n, f, blur, clearAlpha) => {
+    cam.near = Math.max(n0, n); cam.far = Math.min(f0, f); cam.updateProjectionMatrix();
+    R.setClearColor(FOGC, clearAlpha); R.render(scene, cam); R.shadowMap.needsUpdate = false;
+    bg.save(); bg.filter = blur > .3 ? `blur(${blur}px)` : "none"; bg.drawImage(glc, 0, 0); bg.restore();
+  };
+  pass(focus + slab * .8, f0, bf, 1);                       // 奥（ぼかす）
+  pass(Math.max(n0, focus - slab), focus + slab, 0, 0);       // 焦点の前後（くっきり）
+  if (focus - slab > n0 + .001) pass(n0, focus - slab + .002, bn, 0); // 手前（ぼかす）
+  cam.near = n0; cam.far = f0; cam.updateProjectionMatrix();
+}
+// 仕上げ：周辺減光と細かい粒子（フィルムの質感）
+const grain = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = S.rng(99);
+  for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 20; } x.putImageData(d, 0, 0); return c; })();
+function grade(t) {
+  const g = bg.createRadialGradient(W / 2, H * .45, H * .25, W / 2, H * .5, H * .78); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(2,5,10,.55)");
+  bg.fillStyle = g; bg.fillRect(0, 0, W, H);
+  const ox = Math.floor(hash2(Math.floor(t * 30), 1) * 256), oy = Math.floor(hash2(Math.floor(t * 30), 2) * 256);
+  bg.save(); bg.globalCompositeOperation = "overlay"; bg.globalAlpha = .5; bg.fillStyle = bg.createPattern(grain, "repeat"); bg.translate(-ox, -oy); bg.fillRect(ox, oy, W, H); bg.restore();
+}
+
+// ---------------------------------------------------------------- 文字（暗い世界観。読みやすさ優先）
+function uiCard(lines, x, y, k = 1, { align = "center", accent = "#8fdcff" } = {}) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha *= clamp(k);
+  const ws = lines.map(([s, sz, w = 700]) => { ui.font = `${w} ${sz}px ${S.FONT}`; return ui.measureText(s).width; });
+  const pw = Math.max(...ws) + 64, ph = lines.reduce((a, [, sz]) => a + sz * 1.32, 0) + 36;
+  const x0 = align === "left" ? x : x - pw / 2, y0 = y - ph / 2 + 10 * (1 - easeOut(clamp(k)));
+  rrect(ui, x0, y0, pw, ph, 12); ui.fillStyle = "rgba(8,14,26,.74)"; ui.fill(); ui.strokeStyle = "rgba(143,220,255,.35)"; ui.lineWidth = 1.5; ui.stroke();
+  ui.fillStyle = accent; ui.fillRect(x0, y0 + 14, 4, ph - 28);
+  S.group(() => { let yy = y0 + 18; lines.forEach(([s, sz, w = 700, col = "#EAF2F8"], i) => { yy += sz * 1.32 / 2; text(ui, s, x0 + pw / 2, yy + 2, sz, col, { weight: w }); yy += sz * 1.32 / 2; }); },
+    [x0, y0, x0 + pw, y0 + ph]);
+  ui.restore();
+}
+function uiNote(s, x, y, k = 1, size = 28) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha *= clamp(k); ui.font = `500 ${size}px ${S.FONT}`; const w = ui.measureText(s).width + 28;
+  rrect(ui, x - w / 2, y - size * .8, w, size * 1.6, 8); ui.fillStyle = "rgba(8,14,26,.6)"; ui.fill();
+  S.group(() => text(ui, s, x, y + 1, size, "#B8C7D6", { weight: 500 }), [x - w / 2, y - size * .8, x + w / 2, y + size * .8]); ui.restore();
+}
+function subChunk(line, t) {
+  if (!Array.isArray(line.sub)) return line.sub;
+  const lens = line.sub.map(s => s.replace(/\*\*/g, "").replace(/ \/ /g, "").length), tot = lens.reduce((a, b) => a + b, 0);
+  const k = clamp((t - line.start) / (line.end - line.start)) * tot; let acc = 0;
+  for (let i = 0; i < lens.length; i++) { acc += lens[i]; if (k < acc) return line.sub[i]; } return line.sub[line.sub.length - 1];
+}
+function docSub(t) {
+  const line = S.currentLine(t); if (!line || t >= TL.ending_start) return;
+  const rows = subChunk(line, t).split(" / "), cx = 500, cy = 1470, maxW = 840;
+  let size = 50; ui.font = `700 ${size}px ${S.FONT}`;
+  let wmax = Math.max(...rows.map(r => ui.measureText(r.replace(/\*\*/g, "")).width));
+  if (wmax > maxW) { size = Math.max(44, Math.floor(size * maxW / wmax)); ui.font = `700 ${size}px ${S.FONT}`; wmax = Math.max(...rows.map(r => ui.measureText(r.replace(/\*\*/g, "")).width)); }
+  const lh = size * 1.38, bw = wmax + 72, bh = rows.length * lh + 30, k = easeOut(prog(t, line.start - .04, .14));
+  ui.save(); ui.globalAlpha = k;
+  rrect(ui, cx - bw / 2, cy - bh / 2, bw, bh, 14); ui.fillStyle = "rgba(6,12,22,.66)"; ui.fill();
+  ui.fillStyle = "#8fdcff"; ui.fillRect(cx - bw / 2, cy - bh / 2 + 14, 4, bh - 28);
+  S.group(() => rows.forEach((r, i) => S.rich(ui, r, cx, cy - (rows.length - 1) * lh / 2 + i * lh + 2, size, "#F2F6FA", "#A8E6FF", 700)),
+    [cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2]);
+  ui.restore();
+}
+function proj(v) { const p = v.clone().project(cam); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H, p.z]; }
+function guardBox(b) { if (b && b[2] > 0 && b[0] < W && b[3] > 0 && b[1] < H && (b[2] - b[0]) > 30) S.CHARLOG.push(b); }
+
+// ---------------------------------------------------------------- 場面
+function omoteAt(rig, t, o) { rig.pose(o); }
+function drawScene(t, name) {
+  const [a, b] = S.sceneRange(name), lt = t - a;
+  let dof = null;
+  scene.fog.density = .0004; R.toneMappingExposure = 1.15;
+  key.castShadow = true;
+  if (name === "hook" || name === "aerial" || name === "alone") {
+    // ---- 島（大きな場面）
+    show("island"); waves(t, cam.position.x, cam.position.z);
+    hemi.intensity = .55; key.intensity = 1.05; rim.intensity = .9;
+    key.position.set(-3000, 2200, 3600); key.target.position.set(0, 0, 0);
+    rim.position.set(2500, 900, -5000);
+    key.shadow.camera.left = -40; key.shadow.camera.right = 40; key.shadow.camera.top = 40; key.shadow.camera.bottom = -40; key.shadow.camera.near = 1; key.shadow.camera.far = 9000;
+    boat.visible = false; omoteBig.g.visible = false; mist(true);
+    const out = V3(Math.cos(TH0) * IA, 0, Math.sin(TH0) * IB).normalize();
+    if (name === "hook") {
+      const glimpse = t >= CUE.glimpse && t < CUE.glimpse + .55;
+      if (glimpse) return drawGlimpse(t);
+      // 光：海側の斜め上から崖を照らし、島の奥からのリムライトで崖の上の輪郭を出す
+      key.position.copy(P_TOP).addScaledVector(out, 4000).add(V3(0, 1600, 0)); key.target.position.copy(P_TOP);
+      rim.position.copy(P_TOP).addScaledVector(out, -4000).add(V3(0, 800, 0)); rim.target.position.copy(P_TOP);
+      const P1 = P_TOP.clone().addScaledVector(out, 1500), P2 = P_TOP.clone().addScaledVector(out, 430);
+      let pos, look;
+      if (t < CUE.glimpse) { // 海面すれすれを崖へ（ドリーイン）
+        const u1 = easeInOut(prog(t, 0, CUE.glimpse));
+        pos = lerpV(V3(P1.x, 7, P1.z), V3(P2.x, 14, P2.z), u1); look = V3(P_TOP.x, 170 + 70 * u1, P_TOP.z);
+      } else {                // 崖を見上げながら上昇 → 崖の上のオモテの背中越しに、海岸線と島を見る
+        const u2 = easeInOut(prog(t, CUE.glimpse + .55, CUE.globe - CUE.glimpse - .55));
+        const lookEnd = OM_TOP.clone().addScaledVector(TAN, 260).addScaledVector(out, 420).add(V3(0, -90, 0));
+        const vd = lookEnd.clone().sub(OM_TOP).setY(0).normalize(), right = V3(-vd.z, 0, vd.x);
+        const camEnd = OM_TOP.clone().addScaledVector(vd, -7).addScaledVector(right, 1.5).add(V3(0, 1.6, 0));
+        const lift = sstep(0, .7, u2);
+        pos = lerpV(V3(P2.x, 14, P2.z), camEnd, sstep(.25, 1, u2)); pos.y = lerp(14, camEnd.y, lift);
+        look = lerpV(V3(P_TOP.x, P_TOP.y * .6, P_TOP.z), lookEnd, sstep(.45, 1, u2));
+        if (u2 > .5) omoteBig.g.visible = true;
+      }
+      pos.add(shake(t, .5));
+      setCam(pos, look, 42, .3, 90000);
+      // オモテ：崖の上の岩に立ち、海岸線と島を見下ろして、少しずつ乗り出す
+      const lean = k_(t, "lean", 1.4);
+      omoteBig.pose({ x: OM_TOP.x, y: OM_TOP.y, z: OM_TOP.z, yaw: Math.atan2(TAN.x * .5 + out.x, TAN.z * .5 + out.z), lean: .05 + .32 * lean, nod: .2 + .35 * lean, armL: .12 + .1 * lean, armR: .12 + .1 * lean });
+      scene.fog.density = .00032;
+    } else if (name === "aerial") {
+      // 島の空撮：海の上から崖の壁に沿って回り込み（L05）、崖の上を越えて草地へ降りる（L06）
+      const u = easeInOut(prog(t, a, CUE.grass - a)), th = TH0 + .35 + .9 * u;
+      const rimP = rimPoint(th, 0), outT = V3(Math.cos(th) * IA, 0, Math.sin(th) * IB).normalize();
+      key.position.copy(rimP).addScaledVector(outT, 4000).add(V3(1500, 1800, 0)); key.target.position.copy(rimP);
+      rim.position.copy(rimP).addScaledVector(outT, -4000).add(V3(0, 900, 0)); rim.target.position.copy(rimP);
+      const dsc = easeInOut(prog(t, CUE.grass, b - CUE.grass));
+      const sea = rimP.clone().addScaledVector(outT, 760).add(V3(0, 210 + 40 * u, 0));
+      const land = LAND, over = rimP.clone().addScaledVector(outT, 60).add(V3(0, 340, 0));
+      let pos = sea, look = rimP.clone().add(V3(0, 170, 0)).addScaledVector(outT, -200);
+      if (dsc > 0) {
+        pos = dsc < .5 ? lerpV(sea, over, easeInOut(dsc * 2)) : lerpV(over, land.clone().add(V3(0, 2.4, 0)), easeInOut(dsc * 2 - 1) ** .7);
+        look = lerpV(look, land.clone().addScaledVector(outT, -250).add(V3(0, 0, 0)), easeInOut(dsc));
+      }
+      setCam(pos.add(shake(t, 1.2 * (1 - dsc))), look, 44, .5, 90000);
+      scene.fog.density = lerp(.00036, .0011, sstep(.7, 1, dsc));
+    } else { // alone
+      if (t < CUE.edge) { // 高い俯瞰：広い海に囲まれた小さな島
+        const u = easeInOut(prog(t, a, CUE.edge - a));
+        setCam(V3(-6000 + 1500 * u, lerp(1700, 2300, u), -15000 + 1500 * u), V3(0, 150, 0), 34, 10, 160000);
+        scene.fog.density = .000045; mist(false);
+      } else { // 崖の縁に立つオモテの後ろ姿、遠くの海
+        const outE = V3(Math.cos(TH0 + .9) * IA, 0, Math.sin(TH0 + .9) * IB).normalize(), yawOut = Math.atan2(outE.x, outE.z);
+        const base = OM_EDGE.clone(), u = easeInOut(prog(t, CUE.edge, b - CUE.edge));
+        omoteBig.g.visible = true;
+        omoteBig.pose({ x: base.x, y: base.y + .02, z: base.z, yaw: yawOut, lean: .05, nod: .1 + .05 * Math.sin(t * .8) });
+        const camP = base.clone().addScaledVector(outE, -6.5 - 1.5 * u).add(V3(0, 1.0 + .4 * u, 0)).add(V3(-outE.z * .5, 0, outE.x * .5));
+        setCam(camP, base.clone().addScaledVector(outE, 45).add(V3(0, -4, 0)), 40, .3, 120000);
+        boat.visible = t >= CUE.boat; const bp = base.clone().addScaledVector(outE, 5200).add(V3(-outE.z * 900, 0, outE.x * 900)); boat.position.set(bp.x, 0, bp.z); boat.rotation.y = yawOut + 1.2;
+        scene.fog.density = .00016;
+        guardBox(omoteBig.box(cam, W, H));
+      }
+    }
+    if (omoteBig.g.visible) {
+      const tp = omoteBig.g.position.clone(), ld = key.position.clone().sub(key.target.position).normalize();
+      key.target.position.copy(tp); key.position.copy(tp).addScaledVector(ld, 120);
+      const sc = key.shadow.camera; sc.left = -12; sc.right = 12; sc.top = 12; sc.bottom = -12; sc.near = 1; sc.far = 400; sc.updateProjectionMatrix();
+      key.shadow.bias = -.0015; guardBox(omoteBig.box(cam, W, H));
+    } else key.castShadow = false;
+    draw3D(null); key.shadow.bias = -.0006;
+  } else if (name === "globe") {
+    // ---- 地球の俯瞰 → 南大西洋 → 島の印 → 島へ降りていく
+    show("globe"); hemi.intensity = .25; key.intensity = 1.3; rim.intensity = 1.2; key.castShadow = false;
+    key.position.set(-4, 2, 5); rim.position.set(4, 1, -3); scene.fog.density = 0;
+    globe.position.set(0, 0, 0); globe.rotation.set(0, 0, 0);
+    const u = easeInOut(prog(t, a, CUE.pin + .6 - a)), dive = easeIn(prog(t, b - 1.1, 1.1));
+    const tgt = latlon(ISL.lat, ISL.lon);
+    const dir0 = latlon(5, -30), dir = lerpV(dir0, tgt, u).normalize();
+    const dist = lerp(6.2, 1.5, u ** .8) - .42 * dive;
+    setCam(dir.clone().multiplyScalar(dist), tgt.clone().multiplyScalar(lerp(0, .9, u)), lerp(38, 30, u), .01, 100);
+    globe.rotation.y = .12 * (1 - u);
+    pin.visible = t >= CUE.pin - .3; const pk = k_(t, "pin", .5, -.3); pin.scale.setScalar(1 + .3 * Math.sin(t * 3) ** 2); pinRing.material.opacity = .9 * pk;
+    arcSegs.forEach(l => l.visible = false); islandDots.forEach(m => m.visible = false); atmo.visible = true;
+    draw3D(null);
+    // 地名の札（島の印の横）
+    const [px, py] = proj(globe.localToWorld(pin.position.clone()));
+    const pk2 = k_(t, "pin", .5) * (1 - dive * 2);
+    if (pk2 > 0) {
+      ui.save(); ui.globalAlpha = clamp(pk2); ui.strokeStyle = "rgba(160,225,255,.8)"; ui.lineWidth = 2; ui.beginPath(); ui.moveTo(px, py); ui.lineTo(px + 60, py - 160); ui.lineTo(px + 120, py - 160); ui.stroke(); ui.restore();
+      uiCard([["イナクセシブル島", 52, 800], ["南大西洋｜トリスタン・ダ・クーニャ諸島", 30, 500, "#B8C7D6"]], clamp(px + 120, 60, 380), clamp(py - 160, 330, 1100), pk2, { align: "left" });
+    }
+    bg.fillStyle = `rgba(29,39,51,${dive})`; bg.fillRect(0, 0, W, H);
+  } else if (name === "ground" || name === "bird" || name === "wing" || name === "outro" || name === "evoGround") {
+    drawGround(t, name, a, b);
+  } else if (name === "evo") {
+    if (t < CUE.dna) return drawGround(t, "evoGround", a, b);
+    drawLab(t, a, b);
+  }
+}
+function groundLights() {
+  show("ground"); hemi.intensity = .5; key.intensity = 1.25; rim.intensity = 1.35;
+  key.position.set(-4, 6, 3); key.target.position.set(0, 0, -1);
+  rim.position.set(3, 2.5, -6); rim.target.position.set(0, 0, 0);
+  const sc = key.shadow.camera; sc.left = -5; sc.right = 5; sc.top = 5; sc.bottom = -5; sc.near = .5; sc.far = 20; sc.updateProjectionMatrix();
+  scene.fog.density = .09;
+}
+function drawGlimpse(t) { // 冒頭：草の陰に鳥の影が一瞬（全体は見せない）
+  groundLights(); swayPlants(t); hemi.intensity = .3; rim.intensity = 1.8;
+  birdAt(t, -1.2, { walk: 0 }); omoteG.g.visible = false;
+  const p = bird.position;
+  setCam(V3(p.x + .35, .09, p.z + .28), V3(p.x, .06, p.z), 30, .02, 60);
+  draw3D({ focus: .45, slab: .12, far: 9, near: 10 });
+}
+function drawGround(t, name, a, b) {
+  groundLights(); swayPlants(t);
+  omoteG.g.visible = true;
+  const mp = motes.geometry.attributes.position; motes.position.set(.03 * Math.sin(t * .3), .02 * Math.sin(t * .5), 0);
+  let dof = null;
+  if (name === "ground") {
+    // 低い視点で草の間を進む（ドリーイン）。奥の株が揺れる
+    const u = easeInOut(prog(t, a, b - a)), z = lerp(3.2, .2, u);
+    birdAt(t, -1.5, { walk: 0 }); bird.visible = t > CUE.rustle1;
+    omoteG.pose({ x: 1.2, z: 4.6, yaw: Math.PI, lean: .1 });
+    setCam(V3(pathX(z) + .05, .16 + .05 * Math.sin(t * .9), z), V3(pathX(z - 1.5), .14, z - 2), 46, .02, 80);
+    if (t > CUE.rustle1) { const q = tussocks.reduce((m, q) => Math.hypot(q.x - pathX(-1.5), q.z + 1.7) < Math.hypot(m.x - pathX(-1.5), m.z + 1.7) ? q : m); q.ph += 0; }
+    dof = { focus: 1.8, slab: .9, far: 5, near: 7 };
+  } else if (name === "bird") {
+    // 鳥が姿を現す → 名前 → マクロ → 草むらへ。オモテがそっと近づき、前のめりに追う
+    const zWalk = t < CUE.smallest ? lerp(-1.5, -.2, easeInOut(prog(t, a, CUE.smallest - a))) : lerp(-.2, -2.6, easeIn(prog(t, CUE.chase - .3, b - CUE.chase + .3)));
+    const walking = t < CUE.size + .8 || t > CUE.chase - .3;
+    birdAt(t, zWalk, { dir: t < CUE.chase - .3 ? 1 : -1, walk: walking ? t * 9 : Math.sin(t * 2) * .3, look: walking ? 0 : .35 * Math.sin(t * 1.3), tilt: walking ? 0 : .15 * Math.sin(t * .9) });
+    const bp = bird.position.clone();
+    // オモテ：t < size は遠く、size〜chase でゆっくり近づき、驚いて止まる。chase で前のめりに追う（汗のしずく）
+    const appr = easeInOut(prog(t, CUE.size, CUE.chase - CUE.size)), ch = easeInOut(prog(t, CUE.chase, b - CUE.chase));
+    const oz = lerp(2.6, 1.05, appr) - 1.1 * ch, ox = lerp(1.1, .55, appr) - .3 * ch;
+    const freeze = win(t, CUE.smallest - .1, CUE.chase, .08, .2);
+    omoteG.pose({ x: ox, z: oz, yaw: Math.atan2(bp.x - ox, bp.z - oz), walk: (appr > 0 && appr < 1) || (ch > 0 && ch < 1) ? t * 5 : 0, stride: .22,
+      lean: .18 + .25 * ch - .1 * freeze, nod: .45 + .1 * ch, armL: .15 + .25 * freeze, armR: .15 + .25 * freeze, armFL: .2 * freeze, armFR: .2 * freeze,
+      sweat: prog(t, CUE.chase + .2, 1.4) });
+    const F = (slab, far, near) => ({ focus: cam.position.distanceTo(bp.clone().add(V3(0, .04, 0))), slab, far, near });
+    if (t < CUE.size) {        // 草の奥から姿を現す鳥を、通り道の先から低い視点で
+      const zc = bp.z + .8; setCam(V3(pathX(zc) + .04, .085, zc), V3(bp.x, .045, bp.z), 30, .02, 80); dof = F(.18, 7, 8);
+    } else if (t < CUE.smallest) { // マクロ：くちばし・赤い目 → 羽毛と脚。奥にオモテの足（大きさの対比。数値は使わない）
+      const m = prog(t, CUE.size, CUE.smallest - CUE.size);
+      bird.updateMatrixWorld(true);
+      if (m < .5) { const head = birdParts.head.getWorldPosition(V3(0, 0, 0)), fwd = V3(Math.cos(bird.rotation.y), 0, -Math.sin(bird.rotation.y)), sd = V3(fwd.z, 0, -fwd.x);
+        setCam(head.clone().addScaledVector(sd, .42).addScaledVector(fwd, .14).add(V3(0, .02, 0)), head.clone().addScaledVector(fwd, -.03).add(V3(0, -.055, 0)), 28, .005, 60);
+        dof = { focus: cam.position.distanceTo(head), slab: .022, far: 12, near: 10 }; }
+      else { setCam(V3(bp.x - .1, .03, bp.z - .3), V3(bp.x, .03, bp.z + .02), 30, .01, 60); dof = F(.06, 6, 8); }   // 鳥の後ろから：奥にオモテの足
+    } else {                   // 鳥が草むらへ。オモテの肩越しに、低い位置で追う
+      const op = V3(ox, 0, oz);
+      const zc = bp.z - .6;                         // 通り道の先から：草むらへ向かう鳥にピント、奥にぼけたオモテ
+      setCam(V3(pathX(zc) - .03, .16, zc), V3(bp.x, .0, bp.z + .3), 36, .02, 80);
+      dof = { focus: cam.position.distanceTo(bp), slab: .14, far: 9, near: 5 };
+    }
+    guardBox(birdBox()); guardBox(omoteG.box(cam, W, H));
+  } else if (name === "evoGround") {
+    // 「なぜ飛べないのか」：止まった鳥の翼を立体的に。オモテが首をかしげる
+    birdAt(t, -1.0, { walk: 0, wing: .25 * win(t, a + .3, CUE.dna, .4, .3), look: .2 * Math.sin(t) });
+    const bp = bird.position.clone();
+    omoteG.pose({ x: .5, z: .35, yaw: Math.atan2(bp.x - .5, bp.z - .35), lean: .3, nod: .5, tilt: .3 * k_(t, "evo", .8, .3) });
+    const th = .9 + .5 * prog(t, a, CUE.dna - a);
+    setCam(V3(bp.x + Math.sin(th) * .38, .1, bp.z + Math.cos(th) * .38), V3(bp.x, .055, bp.z), 30, .01, 60); dof = { focus: .38, slab: .08, far: 8, near: 8 };
+    guardBox(birdBox());
+  } else if (name === "wing") {
+    // 小さな翼と毛のような羽（マクロ）→（L16〜L18 は観測室）
+    if (t >= CUE.islands) return drawLab(t, ...S.sceneRange("wing"));
+    birdAt(t, -1.0, { walk: 0, wing: .28 + .08 * Math.sin(t * 2.2), look: .1 * Math.sin(t * .7) });
+    omoteG.g.visible = false;
+    const bp = bird.position.clone(), m = prog(t, a, CUE.islands - a);
+    const th = lerp(1.85, 1.45, m), d = lerp(.6, .52, sstep(.45, 1, m));
+    setCam(V3(bp.x + Math.sin(th) * d, .12 + .015 * m, bp.z + Math.cos(th) * d), V3(bp.x - .005, .022, bp.z), 28, .005, 40);
+    dof = { focus: d, slab: .03, far: 12, near: 10 };
+    guardBox(birdBox());
+  } else if (name === "outro") {
+    // 鳥が草むらの奥へ消え、オモテがゆっくり姿勢を正す。カメラが上昇 → 島の俯瞰へ
+    const up = easeInOut(prog(t, CUE.rise, CUE.last + 1 - CUE.rise));
+    if (t >= CUE.last + .6) return drawOutroAerial(t);
+    const zW = lerp(-.4, -3.2, easeIn(prog(t, a, 3.2)));
+    birdAt(t, zW, { dir: -1, walk: t * 9 }); bird.visible = zW > -3.1;
+    const bp = bird.position.clone(), straighten = easeInOut(prog(t, a + 1.2, 2.2));
+    omoteG.pose({ x: .78, z: -.45, yaw: Math.atan2(pathX(-2.2) - .78, -2.2 + .45), lean: lerp(.3, .02, straighten), nod: lerp(.5, .05, straighten) });
+    const zc = 4.8 + 1.0 * up;
+    setCam(V3(pathX(zc) - .3, lerp(1.1, 5.5, up), zc), V3(pathX(-1.2) + .7, lerp(.45, 0, up), -1.2), 36, .02, 80);
+    if (up < .2) dof = { focus: cam.position.distanceTo(bp), slab: 1.2, far: 4, near: 4 };
+    scene.fog.density = lerp(.09, .05, up);
+    guardBox(omoteG.box(cam, W, H));
+  }
+  draw3D(dof);
+}
+function drawOutroAerial(t) {
+  show("island"); waves(t, cam.position.x, cam.position.z);
+  hemi.intensity = .55; key.intensity = 1.05; rim.intensity = .9; key.position.set(-3000, 2200, 3600); rim.position.set(2500, 900, -5000);
+  boat.visible = false; omoteBig.g.visible = false;
+  const u = easeInOut(prog(t, CUE.last + .6, TL.ending_start - CUE.last - .6));
+  const th = TH0 + .6, rp = rimPoint(th, 0), outT = V3(Math.cos(th), 0, Math.sin(th) * IB / IA).normalize();
+  const p0 = rp.clone().addScaledVector(outT, 1400).add(V3(0, 260, 0)), p1 = V3(outT.x * 16000, 2600, outT.z * 16000);
+  setCam(lerpV(p0, p1, u ** .8), lerpV(rp.clone().add(V3(0, 150, 0)), V3(0, 150, 0), u), 40, 1, 160000);
+  scene.fog.density = lerp(.0003, .000045, sstep(0, .6, u)); mist(u < .3);
+  draw3D(null);
+}
+function drawLab(t, a, b) {
+  show("lab", "globe"); hemi.intensity = .3; key.intensity = .9; rim.intensity = 1.1; key.castShadow = false; scene.fog.density = .02;
+  key.position.set(-4, 5, 4); rim.position.set(3, 3, -4); spot.target.position.set(0, 1, 0);
+  globe.position.set(0, 1.55, 0); atmo.visible = true; pin.visible = true; pinRing.material.opacity = .9; pin.scale.setScalar(1 + .4 * Math.sin(t * 3) ** 2);
+  const evoPart = t < CUE.wing;
+  globe.rotation.y = evoPart ? -.35 + .1 * Math.sin(t * .2) : -.35 + 2.2 * easeInOut(prog(t, CUE.islands, 4.5));
+  // 弧：L12 で伸び、L13 で島に届き、L14 で点線に（渡り方は不明）
+  const grow = evoPart ? prog(t, CUE.arc, CUE.arrive - CUE.arc) : 0, dashed = evoPart && t >= CUE.unknown;
+  arcSegs.forEach((l, i) => { l.visible = evoPart && i / 80 < grow && (!dashed || i % 4 < 2); l.material.opacity = .9; });
+  islandDots.forEach((m, i) => { m.visible = !evoPart; m.material.opacity = k_(t, "islands", .4, i * .25); });
+  helix.visible = evoPart; helix.rotation.y = t * .5; helix.scale.setScalar(k_(t, "dna", .6) || .001);
+  // オモテ：地球儀を見上げる。L18 でゆっくりうなずく
+  const nod = !evoPart ? .35 * Math.sin(Math.PI * clamp((t - CUE.nod) / 1.2)) : 0;
+  omoteLab.pose({ x: 1.35, z: .85, yaw: Math.atan2(-1.35, -.85), lean: .06, nod: -.12 + nod, tilt: evoPart ? 0 : .1 * Math.sin(t * .6) });
+  const u = prog(t, a, b - a);
+  setCam(V3(2.6 - .5 * u, 1.75 + .1 * Math.sin(t * .4), 8.2 - .8 * u), V3(-.15, .95, 0), 44, .05, 200);
+  draw3D({ focus: cam.position.distanceTo(globe.position), slab: 1.6, far: 3, near: 3 });
+  guardBox(omoteLab.box(cam, W, H));
+  // 注記と情報（必要なものだけ）
+  if (evoPart) {
+    if (t >= CUE.dna) uiNote("※DNAのらせんはイメージ", 300, 1230, k_(t, "dna", .5, .4));
+    if (t >= CUE.arc) uiCard([["祖先：南アメリカのクイナの仲間", 36, 700]], 540, 300, k_(t, "arc"));
+    if (t >= CUE.arrive) uiCard([["到達：約150万年前（推定）", 40, 800]], 540, 420, k_(t, "arrive"));
+    if (t >= CUE.unknown) uiCard([["渡り方：不明", 40, 800], ["飛んできた？／漂流物に助けられた？", 30, 500, "#B8C7D6"]], 540, 560, k_(t, "unknown"));
+    if (t >= CUE.arc) uiNote("※経路の線はイメージ", 300, 1290, k_(t, "arc", .5, .4));
+  } else {
+    uiCard([["飛ぶ力を失ったクイナがいる（いた）島", 34, 700]], 540, 300, k_(t, "islands", .5, .2));
+    uiNote("※一部の例", 540, 420, k_(t, "islands", .5, .6));
+    const fk = k_(t, "factors"), f2 = k_(t, "factor2");
+    if (fk > 0) uiCard([["天敵が少ない", 40, 800]], 320, 560, fk);
+    if (f2 > 0) uiCard([["飛ぶためのエネルギーが大きい", 36, 800]], 600, 690, f2);
+    if (t >= CUE.caveat) uiCard([["一つの理由では決めつけられない", 36, 800]], 540, 840, k_(t, "caveat"));
+  }
+}
+function drawUI(t, name) {
+  if (name === "hook") {
+    if (t >= CUE.glimpse && t < CUE.glimpse + .55) uiNote("※再現CG", 900, 250, 1, 26);
+  } else if (name === "aerial") {
+    uiCard([["崖の高さ：約300m", 36, 700]], 540, 320, k_(t, "cliff", .5, .3) * (1 - prog(t, CUE.grass, .4)));
+    uiCard([["Inaccessible ＝ 近づけない", 36, 700]], 540, 450, k_(t, "name", .5) * (1 - prog(t, CUE.grass, .4)));
+  } else if (name === "bird") {
+    uiCard([["イナクセシブルクイナ", 50, 800], ["この島だけにすむ固有種", 30, 500, "#B8C7D6"]], 540, 300, k_(t, "bird", .5, .25) * (1 - prog(t, CUE.size - .45, .35)));
+    const half = CUE.size + (CUE.smallest - CUE.size) / 2;   // 頭のマクロの間だけ（脚のマクロではオモテの足と重なるため出さない）
+    if (t >= CUE.size && t < half) uiCard([["体長 約13〜15cm", 44, 800]], 540, 300, k_(t, "size", .4, .2) * (1 - prog(t, half - .35, .3)));
+    uiNote("※再現CG", 900, 250, k_(t, "bird", .4), 26);
+  } else if (name === "wing" && t < CUE.islands) {
+    uiCard([["小さく弱い翼", 40, 800]], 540, 300, k_(t, "wing", .5, .4));
+    if (t >= CUE.feathers) uiCard([["羽の一部は毛のようにばらける", 34, 700]], 540, 420, k_(t, "feathers"));
+    uiNote("※再現CG", 900, 250, k_(t, "wing", .4), 26);
+  } else if (name === "evo" && t < CUE.dna) {
+    uiNote("※再現CG", 900, 250, 1, 26);
+  } else if (name === "alone") {
+    if (t < CUE.edge) uiCard([["イナクセシブル島", 40, 800], ["面積 十数㎢", 30, 500, "#B8C7D6"]], 540, 330, k_(t, "alone", .5, .5) * (1 - prog(t, CUE.edge - .4, .3)));
+    else {
+      uiCard([["ネズミ・ネコ：侵入の記録なし", 34, 700]], 540, 320, k_(t, "edge", .5, .3));
+      if (t >= CUE.boat) uiNote("※船の影はイメージ", 540, 430, k_(t, "boat", .5, .2));
+      if (t >= CUE.iucn) uiCard([["国際自然保護連合（IUCN）の評価", 30, 500, "#B8C7D6"], ["危急種", 48, 800]], 540, 560, k_(t, "iucn"));
+    }
+  } else if (name === "outro" && t < CUE.last + .6) {
+    uiNote("※再現CG", 900, 250, 1 - prog(t, CUE.rise, .5), 26);
+  }
+}
+
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start;
+  if (t >= es) {
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
+    ui.getImageData(0, 0, 1, 1); return;
+  }
+  window.__t = t;
+  const name = S.sceneAt(t);
+  drawScene(t, name);
+  grade(t);
+  drawUI(t, name);
+  S.header(ui, false);
+  docSub(t);
+  // 場面のつなぎ：短い暗転（白い閃光は使わない）
+  const [a] = S.sceneRange(name), i = SCN.indexOf(name);
+  if (i > 0) { const k = 1 - prog(t, a, .35); if (k > 0) { bg.fillStyle = `rgba(4,8,14,${.85 * k})`; bg.fillRect(0, 0, W, H); } }
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); window.__t = 26;
+  groundLights(); swayPlants(26); birdAt(26, -.6, { walk: 0, look: .3 }); omoteG.pose({ x: .55, z: .6, yaw: Math.atan2(pathX(-.6) - .55, -1.2), lean: .3, nod: .5 });
+  const bp = bird.position; setCam(V3(bp.x + .45, .14, bp.z + .55), V3(bp.x, .07, bp.z), 30, .02, 60);
+  draw3D({ focus: .72, slab: .18, far: 7, near: 8 }); grade(26);
+  text(ui, "世界の果ての", 540, 1380, 92, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 });
+  text(ui, "飛べない小さな鳥", 540, 1510, 100, "#A8E6FF", { weight: 900, stroke: "#06101c", sw: 14 });
+  S.header(ui, false); bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; }
+window.__hide = (k) => { if (k === "sea") { seaNear.visible = false; seaFar.visible = false; } if (k === "isl") island.children[0].visible = false; };
+window.__dbg = () => ({ bird: bird.position.toArray(), birdVis: bird.visible, cam: cam.position.toArray(), om: omoteG.g.position.toArray(), near: cam.near, far: cam.far, inTus: tussocks.filter(q => Math.hypot(q.x - cam.position.x, q.z - cam.position.z) < .5).length });
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>

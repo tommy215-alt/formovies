@@ -757,11 +757,67 @@
     text(ctx, "リバース", 112, 124, 34, "#FFFFFF", { align: "left", weight: 900 });
   }
 
+
+  // ---------------------------------------------------------------- オモテ（顔のない、もちもちした人型ピクトグラム）2026-10-27〜
+  // 目・口・鼻・眉・耳は一切つけない。感情は全身の動き（傾き・うなずき・乗り出し・硬直）と、立体の汗のしずくで出す。
+  // 3D の場面に直接置くための部品：mochi3D(THREE) → { g, pose(o), box(camera, W, H) }。単位はメートル（身長 約 1.6 m）。原点は足もと。
+  function mochi3D(THREE, opt = {}) {
+    const col = new THREE.Color(opt.color || 0xd5dbe4).convertSRGBToLinear();
+    const mat = new THREE.MeshStandardMaterial({ color: col, roughness: .62, metalness: 0, emissive: col, emissiveIntensity: .03 });
+    const cap = (r, l) => { const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 10, 24), mat); m.castShadow = true; m.receiveShadow = true; return m; };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    const hips = new THREE.Group(); hips.position.y = .62; body.add(hips);              // 上半身はここを軸に傾く
+    const torso = cap(.235, .3); torso.position.y = .3; torso.scale.set(1.05, 1, .9); hips.add(torso);
+    const neck = new THREE.Group(); neck.position.y = .66; hips.add(neck);
+    const head = new THREE.Group(); head.position.y = .2; neck.add(head);
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(.205, 40, 30), mat); skull.scale.set(1.04, .98, 1); skull.castShadow = true; head.add(skull);
+    const limb = (parent, x, y, r, l1, l2) => {                                       // 付け根 → 上 → 関節 → 下（先は丸い）
+      const a = new THREE.Group(); a.position.set(x, y, 0); parent.add(a);
+      const u = cap(r, l1); u.position.y = -l1 / 2 - r * .3; a.add(u);
+      const el = new THREE.Group(); el.position.y = -l1 - r * .5; a.add(el);
+      const d = cap(r * .95, l2); d.position.y = -l2 / 2 - r * .2; el.add(d);
+      return { a, el };
+    };
+    const armL = limb(hips, -.29, .56, .075, .2, .2), armR = limb(hips, .29, .56, .075, .2, .2);
+    const legL = limb(body, -.11, .64, .095, .22, .2), legR = limb(body, .11, .64, .095, .22, .2);
+    // 立体の汗のしずく（頭の横に現れて落ちる）
+    const dropMat = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, roughness: .1, metalness: 0, transparent: true, opacity: .85 });
+    const drop = new THREE.Group(); head.add(drop);
+    const ds = new THREE.Mesh(new THREE.SphereGeometry(.035, 16, 12), dropMat); drop.add(ds);
+    const dc = new THREE.Mesh(new THREE.ConeGeometry(.033, .06, 16), dropMat); dc.position.y = .04; drop.add(dc);
+    function pose(o = {}) {
+      g.position.set(o.x || 0, o.y || 0, o.z || 0); g.rotation.set(0, o.yaw || 0, 0);
+      g.scale.set(o.sx || 1, o.sy || 1, o.sx || 1);
+      hips.rotation.set(o.lean || 0, 0, o.side || 0);                                  // lean＞0：前に乗り出す
+      head.rotation.set(o.nod || 0, o.look || 0, o.tilt || 0);                          // tilt：首をかしげる
+      const ph = o.walk || 0, st = o.stride ?? .35;
+      legL.a.rotation.x = Math.sin(ph) * st; legR.a.rotation.x = -Math.sin(ph) * st;
+      legL.el.rotation.x = Math.max(0, -Math.sin(ph)) * st * 1.2; legR.el.rotation.x = Math.max(0, Math.sin(ph)) * st * 1.2;
+      body.position.y = o.walk ? Math.abs(Math.cos(ph)) * .02 : 0;
+      const sw = o.walk ? Math.sin(ph) * .3 : 0;
+      armL.a.rotation.set(-(o.armFL ?? 0) + sw, 0, -(o.armL ?? .12)); armR.a.rotation.set(-(o.armFR ?? 0) - sw, 0, (o.armR ?? .12));
+      armL.el.rotation.x = -(o.elbowL ?? .15); armR.el.rotation.x = -(o.elbowR ?? .15);
+      const k = o.sweat || 0; drop.visible = k > 0 && k < 1;                           // 0→1：現れて、頬の横を落ちる
+      drop.position.set(.22, .1 - .25 * Math.max(0, k - .35) / .65, .05); dropMat.opacity = .85 * Math.min(1, k * 4, (1 - k) * 5);
+    }
+    const tmp = new THREE.Vector3();
+    function box(camera, W, H) {                                                       // 画面上のおおよその範囲（文字の検査用）
+      g.updateMatrixWorld(true);
+      const pts = [[0, 0, 0], [0, 1.62, 0], [-.4, .9, 0], [.4, .9, 0], [0, .9, .3], [0, .9, -.3]];
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const p of pts) { tmp.set(...p).applyMatrix4(g.matrixWorld).project(camera); if (tmp.z > 1) return null;
+        const x = (tmp.x + 1) / 2 * W, y = (1 - tmp.y) / 2 * H; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      return [x0, y0, x1, y1];
+    }
+    pose({});
+    return { g, pose, box, mat };
+  }
+
   root.Stage = {
     W, H, FONT, C, clamp, lerp, easeOut, easeIn, easeInOut, back, elastic, prog, win, rng, hexA,
     text, rrect, pill, rich, note, setup, sceneRange, sceneAt, currentLine, talk, speaking, subtitles: subtitles2, header: header2, rewindIcon,
     omote: omote3, omote2d: omote, omotePixel, uraBust, wipe: wipe2, speedLines, burst, bigX, bigO, arrow, vhs, glitch, flash, gradientBG: techBG, dots, rays,
-    techBG, hud, camera, resetCam, whip, mixHex, panel, group, checkText, TEXTLOG, CHARLOG, clearTextLog: () => { TEXTLOG.length = 0; CHARLOG.length = 0; OBSLOG.length = 0; }, subtitlesOld: subtitles, headerOld: header, gradientOld: gradientBG,
+    techBG, hud, camera, resetCam, whip, mixHex, panel, group, checkText, mochi3D, TEXTLOG, CHARLOG, clearTextLog: () => { TEXTLOG.length = 0; CHARLOG.length = 0; OBSLOG.length = 0; }, subtitlesOld: subtitles, headerOld: header, gradientOld: gradientBG,
     get TL() { return TL; }, get CUE() { return CUE; },
   };
 })(typeof window !== "undefined" ? window : globalThis);
