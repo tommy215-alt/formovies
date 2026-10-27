@@ -439,7 +439,7 @@ function draw3D(dof) {
     R.setClearColor(FOGC, clearAlpha); R.render(scene, cam); R.shadowMap.needsUpdate = false;
     bg.save(); bg.filter = blur > .3 ? `blur(${blur}px)` : "none"; bg.drawImage(glc, 0, 0); bg.restore();
   };
-  pass(focus + slab * .8, f0, bf, 1);                       // 奥（ぼかす）
+  pass(n0, f0, bf, 1);                                      // 下地：全体をぼかす（切り出すと、手前のぼけの縁から切り口の霧の色が透けて、地面に帯が出るため）
   pass(Math.max(n0, focus - slab), focus + slab, 0, 0);       // 焦点の前後（くっきり）
   if (focus - slab > n0 + .001) pass(n0, focus - slab + .002, bn, 0); // 手前（ぼかす）
   cam.near = n0; cam.far = f0; cam.updateProjectionMatrix();
@@ -617,14 +617,14 @@ function groundLights() {
 }
 function drawGlimpse(t) { // 冒頭：草の陰に鳥の影が一瞬（全体は見せない）
   groundLights(); swayPlants(t); hemi.intensity = .3; rim.intensity = 1.8;
-  birdAt(t, -1.2, { walk: 0 }); omoteG.g.visible = false;
+  birdAt(t, -1.2, { walk: 0 }); omoteG.g.visible = false; bird.visible = true;
   const p = bird.position;
   setCam(V3(p.x + .35, .09, p.z + .28), V3(p.x, .06, p.z), 30, .02, 60);
   draw3D({ focus: .45, slab: .12, far: 9, near: 10 });
 }
 function drawGround(t, name, a, b) {
   groundLights(); swayPlants(t);
-  omoteG.g.visible = true;
+  omoteG.g.visible = true; bird.visible = true;   // 前のコマの設定を持ち越さない（確認用の単発書き出しで鳥が消えるため）
   const mp = motes.geometry.attributes.position; motes.position.set(.03 * Math.sin(t * .3), .02 * Math.sin(t * .5), 0);
   let dof = null;
   if (name === "ground") {
@@ -757,7 +757,6 @@ function drawUI(t, name) {
     uiNote("※再現CG", 900, 250, k_(t, "bird", .4), 26);
   } else if (name === "wing" && t < CUE.islands) {
     uiCard([["小さく弱い翼", 40, 800]], 540, 300, k_(t, "wing", .5, .4));
-    if (t >= CUE.feathers) uiCard([["羽の一部は毛のようにばらける", 34, 700]], 540, 420, k_(t, "feathers"));
     uiNote("※再現CG", 900, 250, k_(t, "wing", .4), 26);
   } else if (name === "evo" && t < CUE.dna) {
     uiNote("※再現CG", 900, 250, 1, 26);
