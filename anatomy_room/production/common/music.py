@@ -559,7 +559,40 @@ def sfx_bank_soft():
     bank["step"] = _add(*[np.concatenate([np.zeros(int(k * 0.11 * SR)), _bell(330 - 40 * k, 0.04, 0.4, 0.008, 0.002)]) for k in range(4)])
     bank["deep"] = _add(np.sin(2 * np.pi * np.cumsum(55 * np.exp(-t(1.6) / 1.2) + 28) / SR) * np.exp(-t(1.6) / 0.7) * np.minimum(1, t(1.6) / 0.05),
                         _lp(_noise(int(1.6 * SR), 84), 400) * np.exp(-t(1.6) / 0.4) * 0.3)   # 空間の広がりを感じる低い音
+    # 紙と機械の音（pilot_011〜）：紙を折る・切る、機械が動き出す、歯車、紙を広げる、静かな部屋。高い帯域は丸める
+    n5 = _noise(int(0.5 * SR), 91)
+    crk = np.zeros(int(0.5 * SR)); r2 = np.random.default_rng(92)
+    for k in range(9):                                                      # 紙のかさかさ（短い粒）
+        i = int(r2.uniform(0, 0.42) * SR); m = int(0.03 * SR)
+        crk[i:i + m] += (_lp(_noise(m, 93 + k), 3200) - _lp(_noise(m, 93 + k), 700)) * np.exp(-np.arange(m) / SR / 0.008)
+    bank["paper"] = _add(crk, (_lp(n5, 2400) - _lp(n5, 500)) * np.sin(np.pi * t(0.5) / 0.5) ** 2 * 0.3)
+    sn = _noise(int(0.18 * SR), 95)
+    bank["cut"] = _add((_lp(sn, 3000) - _lp(sn, 900)) * np.sin(np.pi * t(0.18) / 0.18) ** 3,
+                       np.concatenate([np.zeros(int(0.14 * SR)), _bell(620, 0.06, 0.3, 0.012, 0.002)]))
+    mf = 38 + 40 * np.clip(t(2.2) / 1.6, 0, 1) ** 1.5                       # 機械が動き出す：低いうなりが上がり、規則的な打音が加わる
+    motor = np.sin(2 * np.pi * np.cumsum(mf) / SR) * np.minimum(1, t(2.2) / 0.3) * 0.6
+    clk = np.zeros(int(2.2 * SR))
+    for k, tt in enumerate(np.cumsum(0.42 * 0.82 ** np.arange(12))):
+        i = int((0.5 + tt) * SR)
+        if i < len(clk) - int(0.04 * SR):
+            clk[i:i + int(0.04 * SR)] += _lp(_noise(int(0.04 * SR), 96 + k), 1500) * np.exp(-np.arange(int(0.04 * SR)) / SR / 0.006)
+    bank["machine"] = _add(motor, clk * 0.8) * np.minimum(1, (2.2 - t(2.2)) / 0.3)
+    g = np.zeros(int(1.6 * SR))
+    for k in range(8):                                                      # 歯車がかみ合う：低めの「カチ」が一定の間隔で
+        i = int(k * 0.2 * SR); m = int(0.035 * SR)
+        g[i:i + m] += _add(_lp(_noise(m, 110 + k), 1800) * np.exp(-np.arange(m) / SR / 0.005), _bell(240 + 30 * (k % 2), 0.035, 0.4, 0.01, 0.001))
+    bank["gear"] = g
+    nu = _noise(int(0.7 * SR), 120)
+    bank["unroll"] = _lp(nu, 1600) * np.sin(np.pi * t(0.7) / 0.7) ** 1.5 * (0.6 + 0.4 * np.sin(2 * np.pi * 7 * t(0.7)))   # 設計図を机に広げる
+    nr = _noise(int(5 * SR), 121)
+    bank["room"] = _lp(nr, 350) * np.sin(np.pi * t(5) / 5) ** 0.4          # 静かな部屋の空気
+    lm = np.zeros(int(3 * SR))
+    for k in range(12):                                                     # 織機の規則的な音（遠く、低く）
+        i = int(k * 0.25 * SR); m = int(0.06 * SR)
+        lm[i:i + m] += _lp(_noise(m, 130 + k), 900) * np.exp(-np.arange(m) / SR / 0.012) * (1.0 if k % 2 == 0 else 0.6)
+    bank["loom"] = lm
     level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09,
+             "paper": 0.04, "cut": 0.04, "machine": 0.06, "gear": 0.035, "unroll": 0.035, "room": 0.02, "loom": 0.04,
              "impact": 0.11, "hit": 0.08, "alarm": 0.08, "stab": 0.08, "brake": 0.06, "rewind": 0.06, "revswell": 0.05,
              "sweep_up": 0.045, "sweep_down": 0.045, "riser": 0.04, "tick": 0.05, "scan": 0.04}
     return {k: _soften(v, rms=level.get(k, 0.06)) for k, v in bank.items()}

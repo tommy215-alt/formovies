@@ -813,7 +813,7 @@
       return [x0, y0, x1, y1];
     }
     pose({});
-    return { g, pose, box, mat };
+    return { g, pose, box, mat, parts: { body, hips, torso, head, skull, armL, armR, legL, legR } };   // parts：衣服や小物を付けるため（2026-10-27 追加）
   }
 
   root.Stage = {
