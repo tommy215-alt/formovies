@@ -62,8 +62,13 @@
 
 - **書き出しはユーザーの PC**（Windows、NVIDIA RTX 3070、`render_frames.js` が GPU を自動で使う。pilot_010 の静止画で 1 コマ 0.67 秒、クラウドは約 3 秒）。PC のセッションは `claude remote-control`（`~\formovies`、same-dir）で、ユーザーはスマホから指示する。PC がスリープ・シャットダウン中は動かない。
 - **クラウドのセッション**は、PC がなくても進められる工程（題材・事実確認・台本・レビュー資料）を担当する。書き出しを両方で同時にしない。push がぶつからないよう、作業の前に `git pull`。
+- **決まった手順（指示に書いていなくても、毎回必ず行う）**：ユーザーの指示は ChatGPT からのコピーのことがあり、git の操作が書かれていないことが多い。
+  1. 作業を始める前に `git pull`（クラウドのセッションが進めた分を取り込む）。
+  2. 書き出しのあとは `python tools/video_qa.py pilot_NNN --sheets` をかけ、結果（NG の項目）をユーザーに伝える。
+  3. 作業が終わったら `git add -A` → `git commit` → `git pull --no-edit` → `git push`。push できたことを確かめてから終わりにする。
+  4. 書き出しの前に VOICEVOX（127.0.0.1:50021）が応答するか確かめる。応答しなければ、ユーザーに VOICEVOX のアプリを開くよう頼む。
 - PC の環境（`docs/PC_SETUP.md`、確認は `node tools/check_pc.js`）：
   - コマンドは `python`（`python3` ではない）。PowerShell では `npm.cmd`・`npx.cmd`。Node の部品は `anatomy_room/node_modules`（Playwright 1.63.0）。
   - VOICEVOX は**アプリ版 0.26.0**（クラウドは ENGINE 0.24.1）。声が少し変わることがあるので、PC で声を作ったら `qc_report.md` の「文末の音程」「読み上げの照合」を見直す。
   - fontconfig がないので、`textcheck` の「フォントにない文字」は PC では未確認になる（必要ならクラウドで確認）。ImageMagick もない（一覧画像は Pillow）。外部コマンドの出力・JSON は UTF-8 で読む（cp932 で止まった）。
-- **pilot_011「紙袋を変えた女性、マーガレット・ナイト」**（`production/pilot_011/`、99.5 秒）：PC で書き出し、クラウドのセッションが全編を確認して直しを入れている途中。YouTube へのアップロードはユーザーの指示まで行わない。
+- **pilot_011「紙袋を変えた女性、マーガレット・ナイト」**（`production/pilot_011/`、99.5 秒）：**完成**（ユーザーの判断で f0bc12a の版。L14 の語尾と最初のコマの直しは入っていない。サムネイルは `thumbnail.png`、タイトル・説明文は `youtube_metadata.md`）。YouTube へのアップロードはユーザーの指示まで行わない。
