@@ -401,8 +401,7 @@ class Episode:
             run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(out), "-frames:v", "1", "-q:v", "3",
                  str(qdir / f"f{i:02d}_{t:05.1f}.jpg")])
         cols = 7
-        run(["montage", *sorted(str(p) for p in qdir.glob("f*.jpg")), "-tile", f"{cols}x{math.ceil(len(times) / cols)}",
-             "-geometry", "300x533+4+4", "-background", "#222", str(qdir / "contact_sheet.jpg")])
+        contact_sheet(sorted(qdir.glob("f*.jpg")), cols, qdir / "contact_sheet.jpg")
         rep += ["## 抽出フレーム", "", f"`qc/` に {len(times)} 枚、一覧は `qc/contact_sheet.jpg`。", ""]
         (self.here / "qc_report.md").write_text("\n".join(rep), encoding="utf-8")
         print("\n".join(l for l in rep if not l.startswith("| L") and not l.startswith("| END")))
@@ -680,6 +679,19 @@ def shown_chunks(tl):
 
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def contact_sheet(files, cols, out, w=300, h=533, pad=4):
+    """コマの一覧画像（ImageMagick の montage -geometry 300x533+4+4 -background #222 と同じ並び。Windows にも入っている Pillow で作る）"""
+    from PIL import Image
+    rows = math.ceil(len(files) / cols)
+    sheet = Image.new("RGB", (cols * (w + 2 * pad), rows * (h + 2 * pad)), "#222222")
+    for i, f in enumerate(files):
+        im = Image.open(f).convert("RGB")
+        im.thumbnail((w, h))
+        x, y = (i % cols) * (w + 2 * pad) + pad + (w - im.width) // 2, (i // cols) * (h + 2 * pad) + pad + (h - im.height) // 2
+        sheet.paste(im, (x, y))
+    sheet.save(out, quality=90)
 
 
 def f0_track(a, sr=SR):
