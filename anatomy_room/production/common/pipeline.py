@@ -488,8 +488,9 @@ class Episode:
 
     def qc_picture(self):
         txt = self.work / "luma.txt"
-        run(["ffmpeg", "-v", "error", "-i", str(self.out), "-vf", f"fps=1,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file={txt}",
-             "-f", "null", "-"])
+        # 出力先はフォルダを移って名前だけで渡す（Windows の「C:\\…」はフィルタの中で区切りの「:」と読まれる）
+        subprocess.run(["ffmpeg", "-v", "error", "-i", str(self.out), "-vf", f"fps=1,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file={txt.name}",
+                        "-f", "null", "-"], capture_output=True, text=True, cwd=txt.parent)
         ys = [float(v) for v in re.findall(r"YAVG=([\d.]+)", txt.read_text())]
         raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(self.out), "-vf", "fps=2,scale=108:192,format=gray", "-f", "rawvideo", "-"],
                              capture_output=True).stdout

@@ -15,6 +15,7 @@
 結果は各話の qa_report.md に書く。問題があれば終了コード 1。
 """
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -178,12 +179,17 @@ def main():
         qa.mkdir(exist_ok=True)
         for p in qa.glob("f_*.png"):
             p.unlink()
-        font = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
-        run(["ffmpeg", "-v", "error", "-i", str(mp4), "-vf", f"fps=1,scale=360:640,drawtext=fontfile={font}:text='%{{pts\\:hms}}':x=8:y=8:fontsize=26:"
-             "fontcolor=yellow:box=1:boxcolor=black", str(qa / "f_%03d.png")])
+        # 時刻の文字のフォントは qa/ に写して名前だけで渡す（Windows の「C:\\…」はフィルタの中で区切りの「:」と読まれる）
+        font = next(f for f in [Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"), Path("C:/Windows/Fonts/arial.ttf"),
+                                Path("/System/Library/Fonts/Supplemental/Arial.ttf")] if f.exists())
+        shutil.copy(font, qa / f"_font{font.suffix}")
+        subprocess.run(["ffmpeg", "-v", "error", "-i", str(mp4), "-vf", f"fps=1,scale=360:640,drawtext=fontfile=_font{font.suffix}:text='%{{pts\\:hms}}':"
+                        "x=8:y=8:fontsize=26:fontcolor=yellow:box=1:boxcolor=black", "f_%03d.png"], cwd=qa, capture_output=True)
+        (qa / f"_font{font.suffix}").unlink()
         n = len(list(qa.glob("f_*.png")))
         for k in range((n + 19) // 20):
-            run(["ffmpeg", "-v", "error", "-y", "-pattern_type", "glob", "-i", str(qa / "f_*.png"), "-vf",
+            # 連番の読み込み（-pattern_type glob は Windows の ffmpeg にない）
+            run(["ffmpeg", "-v", "error", "-y", "-start_number", "1", "-i", str(qa / "f_%03d.png"), "-vf",
                  f"select='between(n\\,{k * 20}\\,{k * 20 + 19})',tile=5x4", "-frames:v", "1", str(qa / f"sheet_{k}.jpg")])
         for p in qa.glob("f_*.png"):
             p.unlink()
