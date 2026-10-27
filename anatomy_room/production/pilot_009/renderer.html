@@ -20,7 +20,7 @@ html,body{margin:0;background:#000}
 const S = Stage, { W, H, C, clamp, lerp, easeOut, easeIn, easeInOut, back, prog, win, text, pill, note, rrect } = Stage;
 const bg = document.getElementById("bg").getContext("2d");
 const ui = document.getElementById("ui").getContext("2d");
-const SCN = ["cold", "hook", "kitchen", "flow", "vuln", "notvirus", "why", "spread", "safe", "outro"];
+const SCN = ["hook", "kitchen", "flow", "vuln", "notvirus", "why", "spread", "safe", "outro"];
 let TL, CUE;
 const k_ = (t, cue, d = .3, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
 
@@ -196,29 +196,21 @@ function bob(t, f = 7, a = .04) { return 1 + a * Math.sin(t * f); }
 function drawScene(t, name) {
   const [a, b] = S.sceneRange(name), lt = t - a;
   const M = S.speaking(t, "M");
-  if (name === "cold") {
-    // 0〜1.5 秒：予約ボタンを押した瞬間、メンテナンス中に（最初のコマは止め絵として成り立つ絵）
-    S.techBG(bg, "#F2FAFF", "#DCEBFF", "#CFE0FF");
-    const sw = t >= .42, gl = win(t, .4, .75, .02, .2);
-    phone(ui, 590, 760, 1.15, sw ? "maint" : "book", { glitch: gl, rot: sw ? .03 * Math.sin(t * 50) * (1 - prog(t, .42, .5)) : 0 });
-    phone(ui, 215, 560, .6, "maint", { app: "注文アプリ", k: easeOut(prog(t, .8, .3)), rot: -.12, small: true });
-    phone(ui, 890, 520, .6, "maint", { app: "銀行アプリ", k: easeOut(prog(t, 1.05, .3)), rot: .12, small: true });
-    om(t, 300, 1330, .78, { expr: sw ? "shock" : "normal", armR: sw ? 2.6 : 1.7, elbowR: .3, look: [1, -.6], sweat: sw, lean: sw ? -.08 : 0 });
-    if (sw) S.burst(ui, 470, 1190, 90, prog(t, .5, .2), "!?", { size: 90, fill: C.yellow });
-    const al = t > .42 ? (.5 + .5 * Math.sin(t * 40)) : 0;
-    if (al > 0) { ui.save(); ui.strokeStyle = `rgba(255,90,40,${.6 * al})`; ui.lineWidth = 40; ui.strokeRect(0, 0, W, H); ui.restore(); }
-  } else if (name === "hook") {
+  if (name === "hook") {
     S.techBG(bg, "#FFF6EE", "#FFE6D2", "#FFDCC4");
     const p2 = k_(t, "maint2"), pk = k_(t, "php", .35), dim = 1 - .85 * pk, dive = easeInOut(prog(t, CUE.dive, .9));
     ui.save(); ui.translate(590, 800); ui.scale(1 + 1.6 * dive, 1 + 1.6 * dive); ui.translate(-590, -800); ui.globalAlpha = 1 - .8 * prog(t, CUE.dive + .5, .4);
     ui.globalAlpha *= dim; ui.__noCheck = dive > .05; // 画面に吸い込まれる途中は検査しない（切り替えの演出）
-    phone(ui, 680, 790, .9, "maint", {});
+    const sw = t >= .3; // 0.3 秒で予約の画面がメンテナンスに切り替わる（最初のコマは「予約する」の画面＝止め絵として成り立つ）
+    phone(ui, 680, 790, .9, sw ? "maint" : "book", { glitch: win(t, .28, .6, .02, .2) });
     phone(ui, 390, 620, .62, "maint", { app: "注文アプリ", k: p2, rot: -.1, small: true });
     phone(ui, 905, 560, .55, "maint", { app: "銀行アプリ", k: k_(t, "maint2", .3, .45), rot: .1, small: true });
     ui.__noCheck = false; ui.restore();
     // 大きな問い
-    const q = easeOut(prog(t, a + .05, .3)) * (1 - prog(t, CUE.php - .2, .25));
-    if (q > 0) { ui.save(); ui.translate(420, 330); ui.scale(q, q); text(ui, "なんで全部止まる!?", 0, 0, 76, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
+    // 大きな問い：0 秒から出しておく（最初の 1〜3 秒で核心の疑問を見せる）
+    const q = (.92 + .08 * easeOut(prog(t, 0, .3))) * (1 - prog(t, CUE.php - .2, .25));
+    if (q > 0) { ui.save(); ui.translate(420, 330); ui.scale(q, q); text(ui, "PHP騒動、結局なに？", 0, 0, 72, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
+    if (sw && t < CUE.php) S.burst(ui, 470, 1100, 80, prog(t, .32, .2) * (1 - prog(t, CUE.php - .3, .2)), "!?", { size: 80, fill: C.yellow });
     // 「PHP」が落ちてくる
     if (pk > 0 && t < CUE.dive + .6) {
       const yy = lerp(-200, 560, easeOut(prog(t, CUE.php, .3)));
@@ -230,9 +222,10 @@ function drawScene(t, name) {
         note(ui, "※イメージ", 540, 870, tg, 30);
       }
     }
-    const ex = t >= CUE.dive ? "think" : t >= CUE.lost ? "panic" : t >= CUE.who ? "think" : t >= CUE.calm ? "deadpan" : t >= CUE.maint2 ? "panic" : "shock";
-    om(t, 170, 1330, .82, { expr: ex, armR: t < CUE.calm ? 2.4 : t >= CUE.lost && t < CUE.dive ? 1.9 : .4, elbowR: .4, armL: t >= CUE.maint2 && t < CUE.calm ? 2.6 : .3,
-      rot: t >= CUE.who && t < CUE.three ? .14 : 0, look: [1, -.5], sweat: t < CUE.calm, legs: t >= CUE.maint2 && t < CUE.calm ? t * 18 : 0 });
+    const ex = t >= CUE.dive ? "think" : t >= CUE.calm ? "deadpan" : t >= CUE.lost ? "panic" : t >= CUE.who ? "think" : !sw ? "normal" : t >= CUE.maint2 ? "panic" : "shock";
+    const upset = (sw && t < CUE.php) || (t >= CUE.lost && t < CUE.calm);
+    om(t, 170, 1330, .82, { expr: ex, armR: !sw ? 1.7 : upset ? 2.4 : .4, elbowR: .4, armL: upset ? 2.6 : .3,
+      rot: t >= CUE.who && t < CUE.three ? .14 : 0, look: [1, -.5], sweat: upset, legs: sw && t < CUE.php ? t * 18 : 0 });
     if (t >= CUE.who && t < CUE.three + .6) S.burst(ui, 470, 1060, 90, prog(t, CUE.who, .25), "……誰？", { size: 48, fill: "#FFFFFF", stroke: C.omote, color: C.omote });
   } else if (name === "kitchen") {
     S.techBG(bg, "#FFFBF4", "#F1F6FF", "#E6EEFA");
@@ -447,14 +440,14 @@ function renderFrame(t) {
   }
   window.__t = t;
   const name = S.sceneAt(t), [a, b] = S.sceneRange(name);
-  S.camera([bg, ui], t, a, b, [.48, CUE.maint2, CUE.php, CUE.holes, CUE.block, CUE.punch], [560, 800]);
+  S.camera([bg, ui], t, a, b, [.3, CUE.maint2, CUE.php, CUE.holes, CUE.block, CUE.punch], [560, 800]);
   drawScene(t, name);
   S.resetCam([bg, ui]);
   S.hud(ui, t);
   S.header(ui, false);
   S.subtitles(ui, t, 1490);
   const i = SCN.indexOf(name);
-  if (i > 1) S.whip(ui, 1 - prog(t, a, .2), i);
+  if (i > 0) S.whip(ui, 1 - prog(t, a, .2), i);
   flushLayers();
 }
 // 描いた内容を確実に画面へ反映させる（1 画素を読み戻して描画を確定させる。前のコマが写り込むのを防ぐ）

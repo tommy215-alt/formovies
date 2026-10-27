@@ -174,11 +174,17 @@ class Episode:
         duck = 1 - 0.6 * np.clip(env, 0, 1)
         mus *= duck
         sfx = np.zeros(n)
-        bank = music.sfx_bank_techno() if tech else music.sfx_bank()
+        # 効果音の種類："soft"（やわらかい音色。PHP の回から）／既定は techno（テクノの回）か旧版
+        kind = self.cfg.get("sfx_bank", "techno" if tech else "pop")
+        bank = {"soft": music.sfx_bank_soft, "techno": music.sfx_bank_techno}.get(kind, music.sfx_bank)()
         for name, cue, *rest in self.cfg["sfx"]:  # (効果音, きっかけ[, 音量[, ずらす秒]])
             s = bank[name] * (rest[0] if rest else 1.0)
             i = max(0, int((cues[cue] + (rest[1] if len(rest) > 1 else 0.0)) * SR))
             sfx[i:i + len(s)] += s[: max(0, n - i)]
+        if self.cfg.get("sfx_duck"):  # セリフ中は効果音も少し下げる（声を邪魔しない）
+            sfx *= 1 - (1 - self.cfg["sfx_duck"]) * np.clip(env, 0, 1)
+        if self.cfg.get("music_lp"):  # BGM の高音を丸める（耳に刺さるハイハットなど）
+            mus = music._lp(music._lp(mus, self.cfg["music_lp"]), self.cfg["music_lp"])
         mix = voice + 0.8 * mus + 0.5 * sfx
         write_wav(self.work / "mix_raw.wav", mix[: int(total * SR)])
         write_wav(self.work / "music.wav", (0.8 * mus)[: int(total * SR)])  # 検証用（BGM だけ・ダッキング後）

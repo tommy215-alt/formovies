@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_009 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/ending.js"></script>
+<script>
+// pilot_009「結局、今回のPHP騒動は何だったの？」のレンダラー。renderFrame(t) が時刻 t の 1 コマを描く（決定的）。
+// 2 層：bg（背景）→ ui（図・キャラクター・文字・字幕）。オモテは stage.js の 3D ピクトグラム（omote3）。
+const S = Stage, { W, H, C, clamp, lerp, easeOut, easeIn, easeInOut, back, prog, win, text, pill, note, rrect } = Stage;
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["cold", "hook", "kitchen", "flow", "vuln", "notvirus", "why", "spread", "safe", "outro"];
+let TL, CUE;
+const k_ = (t, cue, d = .3, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
+
+// ---------------------------------------------------------------- 部品：スマホ
+// mode：book（予約）／maint（メンテナンス中）／done（予約完了）／update（更新の通知）。文字はすべて画面の内側に収める
+function phone(ctx, x, y, s, mode, { app = "予約アプリ", k = 1, rot = 0, glitch = 0, badge = 0, prog_ = 0, small = false } = {}) {
+  if (k <= 0) return;
+  const w = 360, h = 680, sw = 324, sh = 600;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s * back(k), s * back(k));
+  ctx.shadowColor = "rgba(20,40,80,.28)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 18;
+  ctx.fillStyle = "#1C2D4E"; rrect(ctx, -w / 2, -h / 2, w, h, 56); ctx.fill(); ctx.shadowColor = "transparent";
+  const sx = -sw / 2, sy = -sh / 2 + 6;
+  const screen = mode === "maint" ? "#FFF3E6" : "#FFFFFF";
+  ctx.fillStyle = screen; rrect(ctx, sx, sy, sw, sh, 36); ctx.fill();
+  ctx.save(); rrect(ctx, sx, sy, sw, sh, 36); ctx.clip();
+  S.group(() => {
+    // アプリの名前の帯
+    ctx.fillStyle = mode === "maint" ? "#FF7A2A" : "#19B4E0"; ctx.fillRect(sx, sy, sw, 86);
+    text(ctx, app, 0, sy + 46, small ? 50 : 38, "#FFFFFF", { weight: 900 });
+    if (mode === "book") {
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = i === 1 ? "#E3F6FD" : "#F2F5FA"; rrect(ctx, sx + 24, sy + 120 + i * 92, sw - 48, 72, 16); ctx.fill(); }
+      text(ctx, "19:00　2名", 0, sy + 248, 36, "#1C2D4E", { weight: 800 });
+      const pu = 1 + .04 * Math.sin(((root_t()) || 0) * 9);
+      ctx.save(); ctx.translate(0, sy + 470); ctx.scale(pu, pu);
+      ctx.fillStyle = "#FF7A2A"; rrect(ctx, -130, -46, 260, 92, 46); ctx.fill();
+      text(ctx, "予約する", 0, 2, 44, "#FFFFFF", { weight: 900 }); ctx.restore();
+    } else if (mode === "maint") {
+      gear(ctx, 0, sy + 220, 70, "#FF7A2A", (root_t() || 0) * 1.5);
+      if (small) text(ctx, "停止中", 0, sy + 390, 80, "#E8590C", { weight: 900 }); // 小さなスマホは大きな文字 1 つだけ
+      else {
+        text(ctx, "メンテナンス中", 0, sy + 360, 44, "#E8590C", { weight: 900 });
+        text(ctx, "利用できません", 0, sy + 430, 36, "#8A5A3C", { weight: 800 });
+      }
+    } else if (mode === "done") {
+      ctx.strokeStyle = "#20B26B"; ctx.lineWidth = 22; ctx.lineCap = "round"; ctx.beginPath();
+      ctx.moveTo(-70, sy + 230); ctx.lineTo(-15, sy + 285); ctx.lineTo(80, sy + 175); ctx.stroke();
+      text(ctx, "予約完了", 0, sy + 380, 52, "#20B26B", { weight: 900 });
+      text(ctx, "19:00　2名", 0, sy + 450, 36, "#1C2D4E", { weight: 800 });
+    } else if (mode === "update") {
+      text(ctx, "予約完了", 0, sy + 160, 44, "#20B26B", { weight: 900 });
+      if (prog_ > 0) {
+        ctx.fillStyle = "#E6ECF5"; rrect(ctx, sx + 40, sy + 470, sw - 80, 28, 14); ctx.fill();
+        ctx.fillStyle = "#20B26B"; rrect(ctx, sx + 40, sy + 470, (sw - 80) * clamp(prog_), 28, 14); ctx.fill();
+        text(ctx, prog_ >= 1 ? "更新しました" : "更新中…", 0, sy + 540, 36, "#1C2D4E", { weight: 800 });
+      }
+    }
+  }, screenBoxOf(ctx, sx, sy, sx + sw, sy + sh));
+  ctx.restore();
+  if (glitch > 0) { // 画面が乱れる（メンテナンスに切り替わる瞬間）
+    const r = S.rng(Math.floor((root_t() || 0) * 30));
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = `rgba(${r() < .5 ? "255,90,60" : "63,240,255"},${.5 * glitch})`; ctx.fillRect(sx + r() * 40 - 20, sy + r() * sh, sw * (.5 + r() * .5), 10 + r() * 26); }
+  }
+  if (badge > 0) { // 更新の通知の数
+    const b = back(badge);
+    ctx.save(); ctx.translate(sw / 2 - 6, -h / 2 + 30); ctx.scale(b, b);
+    ctx.fillStyle = C.red; ctx.beginPath(); ctx.arc(0, 0, 48, 0, 7); ctx.fill(); ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 8; ctx.stroke();
+    S.group(() => text(ctx, "3", 0, 3, 56, "#FFFFFF", { weight: 900 })); ctx.restore();
+  }
+  ctx.restore();
+}
+function root_t() { return window.__t; }
+function screenBoxOf(ctx, x0, y0, x1, y1) {
+  const m = ctx.getTransform(), pts = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+  return [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
+}
+function gear(ctx, x, y, r, col, a = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = col;
+  for (let i = 0; i < 8; i++) { ctx.save(); ctx.rotate(i * Math.PI / 4); rrect(ctx, -r * .18, -r * 1.12, r * .36, r * .5, 6); ctx.fill(); ctx.restore(); }
+  ctx.beginPath(); ctx.arc(0, 0, r * .82, 0, 7); ctx.fill(); ctx.fillStyle = "#FFF3E6"; ctx.beginPath(); ctx.arc(0, 0, r * .36, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------- 部品：厨房の機械（＝PHP の実行環境のたとえ）
+// holes：穴の開き具合（0〜1）。old：古い型（灰色）。fixed：直した（緑の印）
+function machine(ctx, x, y, s, { holes = 0, hl = 0, old = false, fixed = 0, label = "PHP", k = 1, shake = 0, tag = "" } = {}) {
+  if (k <= 0) return;
+  const tt = root_t() || 0;
+  ctx.save(); ctx.translate(x + shake * 8 * Math.sin(tt * 70), y); ctx.scale(s * back(k), s * back(k));
+  ctx.shadowColor = "rgba(20,40,80,.22)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 14;
+  const body = old ? "#B9C2CF" : "#E9EEF5";
+  ctx.fillStyle = body; rrect(ctx, -150, -170, 300, 340, 38); ctx.fill(); ctx.shadowColor = "transparent";
+  ctx.strokeStyle = old ? "#8693A5" : "#9FB3CC"; ctx.lineWidth = 6; ctx.stroke();
+  // 表示窓
+  ctx.fillStyle = old ? "#5B6676" : "#1C2D4E"; rrect(ctx, -110, -140, 220, 96, 20); ctx.fill();
+  const nc = ctx.__noCheck; ctx.__noCheck = nc || back(k) < .85; // 出てくる途中（小さいうち）は検査しない
+  S.group(() => text(ctx, label, 0, -90, 62, old ? "#E2E8F0" : "#3FF0FF", { weight: 900 })); ctx.__noCheck = nc;
+  // つまみとオーブンの扉
+  for (const dx of [-70, 0, 70]) { ctx.fillStyle = old ? "#8693A5" : "#FF7A2A"; ctx.beginPath(); ctx.arc(dx, -10, 18, 0, 7); ctx.fill(); }
+  ctx.fillStyle = old ? "#9AA6B6" : "#CFDBEA"; rrect(ctx, -110, 30, 220, 110, 18); ctx.fill();
+  ctx.fillStyle = old ? "#7D8899" : "#FFFFFF"; rrect(ctx, -90, 46, 180, 50, 12); ctx.fill();
+  // 穴（2 つ）
+  if (holes > 0) {
+    const hs = back(holes);
+    for (const [hx, hy, hr] of [[-62, 112, 26], [72, 66, 20]]) {
+      ctx.save(); ctx.translate(hx, hy); ctx.scale(hs, hs);
+      ctx.fillStyle = "#121A2A"; ctx.beginPath();
+      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, rr = hr * (i % 2 ? .72 : 1); ctx[i ? "lineTo" : "moveTo"](Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.restore();
+      if (hl > 0) { ctx.strokeStyle = C.red; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(hx, hy, (hr + 18) * back(hl), 0, 7); ctx.stroke(); }
+    }
+  }
+  if (fixed > 0) { // 直った印
+    const f = back(fixed);
+    ctx.save(); ctx.translate(110, -150); ctx.scale(f, f); ctx.fillStyle = "#20B26B"; ctx.beginPath(); ctx.arc(0, 0, 40, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 10; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(-17, 0); ctx.lineTo(-4, 14); ctx.lineTo(19, -12); ctx.stroke(); ctx.restore();
+  }
+  ctx.restore();
+  if (tag) pill(ctx, tag, x, y + 200 * s + 34, 34, "#FFFFFF", old ? "#6B7686" : C.navy2, clamp(k));
+}
+// サーバー（本物の図）：箱と点灯する処理の段
+function server(ctx, x, y, k, steps = [0, 0, 0], phpk = 0) {
+  if (k <= 0) return;
+  ctx.save(); ctx.globalAlpha *= clamp(k);
+  ctx.fillStyle = "#1C2D4E"; ctx.shadowColor = "rgba(20,40,80,.25)"; ctx.shadowBlur = 30; rrect(ctx, x - 190, y - 250, 380, 500, 36); ctx.fill(); ctx.shadowColor = "transparent";
+  const tt = root_t() || 0;
+  for (let i = 0; i < 6; i++) { ctx.fillStyle = (Math.floor(tt * 6 + i * 1.7) % 3 === 0) ? "#3FF0FF" : "#2E4A78"; ctx.beginPath(); ctx.arc(x - 150 + i * 16, y - 215, 5, 0, 7); ctx.fill(); }
+  const names = ["① 空きを調べる", "② 予約を記録", "③ 結果を返す"];
+  names.forEach((s, i) => {
+    const on = clamp(steps[i]);
+    ctx.fillStyle = on > 0 ? `rgba(63,240,255,${.18 + .5 * on})` : "rgba(255,255,255,.08)";
+    rrect(ctx, x - 160, y - 160 + i * 120, 320, 96, 20); ctx.fill();
+  });
+  ctx.restore();
+  names.forEach((s, i) => text(ctx, s, x, y - 112 + i * 120, 38, steps[i] > 0 ? "#FFFFFF" : "rgba(255,255,255,.55)", { weight: 900, alpha: clamp(k) }));
+  pill(ctx, "サーバー", x, y + 290, 40, "#FFFFFF", C.navy2, clamp(k));
+  if (phpk > 0) pill(ctx, "PHP で書いた処理", x, y - 300, 40, "#FFFFFF", C.orange, phpk);
+}
+// 怪しい影（※イメージ）
+function shadowFig(ctx, x, y, s, k) {
+  if (k <= 0) return;
+  ctx.save(); ctx.globalAlpha *= clamp(k); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = "#4B3F72"; ctx.beginPath(); ctx.arc(0, -300, 62, 0, 7); ctx.fill();
+  rrect(ctx, -70, -240, 140, 230, 50); ctx.fill();
+  ctx.fillStyle = "#FFFFFF"; ctx.beginPath(); ctx.ellipse(-22, -305, 10, 6, 0, 0, 7); ctx.ellipse(22, -305, 10, 6, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+// 店の札（看板）：status 0＝営業中、1＝停止中。reveal：厨房の機械が透けて見える
+function shopCard(ctx, x, y, name, status, reveal, k) {
+  if (k <= 0) return;
+  ctx.save(); ctx.globalAlpha *= clamp(k); ctx.translate(x, y); ctx.scale(back(k), back(k));
+  ctx.fillStyle = "#FFFFFF"; ctx.shadowColor = "rgba(20,40,80,.18)"; ctx.shadowBlur = 22; rrect(ctx, -135, -130, 270, 260, 28); ctx.fill(); ctx.shadowColor = "transparent";
+  ctx.strokeStyle = status > .5 ? C.red : "#19B4E0"; ctx.lineWidth = 6; ctx.stroke();
+  S.group(() => {
+    text(ctx, name, 0, -78, 44, C.navy, { weight: 900 });
+    if (reveal > 0) machine(ctx, 0, 34, .45, { k: reveal });
+    else {
+      ctx.fillStyle = status > .5 ? C.red : C.green; rrect(ctx, -100, 20, 200, 70, 35); ctx.fill();
+      text(ctx, status > .5 ? "停止中" : "営業中", 0, 56, 38, "#FFFFFF", { weight: 900 });
+    }
+  }, screenBoxOf(ctx, -135, -130, 135, 130));
+  ctx.restore();
+}
+// レストランの断面（※たとえ）：客席（左）と厨房（右）
+function restaurant(ctx, t, k) {
+  ctx.save(); ctx.globalAlpha *= clamp(k);
+  ctx.fillStyle = "#FFF8EE"; ctx.fillRect(0, 300, 540, 900); ctx.fillStyle = "#EEF5FB"; ctx.fillRect(540, 300, 540, 900);
+  ctx.fillStyle = "#D9C7AE"; ctx.fillRect(0, 1150, 540, 30); ctx.fillStyle = "#B9C8D8"; ctx.fillRect(540, 1150, 540, 30);
+  ctx.fillStyle = "#C9D6E3"; ctx.fillRect(530, 300, 20, 880); // 仕切り
+  ctx.fillStyle = "#FFFFFF"; rrect(ctx, 515, 640, 50, 140, 12); ctx.fill(); // 受け渡し口
+  // 客席：テーブルといす
+  ctx.fillStyle = "#C8925A"; rrect(ctx, 120, 900, 300, 30, 10); ctx.fill(); ctx.fillRect(255, 930, 30, 220);
+  ctx.fillStyle = "#E3A86B"; rrect(ctx, 60, 960, 90, 26, 8); ctx.fill(); ctx.fillRect(70, 986, 18, 164); ctx.fillRect(122, 986, 18, 164);
+  // 厨房：調理台と鍋
+  ctx.fillStyle = "#AFC0D3"; rrect(ctx, 600, 960, 420, 40, 10); ctx.fill(); ctx.fillStyle = "#8FA3BA"; ctx.fillRect(620, 1000, 380, 150);
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------- 場面
+function om(t, x, y, s, o = {}) { S.omote(ui, x, y, s, { talk: S.talk(t, "M"), ...o }); }
+function uraWipe(t) { S.wipe(ui, t, "W", 905, 345, 118, {}); }
+function bob(t, f = 7, a = .04) { return 1 + a * Math.sin(t * f); }
+
+function drawScene(t, name) {
+  const [a, b] = S.sceneRange(name), lt = t - a;
+  const M = S.speaking(t, "M");
+  if (name === "cold") {
+    // 0〜1.5 秒：予約ボタンを押した瞬間、メンテナンス中に（最初のコマは止め絵として成り立つ絵）
+    S.techBG(bg, "#F2FAFF", "#DCEBFF", "#CFE0FF");
+    const sw = t >= .42, gl = win(t, .4, .75, .02, .2);
+    phone(ui, 590, 760, 1.15, sw ? "maint" : "book", { glitch: gl, rot: sw ? .03 * Math.sin(t * 50) * (1 - prog(t, .42, .5)) : 0 });
+    phone(ui, 215, 560, .6, "maint", { app: "注文アプリ", k: easeOut(prog(t, .8, .3)), rot: -.12, small: true });
+    phone(ui, 890, 520, .6, "maint", { app: "銀行アプリ", k: easeOut(prog(t, 1.05, .3)), rot: .12, small: true });
+    om(t, 300, 1330, .78, { expr: sw ? "shock" : "normal", armR: sw ? 2.6 : 1.7, elbowR: .3, look: [1, -.6], sweat: sw, lean: sw ? -.08 : 0 });
+    if (sw) S.burst(ui, 470, 1190, 90, prog(t, .5, .2), "!?", { size: 90, fill: C.yellow });
+    const al = t > .42 ? (.5 + .5 * Math.sin(t * 40)) : 0;
+    if (al > 0) { ui.save(); ui.strokeStyle = `rgba(255,90,40,${.6 * al})`; ui.lineWidth = 40; ui.strokeRect(0, 0, W, H); ui.restore(); }
+  } else if (name === "hook") {
+    S.techBG(bg, "#FFF6EE", "#FFE6D2", "#FFDCC4");
+    const p2 = k_(t, "maint2"), pk = k_(t, "php", .35), dim = 1 - .85 * pk, dive = easeInOut(prog(t, CUE.dive, .9));
+    ui.save(); ui.translate(590, 800); ui.scale(1 + 1.6 * dive, 1 + 1.6 * dive); ui.translate(-590, -800); ui.globalAlpha = 1 - .8 * prog(t, CUE.dive + .5, .4);
+    ui.globalAlpha *= dim; ui.__noCheck = dive > .05; // 画面に吸い込まれる途中は検査しない（切り替えの演出）
+    phone(ui, 680, 790, .9, "maint", {});
+    phone(ui, 390, 620, .62, "maint", { app: "注文アプリ", k: p2, rot: -.1, small: true });
+    phone(ui, 905, 560, .55, "maint", { app: "銀行アプリ", k: k_(t, "maint2", .3, .45), rot: .1, small: true });
+    ui.__noCheck = false; ui.restore();
+    // 大きな問い
+    const q = easeOut(prog(t, a + .05, .3)) * (1 - prog(t, CUE.php - .2, .25));
+    if (q > 0) { ui.save(); ui.translate(420, 330); ui.scale(q, q); text(ui, "なんで全部止まる!?", 0, 0, 76, "#FFFFFF", { weight: 900, stroke: "#0A1022", sw: 18 }); ui.restore(); }
+    // 「PHP」が落ちてくる
+    if (pk > 0 && t < CUE.dive + .6) {
+      const yy = lerp(-200, 560, easeOut(prog(t, CUE.php, .3)));
+      text(ui, "PHP", 540, yy, 230, "#FF7A2A", { weight: 900, stroke: "#FFFFFF", sw: 22 });
+      const tg = k_(t, "three", .3);
+      if (tg > 0) {
+        pill(ui, "緊急の更新", 300, 760, 40, "#FFFFFF", C.red, tg);
+        pill(ui, "一時停止", 760, 780, 40, "#FFFFFF", C.navy2, k_(t, "three", .3, .2));
+        note(ui, "※イメージ", 540, 870, tg, 30);
+      }
+    }
+    const ex = t >= CUE.dive ? "think" : t >= CUE.lost ? "panic" : t >= CUE.who ? "think" : t >= CUE.calm ? "deadpan" : t >= CUE.maint2 ? "panic" : "shock";
+    om(t, 170, 1330, .82, { expr: ex, armR: t < CUE.calm ? 2.4 : t >= CUE.lost && t < CUE.dive ? 1.9 : .4, elbowR: .4, armL: t >= CUE.maint2 && t < CUE.calm ? 2.6 : .3,
+      rot: t >= CUE.who && t < CUE.three ? .14 : 0, look: [1, -.5], sweat: t < CUE.calm, legs: t >= CUE.maint2 && t < CUE.calm ? t * 18 : 0 });
+    if (t >= CUE.who && t < CUE.three + .6) S.burst(ui, 470, 1060, 90, prog(t, CUE.who, .25), "……誰？", { size: 48, fill: "#FFFFFF", stroke: C.omote, color: C.omote });
+  } else if (name === "kitchen") {
+    S.techBG(bg, "#FFFBF4", "#F1F6FF", "#E6EEFA");
+    restaurant(bg, t, 1);
+    machine(bg, 810, 800, .62, { label: "" });
+    note(ui, "※たとえ：Webサイトをレストランに見立てると", 540, 250, k_(t, "kitchen"), 30);
+    pill(ui, "客席＝画面", 270, 470, 46, "#FFFFFF", C.orange, k_(t, "table"));
+    pill(ui, "厨房＝サーバー", 790, 470, 46, "#FFFFFF", C.navy2, k_(t, "galley"));
+    ui.__noCheck = true; phone(ui, 270, 820, .32, "book", { k: k_(t, "kitchen"), app: "予約" }); ui.__noCheck = false; // 小道具（飾り）
+    // 注文票が厨房へ飛ぶ
+    const pr = prog(t, CUE.press + .1, .8);
+    if (pr > 0) {
+      const x = lerp(300, 800, easeInOut(pr)), y = 820 - 260 * Math.sin(Math.PI * pr);
+      ui.save(); ui.translate(x, y); ui.rotate(pr * 6); ui.fillStyle = "#FFFFFF"; ui.strokeStyle = C.orange; ui.lineWidth = 5; rrect(ui, -60, -40, 120, 80, 10); ui.fill(); ui.stroke(); ui.restore();
+      text(ui, "注文", x, y + 2, 34, C.orange, { weight: 900 });
+    }
+    const run = easeInOut(prog(t, CUE.press + .3, 1.0));
+    om(t, lerp(200, 640, run), 1150, .55, { expr: run > 0 ? "shock" : M ? "think" : "normal", armR: t >= CUE.press && run < .1 ? 1.4 : .4, legs: run > 0 && run < 1 ? t * 22 : 0,
+      look: [1, -.4], lean: run > 0 && run < 1 ? -.12 : 0 });
+  } else if (name === "flow") {
+    S.techBG(bg, "#F4FAFF", "#E2EEFF", "#D4E4FF");
+    const back_ = k_(t, "recipe", .4);
+    if (back_ < 1) { // 本物の流れ
+      ui.save(); ui.globalAlpha = 1 - back_;
+      note(ui, "実際の流れ（予約の一例）", 540, 250, 1, 30);
+      phone(ui, 215, 740, .75, t >= CUE.ret + .3 ? "done" : "book", {});
+      server(ui, 760, 760, 1, [k_(t, "check"), k_(t, "record"), k_(t, "ret")], k_(t, "phptag"));
+      const go = prog(t, CUE.flow + .1, .6), rt = prog(t, CUE.ret, .5);
+      if (go > 0) { S.arrow(ui, 375, 650, lerp(375, 560, go), 650, C.orange, 16, 44); text(ui, "注文", 460, 610, 36, C.orange, { weight: 900, alpha: go }); }
+      if (rt > 0) { S.arrow(ui, 560, 850, lerp(560, 375, rt), 850, C.green, 16, 44); text(ui, "結果", 460, 900, 36, C.green, { weight: 900, alpha: rt }); }
+      ui.restore();
+    }
+    if (back_ > 0) { // たとえに戻る：レシピ（言葉）と厨房の機械（動かす仕組み）
+      const rk = back_ * (1 - k_(t, "seven", .3)); // 「7割」の場面ではレシピを消す（並んだ機械と重ならないように）
+      ui.save(); ui.globalAlpha = rk;
+      note(ui, "※たとえ", 540, 250, 1, 30);
+      // レシピ
+      ui.fillStyle = "#FFFFFF"; ui.strokeStyle = "#C8925A"; ui.lineWidth = 6; ui.save(); ui.translate(250, 620); ui.rotate(-.06);
+      rrect(ui, -130, -170, 260, 340, 20); ui.fill(); ui.stroke();
+      for (let i = 0; i < 6; i++) { ui.fillStyle = i % 2 ? "#E6D6C2" : "#D3BFA4"; rrect(ui, -95, -100 + i * 44, 190 - (i % 3) * 40, 18, 9); ui.fill(); }
+      ui.restore();
+      ui.restore();
+      text(ui, "レシピ", 250, 470, 44, "#8A5A2B", { weight: 900, alpha: rk });
+      S.arrow(ui, 400, 620, 560, 620, C.orange, 14, 40, rk);
+      const many = k_(t, "seven", .5);
+      machine(ui, lerp(780, 540, many), lerp(640, 560, many), lerp(1, .7, many), { k: back_ });
+      pill(ui, "レシピ＝PHPで書く言葉", 330, 900, 40, "#FFFFFF", "#8A5A2B", back_ * (1 - many));
+      pill(ui, "機械＝それを動かす仕組み", 600, 990, 40, "#FFFFFF", C.navy2, k_(t, "machine") * (1 - many));
+      if (many > 0) {
+        ui.save(); ui.globalAlpha = many;
+        for (let i = 0; i < 4; i++) machine(ui, 160 + i * 253, 560, .5, { k: k_(t, "seven", .3, .1 + i * .08) * (i === 1 || i === 2 ? 0 : 1) });
+        ui.restore();
+        S.panel(ui, [["サーバー側の言語が分かるサイトの", 36, C.navy2], ["約7割がPHP", 76, C.orange]], 540, 900, many, { edge: C.orange });
+        note(ui, "※W3Techs（2026年8月）", 560, 1070, many, 26); note(ui, "サーバー側の言語を判別できたサイトのうち", 560, 1115, many, 26);
+      }
+    }
+    const chef = t >= CUE.chef && t < CUE.recipe;
+    om(t, 180, 1330, .55, { expr: t >= CUE.many ? "shock" : chef ? "smug" : M ? "think" : "normal", armR: chef ? 2.2 : .3, armL: t >= CUE.many ? 2.6 : .3, look: [0, -.6],
+      sy: t >= CUE.many ? bob(t, 18, .06) : 1 });
+    if (chef) { // コック帽
+      ui.save(); ui.fillStyle = "#FFFFFF"; ui.strokeStyle = "#C9D6E3"; ui.lineWidth = 4;
+      ui.beginPath(); ui.ellipse(188, 1028, 62, 42, 0, 0, 7); ui.fill(); ui.stroke(); rrect(ui, 145, 1040, 90, 40, 8); ui.fill(); ui.stroke(); ui.restore();
+    }
+  } else if (name === "vuln") {
+    S.techBG(bg, "#F8F4FF", "#ECE6FF", "#E0D8FF");
+    const hk = k_(t, "holes", .35), sh = k_(t, "shadow", .5), bl = easeInOut(prog(t, CUE.block, .5)), side = k_(t, "side", .4);
+    S.panel(ui, [["2026年10月21日 公表", 38, C.navy2], ["重大な脆弱性 2件", 60, C.red]], 430, 330, k_(t, "vuln", .35, .3), { edge: C.red });
+    // 裏口（右）
+    ui.save(); ui.fillStyle = "#C9BFEA"; rrect(ui, 830, 640, 190, 420, 16); ui.fill(); ui.fillStyle = "#3B3160"; rrect(ui, 850, 660, 150, 400, 10); ui.fill(); ui.restore();
+    shadowFig(ui, lerp(925, 960, bl), 1060, .9, sh * (1 - .4 * bl));
+    if (sh > 0 && bl < .5) text(ui, "?", 925, 700, 80, "#FFFFFF", { weight: 900, alpha: sh });
+    if (sh > 0) note(ui, "※イメージ（実際の攻撃の様子ではない）", 480, 480, sh, 28);
+    machine(ui, 520, 720, 1.15, { holes: hk, hl: side, shake: win(t, CUE.holes, CUE.holes + .5, .05, .3) });
+    if (t >= CUE.jaku && t < CUE.block) pill(ui, "脆弱性＝守りの穴", 540, 1000, 46, "#FFFFFF", C.red, k_(t, "jaku"));
+    if (side > 0) pill(ui, "穴は機械の側（PHP本体）", 420, 1000, 44, "#FFFFFF", C.navy2, side);
+    // オモテ：のぞき込む → 裏口をふさぐ
+    const peek = t >= CUE.sleepy && t < CUE.jaku + .4;
+    om(t, lerp(180, 760, bl), 1330, .62, { expr: bl > 0 ? (t > CUE.block + 1 ? "deadpan" : "panic") : peek ? "think" : t >= CUE.holes ? "shock" : "normal",
+      armL: bl > .6 ? 1.6 : .3, armR: bl > .6 ? 1.6 : peek ? 1.2 : .3, legs: bl > 0 && bl < 1 ? t * 22 : 0, lean: peek ? -.15 : 0, look: bl > 0 ? [1, -.3] : [1, -.6], sweat: bl > 0 });
+    if (t >= CUE.block && t < CUE.side) S.burst(ui, 560, 1010, 70, prog(t, CUE.block + .3, .25), "通さん!", { size: 40, fill: "#FFFFFF", stroke: C.omote, color: C.omote });
+  } else if (name === "notvirus") {
+    S.techBG(bg, "#F6FBFF", "#E6F1FF", "#DCE8FF");
+    const nv = k_(t, "nv"), nq = k_(t, "neq"), rp = k_(t, "report"), pc = k_(t, "precaution");
+    const top = 1 - nq;
+    if (top > 0) {
+      ui.save(); ui.globalAlpha = top;
+      text(ui, "PHP＝ウイルス？", 470, 450, 84, C.navy, { weight: 900, alpha: k_(t, "notvirus") });
+      S.bigX(ui, 880, 450, 50, nv * top);
+      if (nv > 0) pill(ui, "守りに穴があっただけ", 540, 600, 48, "#FFFFFF", C.navy2, nv);
+      machine(ui, 540, 850, .7, { holes: 1, k: 1 });
+      ui.restore();
+    }
+    if (nq > 0) {
+      const lo = 1 - rp * .0;
+      S.panel(ui, [["穴がある", 56, C.navy2]], 270, 480, nq, { edge: "#19B4E0" });
+      text(ui, "≠", 540, 480, 110, C.red, { weight: 900, alpha: nq });
+      S.panel(ui, [["攻撃された", 56, C.navy2]], 800, 480, nq, { edge: C.red });
+      if (rp > 0) S.panel(ui, [["報告：攻撃を試みる動きはあった", 40, C.navy2]], 540, 700, rp, { edge: C.orange });
+      if (pc > 0) S.panel(ui, [["止まったサービスの多くは", 40, C.navy2], ["予防のための停止", 56, C.green]], 540, 930, pc, { edge: C.green });
+    }
+    om(t, 200, 1330, .58, { expr: t < CUE.nv ? "shock" : M ? "normal" : "think", armR: .3, look: [1, -.6], lean: t < CUE.nv ? .12 : 0, sweat: t < CUE.nv });
+  } else if (name === "why") {
+    S.techBG(bg, "#FFF8F2", "#FFEBDD", "#FFE2CF");
+    const gk = k_(t, "gas"), st = k_(t, "patch", .4), pz = k_(t, "pausing"), gv = k_(t, "gov");
+    if (st < 1 && t >= CUE.why) { // 抗議 → ガス漏れのたとえ
+      ui.save(); ui.globalAlpha = 1 - st;
+      if (gk <= 0) phone(ui, 600, 700, .8, "maint", {});
+      if (gk > 0) {
+        ui.globalAlpha = (1 - st) * gk;
+        ui.fillStyle = "#AFC0D3"; rrect(ui, 380, 820, 440, 150, 20); ui.fill();
+        const fl = 1 - prog(t, CUE.gas + 1.0, .5);
+        for (const fx of [480, 720]) { ui.fillStyle = "#3D4B5F"; rrect(ui, fx - 70, 800, 140, 26, 10); ui.fill();
+          if (fl > 0) { ui.fillStyle = `rgba(80,150,255,${fl})`; ui.beginPath(); ui.moveTo(fx - 40, 800); ui.quadraticCurveTo(fx, 700 - 20 * Math.sin(t * 20), fx + 40, 800); ui.fill(); } }
+      }
+      ui.restore();
+      if (gk > 0) { pill(ui, "ガス漏れの疑い → 火を止める", 600, 1060, 42, "#FFFFFF", C.orange, gk * (1 - st)); note(ui, "※たとえ", 600, 1140, gk * (1 - st), 28); }
+    }
+    if (st > 0) {
+      pill(ui, "修正版：10月21日 公開", 540, 450, 46, "#FFFFFF", C.green, st);
+      const labs = ["版を調べる", "入れ替える", "確かめる"];
+      labs.forEach((s, i) => {
+        const kk = k_(t, "steps", .3, i * .55);
+        S.panel(ui, [[`${"①②③"[i]}`, 44, C.orange], [s, 40, C.navy2]], 200 + i * 340, 640, kk, { edge: C.orange });
+        if (i < 2) S.arrow(ui, 340 + i * 340, 640, 400 + i * 340, 640, C.orange, 12, 30, kk);
+      });
+      if (pz > 0) { ui.save(); ui.translate(540, 840); ui.rotate(-.04); S.panel(ui, [["済むまで 一部を一時停止", 50, C.red]], 0, 0, pz, { edge: C.red }); ui.restore(); }
+      if (gv > 0) S.panel(ui, [["国家サイバー統括室の注意喚起（10/21）", 30, C.navy2], ["すぐ直せないなら 一時停止も有効", 36, C.navy2]], 540, 1060, gv, { edge: "#19B4E0" });
+    }
+    om(t, 150, 1330, .58, { expr: t < CUE.gas ? "panic" : st > 0 ? "think" : "normal", armR: t < CUE.gas ? 2.6 : .3, armL: t < CUE.gas ? 2.2 : .3, look: [1, -.6],
+      rot: t < CUE.gas ? .06 * Math.sin(t * 12) : 0 });
+  } else if (name === "spread") {
+    S.techBG(bg, "#F3F8FF", "#E1ECFF", "#D3E2FF");
+    const names = ["銀行", "予約", "ゲーム", "通販", "図書館", "チケット"], rv = k_(t, "sametype", .45), hw = k_(t, "homework", .35);
+    names.forEach((n, i) => {
+      const c = i % 3, r = Math.floor(i / 3), x = 200 + c * 330, y = 540 + r * 300;
+      const st_ = prog(t, CUE.spread + .3 + i * .3, .2);
+      shopCard(ui, x, y, n, st_, rv, k_(t, "spread", .3, i * .06));
+    });
+    if (hw > 0) S.panel(ui, [["同じ型の機械 → 同じ宿題", 46, C.navy2], ["版を調べて、更新する", 40, C.orange]], 560, 1110, hw, { edge: C.orange });
+    note(ui, "※止まったのは一部。PHPを使う全部のサイトではない", 540, 250, k_(t, "spread", .4, .5), 28);
+    const run = (t - CUE.spread) / Math.max(1, CUE.sametype - CUE.spread);
+    om(t, run < 1 ? lerp(160, 900, (Math.sin(run * Math.PI * 1.5 - Math.PI / 2) + 1) / 2) : 180, 1330, .55,
+      { expr: rv > 0 ? "think" : "panic", legs: run < 1 ? t * 24 : 0, look: run < 1 ? [Math.cos(run * Math.PI * 1.5) > 0 ? 1 : -1, -.3] : [1, -.6], sweat: run < 1 });
+  } else if (name === "safe") {
+    S.techBG(bg, "#F2FFF8", "#DFF7EC", "#CDEFE0");
+    const ov = k_(t, "overstate"), od = k_(t, "oldver"), rp = k_(t, "replace", .6), nu = k_(t, "noupd"), ck = k_(t, "checklist"), sf = k_(t, "staff");
+    const titleK = k_(t, "safe") * (1 - ck);
+    if (titleK > 0) { text(ui, "PHPのサイトは全部危ない？", 480, 460, 60, C.navy, { weight: 900, alpha: titleK }); S.bigX(ui, 975, 460, 36, ov * titleK); }
+    if (ck < 1) {
+      ui.save(); ui.globalAlpha = 1 - ck;
+      if (ov > 0) pill(ui, "言葉そのものは危険じゃない", 560, 580, 44, "#FFFFFF", C.green, ov);
+      machine(ui, 360, 810, .7, { k: ov, fixed: ov, tag: "修正済みの版" });
+      machine(ui, 770, 810, .7, { k: od, old: rp < 1, holes: 1 - rp, fixed: rp, tag: rp >= 1 ? "入れ替え完了" : "穴の残った版" });
+      if (od > 0) pill(ui, "問題：穴の残った版を使い続けること", 560, 1110, 38, "#FFFFFF", C.red, od);
+      if (nu > 0) note(ui, "※古い版には、通常の更新が出ないものもある", 580, 1200, nu, 30);
+      ui.restore();
+    }
+    if (ck > 0) {
+      const items = ["更新する", "確かめる", "再開する"];
+      S.panel(ui, [["安心までの3段", 44, C.navy2]], 540, 450, ck, { edge: C.green });
+      items.forEach((s, i) => {
+        const kk = k_(t, "checklist", .3, .4 + i * .55);
+        ui.save(); ui.globalAlpha = ck; ui.fillStyle = "#FFFFFF"; rrect(ui, 250, 560 + i * 150, 580, 110, 24); ui.fill(); ui.restore();
+        ui.save(); ui.strokeStyle = C.green; ui.lineWidth = 8; ui.globalAlpha = ck; rrect(ui, 285, 585 + i * 150, 60, 60, 12); ui.stroke();
+        if (kk > 0) { ui.lineCap = "round"; ui.lineWidth = 12; ui.beginPath(); ui.moveTo(295, 615 + i * 150); ui.lineTo(312, 635 + i * 150); ui.lineTo(340, 595 + i * 150); ui.stroke(); }
+        ui.restore();
+        text(ui, s, 580, 617 + i * 150, 48, C.navy2, { weight: 900, alpha: ck });
+      });
+      if (sf > 0) { // 厨房で点検するスタッフ（小さなピクトグラム）
+        for (let i = 0; i < 3; i++) {
+          const x = 420 + i * 170, y = 1170 + 6 * Math.sin(t * 6 + i);
+          ui.save(); ui.globalAlpha = sf; ui.fillStyle = "#7B8CA6"; ui.beginPath(); ui.arc(x, y - 92, 24, 0, 7); ui.fill(); rrect(ui, x - 26, y - 64, 52, 74, 20); ui.fill(); ui.restore();
+          machine(ui, x + 52, y - 30, .2, { k: sf, fixed: sf, label: "" });
+        }
+      }
+    }
+    om(t, 120, 1330, .55, { expr: t >= CUE.checklist ? "smug" : t >= CUE.overstate ? "think" : "shock", armR: t >= CUE.checklist ? 2.2 : .3, look: [1, -.6] });
+  } else if (name === "outro") {
+    S.techBG(bg, "#F2FAFF", "#DCEBFF", "#CFE0FF");
+    const nf = k_(t, "notif", .35), lt2 = t >= CUE.later, pu = t >= CUE.punch, tn = t >= CUE.tonight;
+    const flip = lt2 && !tn ? easeInOut(prog(t, CUE.later + .2, .4)) : 0;
+    const upd = tn ? prog(t, CUE.tonight + .2, 1.0) : 0;
+    ui.save(); ui.translate(620, 760); ui.scale(1, 1 - .85 * flip); ui.translate(-620, -760);
+    phone(ui, 620, 760, 1.0, tn ? "update" : "done", { badge: tn ? 1 - prog(t, CUE.tonight + 1.0, .3) : nf, prog_: upd });
+    ui.restore();
+    if (nf > 0 && !tn) {
+      const yy = lerp(150, 300, nf);
+      S.panel(ui, [["アップデートがあります（3件）", 34, C.navy2]], 470, yy, nf * (1 - .5 * flip), { edge: C.red });
+    }
+    if (pu && !tn) { // 「あとで」が穴になる
+      const hk = back(prog(t, CUE.punch + .5, .3));
+      ui.save(); ui.translate(620, 1150); ui.scale(hk, hk); ui.fillStyle = "#121A2A"; ui.beginPath();
+      for (let i = 0; i < 14; i++) { const a2 = i / 14 * Math.PI * 2, rr = 70 * (i % 2 ? .7 : 1); ui[i ? "lineTo" : "moveTo"](Math.cos(a2) * rr, Math.sin(a2) * rr * .55); }
+      ui.closePath(); ui.fill(); ui.restore();
+      if (hk > 0) pill(ui, "「あとで」", 620, 1150, 40, "#FFFFFF", C.red, clamp(hk));
+    }
+    const ok = t < CUE.notif, last = t > TL.ending_start - .55;
+    om(t, 240, 1330, .82, { expr: last ? "happy" : tn ? "normal" : lt2 ? "deadpan" : ok ? "happy" : "shock", armR: tn || ok ? 2.3 : .4, armL: ok ? 2.4 : .3,
+      sy: ok ? 1 + .1 * Math.abs(Math.sin(t * 9)) : 1, look: [1, -.5], sweat: pu && !tn });
+  }
+  uraWipe(t);
+}
+
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start;
+  if (t >= es) {
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
+    flushLayers();
+    return;
+  }
+  window.__t = t;
+  const name = S.sceneAt(t), [a, b] = S.sceneRange(name);
+  S.camera([bg, ui], t, a, b, [.48, CUE.maint2, CUE.php, CUE.holes, CUE.block, CUE.punch], [560, 800]);
+  drawScene(t, name);
+  S.resetCam([bg, ui]);
+  S.hud(ui, t);
+  S.header(ui, false);
+  S.subtitles(ui, t, 1490);
+  const i = SCN.indexOf(name);
+  if (i > 1) S.whip(ui, 1 - prog(t, a, .2), i);
+  flushLayers();
+}
+// 描いた内容を確実に画面へ反映させる（1 画素を読み戻して描画を確定させる。前のコマが写り込むのを防ぐ）
+function flushLayers() { bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1); }
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  window.__t = 2;
+  S.techBG(bg, "#FFF6EE", "#FFE6D2", "#FFDCC4");
+  phone(ui, 640, 760, 1.05, "maint", {});
+  phone(ui, 270, 640, .7, "maint", { app: "銀行アプリ", rot: -.1 });
+  om(2, 260, 1330, .85, { expr: "shock", armR: 2.4, armL: 2.6, look: [1, -.5], sweat: true });
+  text(ui, "PHP騒動って", 540, 1430, 100, C.navy, { weight: 900, stroke: "#FFFFFF", sw: 16 });
+  text(ui, "結局なんだった!?", 540, 1570, 104, C.orange, { weight: 900, stroke: "#FFFFFF", sw: 16 });
+  S.header(ui, false);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; }
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>

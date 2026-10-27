@@ -434,3 +434,80 @@ def sfx_bank_techno():
         "rain": _add(*[np.concatenate([np.zeros(int(k * 0.06 * SR)), np.sign(_tone(f, 0.05, 0.1, 0.02)) * 0.08])
                        for k, f in enumerate([1200, 900, 1500, 1100, 1700, 1000, 1400, 1250])]),
     }
+
+
+# ---------------------------------------------------------------- やわらかい効果音（2026-10-26、PHP の回から）
+# sfx_bank_techno の名前はそのままに、耳に刺さる原因を音色から取り除いた版。
+# - 矩形波（アラーム・エラー）、2 kHz を超える電子音（ザップ・チック・発見音）、7〜8 kHz まで上がるノイズのスウィープをやめる
+# - 驚き・注意は低音寄りの短いヒット、決めは柔らかいデジタル音（正弦波＋ゆっくりした立ち上がり）、切り替えは 2.5 kHz までのスウッシュ
+# - 仕上げに 4.5 kHz のローパスを 2 回かけ、音ごとの大きさ（RMS）をそろえる
+def _bell(f, dur, amp, decay, attack=0.006):
+    """柔らかいベル（基音＋弱い 2 倍音）。立ち上がりを丸めてクリック音を出さない。"""
+    t = np.arange(int(dur * SR)) / SR
+    env = np.exp(-t / decay) * np.minimum(1, t / attack)
+    return amp * env * (np.sin(2 * np.pi * f * t) + 0.18 * np.sin(4 * np.pi * f * t) * np.exp(-t / (decay * 0.4)))
+
+
+def _swoosh(dur, f0, f1, amp, seed):
+    """空気が動くようなスウッシュ（ノイズを帯域で絞り、山型の音量にする）。"""
+    n = int(dur * SR)
+    x = _noise(n, seed)
+    k = np.linspace(0, 1, n)
+    lo, hi = _lp(x, min(f0, f1) * 0.5), _lp(x, max(f0, f1))
+    band = hi - lo
+    y = _lp(band, f0) * (1 - k) + _lp(band, f1) * k
+    env = np.sin(np.pi * k) ** 1.6
+    return amp * y / (np.max(np.abs(y)) + 1e-9) * env
+
+
+def _soften(x, cut=4500, rms=0.06):
+    y = _lp(_lp(x, cut), cut)
+    n = int(0.004 * SR)  # 出だしと終わりを 4 ms でなめらかに
+    if len(y) > 2 * n:
+        y[:n] *= np.linspace(0, 1, n); y[-n:] *= np.linspace(1, 0, n)
+    w = max(1, int(0.25 * SR))  # いちばん大きい 0.25 秒の RMS でそろえる（立ち上がる音も正しく測る）
+    c = np.concatenate([[0], np.cumsum(y ** 2)])
+    r = np.sqrt(np.max(c[w:] - c[:-w]) / w) if len(y) > w else np.sqrt(np.mean(y ** 2))
+    y = y * (rms / (r + 1e-9))
+    return np.clip(y, -0.5, 0.5)
+
+
+def sfx_bank_soft():
+    t = lambda d: np.arange(int(d * SR)) / SR
+    boom_f = 70 * np.exp(-t(0.7) / 0.18) + 42
+    boom = np.sin(2 * np.pi * np.cumsum(boom_f) / SR) * np.exp(-t(0.7) / 0.22) * np.minimum(1, t(0.7) / 0.004)
+    thud = _lp(_noise(int(0.08 * SR), 61), 900) * np.exp(-t(0.08) / 0.015)
+    impact = np.tanh(1.4 * _add(boom, thud * 2.0))                          # 低い「ドン」（鋭いアタックなし）
+    hit = _add(np.sin(2 * np.pi * np.cumsum(140 * np.exp(-t(0.25) / 0.05) + 70) / SR) * np.exp(-t(0.25) / 0.07),
+               _bell(392, 0.25, 0.25, 0.06))                                # 短いヒット（注意：警告音の代わり）
+    bop = np.sin(2 * np.pi * np.cumsum(520 * np.exp(-t(0.16) / 0.04) + 180) / SR) * np.exp(-t(0.16) / 0.06) * np.minimum(1, t(0.16) / 0.008)
+    pops = np.zeros(int(0.4 * SR)); r = np.random.default_rng(65)
+    for k in range(6):                                                      # 低いデジタルのぷつぷつ（グリッチの代わり）
+        i = int(r.uniform(0, 0.33) * SR); f = r.uniform(180, 520)
+        pops[i:i + int(0.05 * SR)] += _bell(f, 0.05, 0.5, 0.015)[: len(pops) - i]
+    chord = _add(*[_bell(f, 0.9, 0.22, 0.35, 0.01) for f in (220.0, 277.18, 329.63, 440.0)], _kick_hard(0.3) * 0.35)
+    tape = np.sin(2 * np.pi * np.cumsum(260 * (1 - t(0.45) / 0.45) ** 2 + 30) / SR) * (1 - t(0.45) / 0.45)
+    bank = {
+        "impact": impact,
+        "hit": hit,
+        "sweep_up": _swoosh(0.45, 300, 2200, 1.0, 67),                     # スウッシュ（切り替え）
+        "sweep_down": _swoosh(0.45, 2200, 300, 1.0, 68),
+        "glitch": pops,
+        "brake": tape,
+        "discover": _add(_bell(523.25, 0.5, 0.3, 0.16), np.concatenate([np.zeros(int(0.08 * SR)), _bell(783.99, 0.6, 0.3, 0.2)])),
+        "zap": bop,                                                         # ウラの決め：柔らかい「ポン」
+        "stab": chord,
+        "revswell": _lp(_noise(int(0.7 * SR), 69), 1400) * (t(0.7) / 0.7) ** 3,
+        "alarm": _add(hit, np.concatenate([np.zeros(int(0.22 * SR)), hit * 0.7])),  # 二度打ちの低いヒット
+        "rewind": _add(_sweep(0.9, 700, 120, 0.3, "sin", 0.6), _swoosh(0.9, 2000, 300, 0.4, 70)),
+        "scan": _sweep(0.5, 300, 700, 0.5, "sin", 1.0),
+        "ok": _add(_bell(659.25, 0.3, 0.3, 0.09), np.concatenate([np.zeros(int(0.08 * SR)), _bell(987.77, 0.4, 0.26, 0.12)])),
+        "error": _add(_bell(196, 0.22, 0.5, 0.07), np.concatenate([np.zeros(int(0.13 * SR)), _bell(164.81, 0.25, 0.5, 0.08)])),
+        "riser": _swoosh(1.0, 250, 2000, 1.0, 71) * np.linspace(0.2, 1, int(1.0 * SR)),
+        "tick": _add(_bell(880, 0.05, 0.4, 0.008, 0.002), _lp(_noise(int(0.02 * SR), 73), 1800) * np.exp(-t(0.02) / 0.004) * 0.6),
+        "cash": _add(_bell(1046.5, 0.4, 0.25, 0.14), _bell(1318.5, 0.35, 0.18, 0.12)),
+        "rain": _add(*[np.concatenate([np.zeros(int(k * 0.06 * SR)), _bell(f, 0.05, 0.3, 0.015)]) for k, f in enumerate([600, 450, 750, 550, 850, 500])]),
+    }
+    level = {"impact": 0.11, "hit": 0.08, "alarm": 0.08, "stab": 0.08, "brake": 0.06, "rewind": 0.06, "revswell": 0.05,
+             "sweep_up": 0.045, "sweep_down": 0.045, "riser": 0.04, "tick": 0.05, "scan": 0.04}
+    return {k: _soften(v, rms=level.get(k, 0.06)) for k, v in bank.items()}
