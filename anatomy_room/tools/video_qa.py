@@ -80,7 +80,7 @@ def main():
     ep = ROOT / sys.argv[1]
     sheets = "--sheets" in sys.argv
     mp4 = next((p for p in ep.glob("reverse_*.mp4")), None) or next(ep.glob("*.mp4"))
-    tl = json.loads((ep / "work" / "timeline.json").read_text())
+    tl = json.loads((ep / "work" / "timeline.json").read_text(encoding="utf-8"))
     ng, rep = [], [f"# 完成動画の品質検査（{ep.name}）", "", f"- 対象：`{mp4.name}`", "- 検査：`tools/video_qa.py`（MASTER_VIDEO_TEMPLATE の固定ルール）", ""]
 
     # 1. 基本仕様
@@ -136,7 +136,7 @@ def main():
     # 4. 文字の自動検査
     tc = ep / "work" / "textcheck.json"
     if tc.exists():
-        d = json.loads(tc.read_text())
+        d = json.loads(tc.read_text(encoding="utf-8"))
         step = d.get("step", 0.1)
         runs = {}
         for i in d.get("issues", []):
