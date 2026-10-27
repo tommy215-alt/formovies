@@ -74,7 +74,9 @@ class Episode:
 
     def synth_cached(self, ln, cache):
         p = self.voice_params(ln)
-        key = hashlib.sha256(json.dumps([ln["speech"], p, SR], ensure_ascii=False).encode()).hexdigest()[:16]
+        # merge_aux の回は、つなげる語の一覧（AUX_END）もキーに入れる（一覧を足したのに古い声を使い回していた：pilot_011 の L14「〜という」）
+        key = hashlib.sha256(json.dumps([ln["speech"], p, SR] + ([AUX_END.pattern] if p.get("merge_aux") else []),
+                                        ensure_ascii=False).encode()).hexdigest()[:16]
         cw, cq = cache / f"{key}.wav", cache / f"{key}.json"
         if cw.exists() and cq.exists():
             return cw.read_bytes(), json.loads(cq.read_text(encoding="utf-8")), p, False
