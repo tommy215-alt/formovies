@@ -36,9 +36,11 @@ git clone https://github.com/tommy215-alt/formovies.git
 cd formovies
 git checkout claude/jolly-knuth-5nlxei
 cd anatomy_room
-npm install
-npx playwright install chromium
+npm.cmd install
+npx.cmd playwright install chromium
 ```
+
+> PowerShell では `npm` だけだと「スクリプトの実行が無効になっている」と止まるので、`npm.cmd`・`npx.cmd` と打つ（PC の設定は変えなくてよい）。
 
 ## 4. 日本語フォント（Noto Sans CJK JP）を入れる
 
