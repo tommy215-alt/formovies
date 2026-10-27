@@ -96,11 +96,11 @@ const island = set("island");
   window.__grid = { w: 5600, d: 4800, nx: 600, nz: 514, ys: Float32Array.from({ length: p.count }, (_, i) => p.getY(i)) };
   g.computeVertexNormals();
   const n = g.attributes.normal, cols = [];
-  const rock = C(0x4a443d), rock2 = C(0x2b2925), grass = C(0x23391f), grass2 = C(0x324626), peat = C(0x3a3022), foam = C(0x55616b), deep = C(0x0b1621);
+  const rock = C(0x5a5248), rock2 = C(0x2e2b27), grass = C(0x34522a), grass2 = C(0x52622f), peat = C(0x5a4630), foam = C(0x55616b), deep = C(0x0b1621);
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), slope = 1 - n.getY(i);
     const nn = fbm(x / 90, z / 90, 3, 11);
-    let c = grass.clone().lerp(grass2, sstep(.35, .75, nn)).lerp(peat, sstep(.62, .9, fbm(x / 240, z / 240, 2, 13)) * .6);
+    let c = grass.clone().lerp(grass2, sstep(.3, .8, nn)).lerp(peat, sstep(.5, .85, fbm(x / 240, z / 240, 2, 13)) * .75);
     const strata = fbm(x / 60 + z / 60, y / 9, 3, 15); // 崖の縦の筋と層
     c.lerp(rock.clone().lerp(rock2, strata), sstep(.16, .38, slope));
     if (y < 3 && y > -3) c.lerp(foam, .5 * (1 - Math.abs(y) / 3));
@@ -108,11 +108,41 @@ const island = set("island");
     cols.push(c.r, c.g, c.b);
   }
   g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+  // 模様の座標を高さでずらす（真上からの投影のままだと、垂直な崖で模様が縦に伸びて、布のような筋になるため）
+  const uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + .8 * p.getY(i)) / 5600 + .5, .5 - (p.getZ(i) - .8 * p.getY(i)) / 4800);
   const rt = (() => { const c = document.createElement("canvas"); c.width = c.height = 512; const x = c.getContext("2d"), d = x.createImageData(512, 512);
     for (let j = 0; j < 512; j++) for (let i = 0; i < 512; i++) { const v = .7 * fbm(i / 26, j / 26, 5, 21) + .3 * fbm(i / 6, j / 6, 2, 22); const q = 165 + 90 * v;
       const k = (j * 512 + i) * 4; d.data[k] = d.data[k + 1] = d.data[k + 2] = q; d.data[k + 3] = 255; } x.putImageData(d, 0, 0);
     const tx = new THREE.CanvasTexture(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(90, 77); tx.anisotropy = 8; return tx; })();
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: rt, bumpMap: rt, bumpScale: 3, roughness: .95, metalness: 0 }));
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, map: rt, bumpMap: rt, bumpScale: .8 }));
+  // 崖の岩肌：画素ごとに横の地層と割れ目を描く（高さの格子は崖の上下に数点しかなく、頂点の色や陰影だけでは縦の筋になるため）
+  m.material.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vWP; varying vec3 vWN;")
+      .replace("#include <project_vertex>", "#include <project_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+varying vec3 vWP; varying vec3 vWN;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }`)
+      .replace("#include <map_fragment>", `#include <map_fragment>
+{ float steep = smoothstep(.3, .75, 1.0 - abs(vWN.y));
+  float hz = vWP.x * .7 + vWP.z * .7;
+  float warp = vn(vec2(hz * .012, vWP.y * .01)) * 9.0 + vn(vec2(hz * .05, vWP.y * .03)) * 2.5;
+  float layer = vn(vec2(hz * .004, (vWP.y + warp) * .16));                // 横の地層（厚さ数 m）
+  float fine = vn(vec2(hz * .03, (vWP.y + warp) * .9));                     // 細かい層
+  float crack = smoothstep(.72, .9, vn(vec2(hz * .09, vWP.y * .012)));      // 縦の割れ目（短い）
+  float ledge = smoothstep(.6, .66, fract((vWP.y + warp) * .045));           // 張り出しの上面（明るい）
+  vec3 rk = vec3(.82 + .36 * layer) * (.85 + .3 * fine);
+  rk *= 1.0 - .45 * crack; rk += .18 * ledge * (1.0 - crack);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * rk, steep);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(.95, 1.02, .9), steep * ledge * .5);
+  // 崖の上の草地：細かいまだらと、緑・枯れ草色の変化（青い光と霧の下でも海に見えないように）
+  float flt = (1.0 - steep) * step(5.0, vWP.y);
+  float tuft = vn(vWP.xz * .9) * .6 + vn(vWP.xz * 3.1) * .4, pch = vn(vWP.xz * .035);
+  vec3 gr = mix(vec3(.62, .95, .42), vec3(1.05, .92, .55), smoothstep(.45, .8, pch)) * (.55 + .5 * tuft);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * gr, flt); }`);
+  };
   m.receiveShadow = true; island.add(m); window.__islandMesh = m;
   // 崖のまわりの霧（やわらかい板）
   const r = S.rng(41);
@@ -554,7 +584,7 @@ function drawScene(t, name) {
         look = lerpV(look, land.clone().addScaledVector(outT, -250).add(V3(0, 0, 0)), easeInOut(dsc));
       }
       setCam(pos.add(shake(t, 1.2 * (1 - dsc))), look, 44, .5, 90000);
-      scene.fog.density = lerp(.00036, .0011, sstep(.7, 1, dsc));
+      scene.fog.density = lerp(.00036, .0006, sstep(.7, 1, dsc));
     } else { // alone
       if (t < CUE.edge) { // 高い俯瞰：広い海に囲まれた小さな島
         const u = easeInOut(prog(t, a, CUE.edge - a));
