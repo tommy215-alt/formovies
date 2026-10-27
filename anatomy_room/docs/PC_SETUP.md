@@ -42,10 +42,10 @@ npx playwright install chromium
 
 ## 4. 日本語フォント（Noto Sans CJK JP）を入れる
 
-https://github.com/notofonts/noto-cjk/releases を開き、「**03_NotoSansCJK-OTC.zip**」をダウンロードして展開。
-中の `NotoSansCJK-*.ttc` をすべて選んで右クリック →「**すべてのユーザーに対してインストール**」。
+https://github.com/notofonts/noto-cjk/releases を開き、Assets の「**Language Specific OTFs Japanese (日本語)**」をダウンロードして展開。
+中の `NotoSansCJKjp-*.otf` をすべて選んで右クリック →「**すべてのユーザーに対してインストール**」（Windows 11 は「その他のオプションを確認」の中）。
 
-> Google Fonts の「Noto Sans JP」は名前が違うので使えない。
+> Google Fonts の「Noto Sans JP」と、Assets の「Region Specific Subset OTFs Japanese」（Noto Sans JP）は名前が違うので使えない。
 
 ## 5. そろったか確かめる
 
