@@ -72,7 +72,21 @@ async function launch() {
 (async () => {
   const browser = await launch();
   const page = await open(browser);
-  const canvas = await page.$("#stage"); // 背景・3D・文字の 3 層を重ねた画面全体
+  const stage = await page.$("#stage"); // 背景・3D・文字の 3 層を重ねた画面全体
+  // 撮影は画面の範囲を決めて撮る（要素の撮影は「動きが止まるまで待つ」確認が 30 秒で切れて止まることがあった：Windows・GPU）
+  const box = await stage.boundingBox();
+  const canvas = {
+    async screenshot(o) {
+      for (let k = 0; ; k++) {
+        try {
+          return await page.screenshot({ ...o, clip: box, timeout: 120000 });
+        } catch (e) {
+          if (k >= 2) throw e;
+          console.error("screenshot: 撮り直し（" + e.message.split("\n")[0] + "）");
+        }
+      }
+    },
+  };
   if (args[0] === "--stills") {
     fs.mkdirSync(path.join(WORK, "stills"), { recursive: true });
     const ts = args[1].split(","), t0 = Date.now();
