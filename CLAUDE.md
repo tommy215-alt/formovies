@@ -57,3 +57,13 @@
 - **自分の PC（GPU）で書き出す手順**は `anatomy_room/docs/PC_SETUP.md`。準備の確認は `node anatomy_room/tools/check_pc.js`。`render_frames.js` は GPU で WebGL が動けば GPU、動かなければソフトウェア描画（`REVERSE_GPU=off` で常にソフトウェア）。
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
 - YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。
+
+## 制作の分担と PC（Windows）での作業（2026-10-27〜）
+
+- **書き出しはユーザーの PC**（Windows、NVIDIA RTX 3070、`render_frames.js` が GPU を自動で使う。pilot_010 の静止画で 1 コマ 0.67 秒、クラウドは約 3 秒）。PC のセッションは `claude remote-control`（`~\formovies`、same-dir）で、ユーザーはスマホから指示する。PC がスリープ・シャットダウン中は動かない。
+- **クラウドのセッション**は、PC がなくても進められる工程（題材・事実確認・台本・レビュー資料）を担当する。書き出しを両方で同時にしない。push がぶつからないよう、作業の前に `git pull`。
+- PC の環境（`docs/PC_SETUP.md`、確認は `node tools/check_pc.js`）：
+  - コマンドは `python`（`python3` ではない）。PowerShell では `npm.cmd`・`npx.cmd`。Node の部品は `anatomy_room/node_modules`（Playwright 1.63.0）。
+  - VOICEVOX は**アプリ版 0.26.0**（クラウドは ENGINE 0.24.1）。声が少し変わることがあるので、PC で声を作ったら `qc_report.md` の「文末の音程」「読み上げの照合」を見直す。
+  - fontconfig がないので、`textcheck` の「フォントにない文字」は PC では未確認になる（必要ならクラウドで確認）。ImageMagick もない（一覧画像は Pillow）。外部コマンドの出力・JSON は UTF-8 で読む（cp932 で止まった）。
+- **pilot_011「紙袋を変えた女性、マーガレット・ナイト」**（`production/pilot_011/`、99.5 秒）：PC で書き出し、クラウドのセッションが全編を確認して直しを入れている途中。YouTube へのアップロードはユーザーの指示まで行わない。
