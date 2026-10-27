@@ -19,6 +19,7 @@ import io
 import json
 import math
 import re
+import shutil
 import subprocess
 import sys
 import urllib.parse
@@ -313,18 +314,21 @@ class Episode:
         """全編を 0.1 秒ごとに描いて、文字の安全領域・重なり・はみ出し・大きさを調べ、使った文字がフォントにあるかを確かめる。"""
         subprocess.run(["node", str(COMMON / "render_frames.js"), "--dir", str(self.here), "--textcheck", "0.1"], check=True)
         res = json.loads((self.work / "textcheck.json").read_text(encoding="utf-8"))
-        # フォント（Noto Sans CJK JP）に含まれる文字の範囲（fontconfig の charset）
-        fontfile = run(["fc-match", "Noto Sans CJK JP", "-f", "%{file}"]).stdout.strip()
-        cs = run(["fc-query", "--index", "0", "--format", "%{charset}", fontfile]).stdout.split()
-        ranges = [tuple(int(v, 16) for v in (r.split("-") * 2)[:2]) for r in cs]
-        missing = sorted({ch for ch in res["chars"] if not any(a <= ord(ch) <= b for a, b in ranges)})
+        # フォント（Noto Sans CJK JP）に含まれる文字の範囲（fontconfig の charset）。fontconfig がない環境（Windows など）は未確認として扱う
+        if shutil.which("fc-match") and shutil.which("fc-query"):
+            fontfile = run(["fc-match", "Noto Sans CJK JP", "-f", "%{file}"]).stdout.strip()
+            cs = run(["fc-query", "--index", "0", "--format", "%{charset}", fontfile]).stdout.split()
+            ranges = [tuple(int(v, 16) for v in (r.split("-") * 2)[:2]) for r in cs]
+            missing = sorted({ch for ch in res["chars"] if not any(a <= ord(ch) <= b for a, b in ranges)})
+        else:
+            missing = None
         res["missing_glyphs"] = missing
         (self.work / "textcheck.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
         by = {}
         for e in res["issues"]:
             by.setdefault((e["kind"], e["s"]), []).append(e["t"])
         real = {k: v for k, v in by.items() if len(v) > 3}   # 0.3 秒以下（3 コマ以下）は飛び出し・切り替えの途中の一時的なもの
-        print(f"textcheck: {res['frames']} コマ、問題 {len(real)} 種類（ほかに一時的なもの {len(by) - len(real)} 種類）、フォントにない文字 {missing or 'なし'}")
+        print(f"textcheck: {res['frames']} コマ、問題 {len(real)} 種類（ほかに一時的なもの {len(by) - len(real)} 種類）、フォントにない文字 {'未確認（fontconfig がない）' if missing is None else missing or 'なし'}")
         for (k, s_), ts in sorted(by.items(), key=lambda kv: kv[1][0]):
             print(f"  [{k}]{'（一時的）' if len(ts) <= 3 else ''} {s_[:40]}  {ts[0]:.1f}〜{ts[-1]:.1f}s（{len(ts)} コマ）")
         return res, by
@@ -345,7 +349,7 @@ class Episode:
         real = sum(1 for ts in by.values() if len(ts) > 3)
         return ["## 文字の自動検査（`render_frames.js --textcheck`、0.1 秒ごと）", "",
                 f"- 検査したコマ：{res['frames']}。安全領域 x 40〜1040・y 170〜1650、右側のボタン列（x≥950・y 880〜1650）を避ける。文字の面積の 10% 以上がオモテにかぶるものも検出",
-                f"- 使った文字 {len(res['chars'])} 種類のうち、フォント（Noto Sans CJK JP）にない文字：{''.join(res.get('missing_glyphs', [])) or 'なし'}",
+                f"- 使った文字 {len(res['chars'])} 種類のうち、フォント（Noto Sans CJK JP）にない文字：{'未確認（fontconfig がない環境）' if res.get('missing_glyphs', []) is None else ''.join(res.get('missing_glyphs', [])) or 'なし'}",
                 f"- 見つかった問題：{real} 種類（ほかに 0.3 秒以下の一時的なもの {len(by) - real} 種類）", "",
                 *(["| 種類 | 文字 | 時間 |", "|------|------|------|", *rows, ""] if rows else [""])]
 

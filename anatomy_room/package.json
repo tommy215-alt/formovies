@@ -1,0 +1,8 @@
+{
+  "name": "reverse-shorts",
+  "private": true,
+  "description": "リバース（YouTube Shorts）の書き出しに使う Node の部品。npm install のあと npx playwright install chromium",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

@@ -54,5 +54,6 @@
   `production/pilot_009/reverse_009_php.mp4`。事実確認は `scripts/pilot_009/fact_check.md`（すべて検索抜粋。公式の本文は未確認）、自己レビューは `reviews/internal_review/pilot_009_review.md`。
 - **pilot_010「世界の果てに、空を飛べない小さな鳥がいる」（イナクセシブルクイナ）はユーザーの指示で動画化**：科学ドキュメンタリー形式（男性ナレーション `v6`＝VOICEVOX:玄野武宏、暗い 3DCG）。オモテは**顔のない、もちもちした人型ピクトグラム**（`stage.js` の `mochi3D`、`CHARACTER_GUIDE.md` v3.2）に統一。`production/pilot_010/`。
 - **標準ルール v2（2026-10-27）**：新作の制作設定は `production/common/standard.py`（`standard.config({...})`：左上のロゴなし・BGM `tech_drive`（ビートのあるテクノ 124 BPM）・やわらかい効果音・冒頭 0.1 秒で話し始める）、声は `voices.json` の `v7`（文末の「いる・いた・ある」を前の句につなげて語尾上がりを防ぐ）。冒頭 3 秒は `video_qa.py` が `qa/hook_3s.mp4` に切り出す。注記は必要最小限。詳細は `REVERSE_STANDARD_RULES.md` v2。
+- **自分の PC（GPU）で書き出す手順**は `anatomy_room/docs/PC_SETUP.md`。準備の確認は `node anatomy_room/tools/check_pc.js`。`render_frames.js` は GPU で WebGL が動けば GPU、動かなければソフトウェア描画（`REVERSE_GPU=off` で常にソフトウェア）。
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
 - YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。

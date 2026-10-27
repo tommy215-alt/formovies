@@ -3,10 +3,13 @@
 //   node render_frames.js --stills 3,40.5  指定した秒のコマを work/stills/ に PNG で保存（確認用）
 //   node render_frames.js --thumb          サムネイル thumbnail.png を書き出す
 //   node render_frames.js --segments job.json  指定したコマの範囲を場面ごとの mp4 に（production_script.py render が使う）
+// GPU：既定（REVERSE_GPU=auto）は GPU で WebGL が動けば GPU、動かなければソフトウェア描画（SwiftShader）。
+//   REVERSE_GPU=off でいつも SwiftShader、REVERSE_GPU=on で GPU が使えなければ止める。
 const { chromium } = require("playwright");
 const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { pathToFileURL } = require("url");
 
 // 第 3 話以降の共通版。node ../common/render_frames.js --dir <各話のフォルダ> [--stills … | --thumb | --segments …]
 const argv = process.argv.slice(2);
@@ -18,7 +21,7 @@ const args = di >= 0 ? argv.filter((_, i) => i !== di && i !== di + 1) : argv;
 async function open(browser) {
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   page.on("pageerror", e => { console.error("page error:", e.message); process.exit(1); });
-  await page.goto("file://" + path.join(HERE, "renderer.html"));
+  await page.goto(pathToFileURL(path.join(HERE, "renderer.html")).href); // Windows のパスでも正しい URL にする
   await page.evaluate(async t => {
     await Promise.all(["900 52px \"Noto Sans CJK JP\"", "800 52px \"Noto Sans CJK JP\"", "700 52px \"Noto Sans CJK JP\"", "500 40px \"Noto Sans CJK JP\""]
       .map(f => document.fonts.load(f, "あ漢A−×")));
@@ -29,17 +32,55 @@ async function open(browser) {
   return page;
 }
 
+const SOFTWARE = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
+
+async function renderer(browser) {
+  const page = await browser.newPage();
+  const r = await page.evaluate(() => {
+    const g = document.createElement("canvas").getContext("webgl2") || document.createElement("canvas").getContext("webgl");
+    if (!g) return "";
+    const e = g.getExtension("WEBGL_debug_renderer_info");
+    return String(e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : g.getParameter(g.RENDERER));
+  });
+  await page.close();
+  return r;
+}
+
+// GPU を試し、WebGL がソフトウェア描画（SwiftShader・llvmpipe）になったら SwiftShader の設定で開き直す
+async function launch() {
+  const mode = (process.env.REVERSE_GPU || "auto").toLowerCase();
+  if (mode !== "off") {
+    try {
+      // channel "chromium" は通常版の Chromium（新しいヘッドレス）。ヘッドレス専用版は GPU を使わない
+      const b = await chromium.launch({ channel: "chromium", args: ["--ignore-gpu-blocklist", "--enable-gpu-rasterization"] });
+      const r = await renderer(b);
+      if (r && !/swiftshader|llvmpipe|software/i.test(r)) {
+        console.error("WebGL: GPU（" + r + "）");
+        return b;
+      }
+      await b.close();
+      if (mode === "on") throw new Error("GPU で WebGL が動かない（" + (r || "WebGL なし") + "）");
+    } catch (e) {
+      if (mode === "on") throw e;
+    }
+  }
+  const b = await chromium.launch({ args: SOFTWARE });
+  console.error("WebGL: ソフトウェア描画（" + await renderer(b) + "）");
+  return b;
+}
+
 (async () => {
-  const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+  const browser = await launch();
   const page = await open(browser);
   const canvas = await page.$("#stage"); // 背景・3D・文字の 3 層を重ねた画面全体
   if (args[0] === "--stills") {
     fs.mkdirSync(path.join(WORK, "stills"), { recursive: true });
-    for (const s of args[1].split(",")) {
+    const ts = args[1].split(","), t0 = Date.now();
+    for (const s of ts) {
       await page.evaluate(t => window.renderFrame(t), parseFloat(s));
       await canvas.screenshot({ path: path.join(WORK, "stills", `t${parseFloat(s).toFixed(2).padStart(6, "0")}.png`) });
     }
-    console.log("stills:", args[1]);
+    console.log(`stills: ${args[1]}（1 コマあたり ${((Date.now() - t0) / 1000 / ts.length).toFixed(2)} 秒）`);
   } else if (args[0] === "--segments") {
     // 指定されたコマの範囲を、場面ごとに別の mp4 に書き出す（production_script.py render から呼ばれる）
     const jobs = JSON.parse(fs.readFileSync(args[1], "utf8"));
