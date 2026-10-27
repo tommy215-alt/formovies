@@ -543,7 +543,7 @@ function drawScene(t, name) {
       shopper.g.visible = false;
       const push = easeOut(prog(t, 0, 2.2));
       setCam(V3(1.15 - .2 * push, 1.72, 1.35 - .25 * push), V3(.33, 1.05, .05), 30); fit([objPts(bag1)]);
-      draw3D(t > CUE.freeze ? null : { focus: cam.position.distanceTo(V3(.3, 1.12, .08)), slab: .25, far: 6, near: 6 });
+      draw3D(null);   // 被写界深度なし：最初のコマ（自動のサムネイル）で紙袋がくっきり見えるように
       if (t > CUE.freeze) {                                         // 静止：少し暗く・冷たく、輪郭の線
         const fk = easeOut(prog(t, CUE.freeze, .15));
         bg.save(); bg.globalAlpha = .45 * fk; bg.fillStyle = "#04121e"; bg.fillRect(0, 0, W, H); bg.restore();
@@ -832,7 +832,7 @@ function renderFrame(t) {
 }
 function renderThumb() {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
-  drawScene(CUE.spread + 1.0, "dispute"); grade(0, .15);
+  drawScene(CUE.steal + .6, "hook"); grade(0, .22);   // 設計図が奥へ引っぱられる瞬間
   text(ui, "紙袋の機械は", 540, 1360, 92, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 });
   text(ui, "盗まれかけた", 540, 1490, 104, "#A8E6FF", { weight: 900, stroke: "#06101c", sw: 14 });
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
