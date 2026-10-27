@@ -42,6 +42,37 @@ def sharpness(g):
     return float(np.mean(np.abs(np.diff(g, axis=0))) + np.mean(np.abs(np.diff(g, axis=1))))
 
 
+def hook_check(ep, mp4, tl, ng):
+    """冒頭 3 秒の自動検査と、目視用の切り出し（qa/hook_3s.mp4・qa/hook_strip.jpg）。
+    自動で分かるのは「始まりの遅さ・無音・止まった画面」まで。「続きを見たいか」は切り出しを見て人が判断する"""
+    import numpy as np
+    body = [x for x in tl["lines"] if not x.get("ending")]
+    first = body[0]["start"] if body else 99.0
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-t", "3", "-i", str(mp4), "-ac", "1", "-ar", "16000", "-f", "s16le", "-"],
+                         capture_output=True).stdout
+    a = np.frombuffer(pcm, np.int16) / 32768 if pcm else np.zeros(1)
+    db = lambda x: 20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-9) if len(x) else -99.0
+    d1, d3 = db(a[:16000]), db(a[:48000])
+    frames = [gray_frame(mp4, t, 216, 384).astype(float) for t in (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 2.95)]
+    motion = float(np.mean([np.mean(np.abs(f1 - f0)) for f0, f1 in zip(frames, frames[1:])]))
+    rows = [("最初のナレーションの開始 1.0 秒以内", first <= 1.0, f"{first:.2f} 秒（「{body[0]['speech'][:16]}…」）" if body else "なし"),
+            ("最初の 1 秒が無音でない（−40 dBFS 以上）", d1 >= -40, f"{d1:.1f} dBFS"),
+            ("最初の 3 秒の音の大きさ（目安 −30 dBFS 以上）", d3 >= -30, f"{d3:.1f} dBFS"),
+            ("画面が止まっていない（0.5 秒ごとのコマの差の平均 3 以上）", motion >= 3, f"{motion:.1f}")]
+    qa = ep / "qa"
+    qa.mkdir(exist_ok=True)
+    run(["ffmpeg", "-v", "error", "-y", "-t", "3", "-i", str(mp4), "-c:v", "libx264", "-crf", "20", "-c:a", "aac", str(qa / "hook_3s.mp4")])
+    run(["ffmpeg", "-v", "error", "-y", "-t", "3", "-i", str(mp4), "-vf", "fps=2,scale=270:480,tile=6x1", "-frames:v", "1", str(qa / "hook_strip.jpg")])
+    out = ["## 冒頭 3 秒", "", "| 項目 | 結果 | 値 |", "|---|---|---|"]
+    for name, ok, val in rows:
+        out.append(f"| {name} | {'OK' if ok else '**NG**' if '目安' not in name else '要確認'} | {val} |")
+        if not ok and "目安" not in name:
+            ng.append("冒頭 3 秒")
+    out += ["", "- 切り出し：`qa/hook_3s.mp4`（音つき）と `qa/hook_strip.jpg`（0.5 秒ごと）。",
+            "- **判断基準：初めて見る人が、この先を見たいと思うか。** 弱ければ冒頭を作り直す（VIDEO_QA_CHECKLIST の「冒頭 3 秒」に記入）", ""]
+    return out
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
@@ -137,6 +168,9 @@ def main():
     rep += ["## 5. 共通エンディング", "", f"- {'OK' if ok_end else '**NG**'}：" + "、".join(f"{x['id']}「{x['speech']}」{x['start']:.2f}s" for x in endl), ""]
     if not ok_end:
         ng.append("共通エンディング")
+
+    # 冒頭 3 秒（2026-10-27〜の標準：最初の 3 秒で興味を獲得する。REVERSE_STANDARD_RULES の「冒頭 3 秒」）
+    rep += hook_check(ep, mp4, tl, ng)
 
     # 目視用の一覧
     if sheets:

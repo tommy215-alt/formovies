@@ -748,6 +748,9 @@
     ctx.restore();
   }
   function header2(ctx) {
+    // 左上の固定ロゴ：2026-10-27 の標準（REVERSE_STANDARD_RULES v2）から表示しない。制作設定の "logo"（既定 False）が
+    // タイムラインに入る。"logo" のない旧版のタイムライン（pilot_009 まで・pilot_010）は従来どおり表示する
+    if (TL && TL.logo === false) return;
     ctx.__noCheck = true; try { header2_(ctx); } finally { ctx.__noCheck = false; }
   }
   function header2_(ctx) {

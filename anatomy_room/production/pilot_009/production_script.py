@@ -13,6 +13,7 @@ import pipeline  # noqa: E402
 EP = {
     "id": "pilot_009",
     "out": "reverse_009_php.mp4",
+    "logo": True,   # 左上の固定ロゴ（この回は表示していた。2026-10-27 以降の新作の標準は表示しない）
     # 映像と効果音のきっかけ：(セリフID, セリフ内の位置 0〜1)。renderer.html と同じ名前
     "cues": {
         "hook": ("L01", 0.0), "maint2": ("L01", 0.5), "php": ("L02", 0.3), "who": ("L03", 0.0), "three": ("L04", 0.3), "lost": ("L05", 0.0),

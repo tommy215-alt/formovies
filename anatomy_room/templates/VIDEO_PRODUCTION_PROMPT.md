@@ -41,7 +41,7 @@
 ## Claude 側の手順（依頼を受けたら、この順で進める）
 
 ### 0. 準備
-- `CLAUDE.md` → `templates/MASTER_VIDEO_TEMPLATE.md` → `docs/` の関連文書を読む。
+- `CLAUDE.md` → **`templates/REVERSE_STANDARD_RULES.md`（最優先の既定値、v2）** → `templates/MASTER_VIDEO_TEMPLATE.md` → `docs/` の関連文書を読む。
 - 新しい番号のフォルダを決める（`scripts/pilot_00N/`、`production/pilot_00N/`）。
 
 ### 1. 事実確認（`scripts/pilot_00N/fact_check.md`）
@@ -59,11 +59,13 @@
 - **ここで止めて、ユーザーの ChatGPT レビューとシナリオ指定を待つ**（制作の範囲が「台本＋動画」でも、指定があるまで CG・音声合成・書き出しをしない）。
 
 ### 3. 演出設計（`production/pilot_00N/production_script.py`・`scene_plan.md`）
-- 既存の回（`pilot_006`）の `production_script.py` をひな形にして、EP の設定だけ書く。
-  - `cues`、`sfx`、`music`（style・sections）、`lead_in: 1.5`、`segments`、`scenes`、`plan_notes`。
+- **v2（2026-10-27〜）**：EP は `production/common/standard.py` の `standard.config({...})` で作る（ロゴなし・BGM `tech_drive`・やわらかい効果音・`lead_in` 0.1 秒が既定値で入る）。`lines.json` の `"voices"` は `"v7"`。
+  - その回で書くのは `out`、`cues`、`sfx`、`music.sections`（doc_hook → doc_drive／doc_build／doc_break／doc_peak → doc_outro → ending）、`segments`、`scenes`、`plan_notes`。
+  - 旧版（v1 まで）：既存の回（`pilot_006`）の `production_script.py` をひな形にして、EP の設定をすべて書いていた（`lead_in: 1.5` など）。
 - `renderer.html` は `pilot_006/renderer.html` を土台にし、場面関数（SCN）だけ題材に合わせて作り替える。
   - 共通部品（`common/stage.js`）は直接変えない。足りない部品は stage.js に追加し、3 本の textcheck をやり直す。
-- 冒頭 1.5 秒の事件、大きな問い、最初のコマ（止め絵として成り立つか）を最初に決める。
+- **冒頭 3 秒を最初に決める**（REVERSE_STANDARD_RULES の「冒頭 3 秒のルール」）：1 秒目の刺激（映像・音）、矛盾や意外性のある最初の一文、BGM の 1 拍目と効果音の位置、最初のコマ（止め絵として成り立つか）。書き出し前に冒頭の静止画を確認し、完成後は `qa/hook_3s.mp4` で「続きを見たいか」を判断する。
+- 注記（uiNote）は v2 の基準で必要なものだけにする。左上のロゴは出さない。
 
 ### 4. 書き出しと検査
 ```bash

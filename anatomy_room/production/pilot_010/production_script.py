@@ -13,6 +13,7 @@ import pipeline  # noqa: E402
 EP = {
     "id": "pilot_010",
     "out": "reverse_010_inaccessible_rail.mp4",
+    "logo": True,   # 左上の固定ロゴ（この回は表示していた。2026-10-27 以降の新作の標準は表示しない）
     # 映像と効果音のきっかけ：(セリフID, セリフ内の位置 0〜1)。renderer.html と同じ名前
     "cues": {
         "hook": ("L01", 0.0), "glimpse": ("L01", 0.55), "only": ("L02", 0.0), "lean": ("L02", 0.5),

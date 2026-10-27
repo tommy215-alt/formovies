@@ -288,6 +288,11 @@ TECH_STYLES = {
     # PHP 騒動の回：緊張感と未来感（ホ短調。ふざけた印象にしない）
     "tech_net":   {"bpm": 134, "chords": [(41.20, [329.63, 392.00, 493.88]), (65.41, [261.63, 329.63, 392.00]),
                                           (55.00, [329.63, 440.00, 523.25]), (61.74, [311.13, 369.99, 493.88])], "seed": 4},
+    # 標準（2026-10-27〜、REVERSE_STANDARD_RULES v2）：ビートのあるダークなテクノ／インダストリアル。
+    # 124 BPM、ニ短調（Dm–Dm–B♭–A）。4 つ打ちのキック、うねるベース、金属的な打音（metal）、低いうなり（rumble）。
+    # ナレーションの帯域（1〜4 kHz）にかぶる和音（stab）とアルペジオは控えめにし、存在感は低音とリズムで出す
+    "tech_drive": {"bpm": 124, "chords": [(36.71, [293.66, 349.23, 440.00]), (36.71, [293.66, 349.23, 440.00]),
+                                          (58.27, [293.66, 349.23, 466.16]), (55.00, [277.18, 329.63, 440.00])], "seed": 6},
 }
 # モード → パートの音量。旧モード名（hook/banter/reveal）も受け付ける
 TECH_MODES = {
@@ -305,6 +310,28 @@ TECH_MODES.update(
     ambient={"kick": 0.0, "clap": 0.0, "hat": 0.0, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.55, "stab": 0.0, "arp": 0.0, "pad": 1.0},
     pulse={"kick": 0.35, "clap": 0.0, "hat": 0.2, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.75, "stab": 0.0, "arp": 0.35, "pad": 0.85},
     rise={"kick": 0.6, "clap": 0.0, "hat": 0.35, "ohat": 0.15, "bass": 0.4, "bass_dark": 0.6, "stab": 0.0, "arp": 0.6, "pad": 1.0})
+
+
+# ドキュメンタリー＋ビート（2026-10-27〜の標準）：静かすぎない。キックは解説中も止めない（密度で展開をつける）
+#   doc_hook＝冒頭 1 拍目から全開（キック・ベース・金属音・うなり）、doc_drive＝解説の基本（ビート＋ベース、和音なし）、
+#   doc_build＝発見へ向けて密度を上げる（アルペジオ・オープンハット）、doc_break＝一瞬の引き（キックを抜き、低音とハットで保つ）、
+#   doc_peak＝核心（全パート）、doc_outro＝余韻（キックを残して薄く）
+TECH_MODES.update(
+    doc_hook={"kick": 1.0, "clap": 0.6, "hat": 0.8, "ohat": 0.5, "bass": 1.0, "bass_dark": 0.3, "stab": 0.5, "arp": 0.3, "pad": 0.6, "metal": 1.0, "rumble": 1.0},
+    doc_drive={"kick": 0.85, "clap": 0.35, "hat": 0.6, "ohat": 0.3, "bass": 0.85, "bass_dark": 0.3, "stab": 0.0, "arp": 0.0, "pad": 0.45, "metal": 0.6, "rumble": 0.5},
+    doc_build={"kick": 0.9, "clap": 0.5, "hat": 0.8, "ohat": 0.6, "bass": 0.9, "bass_dark": 0.2, "stab": 0.0, "arp": 0.5, "pad": 0.6, "metal": 0.8, "rumble": 0.7},
+    doc_break={"kick": 0.0, "clap": 0.0, "hat": 0.45, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.9, "stab": 0.0, "arp": 0.3, "pad": 0.9, "metal": 0.4, "rumble": 0.8},
+    doc_peak={"kick": 1.0, "clap": 0.6, "hat": 0.9, "ohat": 0.7, "bass": 1.0, "bass_dark": 0.2, "stab": 0.35, "arp": 0.5, "pad": 0.7, "metal": 0.9, "rumble": 0.8},
+    doc_outro={"kick": 0.6, "clap": 0.0, "hat": 0.4, "ohat": 0.0, "bass": 0.4, "bass_dark": 0.5, "stab": 0.0, "arp": 0.35, "pad": 0.9, "metal": 0.3, "rumble": 0.5})
+
+
+def _metal(dur=0.12, seed=51):
+    """金属的な打音（インダストリアル）：短いノイズを、倍音の合わない複数の共鳴で鳴らす。高すぎない帯域（〜3 kHz）"""
+    t = np.arange(int(dur * SR)) / SR
+    x = _noise(len(t), seed) * np.exp(-t / 0.004) * 0.6
+    for f, a in ((523, .5), (1187, .35), (1771, .25), (2639, .15)):
+        x += a * np.sin(2 * np.pi * f * t + seed) * np.exp(-t / 0.035)
+    return _lp(x, 3500) * 0.5
 
 
 def _supersaw(f, dur, amp, n=5, spread=0.012, attack=0.004, decay=0.25, seed=0):
@@ -331,7 +358,7 @@ def bgm_techno(total, sections, style="tech_air"):
     st = TECH_STYLES[style]
     beat = 60 / st["bpm"]
     n = int(total * SR)
-    names = ("kick", "clap", "hat", "ohat", "bass", "stab", "arp", "pad")
+    names = ("kick", "clap", "hat", "ohat", "bass", "stab", "arp", "pad", "metal", "rumble")
     P = {k: np.zeros(n) for k in names}
     kick = _kick_hard()
     clap = _add(*[np.concatenate([np.zeros(int(d * SR)), _snare(0.18, 40 + i) * .7]) for i, d in enumerate((0, .008, .016))])
@@ -355,6 +382,10 @@ def bgm_techno(total, sections, style="tech_air"):
         for s16 in range(4):                       # 16 分のハイハット（強弱をつける）
             put("hat", int((tb + s16 * beat / 4) * SR), hat, (0.55, 0.3, 0.8, 0.35)[s16])
         put("ohat", int((tb + beat / 2) * SR), ohat, 0.7)
+        for s16, a in ((3, 0.8), (6, 0.5), (11, 0.9), (14, 0.6)):   # 金属音：小節の中の決まった 16 分（2 拍で 1 周より長い、うねるパターン）
+            if (b % 4) * 4 <= s16 < (b % 4) * 4 + 4:
+                put("metal", int((tb + (s16 % 4) * beat / 4) * SR), _metal(seed=51 + s16), a)
+        put("rumble", i, _lp(_noise(int(beat * SR), 60 + b % 8), 140) * np.exp(-np.arange(int(beat * SR)) / SR / 0.25) * 1.8)  # キックに続く低いうなり
         for s16 in (1, 2, 3):                      # 裏の 16 分で転がるベース（キックの位置は空ける）
             f = root * (2 if s16 == 2 else 1)
             _note(P["bass"], int((tb + s16 * beat / 4) * SR), f, beat * 0.22, 0.5, "saw", attack=0.002, decay=0.07)
@@ -390,9 +421,10 @@ def bgm_techno(total, sections, style="tech_air"):
     for (a, mode), (b, _) in zip(sec, sec[1:]):
         ia, ib = max(0, int(a * SR)), min(n, int(b * SR))
         for k in P:
-            gains[k][ia:ib] = TECH_MODES[mode][k]
+            gains[k][ia:ib] = TECH_MODES[mode].get(k, 0.0)   # metal・rumble は doc_ モードだけ（旧モードでは鳴らない）
     ker = np.ones(int(0.05 * SR)) / int(0.05 * SR)  # 切り替えは短く（急な展開に合わせる）
-    level = {"kick": 0.62, "clap": 0.3, "hat": 0.2, "ohat": 0.14, "bass": 0.42, "bass_dark": 0.5, "stab": 0.55, "arp": 0.4, "pad": 0.5}
+    level = {"kick": 0.62, "clap": 0.3, "hat": 0.2, "ohat": 0.14, "bass": 0.42, "bass_dark": 0.5, "stab": 0.55, "arp": 0.4, "pad": 0.5,
+             "metal": 0.32, "rumble": 0.35}
     mix, out = np.zeros(n), {}
     for k, x in P.items():
         out[k] = x * np.convolve(gains[k], ker, mode="same") * level[k]

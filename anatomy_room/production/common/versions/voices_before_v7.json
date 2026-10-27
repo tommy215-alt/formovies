@@ -1,0 +1,210 @@
+{
+ "note": "キャラクターの声の設定（VOICEVOX）。style は話者のスタイル ID。speed=話速、pitch=高さ（0 が標準）、inton=抑揚の強さ（1 が標準）。セリフごとに lines.json の style / speed / inton で上書きできる。",
+ "v2": {
+  "from_episode": "pilot_003",
+  "M": {
+   "name": "青山龍星",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13,
+    "dry": 82
+   },
+   "default_style": "normal",
+   "speed": 1.03,
+   "pitch": 0.0,
+   "inton": 0.95,
+   "license_note": "個人利用はクレジットで商用・非商用可。企業が携わる形で利用する場合は、ななはぴへの事前確認が必要（エンジン内蔵の規約）"
+  },
+  "W": {
+   "name": "波音リツ",
+   "credit": "VOICEVOX:波音リツ",
+   "styles": {
+    "normal": 9,
+    "queen": 65
+   },
+   "default_style": "normal",
+   "speed": 1.1,
+   "pitch": 0.0,
+   "inton": 1.35,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）"
+  }
+ },
+ "v1": {
+  "from_episode": "pilot_005",
+  "M": {
+   "name": "白上虎太郎",
+   "credit": "VOICEVOX:白上虎太郎",
+   "styles": {
+    "normal": 12
+   },
+   "default_style": "normal",
+   "speed": 1.18,
+   "pitch": 0.0,
+   "inton": 1.0
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.13,
+   "pitch": 0.0,
+   "inton": 1.0
+  }
+ },
+ "ending": {
+  "note": "全動画共通の決めゼリフ（docs/ENDING_SPEC.md）。その回の W の声・ノーマルで、2 つに分けて合成し、間を入れる。",
+  "parts": [
+   {
+    "speech": "リバース。",
+    "speed": 1.0,
+    "inton_mul": 1.15
+   },
+   {
+    "speech": "世界の仕組みを、はじめから。",
+    "speed": 0.9,
+    "inton_mul": 1.0
+   }
+  ],
+  "pause_between": 0.5,
+  "gap_after_last_line": 0.6,
+  "tail": 0.8
+ },
+ "v3": {
+  "from_episode": "pilot_006",
+  "note": "チャンネル「リバース」の新構成（オモテ＝M、ウラ＝W）。M は第 2 話の男性音声を維持、W は第 1 話の女性音声（冥鳴ひまり）に戻した。テンポは第 2 話の約 1.3 倍（話速と間で調整）。冥鳴ひまりのスタイルはノーマルだけなので、ウラの表情は話速・抑揚・高さで付ける。",
+  "M": {
+   "name": "青山龍星",
+   "display": "オモテ",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13,
+    "dry": 82,
+    "hot": 81,
+    "whisper": 86
+   },
+   "default_style": "normal",
+   "speed": 1.22,
+   "pitch": 0.0,
+   "inton": 1.0,
+   "license_note": "個人利用はクレジットで商用・非商用可。企業が携わる形で利用する場合は、ななはぴへの事前確認が必要（エンジン内蔵の規約）"
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）"
+  }
+ },
+ "v4": {
+  "from_episode": "pilot_006（テクノ改修版）",
+  "note": "v3 と同じ声（オモテ＝青山龍星、ウラ＝冥鳴ひまり：第 1 話の女性の声）。テンポを v3 からさらに約 1.3 倍に（話速の倍率 speed_mul 1.26 ＋ セリフの間の短縮 ＋ 重複するセリフの削除）。speed_mul は行ごとの speed 指定にもかかる。共通エンディングの話速は ending の値のまま。",
+  "M": {
+   "name": "青山龍星",
+   "display": "オモテ",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13,
+    "dry": 82,
+    "hot": 81,
+    "whisper": 86
+   },
+   "default_style": "normal",
+   "speed": 1.22,
+   "pitch": 0.0,
+   "inton": 1.0,
+   "license_note": "個人利用はクレジットで商用・非商用可。企業が携わる形で利用する場合は、ななはぴへの事前確認が必要（エンジン内蔵の規約）",
+   "speed_mul": 1.26
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
+   "speed_mul": 1.26
+  }
+ },
+ "v5": {
+  "from_episode": "pilot_009（PHP 騒動の回）",
+  "note": "v4 と同じ声（オモテ＝青山龍星、ウラ＝冥鳴ひまり）。聞き取りやすさのため、話速を v4 の約 0.9 倍に（speed_mul 1.26 → 1.13）。セリフの間（gap 0.03 秒）は短いまま、説明の量で情報を増やす。",
+  "M": {
+   "name": "青山龍星",
+   "display": "オモテ",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13,
+    "dry": 82,
+    "hot": 81,
+    "whisper": 86
+   },
+   "default_style": "normal",
+   "speed": 1.22,
+   "pitch": 0.0,
+   "inton": 1.0,
+   "license_note": "個人利用はクレジットで商用・非商用可。企業が携わる形で利用する場合は、ななはぴへの事前確認が必要（エンジン内蔵の規約）",
+   "speed_mul": 1.13
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
+   "speed_mul": 1.13
+  }
+ },
+ "v6": {
+  "from_episode": "pilot_010（イナクセシブルクイナの回）",
+  "note": "ドキュメンタリー形式：M＝男性ナレーション（VOICEVOX:玄野武宏、ノーマル。落ち着いた声、f0 中央値 約 130 Hz）。オモテは顔のないピクトグラムで話さない。W（冥鳴ひまり）は共通エンディングだけに使う。",
+  "M": {
+   "name": "玄野武宏",
+   "display": "ナレーション",
+   "credit": "VOICEVOX:玄野武宏",
+   "styles": {
+    "normal": 11
+   },
+   "default_style": "normal",
+   "speed": 1.06,
+   "pitch": 0.0,
+   "inton": 1.05,
+   "speed_mul": 1.0,
+   "license_note": "「VOICEVOX:玄野武宏」とクレジットを記載すれば商用・非商用で利用可能（エンジン内蔵の規約）"
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
+   "speed_mul": 1.0
+  }
+ }
+}

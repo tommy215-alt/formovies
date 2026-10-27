@@ -206,5 +206,38 @@
    "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
    "speed_mul": 1.0
   }
+ },
+ "v7": {
+  "from_episode": "pilot_011 以降の標準（2026-10-27、標準ルールの更新）",
+  "note": "v6（玄野武宏のナレーション）＋文末の自然さ：merge_aux＝文末の「〜ている／〜ていた／〜である」の「いる・いた・ある」を前のアクセント句につなげて合成する（VOICEVOX は文末の「いる」を独立した句にして高く戻すため、語尾が上がって聞こえる）。pilot_010 の 8 行で「て→いる」の変化 +0.8〜−0.3 → −0.3〜−3.3 半音、時間は同じ。行ごとに \"merge_aux\": false で無効にできる。残る上がりは qc_report の「文末の音程」で確認し、原稿で直す。",
+  "M": {
+   "name": "玄野武宏",
+   "display": "ナレーション",
+   "credit": "VOICEVOX:玄野武宏",
+   "styles": {
+    "normal": 11
+   },
+   "default_style": "normal",
+   "speed": 1.06,
+   "pitch": 0.0,
+   "inton": 1.05,
+   "speed_mul": 1.0,
+   "license_note": "「VOICEVOX:玄野武宏」とクレジットを記載すれば商用・非商用で利用可能（エンジン内蔵の規約）",
+   "merge_aux": true
+  },
+  "W": {
+   "name": "冥鳴ひまり",
+   "display": "ウラ",
+   "credit": "VOICEVOX:冥鳴ひまり",
+   "styles": {
+    "normal": 14
+   },
+   "default_style": "normal",
+   "speed": 1.32,
+   "pitch": 0.0,
+   "inton": 1.15,
+   "license_note": "クレジットで商用・非商用可（エンジン内蔵の規約）",
+   "speed_mul": 1.0
+  }
  }
 }

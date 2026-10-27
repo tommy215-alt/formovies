@@ -15,6 +15,7 @@
 前提：VOICEVOX ENGINE 0.24.1 を 127.0.0.1:50021 で起動。ffmpeg、Node.js + Playwright、Noto Sans CJK JP。
 """
 import hashlib
+import io
 import json
 import math
 import re
@@ -60,8 +61,15 @@ class Episode:
         style = ln.get("style", v["default_style"])
         # speed_mul：その版の声全体の速さの倍率（行ごとの speed 指定にもかける。エンディングは ending の値をそのまま使う）
         mul = 1.0 if ln.get("ending") else v.get("speed_mul", 1.0)
-        return {"speaker": v["styles"][style], "style": style, "speed": round(ln.get("speed", v["speed"]) * mul, 3),
-                "pitch": ln.get("pitch", v["pitch"]), "inton": ln.get("inton", v["inton"])}
+        p = {"speaker": v["styles"][style], "style": style, "speed": round(ln.get("speed", v["speed"]) * mul, 3),
+             "pitch": ln.get("pitch", v["pitch"]), "inton": ln.get("inton", v["inton"])}
+        # 文末の自然さ（v7〜）：設定がある版だけキーを足す（旧版のキャッシュと音声は変わらない）。行ごとに "merge_aux": false で切れる
+        if not ln.get("ending"):
+            for k in ("merge_aux",):
+                val = ln.get(k, v.get(k))
+                if val:
+                    p[k] = val
+        return p
 
     def synth_cached(self, ln, cache):
         p = self.voice_params(ln)
@@ -72,6 +80,8 @@ class Episode:
         req = urllib.request.Request(f"{ENGINE}/audio_query?text={urllib.parse.quote(ln['speech'])}&speaker={p['speaker']}",
                                      method="POST")
         q = json.loads(urllib.request.urlopen(req, timeout=60).read())
+        if p.get("merge_aux"):
+            merge_final_aux(q, p["speaker"])
         q.update(speedScale=p["speed"], pitchScale=p["pitch"], intonationScale=p["inton"], prePhonemeLength=0.03,
                  postPhonemeLength=0.05, outputSamplingRate=SR, outputStereo=False)
         req = urllib.request.Request(f"{ENGINE}/synthesis?speaker={p['speaker']}", data=json.dumps(q).encode(),
@@ -120,6 +130,7 @@ class Episode:
         tl = {"fps": FPS, "duration": round(total, 5), "endcard_start": round(ending_start, 5),
               "ending_start": round(ending_start, 5), "names": names,
               "credits": [self.voices[k]["credit"] for k in ("M", "W")],
+              "logo": bool(self.cfg.get("logo", False)),   # 左上の固定ロゴ（標準は出さない。個別に出す回だけ "logo": True）
               "cues": self.build_cues(timeline), "lines": timeline}
         (self.work / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1), encoding="utf-8")
         body = [x for x in timeline if not x.get("ending")]
@@ -410,7 +421,34 @@ class Episode:
                 f"- 男女の高さの差：約 {12 * math.log2(res['W'] / res['M']):.1f} 半音",
                 f"- テンポ（本編、間を含む）：**{pace(body):.2f} モーラ/秒**（第 2 話 {EP2_RATE} の **{pace(body) / EP2_RATE:.2f} 倍**）",
                 f"- 話す速さ（間を除く）：オモテ {sp['M']:.2f}、ウラ {sp['W']:.2f} モーラ/秒（第 2 話は M 5.45、W 5.86）",
-                f"- セリフの間：中央値 {np.median(gaps):.2f} 秒、最大 {max(gaps):.2f} 秒（第 2 話は 0.19 秒＋行ごとの間）", ""]
+                f"- セリフの間：中央値 {np.median(gaps):.2f} 秒、最大 {max(gaps):.2f} 秒（第 2 話は 0.19 秒＋行ごとの間）", "",
+                *self.qc_endings(tl)]
+
+    def qc_endings(self, tl):
+        """断定の文末が上がっていないか（最後の有声モーラ − 直前の有声モーラ、半音）。+1 半音を超える行は耳で確認し、
+        必要なら言い回しを変える（VOICEVOX は最後のモーラの音程の指定を反映しないため、原稿で直す）"""
+        cache, rows, ups = self.work / "voice_cache", [], []
+        for x in tl["lines"]:
+            if x.get("ending") or x["speech"].rstrip().endswith(("？", "?", "…", "！", "!")):
+                continue
+            ln = next(l for l in self.lines()["lines"] if l["id"] == x["id"])
+            try:
+                _, q, _, _ = self.synth_cached(ln, cache)
+            except Exception:
+                continue
+            a = read_wav(self.work / "voice" / f"{x['id']}.wav")
+            r, j = ending_rise(a, q), final_phrase_rise(a, q)
+            if r is None and j is None:
+                continue
+            rows.append(r if r is not None else 0.0)
+            if (r or 0) > 1.0 or (j or 0) > 0.5:
+                ups.append(f"{x['id']}（{x['speech'][-10:]}：最後のモーラ {r if r is not None else 0:+.1f}、最後の短い句へ {j if j is not None else 0:+.1f} 半音）")
+        if not rows:
+            return []
+        return ["## 文末の音程（断定の文）", "",
+                f"- 測った行：{len(rows)}。最後の有声モーラ − 直前の有声モーラ：中央値 {np.median(rows):+.2f} 半音（下がっていれば負）",
+                f"- **上がって聞こえるおそれのある行（最後のモーラが +1 半音超、または文末の 3 モーラ以下の句へ +0.5 半音超）："
+                f"{'、'.join(ups) if ups else 'なし'}**" + ("（耳で確認し、必要なら言い回しを変える）" if ups else ""), ""]
 
     def qc_music(self, tl):
         mus = read_wav(self.work / "music.wav", stereo_ok=True)
@@ -467,6 +505,99 @@ class Episode:
 
 
 # ---------------------------------------------------------------- helpers
+AUX_END = re.compile(r"/(イル|イタ|アル)'$")
+
+
+def merge_final_aux(q, speaker):
+    """文末の「〜ている／〜ていた／〜である」の「いる・いた・ある」を、前の句につなげる（v7〜の merge_aux）。
+    VOICEVOX は文末の「いる」を独立したアクセント句（「オオワレテ'/イル'」）にして、低い「て」のあとで高く戻すため、
+    語尾が上がって聞こえる。前の句につなげると、アクセントの下がり目のあとに低く続く（自然な日本語の言い方）。
+    pilot_010 の 8 行で「て→いる」の高さの変化：+0.8〜−0.3 半音 → −0.3〜−3.3 半音（L22 のように前の句の山が早い行は変化なし）。
+    なお、VOICEVOX 0.24 は最後のモーラの音程・長さの指定を反映しない（実測：82.5 Hz を指定しても 101.7 Hz）ので、
+    最後のモーラだけを下げる方法は使わない。"""
+    kana = q.get("kana", "")
+    if not AUX_END.search(kana):
+        return q
+    k2 = AUX_END.sub(lambda m: m.group(1), kana)
+    req = urllib.request.Request(f"{ENGINE}/accent_phrases?text={urllib.parse.quote(k2)}&speaker={speaker}&is_kana=true",
+                                 method="POST")
+    q["accent_phrases"] = json.loads(urllib.request.urlopen(req, timeout=60).read())
+    q["kana"] = k2
+    return q
+
+
+def yin(x, sr=SR, fmin=70, fmax=320, win=0.025, hop=0.005, th=0.3):
+    """声の高さ（YIN 法）。文末の確認用（f0_track より半音の誤差が小さい）"""
+    W, H, tmin, tmax, out = int(win * sr), int(hop * sr), int(sr / fmax), int(sr / fmin), []
+    for i in range(0, len(x) - W - tmax, H):
+        f = x[i:i + W + tmax]
+        if np.sqrt(np.mean(f[:W] ** 2)) < 0.005:
+            out.append(0.0)
+            continue
+        d = np.array([np.sum((f[:W] - f[t:t + W]) ** 2) for t in range(tmax + 1)])
+        dn = np.ones_like(d)
+        dn[1:] = d[1:] * np.arange(1, tmax + 1) / np.maximum(np.cumsum(d[1:]), 1e-12)
+        cand = np.where(dn[tmin:] < th)[0]
+        if not len(cand):
+            out.append(0.0)
+            continue
+        t = tmin + cand[0]
+        while t + 1 < len(dn) and dn[t + 1] < dn[t]:
+            t += 1
+        out.append(sr / t)
+    return np.array(out)
+
+
+def ending_rise(a, q, hop=0.005):
+    """最後の有声モーラが、直前の有声モーラより何半音高いか（モーラの区間は audio_query の長さから）。
+    間に無声化したモーラ（アクセントの山が無声化した「現れて**き**た」など）がある場合は、自然な下がり目なので None"""
+    sp = q["speedScale"]
+    t, moras = q["prePhonemeLength"] / sp, []
+    for ph in q["accent_phrases"]:
+        for m in ph["moras"]:
+            cl, vl = (m.get("consonant_length") or 0) / sp, m["vowel_length"] / sp
+            moras.append((m["pitch"] > 0, t + cl, t + cl + vl))
+            t += cl + vl
+        if ph.get("pause_mora"):
+            t += ph["pause_mora"]["vowel_length"] / sp
+    if len(moras) < 2 or not moras[-1][0] or not moras[-2][0]:
+        return None
+    t0 = moras[-2][1]
+    f = yin(np.concatenate([a[int(t0 * SR):], np.zeros(int(0.05 * SR))]), hop=hop)   # 文末まで窓が届くように後ろを足す
+    seg = lambda m: f[int((m[1] - t0) / hop):int((m[2] - t0) / hop)]
+    p1, p2 = seg(moras[-2]), seg(moras[-1])
+    p1, p2 = p1[p1 > 0], p2[p2 > 0]
+    if not len(p1) or not len(p2):
+        return None
+    return 12 * math.log2(float(np.median(p2)) / float(np.median(p1)))
+
+
+def final_phrase_rise(a, q, hop=0.005):
+    """文末の短いアクセント句（3 モーラ以下。「いる」「だけ」など）の最高点が、その直前のモーラより何半音高いか。
+    VOICEVOX が文末の「いる」を独立した句にしたときの「語尾上がり」を見つける"""
+    phs = q["accent_phrases"]
+    if len(phs) < 2 or len(phs[-1]["moras"]) > 3 or phs[-2].get("pause_mora"):
+        return None
+    sp = q["speedScale"]
+    t, spans = q["prePhonemeLength"] / sp, []
+    for k, ph in enumerate(phs):
+        for m in ph["moras"]:
+            cl, vl = (m.get("consonant_length") or 0) / sp, m["vowel_length"] / sp
+            spans.append((k, m["pitch"] > 0, t + cl, t + cl + vl))
+            t += cl + vl
+        if ph.get("pause_mora"):
+            t += ph["pause_mora"]["vowel_length"] / sp
+    prev = [s_ for s_ in spans if s_[0] == len(phs) - 2 and s_[1]]
+    fin = [s_ for s_ in spans if s_[0] == len(phs) - 1 and s_[1]]
+    if not prev or not fin:
+        return None
+    t0 = prev[-1][2]
+    f = yin(np.concatenate([a[int(t0 * SR):], np.zeros(int(0.05 * SR))]), hop=hop)
+    med = lambda m: (lambda v: float(np.median(v)) if len(v) else 0.0)((lambda v: v[v > 0])(f[int((m[2] - t0) / hop):int((m[3] - t0) / hop)]))
+    p0, pk = med(prev[-1]), max(med(m) for m in fin)
+    return 12 * math.log2(pk / p0) if p0 > 0 and pk > 0 else None
+
+
 def bpm_of(style):
     return (music.TECH_STYLES.get(style) or music.STYLES[style])["bpm"]
 
