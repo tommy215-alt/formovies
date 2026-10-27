@@ -93,6 +93,22 @@ function fit(list, yTop = FIT_TOP, yBot = FIT_BOT) {
   const yb = Math.max(...bots.map(px));
   if (yb > yBot) { const ang = y => Math.atan((1 - 2 * y / H) * Math.tan(cam.fov * Math.PI / 360)); cam.rotateX(-(ang(yBot) - ang(yb))); cam.updateMatrixWorld(); }
 }
+// 人物用：画面上の実際の範囲（box）で収める。近いカメラでは足もとより手前の体のほうが下に写るため
+function fitB(items, yTop = FIT_TOP, yBot = FIT_BOT) {
+  items = items.filter(Boolean); if (!items.length) return;
+  const ang = y => Math.atan((1 - 2 * y / H) * Math.tan(cam.fov * Math.PI / 360));
+  for (let pass = 0; pass < 3; pass++) {
+    cam.updateMatrixWorld();
+    const bs = items.map(i => i.box()).filter(Boolean); if (!bs.length) return;
+    const top = Math.min(...bs.map(b => b[1])), bot = Math.max(...bs.map(b => b[3])), A = yBot - yTop;
+    if (bot - top > A) { const c = items.reduce((m, i) => m.add(i.c()), V3(0, 0, 0)).multiplyScalar(1 / items.length);
+      cam.position.copy(c.clone().add(cam.position.clone().sub(c).multiplyScalar((bot - top) / A * 1.03))); continue; }
+    if (bot > yBot) cam.rotateX(-(ang(yBot) - ang(bot)));
+    else if (top < yTop) cam.rotateX(ang(top) - ang(yTop));
+  }
+  cam.updateMatrixWorld();
+}
+const P_ = p => ({ box: () => p.g.visible ? p.box(cam, W, H) : null, c: () => p.g.position.clone().add(V3(0, .85 * (p.S || 1), 0)) });
 function guardP(p) { if (p.g.visible) guardBox(p.box(cam, W, H)); }
 function boxOf(obj) {      // 物の画面上の範囲（文字の検査用）
   obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj); if (bb.isEmpty()) return null;
@@ -547,7 +563,7 @@ function drawScene(t, name) {
       aHand.visible = kHand.visible = up < .35;
       const push = easeOut(prog(t, CUE.steal, 1.0));                 // 引っぱる瞬間に少し寄る
       setCam(lerpV(V3(.05, 1.3, .78), V3(.1, 1.55, 2.2), up), lerpV(V3(0, .82, -.06), V3(-.05, 1.1, -.45), up), lerp(40 - 5 * push, 38, up));
-      if (knight.g.visible) fit([personPts(knight, .8)]);             // 机より下は机に隠れる：見えている上半身だけを収める
+      if (knight.g.visible) fitB([{ box: () => boxOf(knight.parts.hips), c: () => knight.parts.hips.getWorldPosition(V3(0, 0, 0)) }], t >= CUE.name - .3 ? 440 : FIT_TOP);   // 机より下は机に隠れる：上半身を、上の名前の札と下の字幕の間に
       draw3D(up < .3 ? { focus: cam.position.distanceTo(V3(.1, .82, .05)), slab: .2, far: 5, near: 5 } : null);
       if (knight.g.visible) guardBox(boxOf(knight.parts.hips));
       extraDip = Math.max(0, 1 - (t - CUE.steal) / .12) * .9;        // 切り替えの一瞬だけ暗く（白い閃光は使わない）
@@ -561,7 +577,7 @@ function drawScene(t, name) {
     else if (t < CUE.shuttle) {
       const u = easeInOut(prog(t, CUE.girl, CUE.shuttle - CUE.girl));
       girl.g.visible = true; girl.pose({ x: -1.9, z: -2.3, yaw: -.9 - .4 * u, nod: -.25 + .1 * Math.sin(t), look: .3 * Math.sin(t * .6) });
-      setCam(V3(-.15 + .2 * u, 1.25, .5 - .3 * u), V3(-1.9, 1.0, -2.4), 40); fit([personPts(girl)]);
+      setCam(V3(-.15 + .2 * u, 1.25, .5 - .3 * u), V3(-1.9, 1.0, -2.4), 40); fitB([P_(girl)]);
       dof = { focus: cam.position.distanceTo(V3(-1.9, .8, -2.3)), slab: .8, far: 4, near: 5 };
       guardP(girl);
     } else {                                                        // 杼の動き → 安全装置の線（少女が考えた、と伝えられる）
@@ -593,7 +609,7 @@ function drawScene(t, name) {
     workers.forEach(w => w.g.visible = true);
     workers.forEach((w, i) => w.pose({ x: -1.8 + i * 1.8, z: -.55, yaw: Math.PI, lean: .3, nod: .45, armFL: .9 + .15 * Math.sin(t * 3 + i), armFR: .9 + .15 * Math.cos(t * 3 + i), elbowL: .6, elbowR: .6 }));
     envHero.visible = false; apple.visible = false;
-    if (t < CUE.envelope) { const u = easeInOut(prog(t, a, CUE.envelope - a)); setCam(V3(3.4 - .6 * u, 1.75, 1.0 - .2 * u), V3(-.6, .95, -1.0), 40); }
+    if (t < CUE.envelope) { const u = easeInOut(prog(t, a, CUE.envelope - a)); setCam(V3(3.4 - .6 * u, 1.75, 1.0 - .2 * u), V3(-.6, .95, -1.0), 40); fitB(workers.map(P_)); workers.forEach(guardP); }
     else {                                                          // 封筒型の袋に物を入れると、立たずに倒れる
       envHero.visible = true; apple.visible = true; workers.forEach(w => w.g.visible = false);
       const fall = easeIn(prog(t, CUE.topple, .55));
@@ -685,7 +701,7 @@ function drawMachineShop(t, name) {    // ボストンの機械工場 → 機械
   } else {
     annan.g.visible = true; const u = easeInOut(prog(t, CUE.annan, CUE.claim - CUE.annan));
     annan.pose({ x: .9, z: -1.15, yaw: -.4, lean: .12, nod: .25, look: -.2 });
-    setCam(V3(-.6 + .2 * u, 1.35, 2.0 - .3 * u), V3(.7, 1.0, -1.0), 36); fit([personPts(annan)], 430);   // 上の名前の札にもかからないように
+    setCam(V3(-.6 + .2 * u, 1.35, 2.0 - .3 * u), V3(.7, 1.0, -1.0), 36); fitB([P_(annan)]);   // 上の名前の札にもかからないように
     key.intensity = 26; draw3D({ focus: cam.position.distanceTo(V3(.9, 1.2, -1.15)), slab: .6, far: 4, near: 6 });
     guardP(annan);
   }
@@ -705,10 +721,10 @@ function drawHall(t) {             // 審理の部屋：長い机の手前にナ
   if (woodModel.visible) { const k = easeOut(prog(t, CUE.items + 1.2, .5)); woodModel.position.set(-.05, lerp(1.0, .815, k), .18); woodModel.rotation.y = .6; woodModel.scale.setScalar(.8); }
   if (t < CUE.quote) {               // 斜め上から：長い机の両端に立つ二人（どちらも字幕より上に）
     const u = easeInOut(prog(t, CUE.hall, CUE.quote - CUE.hall));
-    setCam(V3(1.05 - .15 * u, 2.7, 3.3 - .3 * u), V3(-.05, .7, -.2), 44); fit([personPts(knight), personPts(annan)]); draw3D(null);
+    setCam(V3(1.05 - .15 * u, 2.7, 3.3 - .3 * u), V3(-.05, .7, -.2), 44); fitB([P_(knight), P_(annan)]); draw3D(null);
   } else if (t < CUE.evidence) {     // アナンの主張：奥のアナンへ寄る（ナイトはカメラの後ろ）
     const u = easeInOut(prog(t, CUE.quote, CUE.evidence - CUE.quote));
-    setCam(V3(.35, 1.5, .9 - .3 * u), V3(0, 1.0, -1.75), 34); fit([personPts(annan)]);
+    setCam(V3(.35, 1.5, .9 - .3 * u), V3(0, 1.0, -1.75), 34); fitB([P_(annan)]);
     draw3D({ focus: cam.position.distanceTo(V3(0, 1.15, -1.75)), slab: .6, far: 3, near: 7 });
   } else if (t < CUE.witness) {      // 机の上：設計図・日誌・模型（上から。人物は映さない）
     knight.g.visible = annan.g.visible = false;
@@ -718,7 +734,7 @@ function drawHall(t) {             // 審理の部屋：長い机の手前にナ
     witnesses.forEach((w, i) => { const k = easeOut(prog(t, CUE.witness + i * .35, .6)); w.g.visible = k > 0; w.pose({ x: -.75 + .75 * i, z: 2.35 + .25 * (i % 2) + .3 * (1 - k), yaw: Math.PI, nod: .1 }); });
     const u = easeInOut(prog(t, CUE.witness, CUE.patent - CUE.witness));
     setCam(V3(1.6, 2.9 + .2 * u, 6.2 + .4 * u), V3(0, .7, .4), 42);
-    fit([personPts(knight), personPts(annan), ...witnesses.map(w => personPts(w))]); draw3D(null);
+    fitB([P_(knight), P_(annan), ...witnesses.map(P_)]); draw3D(null);
   }
   guardP(knight); guardP(annan); witnesses.forEach(guardP);
 }
@@ -767,7 +783,7 @@ function drawToday(t, a, b) {      // 現代の店へ（冒頭と同じ構図）
     bag1.visible = false; shopper.g.visible = true;
     const u = easeInOut(prog(t, CUE.last, b - CUE.last));
     shopper.pose({ x: .2 - .6 * u, z: 1.3 - .9 * u, yaw: Math.PI + .35, walk: t * 5, stride: .25, armR: .05, armFR: 0, elbowR: 0 });
-    setCam(V3(.9 + .2 * u, 1.6 + .3 * u, 4.4 + .8 * u), V3(-.1 - .3 * u, .95, .3), 38); fit([personPts(shopper)]);
+    setCam(V3(.9 + .2 * u, 1.6 + .3 * u, 4.4 + .8 * u), V3(-.1 - .3 * u, .95, .3), 38); fitB([P_(shopper)]);
     draw3D(null); guardP(shopper);
   }
 }
@@ -776,20 +792,15 @@ function drawUI(t, name) {
   if (name === "mill") {
     uiNote("※人物と場面は再現CG", 540, 250, win(t, CUE.mill, CUE.loom, .3, .4));
     if (t < CUE.loom) uiCard([["1838年　アメリカ・メイン州生まれ", 40, 700]], 540, 340, k_(t, "mill", .45, .2) * (1 - prog(t, CUE.loom - .4, .35)));
-    if (t >= CUE.girl && t < CUE.shuttle) uiCard([["12歳ごろから　綿の工場で", 40, 700]], 540, 330, k_(t, "girl", .45, .2) * (1 - prog(t, CUE.shuttle - .4, .35)));
   }
-  if (name === "bagshop" && t < CUE.envelope) uiCard([["1867年　紙袋の工場へ", 42, 700], ["マサチューセッツ州スプリングフィールド", 28, 500, "#B8C7D6"]], 540, 330, k_(t, "bagshop", .45, .2) * (1 - prog(t, CUE.envelope - .4, .35)));
-  if (name === "workshop" && t >= CUE.trial && t < CUE.shop) uiCard([["2年以上の試作", 42, 700]], 540, 300, k_(t, "trial", .45, .2) * (1 - prog(t, CUE.shop - .4, .35)));
-  if (name === "workshop" && t >= CUE.shop) uiCard([["ボストンの機械工場", 42, 700]], 540, 300, k_(t, "shop", .45, .2));
+  if (name === "bagshop" && t < CUE.envelope) uiCard([["マサチューセッツ州スプリングフィールド", 32, 600]], 540, 300, k_(t, "bagshop", .45, .2) * (1 - prog(t, CUE.envelope - .4, .35)));
   if (name === "dispute") {
-    if (t < CUE.claim) uiCard([["チャールズ・アナン", 48, 800], ["機械工場で製作を見ていた男", 28, 500, "#B8C7D6"]], 540, 330, k_(t, "annan", .45, .4) * (1 - prog(t, CUE.claim - .4, .35)));
     if (t >= CUE.items && t < CUE.witness) {
       const lab = [["設計図", CUE.items, 0, .816, .55], ["日誌", CUE.items + .7, -.28, .85, .05], ["試作品", CUE.items + 1.4, -.05, .9, .18]];
       lab.forEach(([s, t0, x, y, z]) => { const [px, py] = proj(V3(x, y, z)); uiCard([[s, 40, 800]], clamp(px, 150, 930), clamp(py - 150, 280, 1150), easeOut(prog(t, t0, .4))); });
     }
   }
-  if (name === "patent" && t < CUE.machine) uiCard([["1871年　特許取得", 46, 800], ["米国特許 No.116,842", 30, 500, "#B8C7D6"]], 540, 300, k_(t, "patent", .45, .5));
-  if (name === "patent" && t >= CUE.improve) uiCard([["その後も、改良が続く", 40, 700]], 540, 300, k_(t, "improve", .45, .3));
+  if (name === "patent" && t < CUE.machine) uiCard([["米国特許 No.116,842", 38, 700], ["1871年7月11日", 30, 500, "#B8C7D6"]], 540, 300, k_(t, "patent", .45, .5));
 }
 function renderFrame(t) {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
