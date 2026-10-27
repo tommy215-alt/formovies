@@ -1,7 +1,7 @@
 # ChatGPT レビュー依頼：送ったメッセージは、空を飛んでいるのか？（pilot_001）
 
 > この文書は、YouTube Shorts チャンネル「世界の解剖室」のシナリオ 1 本分のレビュー資料です。
-> 生成日：2026-10-26。元ファイル：`anatomy_room/scripts/pilot_001/` と `anatomy_room/reviews/internal_review/pilot_001_review.md`。
+> 生成日：2026-10-27。元ファイル：`anatomy_room/scripts/pilot_001/` と `anatomy_room/reviews/internal_review/pilot_001_review.md`。
 
 ## あなたへの依頼
 
