@@ -583,7 +583,7 @@ function drawScene(t, name) {
     } else {                                                        // 杼の動き → 安全装置の線（少女が考えた、と伝えられる）
       const L = looms[7]; const lp = L.g.position;
       const u = easeInOut(prog(t, CUE.shuttle, CUE.guard - CUE.shuttle + 1));
-      setCam(V3(lp.x + .12 - .08 * u, 1.3, lp.z + .5), V3(lp.x + .05, .83, lp.z - .02), 42);
+      setCam(V3(lp.x + 1.15 - .15 * u, 1.08, lp.z + .3), V3(lp.x - .05, .84, lp.z), 34);   // 横から：杼が左右に走る道すじが見える
     }
     draw3D(dof);
     if (t >= CUE.shuttle) {                                          // 杼の軌跡と、止める仕組みの線（2D）
@@ -684,7 +684,7 @@ function machineRun(t, t0, speed) {
     b.visible = life > 0;
     const run = clamp(life / 1.6), pile = Math.min(i, 6);
     b.position.set(lerp(.55, 1.45, easeOut(run)), lerp(.62, .45 + pile * .0, run), lerp(0, .0, run) + (run >= 1 ? -.18 + (i % 3) * .14 : 0));
-    b.rotation.set(0, run >= 1 ? .3 * (i % 3) : 0, 0);
+    b.rotation.set(0, run >= 1 ? .3 * (i % 3) : 0, 0); b.scale.setScalar(1.7);   // 遠くからでも袋と分かる大きさに
   });
 }
 function drawMachineShop(t, name) {    // ボストンの機械工場 → 機械を見ていた男
@@ -749,12 +749,20 @@ function drawPatent(t, a, b) {
     const u = easeInOut(prog(t, CUE.patent, CUE.machine - CUE.patent));
     setCam(V3(.02, 1.42 - .1 * u, .3 - .05 * u), V3(.02, .8, .0), 34);
     draw3D(null);
-  } else if (t < CUE.improve) {    // 手で一つずつ ⇔ 機械から次々
+  } else if (t < CUE.mass) {       // 手作業：一つずつ折る（このあと機械と対比）
+    show("desk"); warmth = .22;
+    lights({ keyPos: [.2, 1.8, .4], keyAt: [0, .8, 0], keyI: 22, angle: .8, rimPos: [2, 2.5, -2], rimI: .6, hemiI: .25, fog: .08, fogC: 0x0e0c0a, exp: 1.2 });
+    const f = easeInOut(prog(t, CUE.machine + .2, CUE.mass - CUE.machine - .3));
+    const b0 = proto[0]; b0.visible = true; b0.position.set(0, .81, .05); b0.rotation.y = .5; b0.scale.set(2.2, .05 + .95 * f, 2.2);   // 平らな紙が袋の形に立ち上がる
+    kHand.visible = true; kHand.position.set(-.12, .84 + .1 * f, .12); kHand.rotation.set(0, Math.PI / 2, -.3 * f);
+    setCam(V3(.35, 1.15, .55), V3(0, .88, .03), 34); fit([objPts(b0)]);
+    draw3D({ focus: cam.position.distanceTo(V3(0, .9, .05)), slab: .2, far: 5, near: 5 });
+  } else if (t < CUE.improve) {    // 機械から次々に出て、積み上がる
     show("mshop"); warmth = .1;
     lights({ keyPos: [1.5, 3, 1.5], keyAt: [0, .7, 0], keyI: 40, angle: .8, keyCol: 0xffe2b8, rimPos: [-3, 2.5, -3], rimI: 1.1, hemiI: .3, fog: .05, fogC: 0x0f0f10, exp: 1.2 });
-    machineRun(t, CUE.machine - 1.5, t < CUE.mass ? .35 : 1.2);
-    const u = easeInOut(prog(t, CUE.machine, CUE.improve - CUE.machine));
-    setCam(lerpV(V3(-.3, 1.75, 1.9), V3(1.1, 1.5, 1.5), u), lerpV(V3(-.2, .66, 0), V3(1.0, .55, 0), u), 40);
+    machineRun(t, CUE.mass - 1.0, 1.3);
+    const u = easeInOut(prog(t, CUE.mass, CUE.improve - CUE.mass));
+    setCam(lerpV(V3(2.3, 1.45, 1.6), V3(2.0, 1.6, 1.9), u), V3(1.05, .6, 0), 40);   // 出口側から：袋が次々に出て積み上がる
     draw3D(null);
   } else {                         // その後の改良（機械の形が少しずつ変わる模式）
     show(); machine.visible = true; machineRun(t, CUE.machine, 1);

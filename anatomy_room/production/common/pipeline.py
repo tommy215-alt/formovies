@@ -509,7 +509,7 @@ class Episode:
 
 
 # ---------------------------------------------------------------- helpers
-AUX_END = re.compile(r"/(イル|イタ|アル)'$")
+AUX_END = re.compile(r"/(イル|イタ|アル|イウ)'$")   # 「〜という」の「いう」も同じ（pilot_011 の L14 で +1.0 半音の上がりを検出）
 
 
 def merge_final_aux(q, speaker):
