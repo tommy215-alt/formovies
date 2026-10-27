@@ -11,6 +11,8 @@
 
 ## 最初に読むもの
 
+0. **`anatomy_room/templates/REVERSE_STANDARD_RULES.md` — リバース標準制作ルール（2026-10-27〜、最優先の既定値）。参考作品は pilot_010。新しい動画の指示が来たら、指示にない項目はすべてこのルールで決める（下の各 docs と食い違うときはこちらが優先、その回のユーザーの個別指示はさらに優先）**
+
 1. `anatomy_room/docs/CHANNEL_POLICY.md` — チャンネルの目的・テーマ・動画仕様
 2. `anatomy_room/docs/CHARACTER_GUIDE.md` — M と W（女性役）の人物設定と掛け合いのルール
 3. `anatomy_room/docs/SCRIPT_RULES.md` — 台本の構成・書式・字幕のルール
@@ -29,9 +31,9 @@
   検索結果の要約・抜粋で確認したものは、その旨を必ず「確認方法」に書く。
 - 事実・説明・冗談・比喩演出・不確実な情報を分けて記録する（`FACT_CHECK_POLICY.md`）。
 - キャラクター設定（`CHARACTER_GUIDE.md` v3：**オモテ（M）＝破天荒な実験台**、好奇心と自信でブレーキが壊れているが頭は切れる／**ウラ（W）＝毒舌の解説者**、オモテを面白がり、短く鋭い一言で返す。人格否定はしない）を全動画で一貫させる。
-- 第 3 話以降の基本構成：疑問 → オモテが巻き込まれる → とんでもない事態 → ウラが毒舌を交えて解説 → オモテが理解する／さらにひどい目に遭う（`CHANNEL_POLICY.md`）。ギャグ・非現実の演出は画面に明記し、事実と区別する。
+- 標準の構成は `REVERSE_STANDARD_RULES.md` の 5 段（フック → 対象 → 背景・仕組み → 核心 → 余韻）で、ナレーション主体。**オモテとウラの会話形式の回**（ユーザーが指定したとき、または題材に合うとき）は：疑問 → オモテが巻き込まれる → とんでもない事態 → ウラが毒舌を交えて解説 → オモテが理解する／さらにひどい目に遭う（`CHANNEL_POLICY.md`）。ギャグ・非現実の演出・再現 CG は画面に明記し、事実と区別する。
 - **全動画の最後に共通エンディング**（W の声で「リバース。世界の仕組みを、はじめから。」＋専用の明るい画面）を付ける。仕様は `anatomy_room/docs/ENDING_SPEC.md`、映像は `anatomy_room/production/common/ending.js`、声の設定は `production/common/voices.json` の `ending`。
-- 画面は明るく、色のコントラストと動きのあるものにする（`CHANNEL_POLICY.md` の「映像」）。
+- 画面は暗めでテクノロジー感のある色調を標準とする（`REVERSE_STANDARD_RULES.md`）。暗さが目的ではなく、被写体と文字がはっきり見えること。第 7 弾までの明るい画面（`CHANNEL_POLICY.md` の「映像」）は旧標準。
 - 台本を直したら `python3 anatomy_room/tools/check_scripts.py`、
   `python3 anatomy_room/tools/build_chatgpt_review.py`、`python3 anatomy_room/tools/build_copy_page.py` を順に実行し、
   レビュー資料とスマホ用コピーページを作り直す。コピーページは Artifact（https://claude.ai/artifact/MrxPiW8hLtaEUJDx5sDkSZ）としても公開しているので、同じファイルを再公開して更新する。
