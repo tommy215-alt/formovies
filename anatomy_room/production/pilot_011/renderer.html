@@ -74,6 +74,26 @@ function draw3D(dof) {
 }
 function proj(v) { const p = v.clone().project(cam); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H, p.z]; }
 function guardBox(b) { if (b && b[2] > 0 && b[0] < W && b[3] > 0 && b[1] < H && (b[2] - b[0]) > 30) S.CHARLOG.push(b); }
+// 被写体を字幕の帯より上に収める（字幕の上端 ≈ 1443）。下端が帯にかかるならカメラを少し下へ向け、収まらないほど大きければ少し引く。
+// どちらも連続的に変わるので、コマごとにカメラが跳ばない
+const FIT_TOP = 210, FIT_BOT = 1390;
+function personPts(p, fromY = 0) { const s = p.S || 1, g = p.g.position; return { b: [V3(g.x, g.y + fromY, g.z)], t: [V3(g.x, g.y + 1.68 * s, g.z)] }; }
+function objPts(o) { o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o); const c = (y) => [V3(bb.min.x, y, bb.min.z), V3(bb.max.x, y, bb.min.z), V3(bb.min.x, y, bb.max.z), V3(bb.max.x, y, bb.max.z)];
+  return { b: c(bb.min.y), t: c(bb.max.y) }; }
+function fit(list, yTop = FIT_TOP, yBot = FIT_BOT) {
+  list = list.filter(Boolean); if (!list.length) return;
+  const px = v => (1 - v.clone().project(cam).y) / 2 * H;
+  const bots = list.flatMap(o => o.b), tops = list.flatMap(o => o.t), all = bots.concat(tops);
+  cam.updateMatrixWorld();
+  const span = Math.max(...bots.map(px)) - Math.min(...tops.map(px)), A = yBot - yTop;
+  if (span > A) {                                   // 大きすぎる：被写体の中心から遠ざかる
+    const c = all.reduce((m, v) => m.add(v), V3(0, 0, 0)).multiplyScalar(1 / all.length);
+    cam.position.copy(c.clone().add(cam.position.clone().sub(c).multiplyScalar(span / A * 1.03))); cam.updateMatrixWorld();
+  }
+  const yb = Math.max(...bots.map(px));
+  if (yb > yBot) { const ang = y => Math.atan((1 - 2 * y / H) * Math.tan(cam.fov * Math.PI / 360)); cam.rotateX(-(ang(yBot) - ang(yb))); cam.updateMatrixWorld(); }
+}
+function guardP(p) { if (p.g.visible) guardBox(p.box(cam, W, H)); }
 function boxOf(obj) {      // 物の画面上の範囲（文字の検査用）
   obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj); if (bb.isEmpty()) return null;
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -444,7 +464,7 @@ function subChunk(line, t) {
 }
 function docSub(t) {
   const line = S.currentLine(t); if (!line || t >= TL.ending_start) return;
-  const rows = subChunk(line, t).split(" / "), cx = 520, cy = 1470, maxW = 860;
+  const rows = subChunk(line, t).split(" / "), cx = 520, cy = 1530, maxW = 860;
   let size = 52; ui.font = `700 ${size}px ${S.FONT}`;
   let wmax = Math.max(...rows.map(r => ui.measureText(r.replace(/\*\*/g, "")).width));
   if (wmax > maxW) { size = Math.max(44, Math.floor(size * maxW / wmax)); ui.font = `700 ${size}px ${S.FONT}`; wmax = Math.max(...rows.map(r => ui.measureText(r.replace(/\*\*/g, "")).width)); }
@@ -506,7 +526,7 @@ function drawScene(t, name) {
       hHook.visible = true; hHook.position.set(.3 + .02, 1.33 + .05 * lift + .12 * (1 - easeOut(prog(tf, 0, .3))), .08 + .1); hHook.rotation.set(0, Math.PI / 2 - .35, -1.2);   // 口のふちをつまむ
       shopper.g.visible = false;
       const push = easeOut(prog(t, 0, 2.2));
-      setCam(V3(1.15 - .2 * push, 1.72, 1.35 - .25 * push), V3(.33, 1.05, .05), 30);
+      setCam(V3(1.15 - .2 * push, 1.72, 1.35 - .25 * push), V3(.33, 1.05, .05), 30); fit([objPts(bag1)]);
       draw3D(t > CUE.freeze ? null : { focus: cam.position.distanceTo(V3(.3, 1.12, .08)), slab: .25, far: 6, near: 6 });
       if (t > CUE.freeze) {                                         // 静止：少し暗く・冷たく、輪郭の線
         const fk = easeOut(prog(t, CUE.freeze, .15));
@@ -527,8 +547,9 @@ function drawScene(t, name) {
       aHand.visible = kHand.visible = up < .35;
       const push = easeOut(prog(t, CUE.steal, 1.0));                 // 引っぱる瞬間に少し寄る
       setCam(lerpV(V3(.05, 1.3, .78), V3(.1, 1.55, 2.2), up), lerpV(V3(0, .82, -.06), V3(-.05, 1.1, -.45), up), lerp(40 - 5 * push, 38, up));
+      if (knight.g.visible) fit([personPts(knight, .8)]);             // 机より下は机に隠れる：見えている上半身だけを収める
       draw3D(up < .3 ? { focus: cam.position.distanceTo(V3(.1, .82, .05)), slab: .2, far: 5, near: 5 } : null);
-      guardBox(knight.box(cam, W, H));
+      if (knight.g.visible) guardBox(boxOf(knight.parts.hips));
       extraDip = Math.max(0, 1 - (t - CUE.steal) / .12) * .9;        // 切り替えの一瞬だけ暗く（白い閃光は使わない）
     }
   } else if (name === "mill") {
@@ -540,9 +561,9 @@ function drawScene(t, name) {
     else if (t < CUE.shuttle) {
       const u = easeInOut(prog(t, CUE.girl, CUE.shuttle - CUE.girl));
       girl.g.visible = true; girl.pose({ x: -1.9, z: -2.3, yaw: -.9 - .4 * u, nod: -.25 + .1 * Math.sin(t), look: .3 * Math.sin(t * .6) });
-      setCam(V3(-.15 + .2 * u, 1.25, .5 - .3 * u), V3(-1.9, 1.0, -2.4), 40);
+      setCam(V3(-.15 + .2 * u, 1.25, .5 - .3 * u), V3(-1.9, 1.0, -2.4), 40); fit([personPts(girl)]);
       dof = { focus: cam.position.distanceTo(V3(-1.9, .8, -2.3)), slab: .8, far: 4, near: 5 };
-      guardBox(girl.box(cam, W, H));
+      guardP(girl);
     } else {                                                        // 杼の動き → 安全装置の線（少女が考えた、と伝えられる）
       const L = looms[7]; const lp = L.g.position;
       const u = easeInOut(prog(t, CUE.shuttle, CUE.guard - CUE.shuttle + 1));
@@ -580,7 +601,7 @@ function drawScene(t, name) {
       const drop = easeIn(prog(t, CUE.topple - 1.1, .5));
       apple.position.set(1.95, lerp(1.45, 1.06, drop) - .12 * fall, -1.05 + .08 * fall);
       const u = easeInOut(prog(t, CUE.envelope, b - CUE.envelope));
-      setCam(V3(2.45 + .08 * u, 1.18, -.2 + .05 * u), V3(1.95, 1.0, -1.05), 32);
+      setCam(V3(2.45 + .08 * u, 1.18, -.2 + .05 * u), V3(1.95, 1.0, -1.05), 32); fit([objPts(envHero), objPts(apple)]);
       dof = { focus: cam.position.distanceTo(V3(1.95, 1.0, -1.05)), slab: .25, far: 6, near: 6 };
       guardBox(boxOf(envHero));
     }
@@ -597,7 +618,7 @@ function drawScene(t, name) {
       kHand.visible = true; kHand.position.set(-.12 + .1 * Math.sin(t * 2.2), .84, .2 + .04 * Math.cos(t * 1.7)); kHand.rotation.set(0, Math.PI / 2, 0);
       const wk = easeInOut(prog(t, CUE.wood - .3, 1.2));
       woodModel.visible = wk > 0; woodModel.position.set(.32, .81, .22); woodModel.rotation.y = -.5; woodModel.scale.setScalar(.6 + .4 * wk);
-      setCam(lerpV(V3(.05, 1.55, .85), V3(.85, 1.3, 1.0), wk), lerpV(V3(0, .8, 0), V3(.3, .86, .2), wk), 38);
+      setCam(lerpV(V3(.05, 1.55, .85), V3(.85, 1.3, 1.0), wk), lerpV(V3(0, .8, 0), V3(.3, .86, .2), wk), 38); if (wk > 0) fit([objPts(woodModel)]);
       draw3D({ focus: cam.position.distanceTo(wk > .5 ? V3(.32, .86, .22) : V3(0, .8, .05)), slab: .22, far: 5, near: 5 });
       if (wk > .5) guardBox(boxOf(woodModel));
     } else drawMachineShop(t, name);
@@ -610,7 +631,7 @@ function drawScene(t, name) {
       appDoc.visible = true; appDoc.position.set(lerp(.5, 0, u), .815, lerp(-.15, .02, u)); appDoc.rotation.set(-Math.PI / 2, 0, lerp(.5, .08, u));
       aHand.visible = true; aHand.position.set(lerp(.62, .2, u), .84, lerp(-.15, .02, u)); aHand.rotation.set(0, Math.PI, 0);
       drawBlueprint(1); bp.visible = true; bp.position.set(-.38, .812, -.12); bp.rotation.set(-Math.PI / 2, 0, -.2);
-      setCam(V3(.08, 1.2, .5), V3(.02, .8, .0), 32);
+      setCam(V3(.08, 1.2, .5), V3(.02, .8, .0), 32); fit([objPts(appDoc)]);
       draw3D({ focus: cam.position.distanceTo(V3(.02, .8, .02)), slab: .18, far: 5, near: 5 });
       guardBox(boxOf(appDoc));
     } else drawHall(t);
@@ -664,9 +685,9 @@ function drawMachineShop(t, name) {    // ボストンの機械工場 → 機械
   } else {
     annan.g.visible = true; const u = easeInOut(prog(t, CUE.annan, CUE.claim - CUE.annan));
     annan.pose({ x: .9, z: -1.15, yaw: -.4, lean: .12, nod: .25, look: -.2 });
-    setCam(V3(-.6 + .2 * u, 1.35, 2.0 - .3 * u), V3(.7, 1.0, -1.0), 36);
+    setCam(V3(-.6 + .2 * u, 1.35, 2.0 - .3 * u), V3(.7, 1.0, -1.0), 36); fit([personPts(annan)], 430);   // 上の名前の札にもかからないように
     key.intensity = 26; draw3D({ focus: cam.position.distanceTo(V3(.9, 1.2, -1.15)), slab: .6, far: 4, near: 6 });
-    guardBox(annan.box(cam, W, H));
+    guardP(annan);
   }
 }
 function drawHall(t) {             // 審理の部屋：長い机の手前にナイト（背中）、奥にアナン（こちら向き）
@@ -682,22 +703,24 @@ function drawHall(t) {             // 審理の部屋：長い机の手前にナ
   if (bp.visible) { const sp = easeOut(prog(t, CUE.spread - .3, .6)); drawBlueprint(1); bp.position.set(0, .816, .55); bp.rotation.set(-Math.PI / 2, 0, Math.PI + .05); bp.scale.set(lerp(.15, 1, sp), 1, 1); }
   if (diary.visible) { const k = easeOut(prog(t, CUE.items, .5)); diary.position.set(-.28, lerp(1.0, .83, k), .05); diary.rotation.set(0, .3, 0); }
   if (woodModel.visible) { const k = easeOut(prog(t, CUE.items + 1.2, .5)); woodModel.position.set(-.05, lerp(1.0, .815, k), .18); woodModel.rotation.y = .6; woodModel.scale.setScalar(.8); }
-  if (t < CUE.quote) {               // 肩越し：手前にナイトの背中、奥にアナン
+  if (t < CUE.quote) {               // 斜め上から：長い机の両端に立つ二人（どちらも字幕より上に）
     const u = easeInOut(prog(t, CUE.hall, CUE.quote - CUE.hall));
-    setCam(V3(.55 - .1 * u, 1.6, 3.1 - .3 * u), V3(-.05, 1.0, -1.4), 38); draw3D(null);
-  } else if (t < CUE.evidence) {     // アナンの主張：奥のアナンへ寄る（ナイトの肩はぼける）
+    setCam(V3(1.05 - .15 * u, 2.7, 3.3 - .3 * u), V3(-.05, .7, -.2), 44); fit([personPts(knight), personPts(annan)]); draw3D(null);
+  } else if (t < CUE.evidence) {     // アナンの主張：奥のアナンへ寄る（ナイトはカメラの後ろ）
     const u = easeInOut(prog(t, CUE.quote, CUE.evidence - CUE.quote));
-    setCam(V3(.35, 1.45, 2.4 - .5 * u), V3(0, 1.15, -1.75), 30);
+    setCam(V3(.35, 1.5, .9 - .3 * u), V3(0, 1.0, -1.75), 34); fit([personPts(annan)]);
     draw3D({ focus: cam.position.distanceTo(V3(0, 1.15, -1.75)), slab: .6, far: 3, near: 7 });
-  } else if (t < CUE.witness) {      // 机の上：設計図・日誌・模型（上から）
+  } else if (t < CUE.witness) {      // 机の上：設計図・日誌・模型（上から。人物は映さない）
+    knight.g.visible = annan.g.visible = false;
     const u = easeInOut(prog(t, CUE.evidence, CUE.witness - CUE.evidence));
-    setCam(V3(.95 - .1 * u, 1.75, .55 - .1 * u), V3(-.02, .8, .32), 40); draw3D(null);   // 横の上から（ナイトの頭で隠れないように）
+    setCam(V3(.95 - .1 * u, 1.75, .55 - .1 * u), V3(-.02, .8, .32), 40); draw3D(null);   // 横の上から
   } else {                           // 引いて：ナイトの後ろに、製作を見ていた人たちが立つ
     witnesses.forEach((w, i) => { const k = easeOut(prog(t, CUE.witness + i * .35, .6)); w.g.visible = k > 0; w.pose({ x: -.75 + .75 * i, z: 2.35 + .25 * (i % 2) + .3 * (1 - k), yaw: Math.PI, nod: .1 }); });
     const u = easeInOut(prog(t, CUE.witness, CUE.patent - CUE.witness));
-    setCam(V3(1.2, 2.5 + .2 * u, 6.0 + .4 * u), V3(0, .9, .4), 40); draw3D(null);
+    setCam(V3(1.6, 2.9 + .2 * u, 6.2 + .4 * u), V3(0, .7, .4), 42);
+    fit([personPts(knight), personPts(annan), ...witnesses.map(w => personPts(w))]); draw3D(null);
   }
-  guardBox(knight.box(cam, W, H)); guardBox(annan.box(cam, W, H)); witnesses.forEach(w => { if (w.g.visible) guardBox(w.box(cam, W, H)); });
+  guardP(knight); guardP(annan); witnesses.forEach(guardP);
 }
 function drawPatent(t, a, b) {
   if (t < CUE.machine) {           // 設計図の上に特許の書類
@@ -737,15 +760,15 @@ function drawToday(t, a, b) {      // 現代の店へ（冒頭と同じ構図）
     hHook.visible = true; hHook.position.set(.3 + .02, 1.33 + .05 * lift + .12 * (1 - easeOut(prog(t, CUE.lift, .4))), .08 + .1); hHook.rotation.set(0, Math.PI / 2 - .35, -1.2);
     product.visible = true; product.position.set(lerp(-.1, .3, put), lerp(1.06, 1.1 - .1 * put, put) + .12 * Math.sin(Math.PI * put), lerp(.25, .08, put));
     const u = easeOut(prog(t, a, 2.4));
-    setCam(V3(1.15 - .2 * u, 1.72, 1.35 - .25 * u), V3(.33, 1.05, .05), 30);
+    setCam(V3(1.15 - .2 * u, 1.72, 1.35 - .25 * u), V3(.33, 1.05, .05), 30); fit([objPts(bag1)]);
     draw3D({ focus: cam.position.distanceTo(V3(.3, 1.12, .08)), slab: .25, far: 6, near: 6 });
     guardBox(boxOf(bag1));
   } else {                         // 紙袋を持つ人の後ろ姿。ゆっくり引く
     bag1.visible = false; shopper.g.visible = true;
     const u = easeInOut(prog(t, CUE.last, b - CUE.last));
     shopper.pose({ x: .2 - .6 * u, z: 1.3 - .9 * u, yaw: Math.PI + .35, walk: t * 5, stride: .25, armR: .05, armFR: 0, elbowR: 0 });
-    setCam(V3(.9 + .2 * u, 1.6 + .3 * u, 4.4 + .8 * u), V3(-.1 - .3 * u, .95, .3), 38);
-    draw3D(null); guardBox(shopper.box(cam, W, H));
+    setCam(V3(.9 + .2 * u, 1.6 + .3 * u, 4.4 + .8 * u), V3(-.1 - .3 * u, .95, .3), 38); fit([personPts(shopper)]);
+    draw3D(null); guardP(shopper);
   }
 }
 function drawUI(t, name) {
