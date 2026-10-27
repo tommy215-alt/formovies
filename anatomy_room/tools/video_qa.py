@@ -29,7 +29,7 @@ SUB_BAND = (1380, 1580, 400, 580)  # 字幕の帯が来る範囲（y0, y1, x0, x
 
 
 def run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def gray_frame(mp4, t, w=W, h=H):

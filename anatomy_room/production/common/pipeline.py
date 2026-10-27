@@ -203,7 +203,7 @@ class Episode:
         write_wav(self.work / "voice_only.wav", voice[: int(total * SR)])
         meas = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(self.work / "mix_raw.wav"), "-af",
                                "loudnorm=I=-14:TP=-2.0:LRA=11:print_format=json", "-f", "null", "-"],
-                              capture_output=True, text=True).stderr
+                              capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
         st = json.loads(meas[meas.rindex("{"):meas.rindex("}") + 1])
         af = (f"loudnorm=I=-14:TP=-2.0:LRA=11:measured_I={st['input_i']}:measured_TP={st['input_tp']}:"
               f"measured_LRA={st['input_lra']}:measured_thresh={st['input_thresh']}:offset={st['target_offset']}:linear=true,"
@@ -489,7 +489,7 @@ class Episode:
         txt = self.work / "luma.txt"
         # 出力先はフォルダを移って名前だけで渡す（Windows の「C:\\…」はフィルタの中で区切りの「:」と読まれる）
         subprocess.run(["ffmpeg", "-v", "error", "-i", str(self.out), "-vf", f"fps=1,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file={txt.name}",
-                        "-f", "null", "-"], capture_output=True, text=True, cwd=txt.parent)
+                        "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=txt.parent)
         ys = [float(v) for v in re.findall(r"YAVG=([\d.]+)", txt.read_text())]
         raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(self.out), "-vf", "fps=2,scale=108:192,format=gray", "-f", "rawvideo", "-"],
                              capture_output=True).stdout
@@ -678,7 +678,7 @@ def shown_chunks(tl):
 
 
 def run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def contact_sheet(files, cols, out, w=300, h=533, pad=4):
