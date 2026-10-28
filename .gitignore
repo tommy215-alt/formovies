@@ -12,3 +12,8 @@ anatomy_room/output/*/audio_check.*
 node_modules/
 
 .claude/settings.local.json
+
+# 最適化の前のバックアップと基準動画（大きいので git に入れない）
+anatomy_room/_backup/
+anatomy_room/production/*/baseline/
+
