@@ -816,7 +816,62 @@
     return { g, pose, box, mat, parts: { body, hips, torso, head, skull, armL, armR, legL, legR } };   // parts：衣服や小物を付けるため（2026-10-27 追加）
   }
 
+  // ---------------------------------------------------------------- 標準ルール v3（2026-10-28〜、pilot_012 で導入）
+  // 字幕と重要な画面内テキストは従来（pilot_010・011 の 52px）の約 1.2 倍。新しい回はこの docSub と TEXT_SCALE を使う（既存の回は各 renderer.html の字幕のまま）
+  const TEXT_SCALE = 1.2, SUB_BASE = 52;
+  const SUB_SIZE = Math.round(SUB_BASE * TEXT_SCALE), SUB_MIN = Math.round(44 * TEXT_SCALE);   // 62px。縮めても 53px まで（それ未満は検査で「字幕が小さい」）
+  // ナレーション字幕（暗い帯＋左のシアンの線。デザインは pilot_010・011 と同じ）。右のボタン列（x≥950）と下の説明欄（y>1650）を避ける。
+  // 1 行は 13 字前後まで（62px で幅 830px）。長い行は自動で縮めるが、53px 未満になる行は台本の改行で直す
+  function docSub(ctx, t, { cx = 500, cy = 1520, maxW = 830, endAt = Infinity } = {}) {
+    const line = currentLine(t); if (!line || t >= endAt) return;
+    const rows = subChunk(line, t).split(" / ");
+    let size = SUB_SIZE; ctx.font = `700 ${size}px ${FONT}`;
+    const width = () => Math.max(...rows.map(r => ctx.measureText(r.replace(/\*\*/g, "")).width));
+    let wmax = width();
+    if (wmax > maxW) { size = Math.max(SUB_MIN - 1, Math.floor(size * maxW / wmax)); ctx.font = `700 ${size}px ${FONT}`; wmax = width(); }
+    if (size < SUB_MIN) TEXTLOG.push({ s: rows.join(""), box: [0, 0, 0, 0], size, group: -1, container: null, ignore: false, small_sub: true });
+    const lh = size * 1.38, bw = wmax + 72, bh = rows.length * lh + 30, k = easeOut(prog(t, line.start - .04, .12));
+    ctx.save(); ctx.globalAlpha = k;
+    rrect(ctx, cx - bw / 2, cy - bh / 2, bw, bh, 14); ctx.fillStyle = "rgba(6,12,22,.72)"; ctx.fill();
+    ctx.fillStyle = "#8fdcff"; ctx.fillRect(cx - bw / 2, cy - bh / 2 + 14, 4, bh - 28);
+    group(() => rows.forEach((r, i) => rich(ctx, r, cx, cy - (rows.length - 1) * lh / 2 + i * lh + 2, size, "#F2F6FA", "#A8E6FF", 700)),
+      [cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2]);
+    ctx.restore();
+    return [cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2];
+  }
+  // 物語の感情に合わせた色調（標準ルール v3）。keys：[[時刻, {cool, warm, sat, glow, vig, glowX, glowY}], ...] を時刻順に。
+  // 区間の間はなめらかに補間する（急に変えたいときは、同じ時刻の近くに 2 つ置く）。
+  //   cool＝冷たい青（0〜1）、warm＝暖色の光（0〜1）、sat＝彩度（1＝そのまま）、glow＝差し込む暖かい光の強さ、vig＝周辺減光
+  const MOOD0 = { cool: 0, warm: 0, sat: 1, glow: 0, vig: .55, glowX: .5, glowY: .3 };
+  function moodAt(t, keys) {
+    if (!keys || !keys.length) return { ...MOOD0 };
+    const K = keys.map(([tt, m]) => [tt, { ...MOOD0, ...m }]);
+    if (t <= K[0][0]) return K[0][1];
+    for (let i = 0; i + 1 < K.length; i++) {
+      const [a, A] = K[i], [b, B] = K[i + 1];
+      if (t < b) { let u = clamp((t - a) / Math.max(1e-3, b - a)); u = u * u * (3 - 2 * u); const o = {}; for (const k in MOOD0) o[k] = lerp(A[k], B[k], u); return o; }
+    }
+    return K[K.length - 1][1];
+  }
+  function moodGrade(ctx, t, keys) {
+    const m = moodAt(t, keys);
+    if (Math.abs(m.sat - 1) > .01) { ctx.save(); ctx.globalCompositeOperation = "copy"; ctx.filter = `saturate(${m.sat})`; ctx.drawImage(ctx.canvas, 0, 0); ctx.restore(); }
+    if (m.cool > .005) { ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.globalAlpha = m.cool; ctx.fillStyle = "#1c4f86"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+    if (m.warm > .005) { ctx.save(); ctx.globalCompositeOperation = "soft-light"; ctx.globalAlpha = m.warm; ctx.fillStyle = "#c27a34"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+    if (m.glow > .005) {                                     // 差し込む光：画面の一部から、やわらかく（全体を一気に明るくしない）
+      const gx = m.glowX * W, gy = m.glowY * H, g = ctx.createRadialGradient(gx, gy, 20, gx, gy, H * .7);
+      g.addColorStop(0, "rgba(255,214,160,.55)"); g.addColorStop(.45, "rgba(255,190,120,.18)"); g.addColorStop(1, "rgba(255,180,110,0)");
+      ctx.save(); ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = clamp(m.glow); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+    }
+    if (m.vig > .005) {
+      const g = ctx.createRadialGradient(W / 2, H * .42, H * .25, W / 2, H * .5, H * .8); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, `rgba(2,5,10,${m.vig})`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    return m;
+  }
+
   root.Stage = {
+    TEXT_SCALE, SUB_SIZE, SUB_MIN, docSub, moodAt, moodGrade,
     W, H, FONT, C, clamp, lerp, easeOut, easeIn, easeInOut, back, elastic, prog, win, rng, hexA,
     text, rrect, pill, rich, note, setup, sceneRange, sceneAt, currentLine, talk, speaking, subtitles: subtitles2, header: header2, rewindIcon,
     omote: omote3, omote2d: omote, omotePixel, uraBust, wipe: wipe2, speedLines, burst, bigX, bigO, arrow, vhs, glitch, flash, gradientBG: techBG, dots, rays,

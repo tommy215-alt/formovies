@@ -294,6 +294,10 @@ TECH_STYLES = {
     "tech_drive": {"bpm": 124, "chords": [(36.71, [293.66, 349.23, 440.00]), (36.71, [293.66, 349.23, 440.00]),
                                           (58.27, [293.66, 349.23, 466.16]), (55.00, [277.18, 329.63, 440.00])], "seed": 6},
 }
+# 希望の和音（2026-10-28〜、標準ルール v3）：doc_hope・doc_warm だけで鳴る長調の進行（ヘ長調 F–C–Dm–B♭）。
+# 短調の和音（chords）と同じ 4 小節で回す。旧モードではこのパート（wbass・wpad・keys）は鳴らない
+WARM_CHORDS = [(43.65, [349.23, 440.00, 523.25]), (65.41, [329.63, 392.00, 523.25]),
+               (36.71, [293.66, 349.23, 440.00]), (58.27, [293.66, 349.23, 466.16])]
 # モード → パートの音量。旧モード名（hook/banter/reveal）も受け付ける
 TECH_MODES = {
     "intro":   {"kick": 1.0, "clap": 1.0, "hat": 1.0, "ohat": 1.0, "bass": 1.0, "bass_dark": 0.0, "stab": 1.0, "arp": 0.8, "pad": 0.6},
@@ -323,6 +327,20 @@ TECH_MODES.update(
     doc_break={"kick": 0.0, "clap": 0.0, "hat": 0.45, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.9, "stab": 0.0, "arp": 0.3, "pad": 0.9, "metal": 0.4, "rumble": 0.8},
     doc_peak={"kick": 1.0, "clap": 0.6, "hat": 0.9, "ohat": 0.7, "bass": 1.0, "bass_dark": 0.2, "stab": 0.35, "arp": 0.5, "pad": 0.7, "metal": 0.9, "rumble": 0.8},
     doc_outro={"kick": 0.6, "clap": 0.0, "hat": 0.4, "ohat": 0.0, "bass": 0.4, "bass_dark": 0.5, "stab": 0.0, "arp": 0.35, "pad": 0.9, "metal": 0.3, "rumble": 0.5})
+# 物語の感情に合わせるモード（2026-10-28〜、標準ルール v3。pilot_012 で導入）
+#   doc_tense＝不安と緊張（低音中心、控えめなキック、冷たいパルス）、doc_hope＝努力が実る瞬間（短調の低音と和音を抜き、
+#   長調の和音・やわらかい鍵盤・温かい低音が約 1.6 秒かけて差し込む。ビートは残す）、doc_alone＝対立と孤独（希望の音を引き、音数を減らす）、
+#   doc_warm＝現代の日常への静かな感動（温かい和音＋穏やかなビート）、doc_warm_end＝最後の一文（さらに薄く、余韻）
+TECH_MODES.update(
+    doc_tense={"kick": 0.75, "clap": 0.0, "hat": 0.35, "ohat": 0.0, "bass": 0.5, "bass_dark": 0.7, "stab": 0.0, "arp": 0.15, "pad": 0.5, "metal": 0.3, "rumble": 0.9},
+    doc_hope={"kick": 0.8, "clap": 0.35, "hat": 0.55, "ohat": 0.35, "bass": 0.0, "bass_dark": 0.0, "stab": 0.0, "arp": 0.0, "pad": 0.0, "metal": 0.2, "rumble": 0.25,
+              "wbass": 0.9, "wpad": 1.0, "keys": 0.8},
+    doc_alone={"kick": 0.35, "clap": 0.0, "hat": 0.25, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.85, "stab": 0.0, "arp": 0.0, "pad": 0.75, "metal": 0.15, "rumble": 0.6},
+    doc_warm={"kick": 0.6, "clap": 0.2, "hat": 0.4, "ohat": 0.15, "bass": 0.0, "bass_dark": 0.0, "stab": 0.0, "arp": 0.0, "pad": 0.0, "metal": 0.1, "rumble": 0.15,
+              "wbass": 0.7, "wpad": 0.9, "keys": 0.65},
+    doc_warm_end={"kick": 0.3, "clap": 0.0, "hat": 0.25, "ohat": 0.0, "bass": 0.0, "bass_dark": 0.0, "stab": 0.0, "arp": 0.0, "pad": 0.0, "metal": 0.0, "rumble": 0.1,
+                  "wbass": 0.5, "wpad": 0.85, "keys": 0.45})
+WARM_PARTS = ("wbass", "wpad", "keys")   # 切り替えをゆっくり（約 1.6 秒）にするパート：希望が少しずつ差し込むように
 
 
 def _metal(dur=0.12, seed=51):
@@ -354,12 +372,23 @@ def _kick_hard(dur=0.4):
     return np.tanh(1.6 * (body + click)) * 0.85
 
 
+def _smooth(g, ker):
+    """長い窓の移動平均（FFT）。np.convolve だと 1.6 秒の窓で遅すぎるため"""
+    L = 1 << (len(g) + len(ker)).bit_length()
+    y = np.fft.irfft(np.fft.rfft(g, L) * np.fft.rfft(ker, L), L)
+    s = len(ker) // 2
+    return y[s:s + len(g)]
+
+
 def bgm_techno(total, sections, style="tech_air"):
     st = TECH_STYLES[style]
     beat = 60 / st["bpm"]
     n = int(total * SR)
     names = ("kick", "clap", "hat", "ohat", "bass", "stab", "arp", "pad", "metal", "rumble")
     P = {k: np.zeros(n) for k in names}
+    warm = any(TECH_MODES[m].get(k, 0) for _, m in sections for k in WARM_PARTS)   # 希望のパートを使う回だけ作る（旧回の処理は変えない）
+    if warm:
+        P.update({k: np.zeros(n) for k in WARM_PARTS})
     kick = _kick_hard()
     clap = _add(*[np.concatenate([np.zeros(int(d * SR)), _snare(0.18, 40 + i) * .7]) for i, d in enumerate((0, .008, .016))])
     hat, ohat = _hat(0.04, 41), _hat(open_=True, seed=42)
@@ -400,6 +429,20 @@ def bgm_techno(total, sections, style="tech_air"):
                     put("stab", j, x)
             for f in tones:                        # パッド（長く、うねる）
                 put("pad", i, _supersaw(f / 2, beat * 4.1, 0.05, n=5, spread=.008, attack=.3, decay=3.0, seed=bar))
+        if warm:
+            wroot, wtones = WARM_CHORDS[bar % 4]
+            if pos in (0, 2):                      # 温かい低音：2 拍ずつ伸ばす正弦波（転がさない）
+                _note(P["wbass"], i, wroot * 2, beat * 1.9, 0.5, "sin", attack=0.02, decay=0.9)
+            if pos == 0:
+                for k_, f in enumerate(wtones):    # 長調のパッド：ゆっくり立ち上がる、角の取れた音
+                    put("wpad", i, _supersaw(f / 2, beat * 4.1, 0.05, n=3, spread=.004, attack=.6, decay=4.0, seed=200 + bar + k_))
+            for s8 in range(2):                    # やわらかい鍵盤：8 分の分散和音（ベルに近い音色、減衰は長め）
+                f = wtones[(b * 2 + s8) % 3] * (1 if (b // 4) % 2 else 0.5) * 2
+                put("keys", int((tb + s8 * beat / 2) * SR), _bell(f, beat * 1.2, 0.12, 0.35, attack=0.01))
+    if warm:
+        P["wbass"] = _lp(P["wbass"], 300)
+        P["wpad"] = _lp(_lp(P["wpad"], 1200), 1200)
+        P["keys"] = _lp(P["keys"], 2500)
     P["bass"] = _lp(P["bass"], 700)
     P["bass_dark"] = _lp(P["bass"], 260)
     P["stab"] = _lp(P["stab"], 3200)
@@ -416,6 +459,9 @@ def bgm_techno(total, sections, style="tech_air"):
         sc[a:a + m] = np.minimum(sc[a:a + m], 1 - 0.65 * np.exp(-np.arange(m) / SR / 0.11))
     for k in ("bass", "bass_dark", "stab", "pad"):
         P[k] *= sc
+    if warm:                                        # 希望のパートは浅めのサイドチェイン（うねりは残し、やわらかく）
+        for k in WARM_PARTS:
+            P[k] *= 1 - 0.5 * (1 - sc)
     gains = {k: np.zeros(n) for k in P}
     sec = sorted(sections) + [(total + 1, None)]
     for (a, mode), (b, _) in zip(sec, sec[1:]):
@@ -423,11 +469,13 @@ def bgm_techno(total, sections, style="tech_air"):
         for k in P:
             gains[k][ia:ib] = TECH_MODES[mode].get(k, 0.0)   # metal・rumble は doc_ モードだけ（旧モードでは鳴らない）
     ker = np.ones(int(0.05 * SR)) / int(0.05 * SR)  # 切り替えは短く（急な展開に合わせる）
+    ker_warm = np.ones(int(1.6 * SR)) / int(1.6 * SR)   # 希望のパートは約 1.6 秒かけて差し込む・引く
     level = {"kick": 0.62, "clap": 0.3, "hat": 0.2, "ohat": 0.14, "bass": 0.42, "bass_dark": 0.5, "stab": 0.55, "arp": 0.4, "pad": 0.5,
-             "metal": 0.32, "rumble": 0.35}
+             "metal": 0.32, "rumble": 0.35, "wbass": 0.45, "wpad": 0.55, "keys": 0.3}
     mix, out = np.zeros(n), {}
     for k, x in P.items():
-        out[k] = x * np.convolve(gains[k], ker, mode="same") * level[k]
+        g = _smooth(gains[k], ker_warm) if k in WARM_PARTS else np.convolve(gains[k], ker, mode="same")
+        out[k] = x * g * level[k]
         mix += out[k]
     mix = np.tanh(1.3 * mix) / 1.3                  # 軽いサチュレーションで硬く
     fade = np.clip(t / 0.01, 0, 1) * np.clip((total - t) / 1.2, 0, 1)
@@ -591,7 +639,17 @@ def sfx_bank_soft():
         i = int(k * 0.25 * SR); m = int(0.06 * SR)
         lm[i:i + m] += _lp(_noise(m, 130 + k), 900) * np.exp(-np.arange(m) / SR / 0.012) * (1.0 if k % 2 == 0 else 0.6)
     bank["loom"] = lm
-    level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09,
+    # 水と光の音（pilot_012〜）：手を洗う水（低めの流れ＋小さなしずく）、希望が差し込む瞬間のやわらかい長調の和音
+    nw = _noise(int(1.4 * SR), 140)
+    flow = (_lp(nw, 1400) - _lp(nw, 250)) * np.sin(np.pi * t(1.4) / 1.4) ** 1.2 * (0.7 + 0.3 * np.sin(2 * np.pi * 5.3 * t(1.4)))
+    drops = np.zeros(int(1.4 * SR)); r3 = np.random.default_rng(141)
+    for k in range(10):
+        i = int(r3.uniform(0.05, 1.25) * SR); f0 = r3.uniform(300, 620)
+        d = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 0.6 * np.exp(-t(0.06) / 0.015))) / SR) * np.exp(-t(0.06) / 0.018)
+        drops[i:i + len(d)] += d[: len(drops) - i] * 0.35
+    bank["water"] = _add(flow, drops)
+    bank["glow"] = _add(*[np.concatenate([np.zeros(int(k * 0.07 * SR)), _bell(f, 1.8, 0.2, 0.7, 0.05)]) for k, f in enumerate((174.61, 220.0, 261.63, 349.23))])
+    level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09, "water": 0.04, "glow": 0.05,
              "paper": 0.04, "cut": 0.04, "machine": 0.06, "gear": 0.035, "unroll": 0.035, "room": 0.02, "loom": 0.04,
              "impact": 0.11, "hit": 0.08, "alarm": 0.08, "stab": 0.08, "brake": 0.06, "rewind": 0.06, "revswell": 0.05,
              "sweep_up": 0.045, "sweep_down": 0.045, "riser": 0.04, "tick": 0.05, "scan": 0.04}

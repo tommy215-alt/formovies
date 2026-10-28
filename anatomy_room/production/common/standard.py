@@ -10,7 +10,8 @@
     })
     pipeline.main(__file__, EP)
 
-声の版は lines.json の "voices" に書く（標準は "v7"）。既存の回（pilot_006〜010）はこのファイルを使わないので、変わらない。
+声の版は lines.json の "voices" に書く（標準は "v7"）。
+v3（2026-10-28〜）：字幕と重要な文字は約 1.2 倍（renderer.html で Stage.docSub と Stage.TEXT_SCALE）、色調は感情に合わせて Stage.moodGrade。既存の回（pilot_006〜010）はこのファイルを使わないので、変わらない。
 """
 import copy
 
@@ -26,6 +27,8 @@ DEFAULTS = {
         "style": "tech_drive",     # ビートのあるダークなテクノ／インダストリアル（124 BPM）
         # 区間の例（きっかけ, ずらす秒, モード）。冒頭は 1 拍目から doc_hook、解説は doc_drive、発見へ doc_build、
         # 一瞬の引きに doc_break（2〜4 秒まで）、核心で doc_peak、余韻は doc_outro、エンディングは ending
+        # v3（2026-10-28〜）：単一のループで押し切らず、感情に合わせて変える。不安＝doc_tense、努力が実る瞬間＝doc_hope（長調の和音が差し込む）、
+        # 対立・孤独＝doc_alone、現代の日常＝doc_warm → doc_warm_end（例は pilot_012 の production_script.py）
         "sections": [("t0", 0.0, "doc_hook"), ("end1", -0.6, "ending")],
     },
 }

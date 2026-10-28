@@ -54,6 +54,7 @@
   `production/pilot_009/reverse_009_php.mp4`。事実確認は `scripts/pilot_009/fact_check.md`（すべて検索抜粋。公式の本文は未確認）、自己レビューは `reviews/internal_review/pilot_009_review.md`。
 - **pilot_010「世界の果てに、空を飛べない小さな鳥がいる」（イナクセシブルクイナ）はユーザーの指示で動画化**：科学ドキュメンタリー形式（男性ナレーション `v6`＝VOICEVOX:玄野武宏、暗い 3DCG）。オモテは**顔のない、もちもちした人型ピクトグラム**（`stage.js` の `mochi3D`、`CHARACTER_GUIDE.md` v3.2）に統一。`production/pilot_010/`。
 - **標準ルール v2（2026-10-27）**：新作の制作設定は `production/common/standard.py`（`standard.config({...})`：左上のロゴなし・BGM `tech_drive`（ビートのあるテクノ 124 BPM）・やわらかい効果音・冒頭 0.1 秒で話し始める）、声は `voices.json` の `v7`（文末の「いる・いた・ある」を前の句につなげて語尾上がりを防ぐ）。冒頭 3 秒は `video_qa.py` が `qa/hook_3s.mp4` に切り出す。注記は必要最小限。詳細は `REVERSE_STANDARD_RULES.md` v2。
+- **標準ルール v3（2026-10-28）**：字幕と重要な画面内テキストは従来の約 1.2 倍（`stage.js` の `docSub`・`TEXT_SCALE`、字幕 62px・1 行 15 字まで）。BGM は単一のループで押し切らず感情に合わせて変える（`music.py` の `doc_tense`・`doc_hope`〔長調の和音が差し込む〕・`doc_alone`・`doc_warm`・`doc_warm_end`）。色調も感情に合わせて変える（`stage.js` の `moodGrade`）。既存の回の BGM・効果音・描画は変わらない（数値で確認済み）。新作の土台は `production/pilot_012/`。
 - **自分の PC（GPU）で書き出す手順**は `anatomy_room/docs/PC_SETUP.md`。準備の確認は `node anatomy_room/tools/check_pc.js`。`render_frames.js` は GPU で WebGL が動けば GPU、動かなければソフトウェア描画（`REVERSE_GPU=off` で常にソフトウェア）。
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
 - YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。
@@ -72,3 +73,4 @@
   - VOICEVOX は**アプリ版 0.26.0**（クラウドは ENGINE 0.24.1）。声が少し変わることがあるので、PC で声を作ったら `qc_report.md` の「文末の音程」「読み上げの照合」を見直す。
   - fontconfig がないので、`textcheck` の「フォントにない文字」は PC では未確認になる（必要ならクラウドで確認）。ImageMagick もない（一覧画像は Pillow）。外部コマンドの出力・JSON は UTF-8 で読む（cp932 で止まった）。
 - **pilot_011「紙袋を変えた女性、マーガレット・ナイト」**（`production/pilot_011/`、99.5 秒）：**完成**（ユーザーの判断で f0bc12a の版。L14 の語尾と最初のコマの直しは入っていない。サムネイルは `thumbnail.png`、タイトル・説明文は `youtube_metadata.md`）。YouTube へのアップロードはユーザーの指示まで行わない。
+- **pilot_012「手を洗うだけで、救える命があった」**（ゼンメルワイス、`production/pilot_012/`、99.9 秒、標準ルール v3 の最初の回）：PC で書き出し。事実確認は `scripts/pilot_012/fact_check.md`（WebFetch で本文から抜き出し。数字は著書の表の転載ページ）。YouTube へのアップロードはユーザーの指示まで行わない。

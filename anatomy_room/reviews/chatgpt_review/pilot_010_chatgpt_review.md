@@ -1,7 +1,7 @@
 # ChatGPT レビュー依頼：世界の果てに、空を飛べない小さな鳥がいる（pilot_010）
 
 > この文書は、YouTube Shorts チャンネル「世界の解剖室」のシナリオ 1 本分のレビュー資料です。
-> 生成日：2026-10-27。元ファイル：`anatomy_room/scripts/pilot_010/` と `anatomy_room/reviews/internal_review/pilot_010_review.md`。
+> 生成日：2026-10-28。元ファイル：`anatomy_room/scripts/pilot_010/` と `anatomy_room/reviews/internal_review/pilot_010_review.md`。
 
 ## あなたへの依頼
 

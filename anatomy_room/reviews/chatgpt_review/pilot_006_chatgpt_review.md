@@ -1,7 +1,7 @@
 # ChatGPT レビュー依頼：飛行機の窓、穴が開いてるんだけど!?（pilot_006）
 
 > この文書は、YouTube Shorts チャンネル「世界の解剖室」のシナリオ 1 本分のレビュー資料です。
-> 生成日：2026-10-27。元ファイル：`anatomy_room/scripts/pilot_006/` と `anatomy_room/reviews/internal_review/pilot_006_review.md`。
+> 生成日：2026-10-28。元ファイル：`anatomy_room/scripts/pilot_006/` と `anatomy_room/reviews/internal_review/pilot_006_review.md`。
 
 ## あなたへの依頼
 

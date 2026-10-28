@@ -1,7 +1,7 @@
 # ChatGPT レビュー依頼：QRコードを消したら、オモテが消えた（pilot_007）
 
 > この文書は、YouTube Shorts チャンネル「世界の解剖室」のシナリオ 1 本分のレビュー資料です。
-> 生成日：2026-10-27。元ファイル：`anatomy_room/scripts/pilot_007/` と `anatomy_room/reviews/internal_review/pilot_007_review.md`。
+> 生成日：2026-10-28。元ファイル：`anatomy_room/scripts/pilot_007/` と `anatomy_room/reviews/internal_review/pilot_007_review.md`。
 
 ## あなたへの依頼
 
