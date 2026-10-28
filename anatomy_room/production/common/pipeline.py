@@ -121,7 +121,8 @@ class Episode:
             t = end + data["gap"] + ln.get("pause", 0.0)
         end_speech = timeline[-1]["end"]
         # 共通エンディング：その回の W の声で、決めゼリフを 2 つに分けて合成し、間を入れる（docs/ENDING_SPEC.md）
-        ending_start = math.ceil((end_speech + self.ending["gap_after_last_line"]) * FPS) / FPS
+        # final_hold（production_script.py の設定、秒）：最後のセリフのあとに足す余韻（最後の一文の表示など）。書かない回は 0（従来どおり）
+        ending_start = math.ceil((end_speech + self.ending["gap_after_last_line"] + self.cfg.get("final_hold", 0.0)) * FPS) / FPS
         t = ending_start + 0.35
         w = self.voices["W"]
         for i, part in enumerate(self.ending["parts"]):
