@@ -3,6 +3,8 @@
 //   node render_frames.js --stills 3,40.5  指定した秒のコマを work/stills/ に PNG で保存（確認用）
 //   node render_frames.js --thumb          サムネイル thumbnail.png を書き出す
 //   node render_frames.js --segments job.json  指定したコマの範囲を場面ごとの mp4 に（production_script.py render が使う）
+//   node render_frames.js --clip 58,66 out.mp4  指定した秒の範囲だけを mp4 に（音なし。比較・試し書き出し用）
+//   --renderer <ファイル名>  renderer.html の代わりに別の描画ファイルを使う（比較用。省略時は renderer.html）
 // GPU：既定（REVERSE_GPU=auto）は GPU で WebGL が動けば GPU、動かなければソフトウェア描画（SwiftShader）。
 //   REVERSE_GPU=off でいつも SwiftShader、REVERSE_GPU=on で GPU が使えなければ止める。
 const { chromium } = require("playwright");
@@ -16,12 +18,15 @@ const argv = process.argv.slice(2);
 const di = argv.indexOf("--dir");
 const HERE = di >= 0 ? path.resolve(argv[di + 1]) : process.cwd(), WORK = path.join(HERE, "work");
 const tl = JSON.parse(fs.readFileSync(path.join(WORK, "timeline.json"), "utf8"));
-const args = di >= 0 ? argv.filter((_, i) => i !== di && i !== di + 1) : argv;
+let args = di >= 0 ? argv.filter((_, i) => i !== di && i !== di + 1) : argv;
+const ri = args.indexOf("--renderer");
+const RENDERER = ri >= 0 ? args[ri + 1] : "renderer.html";
+if (ri >= 0) args = args.filter((_, i) => i !== ri && i !== ri + 1);
 
 async function open(browser) {
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   page.on("pageerror", e => { console.error("page error:", e.message); process.exit(1); });
-  await page.goto(pathToFileURL(path.join(HERE, "renderer.html")).href); // Windows のパスでも正しい URL にする
+  await page.goto(pathToFileURL(path.join(HERE, RENDERER)).href); // Windows のパスでも正しい URL にする
   await page.evaluate(async t => {
     await Promise.all(["900 52px \"Noto Sans CJK JP\"", "800 52px \"Noto Sans CJK JP\"", "700 52px \"Noto Sans CJK JP\"", "500 40px \"Noto Sans CJK JP\""]
       .map(f => document.fonts.load(f, "あ漢A−×")));
@@ -114,6 +119,19 @@ async function launch() {
       fs.renameSync(tmp, s.out); // 書き終わってから名前を付ける（途中で止まっても壊れた場面を再利用しない）
       console.log(`segment ${s.a}-${s.b} (${s.b - s.a} frames) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     }
+  } else if (args[0] === "--clip") {
+    const [a, b] = args[1].split(",").map(parseFloat), out = path.resolve(args[2]), t0 = Date.now();
+    const ff = spawn("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(tl.fps),
+      "-c:v", "png", "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-r", String(tl.fps), out], { stdio: ["pipe", "inherit", "inherit"] });
+    const i0 = Math.round(a * tl.fps), i1 = Math.round(b * tl.fps);
+    for (let i = i0; i < i1; i++) {
+      await page.evaluate(t => window.renderFrame(t), i / tl.fps);
+      const buf = await canvas.screenshot({ type: "png" });
+      if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once("drain", r));
+    }
+    ff.stdin.end();
+    await new Promise((res, rej) => ff.on("close", c => c === 0 ? res() : rej(new Error("ffmpeg " + c))));
+    console.log(`clip: ${i1 - i0} frames in ${((Date.now() - t0) / 1000).toFixed(0)}s（1 コマ ${((Date.now() - t0) / 1000 / (i1 - i0)).toFixed(2)} 秒）`);
   } else if (args[0] === "--textcheck") {
     // 文字の自動検査：step 秒ごとに 1 コマ描き、stage.js の checkText() の結果と、使った文字の一覧を work/textcheck.json に保存
     const step = parseFloat(args[1] || "0.1"), n = Math.floor(tl.duration / step);

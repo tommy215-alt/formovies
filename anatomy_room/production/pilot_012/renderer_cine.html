@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_012 renderer (cine)</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../common/ending.js"></script>
+<script>
+// pilot_012「手を洗うだけで、救える命があった」（ゼンメルワイス）のレンダラー（標準ルール v3：暗めのテック調を基本に、色調を物語の感情に合わせて変える。
+// 字幕と重要な画面内テキストは従来の約 1.2 倍＝Stage.docSub・Stage.TEXT_SCALE、色調は Stage.moodGrade）。
+// renderFrame(t) が時刻 t の 1 コマを描く（決定的：乱数はすべて種つき）。3D は画面外の WebGL に描いて bg（2D）に重ね、ui（2D）に文字。
+// 人物は顔のない人形（stage.js の mochi3D に服を付ける）。実際の顔・苦しむ患者・遺体は描かない。
+const S = Stage, { W, H, clamp, lerp, easeOut, easeIn, easeInOut, prog, win, text, rrect } = Stage;
+const TS = S.TEXT_SCALE;                                    // 画面内テキストの倍率（1.2）
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["hook", "ward", "clinics", "search", "wash", "numbers", "conflict", "today"];
+let TL, CUE, MOOD = [];
+const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
+const sstep = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const lerpV = (a, b, k) => a.clone().lerp(b, k);
+
+// ---------------------------------------------------------------- WebGL
+const SS = 1.5;                                             // 超解像度：1.5 倍で描いて縮める（輪郭と細かい模様のちらつきを減らす。GPU の余力を使う）
+const glc = document.createElement("canvas"); glc.width = W * SS; glc.height = H * SS;
+const R = new THREE.WebGLRenderer({ canvas: glc, antialias: true, alpha: true, preserveDrawingBuffer: true });
+R.setPixelRatio(1); R.setSize(W * SS, H * SS, false); R.outputEncoding = THREE.sRGBEncoding;
+R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.2;
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(40, W / H, .01, 200);
+const C = c => new THREE.Color(c).convertSRGBToLinear();
+let FOGC = C(0x0e141c);
+scene.fog = new THREE.FogExp2(FOGC, .03);
+const hemi = new THREE.HemisphereLight(C(0x8ea2bd), C(0x1a1612), .45); scene.add(hemi);
+const key = new THREE.SpotLight(C(0xffd9a8), 2.5, 0, .7, .55, 1); key.castShadow = true; scene.add(key); scene.add(key.target);
+key.shadow.mapSize.set(4096, 4096); key.shadow.bias = -.0004; key.shadow.normalBias = .01;
+const rim = new THREE.DirectionalLight(C(0x9fd4ff), .9); scene.add(rim); scene.add(rim.target);
+const fill = new THREE.PointLight(C(0x6fa8d8), 0, 12, 2); scene.add(fill);
+const sets = {};
+function set(name) { const g = new THREE.Group(); g.visible = false; scene.add(g); sets[name] = g; return g; }
+function show(...names) { for (const k in sets) sets[k].visible = names.includes(k); }
+function setCam(pos, look, fov = 40, near = .02, far = 200) {
+  cam.position.copy(pos); cam.fov = fov; cam.near = near; cam.far = far; cam.lookAt(look); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+}
+function lights({ hemiI = .45, keyI = 30, keyPos, keyAt, keyCol = 0xffd9a8, angle = .7, rimI = .9, rimCol = 0x9fd4ff, rimPos = [3, 4, -4], fillI = 0, fillCol = 0x6fa8d8, fillPos = [0, 2, 2], fog = .03, fogC = 0x0e141c, exp = 1.1, hemiSky = 0x8ea2bd }) {
+  hemi.intensity = hemiI; hemi.color = C(hemiSky); key.intensity = keyI * .085; key.color = C(keyCol); key.angle = angle;   // 値は旧来の光の単位（r149 の既定）。0.085 倍で実際の強さ
+  key.position.set(...keyPos); key.target.position.set(...keyAt); key.target.updateMatrixWorld();
+  rim.intensity = rimI * .6; rim.color = C(rimCol); rim.position.set(...rimPos); fill.intensity = fillI * .2; fill.color = C(fillCol); fill.position.set(...fillPos);
+  FOGC = C(fogC); scene.fog.color = FOGC; scene.fog.density = fog; R.toneMappingExposure = exp;
+}
+function draw3D(dof) {
+  R.shadowMap.needsUpdate = true;
+  const n0 = cam.near, f0 = cam.far;
+  if (!dof) { R.setClearColor(FOGC, 1); R.render(scene, cam); bg.imageSmoothingQuality = "high"; bg.drawImage(glc, 0, 0, W, H); return; }
+  const { focus, slab, far: bf, near: bn } = dof;
+  const pass = (n, f, blur, clearAlpha) => {
+    cam.near = Math.max(n0, n); cam.far = Math.min(f0, f); cam.updateProjectionMatrix();
+    const fx = clearAlpha === 0 && typeof shafts !== "undefined" ? [...shafts, wardDust.points] : [], vis = fx.map(o => o.visible);
+    fx.forEach(o => o.visible = false);                     // 光の筋と埃（加算）は下地の 1 回目だけ：透明な層に描くと不透明な暗い色として残り、画面を覆った
+    R.setClearColor(FOGC, clearAlpha); R.render(scene, cam); R.shadowMap.needsUpdate = false;
+    fx.forEach((o, i) => o.visible = vis[i]);
+    bg.save(); bg.imageSmoothingQuality = "high"; bg.filter = blur > .3 ? `blur(${blur}px)` : "none"; bg.drawImage(glc, 0, 0, W, H); bg.restore();
+  };
+  pass(n0, f0, bf, 1);                                      // 下地：全体をぼかす（切り出すと境目に帯が出るため）
+  pass(Math.max(n0, focus - slab), focus + slab, 0, 0);       // 焦点の前後（くっきり）
+  if (focus - slab > n0 + .001) pass(n0, focus - slab + .002, bn, 0);
+  cam.near = n0; cam.far = f0; cam.updateProjectionMatrix();
+}
+function proj(v) { const p = v.clone().project(cam); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H, p.z]; }
+function guardBox(b) { if (b && b[2] > 0 && b[0] < W && b[3] > 0 && b[1] < H && (b[2] - b[0]) > 30) S.CHARLOG.push(b); }
+// 被写体を字幕の帯より上に収める（1.2 倍の字幕は 3 行で上端 ≈ 1377）。下端が帯にかかるならカメラを少し下へ向け、収まらないほど大きければ少し引く
+const FIT_TOP = 210, FIT_BOT = 1360;
+function objPts(o) { o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o); const c = (y) => [V3(bb.min.x, y, bb.min.z), V3(bb.max.x, y, bb.min.z), V3(bb.min.x, y, bb.max.z), V3(bb.max.x, y, bb.max.z)];
+  return { b: c(bb.min.y), t: c(bb.max.y) }; }
+function fit(list, yTop = FIT_TOP, yBot = FIT_BOT) {
+  list = list.filter(Boolean); if (!list.length) return;
+  const px = v => (1 - v.clone().project(cam).y) / 2 * H;
+  const bots = list.flatMap(o => o.b), tops = list.flatMap(o => o.t), all = bots.concat(tops);
+  cam.updateMatrixWorld();
+  const span = Math.max(...bots.map(px)) - Math.min(...tops.map(px)), A = yBot - yTop;
+  if (span > A) {
+    const c = all.reduce((m, v) => m.add(v), V3(0, 0, 0)).multiplyScalar(1 / all.length);
+    cam.position.copy(c.clone().add(cam.position.clone().sub(c).multiplyScalar(span / A * 1.03))); cam.updateMatrixWorld();
+  }
+  const yb = Math.max(...bots.map(px));
+  if (yb > yBot) { const ang = y => Math.atan((1 - 2 * y / H) * Math.tan(cam.fov * Math.PI / 360)); cam.rotateX(-(ang(yBot) - ang(yb))); cam.updateMatrixWorld(); }
+}
+function fitB(items, yTop = FIT_TOP, yBot = FIT_BOT) {
+  items = items.filter(Boolean); if (!items.length) return;
+  const ang = y => Math.atan((1 - 2 * y / H) * Math.tan(cam.fov * Math.PI / 360));
+  for (let pass = 0; pass < 3; pass++) {
+    cam.updateMatrixWorld();
+    const bs = items.map(i => i.box()).filter(Boolean); if (!bs.length) return;
+    const top = Math.min(...bs.map(b => b[1])), bot = Math.max(...bs.map(b => b[3])), A = yBot - yTop;
+    if (bot - top > A) { const c = items.reduce((m, i) => m.add(i.c()), V3(0, 0, 0)).multiplyScalar(1 / items.length);
+      cam.position.copy(c.clone().add(cam.position.clone().sub(c).multiplyScalar((bot - top) / A * 1.03))); continue; }
+    if (bot > yBot) cam.rotateX(-(ang(yBot) - ang(bot)));
+    else if (top < yTop) cam.rotateX(ang(top) - ang(yTop));
+  }
+  cam.updateMatrixWorld();
+}
+const P_ = p => ({ box: () => p.g.visible ? p.box(cam, W, H) : null, c: () => p.g.position.clone().add(V3(0, .85 * (p.S || 1), 0)) });
+function guardP(p) { if (p.g.visible) guardBox(p.box(cam, W, H)); }
+function boxOf(obj) {
+  obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj); if (bb.isEmpty()) return null;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+    const [px, py, pz] = proj(V3(x, y, z)); if (pz > 1) return null; x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
+  return [x0, y0, x1, y1];
+}
+
+// ---------------------------------------------------------------- 画像（床・壁・タイル・記録簿）
+function canvasTex(w, h, draw, rep = [1, 1]) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); draw(x, w, h);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); t.anisotropy = 8; return t;
+}
+const rnd = S.rng(12);
+const stoneTex = canvasTex(512, 512, (x, w, h) => {            // 石の床（大きな四角い石）
+  x.fillStyle = "#5a5852"; x.fillRect(0, 0, w, h);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { const v = 78 + rnd() * 26; x.fillStyle = `rgb(${v},${v - 2},${v - 6})`; x.fillRect(c * 128 + 2, r * 128 + 2, 124, 124);
+    for (let i = 0; i < 60; i++) { x.fillStyle = `rgba(30,28,24,${.04 + rnd() * .06})`; x.fillRect(c * 128 + rnd() * 124, r * 128 + rnd() * 124, 2 + rnd() * 8, 1 + rnd() * 3); } }
+}, [8, 8]);
+const plasterTex = canvasTex(512, 512, (x, w, h) => {          // しっくいの壁（下の腰壁は少し暗く）
+  x.fillStyle = "#b9b6ac"; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 3000; i++) { x.fillStyle = `rgba(${rnd() < .5 ? "90,86,78" : "220,216,206"},${.03 + rnd() * .05})`; x.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 5, 1 + rnd() * 3); }
+}, [6, 2]);
+const tileTex = canvasTex(512, 512, (x, w, h) => {              // 現代の白いタイル
+  x.fillStyle = "#e9edf0"; x.fillRect(0, 0, w, h); x.strokeStyle = "#c9d0d6"; x.lineWidth = 3;
+  for (let i = 0; i <= 8; i++) { x.beginPath(); x.moveTo(i * 64, 0); x.lineTo(i * 64, h); x.stroke(); x.beginPath(); x.moveTo(0, i * 64); x.lineTo(w, i * 64); x.stroke(); }
+}, [6, 4]);
+const WOODS = new Set();
+const woodTex = (base, dark, rep) => { const t = canvasTex(512, 512, (x, w, h) => {
+  x.fillStyle = base; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 140; i++) { x.strokeStyle = `rgba(${dark},${.05 + rnd() * .12})`; x.lineWidth = 1 + rnd() * 3; const y = rnd() * h;
+    x.beginPath(); x.moveTo(0, y); for (let k = 0; k <= 8; k++) x.lineTo(k * w / 8, y + Math.sin(k * 1.3 + i) * 4 * rnd()); x.stroke(); }
+}, rep); WOODS.add(t); return t; };
+const tableWood = woodTex("#5a3d26", "25,14,6", [2, 1]);
+const floorWood = woodTex("#4a3524", "20,12,6", [6, 6]);
+const lightWood = woodTex("#a07a52", "60,40,20", [3, 3]);
+// 記録簿（手書きの行。数字は読めない線にし、実際の数字は画面のグラフだけで示す）。writeK で新しい行が書き込まれる
+const ledCanvas = document.createElement("canvas"); ledCanvas.width = 1024; ledCanvas.height = 720;
+const ledTex = new THREE.CanvasTexture(ledCanvas); ledTex.encoding = THREE.sRGBEncoding; ledTex.anisotropy = 8;
+let ledDrawn = -1;
+function drawLedger(writeK = 0, mark = 0) {
+  const key_ = Math.round(writeK * 40) + mark * 100; if (key_ === ledDrawn) return; ledDrawn = key_;
+  const x = ledCanvas.getContext("2d"), w = ledCanvas.width, h = ledCanvas.height, r = S.rng(31);
+  x.fillStyle = "#d9cdb0"; x.fillRect(0, 0, w, h); x.fillStyle = "#b8a780"; x.fillRect(w / 2 - 4, 0, 8, h);
+  for (let i = 0; i < 1400; i++) { x.fillStyle = `rgba(120,100,70,${.03 + r() * .05})`; x.fillRect(r() * w, r() * h, 1 + r() * 4, 1); }
+  for (let p = 0; p < 2; p++) {
+    const x0 = 40 + p * w / 2;
+    x.strokeStyle = "rgba(90,60,40,.45)"; x.lineWidth = 2;
+    for (const cx of [0, 150, 300, 400]) { x.beginPath(); x.moveTo(x0 + cx, 60); x.lineTo(x0 + cx, h - 40); x.stroke(); }
+    x.beginPath(); x.moveTo(x0, 90); x.lineTo(x0 + w / 2 - 80, 90); x.stroke();
+    x.strokeStyle = "rgba(40,30,22,.75)"; x.lineWidth = 3;
+    const rows = p === 1 ? Math.round(6 + 10 * writeK) : 16;
+    for (let i = 0; i < rows; i++) {
+      const y = 120 + i * 34;
+      for (const [cx, len] of [[10, 120], [160, 120], [310, 70], [410, 30]]) {
+        x.beginPath(); x.moveTo(x0 + cx, y); let xx = x0 + cx;
+        while (xx < x0 + cx + len * (.6 + r() * .4)) { xx += 6 + r() * 6; x.lineTo(xx, y + (r() - .5) * 9); }
+        x.stroke();
+      }
+    }
+  }
+  if (mark) { x.strokeStyle = "rgba(160,30,20,.8)"; x.lineWidth = 5; x.beginPath(); x.ellipse(w * .63, 120 + 9 * 34, 110, 24, 0, 0, 6.283); x.stroke(); }
+  ledTex.needsUpdate = true;
+}
+drawLedger(0);
+
+// ---------------------------------------------------------------- 材質と形
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: C(c), roughness: .7, metalness: 0, ...o });
+const iron = M(0x3a3f46, { roughness: .45, metalness: .6 });
+const brass = M(0x9a7a3c, { roughness: .35, metalness: .85 });
+const linen = M(0xd8d4c8, { roughness: .92 });
+const linenDark = M(0xa8a498, { roughness: .95 });
+const porcelain = M(0xe8e6df, { roughness: .25, metalness: .02 });
+const steel = M(0xc8ced4, { roughness: .2, metalness: .9 });
+const woodM = new THREE.MeshStandardMaterial({ map: tableWood, roughness: .65 });
+const glowMat = c => new THREE.MeshStandardMaterial({ color: C(0x111111), emissive: C(c), emissiveIntensity: 2.2 });
+function box(w, h, d, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; if (parent) parent.add(m); return m; }
+function cyl(r, h, mat, x = 0, y = 0, z = 0, parent, rotZ = 0, seg = 24) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat); m.position.set(x, y, z); m.rotation.z = rotZ; m.castShadow = m.receiveShadow = true; if (parent) parent.add(m); return m; }
+function plane(w, h, mat, parent, x = 0, y = 0, z = 0, ry = 0) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.y = ry; m.receiveShadow = true; if (parent) parent.add(m); return m; }
+function floor(mat, parent, size = 40) { const f = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat); f.rotation.x = -Math.PI / 2; f.receiveShadow = true; parent.add(f); return f; }
+// 窓（光る面）と光の筋。col は場面ごとに変える（冷たい青 → 暖かい光）
+function windowPane(parent, x, y, z, ry, w = 1.2, h = 2.4) {
+  const pane = plane(w, h, new THREE.MeshBasicMaterial({ color: C(0x6a8098) }), parent, x, y, z, ry);
+  for (let k = 0; k < 3; k++) { const m = box(.03, h, .03, M(0x1a1612), 0, 0, 0, parent); m.position.set(x, y, z); m.rotation.y = ry; m.translateX(-w / 2 + k * w / 2); m.translateZ(.01); }
+  const bar = box(w, .03, .03, M(0x1a1612), 0, 0, 0, parent); bar.position.set(x, y, z); bar.rotation.y = ry; bar.translateZ(.01);
+  const ray = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.3, 7), new THREE.MeshBasicMaterial({ color: C(0xbcd4e4), transparent: true, opacity: .05, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  ray.position.set(x, y - 1.6, z); ray.rotation.y = ry; ray.translateZ(1.6); ray.rotateX(.7); parent.add(ray);
+  return { pane, ray };
+}
+
+// ---------------------------------------------------------------- 人物（顔のない人形）と手
+function person({ dress = null, hair = null, coat = null, apron = false, cap = null, scale = 1, skin = 0xd5dbe4, scrubs = null } = {}) {
+  const p = S.mochi3D(THREE, { color: skin }); const P = p.parts;
+  if (hair) {
+    const hm = M(hair, { roughness: .8 });
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(.214, 32, 12, 0, 6.283, 0, .6), hm); crown.rotation.x = -.5; P.head.add(crown);
+    const back = new THREE.Mesh(new THREE.SphereGeometry(.214, 32, 20, Math.PI, Math.PI, 0, 2.0), hm); P.head.add(back);
+    const bun = new THREE.Mesh(new THREE.SphereGeometry(.085, 20, 14), hm); bun.position.set(0, .06, -.2); P.head.add(bun);
+  }
+  if (dress) {
+    const dm = M(dress, { roughness: .85 });
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(.2, .36, .66, 28, 1, true), dm); skirt.position.y = .33; skirt.material.side = THREE.DoubleSide; P.body.add(skirt);
+    const bod = new THREE.Mesh(new THREE.CapsuleGeometry(.245, .28, 8, 24), dm); bod.position.y = .3; bod.scale.set(1.04, 1, .92); P.hips.add(bod);
+    for (const a of [P.armL, P.armR]) { const sl = new THREE.Mesh(new THREE.CapsuleGeometry(.083, .2, 6, 16), dm); sl.position.y = -.12; a.a.add(sl); }
+    P.legL.a.visible = P.legR.a.visible = false;
+    [skirt, bod].forEach(o => { o.castShadow = o.receiveShadow = true; });
+  }
+  if (apron) { const ap = new THREE.Mesh(new THREE.PlaneGeometry(.34, .6), M(0xcfc6b2, { roughness: .9 })); ap.position.set(0, .4, .33); ap.rotation.x = -.18; P.body.add(ap); }
+  if (coat || scrubs) {
+    const cm = M(coat || scrubs, { roughness: .75 });
+    const jk = new THREE.Mesh(new THREE.CapsuleGeometry(.27, scrubs ? .3 : .44, 8, 24), cm); jk.position.y = scrubs ? .3 : .25; jk.scale.set(1.06, 1, .97); P.hips.add(jk);
+    for (const a of [P.armL, P.armR]) { const sl = new THREE.Mesh(new THREE.CapsuleGeometry(.084, scrubs ? .08 : .2, 6, 16), cm); sl.position.y = scrubs ? -.06 : -.12; a.a.add(sl); }
+    for (const l of [P.legL, P.legR]) { const tr = new THREE.Mesh(new THREE.CapsuleGeometry(.1, .22, 6, 16), M(scrubs || 0x1c1f24)); tr.position.y = -.14; l.a.add(tr); }
+    jk.castShadow = true;
+  }
+  if (cap) { const cm = M(cap, { roughness: .8 }); const c = new THREE.Mesh(new THREE.SphereGeometry(.215, 28, 12, 0, 6.283, 0, 1.2), cm); c.position.y = .02; P.head.add(c); }
+  p.g.scale.setScalar(scale); p.S = scale;
+  const pose0 = p.pose; p.pose = o => { pose0({ ...o, sx: scale, sy: scale }); };
+  return p;
+}
+function hand(sleeve = 0x2b3442, skin = 0xd5dbe4, cuff = null) {   // 手と前腕だけ（手もとのアップ用）。指先は +x
+  const g = new THREE.Group(), sm = M(skin, { roughness: .55, emissive: C(skin), emissiveIntensity: .03 });
+  const fore = new THREE.Mesh(new THREE.CapsuleGeometry(.032, .2, 8, 16), M(sleeve, { roughness: .85 })); fore.rotation.z = Math.PI / 2; fore.position.x = -.16; g.add(fore);
+  if (cuff) { const cf = new THREE.Mesh(new THREE.CylinderGeometry(.036, .036, .02, 16), M(cuff)); cf.rotation.z = Math.PI / 2; cf.position.x = -.06; g.add(cf); }
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(.045, 20, 14), sm); palm.scale.set(1.25, .55, 1); g.add(palm);
+  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.CapsuleGeometry(.011, .04, 4, 10), sm); f.rotation.z = Math.PI / 2; f.position.set(.07, 0, -.03 + i * .02); g.add(f); }
+  const th = new THREE.Mesh(new THREE.CapsuleGeometry(.012, .035, 4, 10), sm); th.position.set(.03, -.005, .055); th.rotation.set(0, -.6, Math.PI / 2); g.add(th);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+
+// ================================================================ 19 世紀の病棟（並ぶベッド、高い窓、ランプ）
+const ward = set("ward");
+const beds = [], wardWins = [];
+let lampFlame, lampLight;
+{
+  floor(new THREE.MeshStandardMaterial({ map: stoneTex, roughness: .85 }), ward);
+  const wallM = new THREE.MeshStandardMaterial({ map: plasterTex, roughness: .95 });
+  plane(40, 7, wallM, ward, -4, 3.5, 0, Math.PI / 2); plane(40, 7, wallM, ward, 4, 3.5, 0, -Math.PI / 2); plane(10, 7, wallM, ward, 0, 3.5, -12, 0);
+  const back = plane(10, 7, wallM, ward, 0, 3.5, 6, Math.PI);
+  for (let i = 0; i < 6; i++) wardWins.push(windowPane(ward, 3.97, 3.4, -10 + i * 3, -Math.PI / 2));
+  for (let s = -1; s <= 1; s += 2) for (let i = 0; i < 7; i++) {        // 鉄のベッド：枠・マットレス・枕・毛布
+    const g = new THREE.Group(); g.position.set(s * 2.9, 0, -10.5 + i * 2.2); g.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; ward.add(g);
+    for (const x of [-.45, .45]) for (const z of [-.95, .95]) cyl(.02, .6, iron, x, .3, z, g);
+    box(.94, .03, .03, iron, 0, .85, -.95, g); for (let k = 0; k < 5; k++) cyl(.012, .55, iron, -.36 + k * .18, .58, -.95, g);
+    box(.9, .14, 1.9, linen, 0, .5, 0, g); const pil = box(.6, .1, .3, linen, 0, .62, -.75, g);
+    const empty = (i === 3 && s < 0);
+    const bl = box(.94, .05, empty ? .45 : 1.3, linenDark, 0, .6, empty ? .7 : .3, g);                // 空のベッド：毛布を足もとにたたむ
+    let mound = null;
+    if (!empty) { mound = new THREE.Mesh(new THREE.SphereGeometry(.3, 20, 12), linenDark); mound.scale.set(1.1, .32, 2.4); mound.position.set(0, .62, .05); mound.castShadow = true; g.add(mound); }
+    beds.push({ g, empty, mound, s, i });
+  }
+  const lampG = new THREE.Group(); lampG.position.set(-2.35, 0, -3.7); ward.add(lampG);    // 空のベッドの横の台とランプ
+  box(.4, .7, .35, woodM, 0, .35, 0, lampG); cyl(.06, .04, brass, 0, .72, 0, lampG); cyl(.014, .2, brass, 0, .84, 0, lampG);
+  lampFlame = new THREE.Mesh(new THREE.SphereGeometry(.06, 16, 12), new THREE.MeshStandardMaterial({ color: C(0xfff0d0), emissive: C(0xffb060), emissiveIntensity: 2.6, transparent: true, opacity: .9 })); lampFlame.position.y = .98; lampG.add(lampFlame);
+  lampLight = new THREE.PointLight(C(0xffb070), 0, 5, 2); lampLight.position.set(0, 1.05, 0); lampG.add(lampLight);
+  for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(new THREE.SphereGeometry(.07, 12, 8), glowMat(0xffc070)); l.position.set(0, 3.2, -10 + i * 4); ward.add(l); }
+  box(1.4, 2.6, .1, M(0x2a2018), 0, 1.3, 5.95, ward);                     // 戸口（奥）
+}
+const emptyBed = beds.find(b => b.empty);
+const family = [person({ coat: 0x2c2a28 }), person({ dress: 0x3c3a40, hair: 0x221c18 })]; family.forEach(f => ward.add(f.g));
+const mother = person({ dress: 0x5a5668, hair: 0x2a221c }); ward.add(mother.g);
+const baby = new THREE.Mesh(new THREE.CapsuleGeometry(.08, .16, 8, 16), M(0xe8e2d4, { roughness: .9 })); baby.castShadow = true;
+mother.parts.hips.add(baby); baby.position.set(0, .42, .26); baby.rotation.z = Math.PI / 2 - .3;
+const doctors = [person({ coat: 0x262a30 }), person({ coat: 0x30343a }), person({ dress: 0x4a4e58, hair: 0x2a221c, apron: true })];
+doctors.forEach(d => ward.add(d.g));
+
+// ================================================================ 廊下（アーチ、両側の扉、壁のランプ）
+const corr = set("corr");
+const doors = [];
+{
+  floor(new THREE.MeshStandardMaterial({ map: stoneTex, roughness: .8 }), corr);
+  const wallM = new THREE.MeshStandardMaterial({ map: plasterTex, roughness: .95, color: C(0xa8a8a8) });
+  plane(60, 6, wallM, corr, -1.8, 3, -10, Math.PI / 2); plane(60, 6, wallM, corr, 1.8, 3, -10, -Math.PI / 2);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(4, 60), M(0x6a6862, { roughness: .95 })); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, 4.2, -10); corr.add(ceil);
+  for (let i = 0; i < 9; i++) {
+    const z = 4 - i * 4;
+    for (const s of [-1, 1]) { box(.3, 4.2, .4, M(0x8a877e, { roughness: .9 }), s * 1.65, 2.1, z, corr); }
+    box(3.6, .3, .4, M(0x8a877e, { roughness: .9 }), 0, 4.05, z, corr);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(.08, 12, 8), glowMat(0xffc070)); lamp.position.set(-1.68, 2.6, z - 2); corr.add(lamp);
+  }
+  plane(3.6, 4.2, wallM, corr, 0, 2.1, -5.6);                           // 突き当たりの壁と、並ぶ二つの扉（左：第一産科、右：第二産科）
+  for (const s of [-1, 1]) {
+    const d = box(1.0, 2.3, .08, M(0x3a2a1e, { roughness: .7 }), s * .78, 1.15, -5.55, corr); doors.push(d);
+    box(1.12, .08, .1, M(0x2a2018), s * .78, 2.34, -5.54, corr);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(.07, 12, 8), glowMat(0xffc070)); lamp.position.set(s * .78, 2.75, -5.45); corr.add(lamp);
+  }
+}
+const semm = person({ coat: 0x22262e }); scene.add(semm.g);              // ゼンメルワイス（暗い上着。顔は描かない）
+const walkers = [person({ coat: 0x2e3238 }), person({ dress: 0x4a4e58, hair: 0x2a221c, apron: true }), person({ coat: 0x34383e })];
+walkers.forEach(w => corr.add(w.g));
+
+// ================================================================ 机（記録簿、ランプ）
+const desk = set("desk");
+{
+  box(1.6, .06, .9, woodM, 0, .78, 0, desk); for (const x of [-.72, .72]) for (const z of [-.38, .38]) box(.06, .78, .06, woodM, x, .39, z, desk);
+  floor(new THREE.MeshStandardMaterial({ map: floorWood, roughness: .85 }), desk, 20);
+  plane(20, 6, M(0x2a2622, { roughness: .95 }), desk, 0, 3, -1.6);
+  const dwin = windowPane(desk, .4, 1.6, -1.58, 0, 1.0, 1.5);
+  const lamp = new THREE.Group(); lamp.position.set(-.55, .81, -.25); desk.add(lamp);
+  cyl(.06, .02, brass, 0, 0, 0, lamp); cyl(.012, .32, brass, 0, .16, 0, lamp);
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(.07, 16, 12), new THREE.MeshStandardMaterial({ color: C(0xfff0d0), emissive: C(0xffc070), emissiveIntensity: 2.5, transparent: true, opacity: .9 })); glass.position.y = .36; lamp.add(glass);
+  const ink = cyl(.03, .05, M(0x111418, { roughness: .2 }), .5, .835, -.2, desk);
+}
+const ledger = new THREE.Mesh(new THREE.BoxGeometry(.62, .025, .44), [M(0x3a2418), M(0x3a2418), new THREE.MeshStandardMaterial({ map: ledTex, roughness: .9 }), M(0x3a2418), M(0x3a2418), M(0x3a2418)]);
+ledger.castShadow = ledger.receiveShadow = true; scene.add(ledger);
+const pen = new THREE.Group(); scene.add(pen);
+{ const sh = cyl(.004, .16, M(0x1a1a1a), 0, .08, 0, pen); const nib = new THREE.Mesh(new THREE.ConeGeometry(.004, .02, 8), brass); nib.rotation.x = Math.PI; nib.position.y = -.005; pen.add(nib); }
+const hR = hand(0x22262e, 0xd5dbe4, 0xd8d4c8), hL = hand(0x22262e, 0xd5dbe4, 0xd8d4c8); scene.add(hR); scene.add(hL);   // ゼンメルワイスの手（暗い袖、白いカフス）
+
+// ================================================================ 解剖室（布をかけた台。遺体は描かない）
+const anat = set("anat");
+{
+  floor(new THREE.MeshStandardMaterial({ map: stoneTex, roughness: .9, color: C(0x8a8a8a) }), anat, 20);
+  const wallM = new THREE.MeshStandardMaterial({ map: plasterTex, roughness: .95, color: C(0x7a7c80) });
+  plane(20, 6, wallM, anat, 0, 3, -3); plane(20, 6, wallM, anat, -3, 3, 0, Math.PI / 2);
+  windowPane(anat, -2.98, 2.6, -1, Math.PI / 2, 1.0, 1.8);
+  const tb = box(.9, .1, 2.0, M(0x6a6a66, { roughness: .6 }), 0, .85, 0, anat); for (const x of [-.35, .35]) for (const z of [-.85, .85]) cyl(.04, .85, iron, x, .42, z, anat);
+  const cloth = new THREE.Mesh(new THREE.BoxGeometry(.92, .18, 1.9, 1, 1, 1), M(0x9a978e, { roughness: .95 })); cloth.position.set(0, .99, 0); cloth.castShadow = true; anat.add(cloth);   // 布（形は四角いまま。体の形は見せない）
+  const tray = box(.4, .02, .26, steel, .75, .95, .6, anat); box(.12, .9, .12, iron, .75, .45, .6, anat);
+  const scal = new THREE.Group(); scal.position.set(.72, .965, .6); scal.rotation.y = .5; anat.add(scal);
+  box(.12, .008, .012, steel, 0, 0, 0, scal); box(.05, .006, .01, M(0xe0e6ea, { metalness: 1, roughness: .1 }), .085, 0, 0, scal);
+  const lampG = new THREE.Group(); lampG.position.set(0, 2.3, 0); anat.add(lampG); cyl(.01, .8, iron, 0, .4, 0, lampG);
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(.3, .22, 24, 1, true), M(0x2a3030, { side: THREE.DoubleSide, roughness: .5 })); lampG.add(shade);
+}
+
+// ================================================================ 洗面器（病棟の入口。塩素を含む液）
+const basin = set("basin");
+const ripples = [];
+let water;
+{
+  floor(new THREE.MeshStandardMaterial({ map: stoneTex, roughness: .85 }), basin, 20);
+  plane(20, 6, new THREE.MeshStandardMaterial({ map: plasterTex, roughness: .95 }), basin, 0, 3, -.8);
+  box(.9, .06, .6, woodM, 0, .86, 0, basin); for (const x of [-.4, .4]) for (const z of [-.26, .26]) box(.05, .86, .05, woodM, x, .43, z, basin);
+  const pts = []; for (let i = 0; i <= 12; i++) { const a = i / 12; pts.push(new THREE.Vector2(.08 + .22 * Math.sin(a * Math.PI / 2), .12 * a * a)); }
+  const bowl = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), new THREE.MeshStandardMaterial({ color: C(0xe8e6df), roughness: .25, side: THREE.DoubleSide })); bowl.position.set(0, .89, 0); bowl.castShadow = bowl.receiveShadow = true; basin.add(bowl);
+  water = new THREE.Mesh(new THREE.CircleGeometry(.27, 48), new THREE.MeshStandardMaterial({ color: C(0x7e8c8c), roughness: .06, metalness: .3, transparent: true, opacity: .88 }));
+  water.rotation.x = -Math.PI / 2; water.position.set(0, .98, 0); basin.add(water);
+  const jug = new THREE.Mesh(new THREE.CylinderGeometry(.07, .09, .26, 24), porcelain); jug.position.set(.36, 1.02, -.12); jug.castShadow = true; basin.add(jug);
+  const towel = box(.3, .01, .2, linen, -.32, .9, .1, basin); towel.rotation.y = .3;
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(.07, 12, 8), glowMat(0xffc070)); lamp.position.set(-.6, 2.0, -.7); basin.add(lamp);
+}
+
+// ================================================================ 会議の場（長い机、医師たち）
+const meet = set("meet");
+const seated = [];
+{
+  floor(new THREE.MeshStandardMaterial({ map: floorWood, roughness: .8 }), meet, 30);
+  const wm = new THREE.MeshStandardMaterial({ map: woodTex("#3a281b", "15,8,4", [3, 2]), roughness: .8 });
+  plane(14, 6, wm, meet, 0, 3, -3.5); plane(14, 6, wm, meet, -3.6, 3, 0, Math.PI / 2);
+  for (let i = 0; i < 2; i++) windowPane(meet, -2 + i * 4, 3.0, -3.48, 0, 1.0, 2.2);
+  box(1.1, .07, 3.4, woodM, 0, .78, -.2, meet); for (const x of [-.46, .46]) for (const z of [-1.75, 1.35]) box(.08, .78, .08, woodM, x, .39, z, meet);
+  for (let i = 0; i < 4; i++) { const d = person({ coat: [0x2e3238, 0x3a3630, 0x2a2e34, 0x383c42][i] }); meet.add(d.g); seated.push(d); }
+}
+const paper = new THREE.Mesh(new THREE.PlaneGeometry(.34, .44), new THREE.MeshStandardMaterial({ map: ledTex, roughness: .9, side: THREE.DoubleSide })); paper.castShadow = true; scene.add(paper);
+
+// ================================================================ 現代：病院の洗面台・家庭の洗面台
+const hosp = set("hosp");
+const streams = [];
+function faucet(parent, x, y, z) {
+  const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g);
+  cyl(.022, .28, steel, 0, .14, 0, g); const arm = cyl(.018, .22, steel, 0, .28, .1, g); arm.rotation.x = Math.PI / 2;
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(.009, .012, .3, 12), new THREE.MeshStandardMaterial({ color: C(0xd8ecf6), roughness: .05, transparent: true, opacity: .55, emissive: C(0x6a8a9a), emissiveIntensity: .3 }));
+  st.position.set(0, .13, .21); g.add(st); streams.push(st); return g;
+}
+{
+  floor(M(0x9aa2aa, { roughness: .4 }), hosp, 20);
+  const tm = new THREE.MeshStandardMaterial({ map: tileTex, roughness: .3 });
+  plane(20, 6, tm, hosp, 0, 3, -.6); plane(20, 6, tm, hosp, -1.6, 3, 0, Math.PI / 2);
+  const sink = box(1.2, .2, .5, steel, 0, .82, -.32, hosp); box(1.1, .02, .42, M(0x9aa2aa, { roughness: .15, metalness: .9 }), 0, .93, -.32, hosp);
+  faucet(hosp, 0, .92, -.52);
+  const disp = box(.12, .22, .08, M(0xf0f2f4, { roughness: .3 }), .45, 1.35, -.56, hosp);
+  for (let i = 0; i < 3; i++) { const l = new THREE.Mesh(new THREE.PlaneGeometry(1.2, .08), new THREE.MeshBasicMaterial({ color: C(0xf4f8ff) })); l.rotation.x = Math.PI / 2; l.position.set(-.6 + i * .8, 3.0, .6); hosp.add(l); }
+}
+const nurse = person({ scrubs: 0x3f7f8a, cap: 0x3f7f8a }); hosp.add(nurse.g);
+const home = set("home");
+{
+  floor(new THREE.MeshStandardMaterial({ map: lightWood, roughness: .6 }), home, 20);
+  plane(20, 6, M(0xd8cbb6, { roughness: .9 }), home, 0, 3, -.6); plane(20, 6, M(0xcfc2ac, { roughness: .9 }), home, -1.6, 3, 0, Math.PI / 2);
+  box(1.0, .8, .5, new THREE.MeshStandardMaterial({ map: lightWood, roughness: .6 }), 0, .4, -.32, home);
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(.26, .2, .12, 32), porcelain); bowl.position.set(0, .86, -.3); bowl.castShadow = true; home.add(bowl);
+  faucet(home, 0, .86, -.52);
+  const mirror = plane(.8, .9, new THREE.MeshStandardMaterial({ color: C(0x8a9aa4), roughness: .05, metalness: .8 }), home, 0, 1.7, -.58);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(.08, 12, 8), glowMat(0xffd8a0)); lamp.position.set(0, 2.3, -.5); home.add(lamp);
+  const step = box(.4, .18, .3, M(0x8aa0b4, { roughness: .6 }), .15, .09, .05, home);
+  const towel = box(.3, .4, .03, M(0x9ab8c8, { roughness: .95 }), .7, 1.0, -.56, home);
+}
+const parent_ = person({ coat: 0x6a7a8a }); home.add(parent_.g);
+const child = person({ coat: 0xc08a5a, scale: .62 }); home.add(child.g);
+const hM1 = hand(0x3f7f8a), hM2 = hand(0x3f7f8a); scene.add(hM1); scene.add(hM2);   // 現代の手（袖の色は場面で変える）
+const hC1 = hand(0xc08a5a), hC2 = hand(0xc08a5a); scene.add(hC1); scene.add(hC2);
+
+function hideProps() {
+  [ledger, pen, hR, hL, semm.g, paper, hM1, hM2, hC1, hC2, mother.g, parent_.g, child.g, nurse.g, ...family.map(f => f.g), ...doctors.map(d => d.g), ...walkers.map(w => w.g)].forEach(o => o.visible = false);
+  lampLight.intensity = 0;
+}
+
+// ================================================================ 映像品質（cine.js）：周りの光・素材・光の筋・埃
+Cine.init(THREE, R);
+{
+  const done = new Set(), up = (m, kind, o) => { if (!m || done.has(m) || !m.isMeshStandardMaterial) return; done.add(m); Cine.surface(m, kind, o); };
+  scene.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || !m.map) continue;
+    if (m.map === stoneTex) up(m, "stone", { repeat: [10, 10], normal: 1.6 });
+    else if (m.map === plasterTex) up(m, "plaster", { repeat: [5, 3], normal: 1.0 });
+    else if (WOODS.has(m.map)) up(m, "wood", { repeat: [3, 3], normal: 1.0 });
+    else if (m.map === tileTex) up(m, "porcelain", { repeat: [6, 4], normal: .25 }); } });
+  up(linen, "fabric", { repeat: [10, 10], normal: .9 }); up(linenDark, "fabric", { repeat: [10, 10], normal: 1.0 });
+  up(iron, "metal", { repeat: [2, 2], normal: .35, metal: .75 }); up(steel, "metal", { repeat: [3, 1], normal: .25, metal: .95 }); up(brass, "metal", { repeat: [2, 2], normal: .3, metal: .9 });
+  up(porcelain, "porcelain", { normal: .15 });
+  for (const p of [...family, mother, ...doctors, semm, ...walkers, ...seated, nurse, parent_, child]) p.g.traverse(o => { if (!o.isMesh) return;
+    if (o.material === p.mat) up(o.material, "skin", { repeat: [2, 2], normal: .12 }); else up(o.material, "fabric", { repeat: [6, 6], normal: .8 }); });
+  [hR, hL, hM1, hM2, hC1, hC2].forEach(h => h.traverse(o => { if (o.isMesh) up(o.material, o.geometry.type === "SphereGeometry" || o.geometry.type === "CapsuleGeometry" && o.position.x > 0 ? "skin" : "fabric", { repeat: [2, 2], normal: .2 }); }));
+  water.material = Cine.water({ depth: .3 }); water.position.y = .975;
+}
+// 病棟の窓から差し込む光の筋と、光の中の埃（冷たい光 → 希望の場面で暖かい光）
+const COLDC = C(0xa8c4e0), WARMC = C(0xffcf96);
+const shafts = wardWins.map((w, i) => { const z = -10 + i * 3, s = Cine.shaft({ from: [3.92, 4.2, z], to: [0.6, 0, z + .9], r0: .55, r1: 1.4, color: 0xffcf96, opacity: .3 }); ward.add(s); return s; });
+const wardDust = Cine.dust({ min: [-3.6, .2, -11], max: [3.8, 3.8, 6], count: 1400, size: .016, seed: 12 }); ward.add(wardDust.points);
+const MB_N = 3;                                            // 動きのぶれ：1 コマの露光（1/60 秒）の間に 3 回描いて平均
+function envFor(t, name) {
+  if (name === "today") return t < CUE.family2 ? ["studio", .8] : ["warm", .55];
+  if (name === "numbers") return t >= CUE.drop ? ["warm", .6] : ["lamp", .5];
+  if (name === "clinics" && t >= CUE.ratio && t < CUE.first) return ["lamp", .5];
+  if (name === "ward" && t >= CUE.record) return ["lamp", .5];
+  if (name === "search" && (t < CUE.autopsy || (t >= CUE.compare && t < CUE.walk))) return ["lamp", .5];
+  return ["cold", .75];
+}
+function atmos(t, name) {
+  const warm = name === "numbers" && t >= CUE.home - .05;
+  const k = name === "hook" || name === "ward" ? .85 : warm ? easeInOut(prog(t, CUE.home, 2.4)) : 0;
+  shafts.forEach(s => { s.material.uniforms.uColor.value.copy(warm ? WARMC : COLDC); s.userData.set(t, k); });
+  wardDust.update(t, warm ? k : .5 * k); wardDust.points.material.color.copy(warm ? WARMC : COLDC);
+  water.material.normalMap.offset.set(t * .03, t * .021);
+  const [e, ek] = envFor(t, name); Cine.useEnv(scene, e, ek);
+}
+function bloomK(t, name) { return name === "numbers" && t >= CUE.drop ? .5 : name === "today" ? .22 : .3; }
+
+// ---------------------------------------------------------------- 画面の文字（1.2 倍）
+const grain = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = S.rng(99);
+  for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 18; } x.putImageData(d, 0, 0); return c; })();
+function addGrain(t) {
+  const ox = Math.floor(S.rng(Math.floor(t * 30) + 7)() * 256), oy = Math.floor(S.rng(Math.floor(t * 30) + 91)() * 256);
+  bg.save(); bg.globalCompositeOperation = "overlay"; bg.globalAlpha = .5; bg.fillStyle = bg.createPattern(grain, "repeat"); bg.translate(-ox, -oy); bg.fillRect(ox, oy, W, H); bg.restore();
+}
+function uiCard(lines, x, y, k = 1, { align = "center", accent = "#8fdcff" } = {}) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha *= clamp(k);
+  const ws = lines.map(([s, sz, w = 700]) => { ui.font = `${w} ${sz}px ${S.FONT}`; return ui.measureText(s).width; });
+  const pw = Math.max(...ws) + 64, ph = lines.reduce((a, [, sz]) => a + sz * 1.32, 0) + 36;
+  const x0 = align === "left" ? x : x - pw / 2, y0 = y - ph / 2 + 10 * (1 - easeOut(clamp(k)));
+  rrect(ui, x0, y0, pw, ph, 12); ui.fillStyle = "rgba(8,14,26,.78)"; ui.fill(); ui.strokeStyle = "rgba(143,220,255,.35)"; ui.lineWidth = 1.5; ui.stroke();
+  ui.fillStyle = accent; ui.fillRect(x0, y0 + 14, 4, ph - 28);
+  S.group(() => { let yy = y0 + 18; lines.forEach(([s, sz, w = 700, col = "#EAF2F8"]) => { yy += sz * 1.32 / 2; text(ui, s, x0 + pw / 2, yy + 2, sz, col, { weight: w }); yy += sz * 1.32 / 2; }); },
+    [x0, y0, x0 + pw, y0 + ph]);
+  ui.restore();
+}
+function uiNote(s, x, y, k = 1, size = Math.round(24 * TS)) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha *= clamp(k); ui.font = `500 ${size}px ${S.FONT}`; const w = ui.measureText(s).width + 28;
+  rrect(ui, x - w / 2, y - size * .8, w, size * 1.6, 8); ui.fillStyle = "rgba(8,14,26,.6)"; ui.fill();
+  S.group(() => text(ui, s, x, y + 1, size, "#B8C7D6", { weight: 500 }), [x - w / 2, y - size * .8, x + w / 2, y + size * .8]); ui.restore();
+}
+// 1846 年の二つの産科（L08）と、第一産科の 1846 → 1848（L16・L17）の棒グラフ。数字は fact_check の FACT-03・FACT-06
+function barChart(t, bars, { title, sub, x0 = 150, y0 = 380, w = 740, h = 560, k = 1, maxV = 12 }) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha *= clamp(k);
+  rrect(ui, x0 - 40, y0 - 40, w + 80, h + 80, 18); ui.fillStyle = "rgba(6,12,22,.78)"; ui.fill(); ui.strokeStyle = "rgba(143,220,255,.3)"; ui.lineWidth = 1.5; ui.stroke();
+  S.group(() => {
+    text(ui, title, x0 + w / 2, y0 + 16, Math.round(34 * TS), "#EAF2F8", { weight: 800 });
+    if (sub) text(ui, sub, x0 + w / 2, y0 + 16 + 50, Math.round(24 * TS), "#B8C7D6", { weight: 500 });
+    const base = y0 + h - 70, top = y0 + 150, bw = 200, gap = (w - bars.length * bw) / (bars.length + 1);
+    ui.strokeStyle = "rgba(180,200,220,.4)"; ui.lineWidth = 2; ui.beginPath(); ui.moveTo(x0, base); ui.lineTo(x0 + w, base); ui.stroke();
+    bars.forEach((b, i) => {
+      const bx = x0 + gap + i * (bw + gap), kk = clamp(b.k), hh = (base - top) * b.v / maxV * easeOut(kk);
+      if (kk <= 0) return;
+      const g = ui.createLinearGradient(0, base - hh, 0, base); g.addColorStop(0, b.col); g.addColorStop(1, b.col2 || b.col);
+      ui.fillStyle = g; rrect(ui, bx, base - hh, bw, hh, 8); ui.fill();
+      text(ui, b.label, bx + bw / 2, base + 38, Math.round(28 * TS), "#DDE7F0", { weight: 700 });
+      if (kk > .6) text(ui, b.value, bx + bw / 2, base - hh - 46, Math.round(44 * TS), b.vcol || "#FFFFFF", { weight: 900, alpha: clamp((kk - .6) / .4) });
+    });
+  }, [x0 - 40, y0 - 40, x0 + w + 40, y0 + h + 40]);
+  ui.restore();
+}
+
+// ---------------------------------------------------------------- 場面の描画
+let extraDip = 0;
+function poseHands(t, cx, cy, cz, rub, sleeveL = hL, sleeveR = hR, spread = .07, dipY = 0) {   // 両手を向かい合わせ、こすり合わせる
+  const s = Math.sin(t * 9) * .018 * rub, c = Math.cos(t * 9) * .012 * rub;
+  sleeveR.visible = sleeveL.visible = true;
+  sleeveR.position.set(cx + spread + s, cy + dipY + c, cz + .06); sleeveR.rotation.set(0, Math.PI - .35, -.75);
+  sleeveL.position.set(cx - spread - s, cy + dipY - c, cz + .06); sleeveL.rotation.set(Math.PI, .35, -.75);
+}
+function wardLight(mode) {   // 病棟の窓の色：冷たい青（問題）→ 暖かい光（成果）
+  const warm = mode === "warm";
+  wardWins.forEach(w => { w.pane.material.color = C(warm ? 0xffd8a8 : 0x5a7088); w.ray.material.color = C(warm ? 0xffc890 : 0xb0c8dc); w.ray.material.opacity = warm ? .12 : .045; });
+}
+function drawScene(t, name) {
+  extraDip = 0; hideProps(); key.castShadow = true;
+  const [a, b] = S.sceneRange(name);
+  let dof = null;
+  if (name === "hook") {
+    if (t < CUE.hands) {                                            // 暗い病棟：空のベッドとランプへ急速に寄る → 一瞬止まる
+      show("ward"); wardLight("cold");
+      lights({ keyPos: [-1.5, 3.2, -2.5], keyAt: [-2.6, .6, -3.9], keyI: 26, angle: .5, keyCol: 0xbfd2e6, rimPos: [3, 3, -6], rimI: .9, hemiI: .18, fog: .07, fogC: 0x0a0f16, exp: 1.15 });
+      const tf = Math.min(t, CUE.freeze), push = easeOut(prog(tf, 0, CUE.freeze + .2));
+      lampLight.intensity = 1.8 + .5 * Math.sin(tf * 23) * Math.sin(tf * 7);
+      setCam(lerpV(V3(1.3, 2.1, 2.6), V3(-1.05, 1.3, -1.9), push), lerpV(V3(-2.2, .55, -5.5), V3(-2.75, .6, -3.9), push), lerp(46, 38, push));
+      fit([objPts(emptyBed.g)]);                                    // 空のベッドを字幕より上に
+      draw3D(null);                                                 // 被写界深度なし：最初のコマ（自動のサムネイル）でベッドがくっきり見えるように
+      if (t > CUE.freeze) { const fk = easeOut(prog(t, CUE.freeze, .12)); bg.save(); bg.globalAlpha = .35 * fk; bg.fillStyle = "#04121e"; bg.fillRect(0, 0, W, H); bg.restore(); }
+      guardBox(boxOf(emptyBed.g));
+    } else {                                                        // 医師の手もとへ：洗面器の上の両手 →「救える命」で水に浸す
+      show("basin");
+      lights({ keyPos: [.4, 1.9, .6], keyAt: [0, .95, 0], keyI: 22, angle: .55, keyCol: 0xdde8f4, rimPos: [-2, 2, -2], rimI: 1.2, hemiI: .2, fog: .08, fogC: 0x0a1018, exp: 1.2 });
+      const dip = easeInOut(prog(t, CUE.lives - .1, .6));
+      poseHands(t, 0, 1.12 - .12 * dip, 0, dip, hL, hR);
+      const push = easeOut(prog(t, CUE.hands, 1.4));
+      setCam(V3(.05, 1.42 - .06 * push, .62 - .1 * push), V3(0, 1.0, 0), 36);
+      draw3D({ focus: cam.position.distanceTo(V3(0, 1.05, 0)), slab: .18, far: 5, near: 5 });
+      if (dip > .5) ripple(t, CUE.lives + .3, V3(0, .985, .05));
+      extraDip = Math.max(0, 1 - (t - CUE.hands) / .1) * .9;        // 切り替えの一瞬だけ暗く（白い閃光は使わない）
+    }
+  } else if (name === "ward") {
+    if (t < CUE.beds) drawCorridor(t, a, CUE.beds, "busy");
+    else if (t < CUE.record) {                                      // 静まり返った病室 → 戸口の家族
+      show("ward"); wardLight("cold");
+      lights({ keyPos: [2.5, 4, -2], keyAt: [-1, 0, -4], keyI: 30, angle: .9, keyCol: 0xbfd2e6, rimPos: [0, 3, 8], rimI: 1.0, hemiI: .25, fillI: 2, fillPos: [0, 2.5, 3], fog: .05, fogC: 0x0b1118, exp: 1.2 });
+      lampLight.intensity = 1.6 + .4 * Math.sin(t * 17) * Math.sin(t * 5);
+      if (t < CUE.family) { const u = easeInOut(prog(t, CUE.beds, CUE.family - CUE.beds)); setCam(V3(1.6, 1.75 - .15 * u, 3.2 - 1.2 * u), V3(-2.6, .55, -5.5), 44); }
+      else {                                                         // 戸口から病室を見つめる家族（背中側から光）
+        family.forEach((f, i) => { f.g.visible = true; f.pose({ x: -.35 + i * .62, z: 5.3, yaw: Math.PI, nod: .2, armFL: i ? .3 : 0, armFR: i ? .4 : 0 }); });
+        const u = easeInOut(prog(t, CUE.family, CUE.record - CUE.family));
+        setCam(V3(1.0 - .2 * u, 1.4, 1.2 + .3 * u), V3(.1, 1.1, 5.3), 40); fitB(family.map(P_));
+        family.forEach(guardP);
+      }
+      draw3D(null);
+    } else drawLedgerShot(t, CUE.record, b, { write: 0, cold: true });
+  } else if (name === "clinics") {
+    if (t < CUE.ratio) drawCorridor(t, a, CUE.ratio, "semm");
+    else if (t < CUE.first) drawLedgerShot(t, CUE.ratio, CUE.first, { write: 0, mark: 1, semmHands: true });
+    else drawCorridor(t, CUE.first, b, "doors");
+  } else if (name === "search") {
+    if (t < CUE.autopsy) drawThink(t, a, CUE.autopsy);
+    else if (t < CUE.compare) drawAnat(t, CUE.autopsy, CUE.compare);
+    else if (t < CUE.walk) drawLedgerShot(t, CUE.compare, CUE.walk, { write: 0, mark: 1, semmHands: true, compare: true });
+    else if (t < CUE.theory) drawCorridor(t, CUE.walk, CUE.theory, "walk");
+    else drawTheory(t, CUE.theory, b);
+  } else if (name === "wash") drawWash(t, a, b);
+  else if (name === "numbers") {
+    if (t < CUE.home) drawLedgerShot(t, a, CUE.home, { write: prog(t, a + .3, 2.2), warmFrom: CUE.drop, chart: true });
+    else drawHome(t, CUE.home, b);
+  } else if (name === "conflict") {
+    if (t < CUE.alone) drawMeeting(t, a, CUE.alone);
+    else drawCorridor(t, CUE.alone, b, "alone");
+  } else if (name === "today") drawToday(t, a, b);
+}
+function ripple(t, t0, c) {        // 水面の波紋（2D：水面の円を画面に写して描く）
+  for (let i = 0; i < 3; i++) {
+    const u = (t - t0 - i * .45); if (u < 0) continue;
+    const r = .03 + .2 * ((u % 1.4) / 1.4), al = (1 - (u % 1.4) / 1.4) * .55; if (r > .26) continue;
+    bg.save(); bg.strokeStyle = `rgba(200,230,245,${al})`; bg.lineWidth = 2; bg.beginPath();
+    for (let k = 0; k <= 40; k++) { const a = k / 40 * 6.283, [x, y] = proj(V3(c.x + r * Math.cos(a), c.y, c.z + r * Math.sin(a))); k ? bg.lineTo(x, y) : bg.moveTo(x, y); }
+    bg.stroke(); bg.restore();
+  }
+}
+function corrLights(cold = true, dim = 1) {
+  lights({ keyPos: [0, 3.8, 1], keyAt: [0, 0, -4], keyI: 26 * dim, angle: 1.0, keyCol: cold ? 0xc8d6e6 : 0xffd9a8, rimPos: [0, 3, -12], rimI: 1.1 * dim, rimCol: 0xa8c8e8, hemiI: .2 * dim, fillI: 3 * dim, fillCol: 0xffc080, fillPos: [-1.2, 2.5, -2], fog: .07, fogC: 0x0a0f16, exp: 1.2 });
+}
+function drawCorridor(t, a, b, mode) {
+  show("corr"); corrLights(true, mode === "alone" ? .7 : 1);
+  const u = easeInOut(prog(t, a, b - a));
+  if (mode === "busy") {                                         // 行き交う医師と看護の人
+    walkers.forEach((w, i) => { w.g.visible = true; const dir = i % 2 ? 1 : -1, z0 = [-1, -4.8, -3.2][i];
+      w.pose({ x: [-.6, .5, .1][i], z: z0 + dir * (t - a) * 1.1, yaw: dir > 0 ? 0 : Math.PI, walk: t * 6 + i, stride: .3 }); });
+    setCam(V3(.2, 1.7, 3.6 - .8 * u), V3(0, 1.2, -6), 42); fitB(walkers.map(P_)); walkers.forEach(guardP);
+    draw3D(null);
+  } else if (mode === "semm") {                                  // 廊下を歩くゼンメルワイス（カメラが並んで進む）
+    semm.g.visible = true; const z = 1.5 - 2.4 * u;
+    semm.pose({ x: -.3, z, yaw: Math.PI, walk: t * 5.5, stride: .3, nod: .1 });
+    setCam(V3(.7, 1.6, z + 2.2), V3(-.3, 1.05, z - .2), 40); fitB([P_(semm)], t < CUE.ratio ? 470 : FIT_TOP);   // 上の名前の札にかからないように
+    draw3D({ focus: cam.position.distanceTo(V3(-.3, 1.0, z)), slab: .9, far: 3, near: 4 }); guardP(semm);
+  } else if (mode === "doors") {                                 // 二つの病棟（左：第一産科、右：第二産科）。手前から奥を見る
+    semm.g.visible = true; semm.pose({ x: -.75, z: .9, yaw: Math.PI - .15, nod: .05, look: Math.sin(t * .8) * .25 });
+    setCam(V3(.35, 1.7, 3.6 - .5 * u), V3(0, 1.25, -5), 40);
+    draw3D(null); guardP(semm);
+    const kL = k_(t, "first", .4), kR = k_(t, "second", .4), gp = CUE.gap;
+    for (const [d, k] of [[doors[0], kL], [doors[1], kR]]) { if (k <= 0) continue; const bb = boxOf(d); if (!bb) continue;   // 扉のまわりの光（どちらの話か）
+      bg.save(); bg.strokeStyle = `rgba(143,220,255,${.8 * k * (t < gp ? 1 : .5)})`; bg.lineWidth = 4; bg.shadowColor = "rgba(80,200,255,.7)"; bg.shadowBlur = 14; bg.strokeRect(bb[0] - 8, bb[1] - 8, bb[2] - bb[0] + 16, bb[3] - bb[1] + 16); bg.restore(); }
+  } else if (mode === "walk") {                                  // 解剖室から病棟へ：歩く足もと → 手もと
+    semm.g.visible = true; const z = 2 - 3.2 * u;
+    semm.pose({ x: .2, z, yaw: Math.PI, walk: t * 5.5, stride: .3, armFR: .2, armFL: .2 });
+    setCam(V3(.85, 1.35, z + 2.3), V3(.1, .95, z - .2), 46); fitB([P_(semm)]);   // 斜め後ろから：解剖室から病棟へ歩く（カメラは柱の内側。柱が手前に入らない）
+    draw3D({ focus: cam.position.distanceTo(V3(.2, .95, z)), slab: .5, far: 4, near: 5 }); guardP(semm);
+  } else if (mode === "alone") {                                 // 暗い廊下：一人で記録を見つめる
+    semm.g.visible = true; semm.pose({ x: -1.1, z: -2.0, yaw: -Math.PI / 2 - .25, nod: .45, armFL: .9, armFR: .9, elbowL: .9, elbowR: .9, lean: .08 });
+    ledger.visible = true; drawLedger(1, 1); ledger.position.copy(semm.g.position.clone().add(V3(.28, 1.06, .0))); ledger.rotation.set(-.9, -Math.PI / 2 - .25, 0); ledger.scale.setScalar(.55);
+    setCam(V3(.9 - .3 * u, 1.9, 2.8 + .8 * u), V3(-1.1, 1.0, -2.0), 40); fitB([P_(semm)]);
+    draw3D(null); guardP(semm); ledger.scale.setScalar(1);
+  }
+}
+function deskLights(warmK = 0) {
+  lights({ keyPos: [-.55, 1.7, -.2], keyAt: [0, .8, 0], keyI: 18 + 8 * warmK, angle: .9, keyCol: warmK > 0 ? 0xffd2a0 : 0xd8e2ee, rimPos: [2, 2.5, -2], rimI: .7, rimCol: warmK > .5 ? 0xffd0a0 : 0x9fd4ff, hemiI: .22 + .1 * warmK, fog: .08, fogC: warmK > .5 ? 0x14100c : 0x0c0e12, exp: 1.2 });
+}
+function drawLedgerShot(t, a, b, { write = 0, mark = 0, cold = false, semmHands = false, compare = false, warmFrom = 1e6, chart = false }) {   // warmFrom に Infinity を使わない（Inf−Inf＝NaN で光が壊れ、画面が真っ黒になった）
+  show("desk"); const wk = sstep(warmFrom, warmFrom + 2.5, t); deskLights(wk);
+  drawLedger(write, mark && t > a + .8 ? 1 : 0);
+  ledger.visible = true; ledger.position.set(0, .82, .05); ledger.rotation.set(0, compare ? .08 * Math.sin(t) : 0, 0); ledger.scale.setScalar(1);
+  hR.visible = true;
+  if (write > 0 && write < 1) { pen.visible = true; const px = .17 + .1 * Math.sin(t * 7), pz = -.1 + .25 * write; pen.position.set(px, .84, pz); pen.rotation.set(.5, 0, -.5); hR.position.set(px - .05, .86, pz + .06); hR.rotation.set(0, -Math.PI / 2 + .6, -.3); }
+  else { hR.position.set(.25 - .02 * Math.sin(t * 1.3), .85, .2); hR.rotation.set(0, -Math.PI / 2 + .4, 0); }
+  if (semmHands || compare) { hL.visible = true; hL.position.set(-.27, .85, .22); hL.rotation.set(0, -Math.PI / 2 - .3, 0); }
+  const u = easeInOut(prog(t, a, b - a));
+  if (chart) setCam(V3(.02, 1.5 - .05 * u, .55 - .05 * u), V3(0, .8, .02), 38);      // 上から（グラフの下地。少しぼかす）
+  else setCam(V3(.1 + .1 * u, 1.3, .62 - .12 * u), V3(.05, .82, .0), 36);
+  draw3D(chart ? { focus: cam.position.distanceTo(V3(0, .82, .05)), slab: .08, far: 7, near: 7 } : { focus: cam.position.distanceTo(V3(.1, .82, .05)), slab: .2, far: 5, near: 5 });
+}
+function drawThink(t, a, b) {      // 記録を前に考え込む（窓を背にしたシルエット）
+  show("desk"); deskLights(0);
+  drawLedger(0, 1); ledger.visible = true; ledger.position.set(0, .82, .05); ledger.rotation.set(0, 0, 0);
+  semm.g.visible = true; semm.pose({ x: .05, z: -.62, yaw: 0, lean: .3, nod: .35, armFL: .8, armFR: .55, elbowL: .5, elbowR: 1.4, tilt: .1 });
+  const u = easeInOut(prog(t, a, b - a));
+  setCam(V3(.85 - .2 * u, 1.45, 1.3 - .15 * u), V3(0, 1.05, -.5), 40); fitB([P_(semm)]);
+  draw3D({ focus: cam.position.distanceTo(V3(.05, 1.1, -.62)), slab: .5, far: 4, near: 5 }); guardP(semm);
+}
+function drawAnat(t, a, b) {       // 解剖室：布をかけた台と、トレーのメス（遺体は描かない）
+  show("anat");
+  lights({ keyPos: [0, 2.2, 0], keyAt: [0, .9, 0], keyI: 30, angle: .75, keyCol: 0xd8e4ee, rimPos: [-3, 2.5, -1], rimI: 1.0, hemiI: .08, fog: .1, fogC: 0x070a0e, exp: 1.05 });
+  const u = easeInOut(prog(t, a, b - a));
+  if (t < a + 2.4) setCam(V3(1.9 - .3 * u, 1.8, 2.3 - .4 * u), V3(.1, .9, 0), 40);
+  else { const v = easeInOut(prog(t, a + 2.4, b - a - 2.4)); setCam(V3(1.05 - .05 * v, 1.2, .95 - .05 * v), V3(.73, .96, .6), 30); }   // メスに寄る
+  draw3D(t < a + 2.4 ? null : { focus: cam.position.distanceTo(V3(.73, .965, .6)), slab: .1, far: 6, near: 6 });
+}
+function drawTheory(t, a, b) {     // 手のまわりに、目に見えない「何か」のイメージ（光の粒）
+  show("corr"); corrLights(true, .55);
+  hR.visible = hL.visible = true;
+  const z = -1;
+  hR.position.set(.08, 1.05, z); hR.rotation.set(0, -Math.PI / 2 + .3, .5);
+  hL.position.set(-.08, 1.03, z + .02); hL.rotation.set(Math.PI, -Math.PI / 2 - .3, .5);
+  const u = easeInOut(prog(t, a, b - a));
+  setCam(V3(.05, 1.18 + .02 * u, z + .55 - .08 * u), V3(0, 1.02, z), 34);
+  draw3D({ focus: cam.position.distanceTo(V3(0, 1.04, z)), slab: .15, far: 7, near: 6 });
+  const [cx, cy] = proj(V3(0, 1.04, z)), k = prog(t, a + .2, 1.0), r = S.rng(7);
+  bg.save(); bg.globalCompositeOperation = "screen";
+  for (let i = 0; i < 70; i++) {
+    const ang = r() * 6.283, rad = 60 + r() * 260, sp = .3 + r() * .7, ph = r() * 6.283;
+    const x = cx + Math.cos(ang + t * .2 * sp) * rad * (1.1 - .1 * Math.sin(t * sp + ph)), y = cy + Math.sin(ang + t * .2 * sp) * rad * .7 - 20 * Math.sin(t * sp + ph);
+    const al = clamp(k * 1.5 - i / 70) * (.35 + .35 * Math.sin(t * 3 * sp + ph));
+    const g = bg.createRadialGradient(x, y, 0, x, y, 14); g.addColorStop(0, `rgba(190,240,255,${Math.min(1, al * 1.6)})`); g.addColorStop(1, "rgba(120,200,255,0)");
+    bg.fillStyle = g; bg.beginPath(); bg.arc(x, y, 14, 0, 6.283); bg.fill();
+  }
+  bg.restore();
+}
+function drawWash(t, a, b) {       // 病棟の入口の洗面器：両手を液に浸して洗う
+  show("basin");
+  lights({ keyPos: [.4, 1.9, .6], keyAt: [0, .95, 0], keyI: 24, angle: .55, keyCol: 0xe6eef6, rimPos: [-2, 2, -2], rimI: 1.2, hemiI: .25, fog: .07, fogC: 0x0b1118, exp: 1.2 });
+  const u = easeInOut(prog(t, a, b - a)), dip = easeInOut(prog(t, CUE.dip - .2, .5));
+  if (t < CUE.dip) {               // 少し引いた画：洗面器へ近づく医師
+    semm.g.visible = true; semm.pose({ x: 0, z: .55, yaw: Math.PI, armFL: .7 * u, armFR: .7 * u, elbowL: .3, elbowR: .3, lean: .1, nod: .3 });
+    setCam(V3(.9, 1.55, 1.9 - .3 * u), V3(0, 1.0, .1), 40); fitB([P_(semm)]);
+    draw3D(null); guardP(semm);
+  } else {
+    poseHands(t, 0, 1.06 - .1 * dip, .0, dip);
+    setCam(V3(.25, 1.36, .5), V3(0, .98, 0), 34);
+    draw3D({ focus: cam.position.distanceTo(V3(0, 1.0, 0)), slab: .18, far: 5, near: 5 });
+    ripple(t, CUE.dip + .1, V3(0, .985, .06));
+  }
+}
+function drawHome(t, a, b) {       // 暖かい光の病室：赤ちゃんを抱く母親と家族（特定の人物ではない）
+  show("ward"); wardLight("warm");
+  lights({ keyPos: [3.6, 3.6, -1], keyAt: [-.5, .8, 1.5], keyI: 40, angle: 1.0, keyCol: 0xffcf98, rimPos: [4, 3, -3], rimI: 1.2, rimCol: 0xffd8a8, hemiI: .35, hemiSky: 0xd8c4a8, fillI: 3, fillCol: 0xffc080, fillPos: [0, 2, 3], fog: .04, fogC: 0x1a140e, exp: 1.25 });
+  mother.g.visible = true; mother.pose({ x: -.5, z: 1.8, yaw: Math.PI / 2 + .5, nod: .35, armFL: .9, armFR: .9, elbowL: 1.1, elbowR: 1.1, lean: .05 });
+  family[0].g.visible = true; family[0].pose({ x: .25, z: 2.1, yaw: -Math.PI / 2 - .3, nod: .25, armFL: .4, armFR: .2, armR: .3 });
+  const u = easeInOut(prog(t, a, b - a));
+  setCam(lerpV(V3(2.0, 2.0, 5.6), V3(1.35, 1.5, 4.0), easeInOut(u)), lerpV(V3(-.1, 1.2, 1.4), V3(-.15, 1.05, 1.9), u), lerp(44, 40, u)); fitB([P_(mother), P_(family[0])]);   // 窓の光の中から、母親と家族へ
+  draw3D({ focus: cam.position.distanceTo(V3(-.1, 1.0, 1.9)), slab: .8, far: 4, near: 4 }); guardP(mother); guardP(family[0]);
+}
+function drawMeeting(t, a, b) {    // 冷たい光の会議の場：資料を示すゼンメルワイスと医師たち（悪人として描かない）
+  show("meet");
+  lights({ keyPos: [.8, 3.0, 2.4], keyAt: [0, .9, .2], keyI: 34, angle: 1.0, keyCol: 0xc8d4e2, rimPos: [0, 3, -4], rimI: 1.1, rimCol: 0x9fc4e8, hemiI: .32, fillI: 2.5, fillPos: [0, 1.8, 2.5], fog: .05, fogC: 0x0a0e14, exp: 1.25 });
+  const op = prog(t, CUE.oppose, 1.6), sup = prog(t, CUE.support, .8);
+  const seatsX = [-.85, .85, -.85, .85], seatsZ = [-1.2, -1.2, -.2, -.2];
+  seated.forEach((d, i) => {
+    const away = t >= CUE.miasma ? easeInOut(prog(t, CUE.miasma + i * .25, .8)) : 0;
+    const supporter = i === 1;
+    const leave = (i === 0 || i === 2) ? easeInOut(op) : 0;            // 反発：二人が席を離れる
+    d.g.visible = true;
+    d.pose({ x: seatsX[i] * (1 + .5 * leave), z: seatsZ[i] - 1.5 * leave, yaw: (seatsX[i] < 0 ? Math.PI / 2 : -Math.PI / 2) + (supporter ? 0 : (seatsX[i] < 0 ? -1 : 1) * .9 * away) + (leave ? Math.PI * .7 * leave * (seatsX[i] < 0 ? -1 : 1) : 0),
+      nod: supporter ? .1 + .25 * Math.max(0, Math.sin((t - CUE.support) * 5)) * (sup > 0 && sup < 1 ? 1 : 0) : .05, walk: leave > 0 && leave < 1 ? t * 5 : 0, lean: supporter ? .1 * sup : -.05 * away, armFL: supporter ? .2 : 0 });
+  });
+  semm.g.visible = true; semm.pose({ x: 0, z: 1.9, yaw: Math.PI, armFL: .9, armFR: 1.0, elbowL: .3, elbowR: .25, lean: .1, nod: .2 });
+  paper.visible = true; paper.position.set(.02, 1.32, 1.5); paper.rotation.set(-.2, 0, 0); drawLedger(1, 1);
+  const u = easeInOut(prog(t, a, b - a));
+  if (t < CUE.oppose) { setCam(V3(2.4 - .2 * u, 2.6, 4.0 - .3 * u), V3(0, .9, .6), 40); fitB([P_(semm), ...seated.map(P_)]); }
+  else { setCam(V3(-2.3, 2.4, 3.5 - .2 * u), V3(.2, .95, .1), 40); fitB([P_(semm), ...seated.map(P_)]); }   // 反対の斜め前から：資料を示すゼンメルワイスと、席を離れる人・残る人
+  draw3D(null); guardP(semm); seated.forEach(guardP);
+}
+function drawToday(t, a, b) {      // 現代：病院の洗面台 → 家庭で親が子どもの手を洗う → 帰宅した人が手を洗う
+  streams.forEach((s, i) => { s.scale.y = 1 + .04 * Math.sin(t * 40 + i); });
+  if (t < CUE.family2) {
+    show("hosp");
+    lights({ keyPos: [0, 3, 1.2], keyAt: [0, .9, -.3], keyI: 30, angle: 1.0, keyCol: 0xf2f6fa, rimPos: [-2, 3, 2], rimI: .8, rimCol: 0xe8f2ff, hemiI: .38, hemiSky: 0xdde6ee, fillI: 3, fillCol: 0xffe8cc, fillPos: [1, 2, 1.5], fog: .05, fogC: 0x1a2028, exp: .95 });   // 白くなりすぎない（暗い廊下からの切り替えを急にしない）
+    const u = easeInOut(prog(t, a, CUE.family2 - a));
+    if (t < a + 2.0) { nurse.g.visible = true; nurse.pose({ x: 0, z: .3, yaw: Math.PI, armFL: 1.0, armFR: 1.0, elbowL: .4, elbowR: .4, lean: .15, nod: .35 });
+      setCam(V3(1.1, 1.6, 2.2 - .3 * u), V3(0, 1.05, -.1), 40); fitB([P_(nurse)]); draw3D(null); guardP(nurse); }
+    else { poseHands(t, 0, 1.02, -.32, 1, hM1, hM2, .06); [hM1, hM2].forEach(h => h.children[0].material.color = C(0x3f7f8a));
+      setCam(V3(.3, 1.3, .3), V3(0, .98, -.32), 34); draw3D({ focus: cam.position.distanceTo(V3(0, 1.0, -.32)), slab: .18, far: 5, near: 5 }); }
+  } else {
+    show("home");
+    lights({ keyPos: [.5, 2.6, 1.0], keyAt: [0, .9, -.3], keyI: 32, angle: 1.1, keyCol: 0xffe2b8, rimPos: [-2, 3, 2], rimI: .8, rimCol: 0xffe0c0, hemiI: .55, hemiSky: 0xe8d8c0, fillI: 3, fillCol: 0xffd0a0, fillPos: [1, 2, 1.5], fog: .02, fogC: 0x1e1812, exp: 1.15 });
+    if (t < CUE.last) {             // 親が子どもの手を洗う（後ろから。並んで洗面台へ）
+      const u = easeInOut(prog(t, CUE.family2, CUE.last - CUE.family2));
+      parent_.g.visible = child.g.visible = true;
+      child.pose({ x: .1, z: .18, y: .18, yaw: Math.PI, armFL: 1.1, armFR: 1.1, elbowL: .3, elbowR: .3, nod: .3 });
+      parent_.pose({ x: .12, z: .62, yaw: Math.PI, armFL: 1.0, armFR: 1.0, elbowL: .7, elbowR: .7, lean: .35, nod: .4 });
+      setCam(V3(1.7 - .15 * u, 1.45, 1.0 - .1 * u), V3(.05, .95, .1), 40); fitB([P_(parent_), P_(child)]);
+      draw3D(null); guardP(parent_); guardP(child);
+    } else {                        // 手もと（大人の手と子どもの手）→ ゆっくり引く
+      const u = easeInOut(prog(t, CUE.last, b - CUE.last));
+      poseHands(t, .0, 1.0, -.3, .7, hM1, hM2, .085); [hM1, hM2].forEach(h => h.children[0].material.color = C(0x6a7a8a));
+      hC1.visible = hC2.visible = true; hC1.position.set(.04, .97, -.24); hC1.rotation.set(0, Math.PI - .5, -.8); hC1.scale.setScalar(.7); hC2.position.set(-.04, .97, -.24); hC2.rotation.set(Math.PI, .5, -.8); hC2.scale.setScalar(.7);
+      setCam(lerpV(V3(.4, 1.42, .35), V3(1.0, 1.75, 1.7), u), V3(0, .95, -.3), lerp(38, 44, u));
+      draw3D(u < .5 ? { focus: cam.position.distanceTo(V3(0, .98, -.3)), slab: .2 + u, far: 5 * (1 - u), near: 5 } : null);
+    }
+  }
+}
+function drawUI(t, name) {
+  const T = s => Math.round(s * TS);
+  if (name === "ward") uiNote("※人物と場面は再現CG", 540, 250, win(t, CUE.ward, CUE.ward + 2.6, .3, .4));
+  if (name === "ward" && t >= CUE.ward && t < CUE.beds) uiCard([["ウィーン総合病院", T(38), 800], ["1840年代", T(26), 500, "#B8C7D6"]], 540, 360, k_(t, "ward", .45, .3) * (1 - prog(t, CUE.beds - .4, .35)));
+  if (name === "clinics" && t < CUE.ratio) uiCard([["Ignaz Semmelweis", T(40), 700], ["1818–1865　ハンガリー出身", T(26), 500, "#B8C7D6"]], 540, 330, k_(t, "clinics", .45, .3));
+  if (name === "clinics" && t >= CUE.first) {
+    const lab = (s1, s2, x, k) => uiCard([[s1, T(36), 800], [s2, T(24), 500, "#B8C7D6"]], x, 330, k);
+    if (t < CUE.gap) { lab("第一産科", "医師・医学生", 290, k_(t, "first", .4)); lab("第二産科", "助産師", 790, k_(t, "second", .4)); }
+    else barChart(t, [{ label: "第一産科", value: "11.4%", v: 11.4, k: prog(t, CUE.gap + .1, .9), col: "#e07a6a", col2: "#8a3a34" }, { label: "第二産科", value: "2.8%", v: 2.8, k: prog(t, CUE.gap + .4, .9), col: "#8fb8d8", col2: "#3a5a78" }],
+      { title: "亡くなった母親の割合", sub: "1846年　ウィーン総合病院", k: k_(t, "gap", .4) });
+  }
+  if (name === "search" && t >= CUE.theory) uiNote("※当時の考えをイメージで表現", 540, 250, win(t, CUE.theory + .3, CUE.wash, .3, .4));
+  if (name === "numbers" && t >= CUE.y1846 && t < CUE.home) {
+    const drop = prog(t, CUE.y1848 + .1, 1.0);
+    barChart(t, [{ label: "1846年", value: "11.4%", v: 11.4, k: prog(t, CUE.y1846 + .1, .9), col: "#e07a6a", col2: "#8a3a34" },
+                 { label: "1848年", value: "1.3%", v: 1.3, k: drop, col: "#ffd08a", col2: "#c08040", vcol: "#FFE2A8" }],
+      { title: "第一産科で亡くなった母親の割合", sub: "手洗いの導入は1847年5月", k: k_(t, "y1846", .4) * (1 - prog(t, CUE.home - .4, .35)) });
+  }
+}
+// 色調の時間割（Stage.moodGrade）：不安＝冷たい青 → 調査＝基本の暗さ → 成果＝暖かい光が差し込む → 対立＝冷たい青へ → 現代＝自然な白色光とやわらかな暖色
+function buildMood() {
+  const c = CUE;
+  MOOD = [
+    [0, { cool: .5, sat: .72, vig: .6 }], [c.ward, { cool: .55, sat: .65, vig: .6 }],
+    [c.clinics, { cool: .38, sat: .75, vig: .55 }], [c.search, { cool: .35, sat: .75, vig: .58 }], [c.theory, { cool: .45, sat: .7, vig: .62 }],
+    [c.wash, { cool: .32, sat: .78, vig: .55 }], [c.y1848 - .1, { cool: .32, sat: .78, vig: .55 }],
+    [c.y1848 + 2.6, { cool: .08, warm: .3, sat: .95, glow: .55, glowX: .2, glowY: .2, vig: .42 }],
+    [c.home, { cool: 0, warm: .38, sat: 1.0, glow: .6, glowX: .85, glowY: .3, vig: .38 }], [c.conflict - .2, { cool: 0, warm: .32, sat: 1.0, glow: .45, glowX: .85, glowY: .3, vig: .4 }],
+    [c.conflict + 1.2, { cool: .55, sat: .6, vig: .65 }], [c.alone, { cool: .62, sat: .52, vig: .72 }],
+    [c.today - .2, { cool: .6, sat: .55, vig: .7 }], [c.today + .3, { cool: .3, warm: .05, sat: .85, glow: .1, glowX: .7, glowY: .15, vig: .5 }], [c.today + 2.2, { cool: .06, warm: .12, sat: 1.0, glow: .2, glowX: .7, glowY: .15, vig: .38 }],
+    [c.family2, { cool: 0, warm: .22, sat: 1.0, glow: .3, glowX: .5, glowY: .1, vig: .3 }], [c.last + 3, { cool: 0, warm: .25, sat: .98, glow: .32, glowX: .5, glowY: .1, vig: .38 }],
+  ];
+}
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start;
+  if (t >= es) {
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
+    ui.getImageData(0, 0, 1, 1); return;
+  }
+  const name = S.sceneAt(t);
+  Cine.motionBlur(bg, t, { n: MB_N, shutter: 1 / 60 }, tk => { const nm = S.sceneAt(tk); atmos(tk, nm); drawScene(tk, nm); });
+  S.moodGrade(bg, t, MOOD); Cine.bloom(bg, bloomK(t, name)); addGrain(t);
+  drawUI(t, name);
+  S.header(ui, false);
+  S.docSub(ui, t, { endAt: TL.ending_start });
+  const [a] = S.sceneRange(name), i = SCN.indexOf(name);
+  if (i > 0) { const k = 1 - prog(t, a, .3); if (k > 0) { bg.fillStyle = `rgba(4,8,14,${.85 * k})`; bg.fillRect(0, 0, W, H); } }
+  if (extraDip > 0) { bg.fillStyle = `rgba(4,8,14,${extraDip})`; bg.fillRect(0, 0, W, H); }
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  atmos(CUE.lives + .5, "hook"); drawScene(CUE.lives + .5, "hook"); S.moodGrade(bg, 0, [[0, { cool: .25, warm: .15, glow: .35, glowX: .5, glowY: .45, vig: .55 }]]); addGrain(0);
+  text(ui, "手を洗うだけで", 540, 1360, 92, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 });
+  text(ui, "救える命があった", 540, 1490, 96, "#FFE2A8", { weight: 900, stroke: "#06101c", sw: 14 });
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; buildMood(); }
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>

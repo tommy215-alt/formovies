@@ -55,6 +55,7 @@
 - **pilot_010「世界の果てに、空を飛べない小さな鳥がいる」（イナクセシブルクイナ）はユーザーの指示で動画化**：科学ドキュメンタリー形式（男性ナレーション `v6`＝VOICEVOX:玄野武宏、暗い 3DCG）。オモテは**顔のない、もちもちした人型ピクトグラム**（`stage.js` の `mochi3D`、`CHARACTER_GUIDE.md` v3.2）に統一。`production/pilot_010/`。
 - **標準ルール v2（2026-10-27）**：新作の制作設定は `production/common/standard.py`（`standard.config({...})`：左上のロゴなし・BGM `tech_drive`（ビートのあるテクノ 124 BPM）・やわらかい効果音・冒頭 0.1 秒で話し始める）、声は `voices.json` の `v7`（文末の「いる・いた・ある」を前の句につなげて語尾上がりを防ぐ）。冒頭 3 秒は `video_qa.py` が `qa/hook_3s.mp4` に切り出す。注記は必要最小限。詳細は `REVERSE_STANDARD_RULES.md` v2。
 - **標準ルール v3（2026-10-28）**：字幕と重要な画面内テキストは従来の約 1.2 倍（`stage.js` の `docSub`・`TEXT_SCALE`、字幕 62px・1 行 15 字まで）。BGM は単一のループで押し切らず感情に合わせて変える（`music.py` の `doc_tense`・`doc_hope`〔長調の和音が差し込む〕・`doc_alone`・`doc_warm`・`doc_warm_end`）。色調も感情に合わせて変える（`stage.js` の `moodGrade`）。既存の回の BGM・効果音・描画は変わらない（数値で確認済み）。新作の土台は `production/pilot_012/`。
+- **標準ルール v4（2026-10-28）映像品質**：新しい回は `production/common/cine.js`（周りの光の映り込み・素材の凹凸とつや・水とガラスの透過・光の筋と埃・超解像度 1.5 倍・動きのぶれ・光のにじみ）を使い、各動画に決定的な映像を 1 つ設計する。GPU の調査結果と使い方は `docs/CINE_QUALITY.md`、見本は `production/pilot_012/renderer_cine.html`（pilot_012 の完成版 mp4 は従来の renderer.html のまま）。比較は `render_frames.js --renderer … --stills／--clip`。
 - **自分の PC（GPU）で書き出す手順**は `anatomy_room/docs/PC_SETUP.md`。準備の確認は `node anatomy_room/tools/check_pc.js`。`render_frames.js` は GPU で WebGL が動けば GPU、動かなければソフトウェア描画（`REVERSE_GPU=off` で常にソフトウェア）。
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
 - YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。
