@@ -870,7 +870,44 @@
     return m;
   }
 
+  // ---------------------------------------------------------------- 注目マーク（ガイドライン v2.1、2026-10-28〜）
+  // 本当に見てほしい対象にだけ使う控えめな HUD 風の表示。k＝0→1 で現れる（0 なら何も描かない）。col は "r,g,b"
+  function hudTarget(ctx, x, y, r, k, t = 0, col = "143,220,255") {   // 円形のターゲット：外から縮んで止まる。4 つの目盛りがゆっくり回る
+    if (k <= 0) return;
+    const e = easeOut(clamp(k)), rr = r * (1.45 - .45 * e);
+    ctx.save(); ctx.globalAlpha *= clamp(k * 1.5); ctx.strokeStyle = `rgba(${col},.95)`; ctx.lineWidth = 3; ctx.shadowColor = `rgba(${col},.6)`; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(x, y, rr, 0, 6.283); ctx.stroke();
+    ctx.lineWidth = 2; ctx.globalAlpha *= .8; ctx.beginPath(); ctx.arc(x, y, rr * .72, 0, 6.283 * e); ctx.stroke();
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + t * .6; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * rr * 1.08, y + Math.sin(a) * rr * 1.08); ctx.lineTo(x + Math.cos(a) * rr * 1.28, y + Math.sin(a) * rr * 1.28); ctx.stroke(); }
+    ctx.fillStyle = `rgba(${col},.95)`; ctx.beginPath(); ctx.arc(x, y, 4, 0, 6.283); ctx.fill();
+    ctx.restore();
+  }
+  function hudBox(ctx, x0, y0, x1, y1, k, col = "143,220,255") {   // 細い枠：四隅のかぎ括弧が伸びる
+    if (k <= 0) return;
+    const e = easeOut(clamp(k)), L = Math.min(x1 - x0, y1 - y0) * .28 * e;
+    ctx.save(); ctx.globalAlpha *= clamp(k * 1.5); ctx.strokeStyle = `rgba(${col},.95)`; ctx.lineWidth = 3; ctx.shadowColor = `rgba(${col},.6)`; ctx.shadowBlur = 8;
+    for (const [x, y, sx, sy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) { ctx.beginPath(); ctx.moveTo(x + sx * L, y); ctx.lineTo(x, y); ctx.lineTo(x, y + sy * L); ctx.stroke(); }
+    ctx.restore();
+  }
+  function hudPointer(ctx, x0, y0, x1, y1, k, label = "", size = 34, col = "143,220,255") {   // 対象 (x0,y0) から札 (x1,y1) へ折れ線が伸び、札の文字が出る
+    if (k <= 0) return;
+    const e = easeOut(clamp(k * 1.3)), mx = x1, my = y0 + (y1 - y0) * .0;
+    ctx.save(); ctx.strokeStyle = `rgba(${col},.9)`; ctx.lineWidth = 2.5; ctx.shadowColor = `rgba(${col},.5)`; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(x0, y0, 6, 0, 6.283); ctx.stroke();
+    const px = lerp(x0, mx, Math.min(1, e * 2)), py = lerp(y0, my, Math.min(1, e * 2));
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(px, py); if (e > .5) ctx.lineTo(mx, lerp(my, y1, (e - .5) * 2)); ctx.stroke();
+    ctx.restore();
+    if (label && k > .6) { ctx.save(); ctx.globalAlpha *= clamp((k - .6) / .4); group(() => text(ctx, label, x1, y1 + (y1 < y0 ? -size * .8 : size * .8), size, `rgb(${col})`, { weight: 800, stroke: "#06101c", sw: 8 })); ctx.restore(); }
+  }
+  function hudScan(ctx, k, col = "143,220,255") {   // 場面転換：細い光の線が画面を上から下へ横切る（k＝0→1）
+    if (k <= 0 || k >= 1) return;
+    const y = H * easeInOut(k), g = ctx.createLinearGradient(0, y - 40, 0, y + 4);
+    ctx.save(); g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(1, `rgba(${col},.22)`); ctx.fillStyle = g; ctx.fillRect(0, y - 40, W, 44);
+    ctx.fillStyle = `rgba(${col},.9)`; ctx.fillRect(0, y, W, 2); ctx.restore();
+  }
+
   root.Stage = {
+    hudTarget, hudBox, hudPointer, hudScan,
     TEXT_SCALE, SUB_SIZE, SUB_MIN, docSub, moodAt, moodGrade,
     W, H, FONT, C, clamp, lerp, easeOut, easeIn, easeInOut, back, elastic, prog, win, rng, hexA,
     text, rrect, pill, rich, note, setup, sceneRange, sceneAt, currentLine, talk, speaking, subtitles: subtitles2, header: header2, rewindIcon,

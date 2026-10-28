@@ -665,8 +665,15 @@ def sfx_bank_soft():
     bank["calc"] = cc
     tp = np.sin(2 * np.pi * np.cumsum(90 + 10 * np.sin(2 * np.pi * 0.8 * t(2.5))) / SR) * 0.3 + (_lp(_noise(int(2.5 * SR), 171), 700) - _lp(_noise(int(2.5 * SR), 171), 200)) * 0.5
     bank["tape"] = tp * np.minimum(1, t(2.5) / 0.3) * np.minimum(1, (2.5 - t(2.5)) / 0.4)
+    # 注目マークと発見の音（ガイドライン v2.1、2026-10-28〜）：鋭い高音を使わない、短く柔らかいアクセント
+    bank["lock"] = _add(_bell(392, 0.12, 0.4, 0.04, 0.003), np.concatenate([np.zeros(int(0.07 * SR)), _bell(523.25, 0.18, 0.35, 0.06, 0.003)]),
+                        _lp(_noise(int(0.03 * SR), 180), 1500) * np.exp(-t(0.03) / 0.006) * 0.4)   # 照準が合う：低めの 2 音
+    ns = _noise(int(0.5 * SR), 181)
+    bank["scanline"] = (_lp(ns, 2000) - _lp(ns, 600)) * np.sin(np.pi * t(0.5) / 0.5) ** 2 * (0.7 + 0.3 * np.sin(2 * np.pi * 18 * t(0.5)))   # 線が画面を横切る
+    bank["reveal"] = _add(np.sin(2 * np.pi * np.cumsum(60 * np.exp(-t(1.2) / 0.3) + 40) / SR) * np.exp(-t(1.2) / 0.45) * np.minimum(1, t(1.2) / 0.01),
+                          _swoosh(1.2, 400, 1600, 0.35, 182) * np.linspace(1, 0.3, int(1.2 * SR)))   # 重要な事実が明らかになる：低い一打と、空気が広がる音
     bank["glow"] = _add(*[np.concatenate([np.zeros(int(k * 0.07 * SR)), _bell(f, 1.8, 0.2, 0.7, 0.05)]) for k, f in enumerate((174.61, 220.0, 261.63, 349.23))])
-    level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09, "water": 0.04, "glow": 0.05, "roar": 0.12, "pencil": 0.035, "calc": 0.045, "tape": 0.03,
+    level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09, "water": 0.04, "glow": 0.05, "roar": 0.12, "pencil": 0.035, "calc": 0.045, "tape": 0.03, "lock": 0.05, "scanline": 0.035, "reveal": 0.09,
              "paper": 0.04, "cut": 0.04, "machine": 0.06, "gear": 0.035, "unroll": 0.035, "room": 0.02, "loom": 0.04,
              "impact": 0.11, "hit": 0.08, "alarm": 0.08, "stab": 0.08, "brake": 0.06, "rewind": 0.06, "revswell": 0.05,
              "sweep_up": 0.045, "sweep_down": 0.045, "riser": 0.04, "tick": 0.05, "scan": 0.04}

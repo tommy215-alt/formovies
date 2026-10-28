@@ -48,6 +48,10 @@ class Episode:
         self.out = self.here / cfg["out"]
         vc = json.loads((COMMON / "voices.json").read_text(encoding="utf-8"))
         self.voices = vc[self.lines()["voices"]]
+        # その回だけ声を変える（ガイドライン v2.1、2026-10-28〜）：lines.json の "voice_override": {"M": {"name", "credit", "styles", "default_style", "speed", "pitch", "inton"}}
+        # 書いた項目だけを voices.json の版に重ねる。書かない回は従来どおり
+        for who, ov in self.lines().get("voice_override", {}).items():
+            self.voices = {**self.voices, who: {**self.voices[who], **ov}}
         self.ending = vc["ending"]
 
     def lines(self):
