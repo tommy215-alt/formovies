@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_013 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../common/vendor/earth/earth_tex.js"></script>
+<script src="../common/ending.js"></script>
+<script>
+// pilot_013「宇宙飛行士の命を、数字で支えた女性——キャサリン・ジョンソン」のレンダラー（標準ルール v4：cine.js の映像品質、字幕 1.2 倍、色調の感情設計）。
+// renderFrame(t) が時刻 t の 1 コマを描く（決定的：乱数はすべて種つき）。3D は画面外の WebGL に 1.5 倍で描いて bg（2D）に縮めて重ね、ui（2D）に文字。
+// 人物は顔のない人形（stage.js の mochi3D）。実際の顔は描かない。地球の画像は NASA Visible Earth（パブリックドメイン、common/vendor/earth/）。
+const S = Stage, { W, H, clamp, lerp, easeOut, easeIn, easeInOut, prog, win, text, rrect } = Stage;
+const TS = S.TEXT_SCALE;
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["hook", "girl", "naca", "orbit", "trust", "space", "end"];
+let TL, CUE, MOOD = [];
+const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
+const sstep = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const lerpV = (a, b, k) => a.clone().lerp(b, k);
+
+// ---------------------------------------------------------------- WebGL（超解像度 1.5 倍）
+const SS = 1.5;
+const glc = document.createElement("canvas"); glc.width = W * SS; glc.height = H * SS;
+const R = new THREE.WebGLRenderer({ canvas: glc, antialias: true, alpha: true, preserveDrawingBuffer: true });
+R.setPixelRatio(1); R.setSize(W * SS, H * SS, false); R.outputEncoding = THREE.sRGBEncoding;
+R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.2;
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(40, W / H, .01, 200);
+const C = c => new THREE.Color(c).convertSRGBToLinear();
+let FOGC = C(0x0e141c);
+scene.fog = new THREE.FogExp2(FOGC, .03);
+const hemi = new THREE.HemisphereLight(C(0x8ea2bd), C(0x1a1612), .45); scene.add(hemi);
+const key = new THREE.SpotLight(C(0xffd9a8), 2.5, 0, .7, .55, 1); key.castShadow = true; scene.add(key); scene.add(key.target);
+key.shadow.mapSize.set(4096, 4096); key.shadow.bias = -.0004; key.shadow.normalBias = .01;
+const rim = new THREE.DirectionalLight(C(0x9fd4ff), .9); scene.add(rim); scene.add(rim.target);
+const fill = new THREE.PointLight(C(0x6fa8d8), 0, 12, 2); scene.add(fill);
+const sets = {};
+function set(name) { const g = new THREE.Group(); g.visible = false; scene.add(g); sets[name] = g; return g; }
+function show(...names) { for (const k in sets) sets[k].visible = names.includes(k); }
+function setCam(pos, look, fov = 40, near = .02, far = 200, up = null) {
+  cam.up.copy(up || V3(0, 1, 0)); cam.position.copy(pos); cam.fov = fov; cam.near = near; cam.far = far; cam.lookAt(look); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+}
+function lights({ hemiI = .45, keyI = 30, keyPos, keyAt, keyCol = 0xffd9a8, angle = .7, rimI = .9, rimCol = 0x9fd4ff, rimPos = [3, 4, -4], fillI = 0, fillCol = 0x6fa8d8, fillPos = [0, 2, 2], fog = .03, fogC = 0x0e141c, exp = 1.1, hemiSky = 0x8ea2bd, hemiGround = 0x1a1612 }) {
+  hemi.intensity = hemiI; hemi.color = C(hemiSky); hemi.groundColor = C(hemiGround); key.intensity = keyI * .085; key.color = C(keyCol); key.angle = angle;
+  key.position.set(...keyPos); key.target.position.set(...keyAt); key.target.updateMatrixWorld();
+  rim.intensity = rimI * .6; rim.color = C(rimCol); rim.position.set(...rimPos); fill.intensity = fillI * .2; fill.color = C(fillCol); fill.position.set(...fillPos);
+  FOGC = C(fogC); scene.fog.color = FOGC; scene.fog.density = fog; R.toneMappingExposure = exp;
+}
+const FX = [];   // 加算の光の筋・埃・炎（被写界深度の透明な層には描かない：不透明な暗い色として残り、画面を覆う）
+function draw3D(dof) {
+  R.shadowMap.needsUpdate = true;
+  const n0 = cam.near, f0 = cam.far;
+  if (!dof) { R.setClearColor(FOGC, 1); R.render(scene, cam); bg.imageSmoothingQuality = "high"; bg.drawImage(glc, 0, 0, W, H); return; }
+  const { focus, slab, far: bf, near: bn } = dof;
+  const pass = (n, f, blur, clearAlpha) => {
+    const fx = clearAlpha === 0 ? FX : [], vis = fx.map(o => o.visible); fx.forEach(o => o.visible = false);
+    cam.near = Math.max(n0, n); cam.far = Math.min(f0, f); cam.updateProjectionMatrix();
+    R.setClearColor(FOGC, clearAlpha); R.render(scene, cam); R.shadowMap.needsUpdate = false;
+    fx.forEach((o, i) => o.visible = vis[i]);
+    bg.save(); bg.imageSmoothingQuality = "high"; bg.filter = blur > .3 ? `blur(${blur}px)` : "none"; bg.drawImage(glc, 0, 0, W, H); bg.restore();
+  };
+  pass(n0, f0, bf, 1);
+  pass(Math.max(n0, focus - slab), focus + slab, 0, 0);
+  if (focus - slab > n0 + .001) pass(n0, focus - slab + .002, bn, 0);
+  cam.near = n0; cam.far = f0; cam.updateProjectionMatrix();
+}
+function proj(v, c = cam) { const p = v.clone().project(c); return [(p.x + 1) / 2 * W, (1 - p.y) / 2 * H, p.z]; }
+function guardBox(b) { if (b && b[2] > 0 && b[0] < W && b[3] > 0 && b[1] < H && (b[2] - b[0]) > 30) S.CHARLOG.push(b); }
+const FIT_TOP = 210, FIT_BOT = 1360;
+function objPts(o) { o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o); const c = (y) => [V3(bb.min.x, y, bb.min.z), V3(bb.max.x, y, bb.min.z), V3(bb.min.x, y, bb.max.z), V3(bb.max.x, y, bb.max.z)];
+  return { b: c(bb.min.y), t: c(bb.max.y) }; }
+function fitB(items, yTop = FIT_TOP, yBot = FIT_BOT) {
+  items = items.filter(Boolean); if (!items.length) return;
+  const ang = y => Math.atan((1 - 2 * y / H) * Math.tan(cam.fov * Math.PI / 360));
+  for (let pass = 0; pass < 3; pass++) {
+    cam.updateMatrixWorld();
+    const bs = items.map(i => i.box()).filter(Boolean); if (!bs.length) return;
+    const top = Math.min(...bs.map(b => b[1])), bot = Math.max(...bs.map(b => b[3])), A = yBot - yTop;
+    if (bot - top > A) { const c = items.reduce((m, i) => m.add(i.c()), V3(0, 0, 0)).multiplyScalar(1 / items.length);
+      cam.position.copy(c.clone().add(cam.position.clone().sub(c).multiplyScalar((bot - top) / A * 1.03))); continue; }
+    if (bot > yBot) cam.rotateX(-(ang(yBot) - ang(bot)));
+    else if (top < yTop) cam.rotateX(ang(top) - ang(yTop));
+  }
+  cam.updateMatrixWorld();
+}
+const P_ = p => ({ box: () => p.g.visible ? p.box(cam, W, H) : null, c: () => p.g.position.clone().add(V3(0, .85 * (p.S || 1), 0)) });
+function guardP(p) { if (p.g.visible) guardBox(p.box(cam, W, H)); }
+function boxOf(obj) {
+  obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj); if (bb.isEmpty()) return null;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+    const [px, py, pz] = proj(V3(x, y, z)); if (pz > 1) return null; x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); }
+  return [x0, y0, x1, y1];
+}
+
+// ---------------------------------------------------------------- 画像
+function canvasTex(w, h, draw, rep = [1, 1]) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); draw(x, w, h);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); t.anisotropy = 16; return t;
+}
+const rnd = S.rng(13);
+const woodTex = (base, dark, rep) => canvasTex(512, 512, (x, w, h) => {
+  x.fillStyle = base; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 140; i++) { x.strokeStyle = `rgba(${dark},${.05 + rnd() * .12})`; x.lineWidth = 1 + rnd() * 3; const y = rnd() * h;
+    x.beginPath(); x.moveTo(0, y); for (let k = 0; k <= 8; k++) x.lineTo(k * w / 8, y + Math.sin(k * 1.3 + i) * 4 * rnd()); x.stroke(); }
+}, rep);
+const deskWood = woodTex("#5a3d26", "25,14,6", [2, 1]), floorWood = woodTex("#6a4a30", "30,18,8", [6, 6]), porchWood = woodTex("#8a6a4a", "40,26,12", [2, 2]);
+const linoTex = canvasTex(512, 512, (x, w, h) => {   // 1950 年代の床（市松のリノリウム）
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) { x.fillStyle = (r + c) % 2 ? "#4a4e48" : "#6a6c64"; x.fillRect(c * 64, r * 64, 64, 64); }
+  for (let i = 0; i < 2000; i++) { x.fillStyle = `rgba(20,20,18,${.03 + rnd() * .05})`; x.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1); }
+}, [10, 10]);
+const wallTex = canvasTex(512, 512, (x, w, h) => {
+  x.fillStyle = "#9aa39a"; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(${rnd() < .5 ? "60,66,60" : "200,206,196"},${.03 + rnd() * .05})`; x.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 5, 1 + rnd() * 3); }
+}, [6, 2]);
+const boardTex = canvasTex(1024, 512, (x, w, h) => {   // 大学の黒板：楕円と軌道に関係する式（チョーク）
+  x.fillStyle = "#1f2b24"; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 3000; i++) { x.fillStyle = `rgba(200,210,200,${.02 + rnd() * .03})`; x.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 10, 1); }
+  x.fillStyle = "rgba(235,240,230,.88)"; x.font = "italic 46px serif";
+  x.fillText("x² / a²  +  y² / b²  =  1", 60, 110); x.fillText("r = a (1 − e²) / (1 + e cos θ)", 60, 210);
+  x.fillText("v² = GM (2 / r − 1 / a)", 60, 310);
+  x.strokeStyle = "rgba(235,240,230,.8)"; x.lineWidth = 3; x.beginPath(); x.ellipse(800, 270, 150, 95, 0, 0, 6.283); x.stroke();
+  x.beginPath(); x.arc(860, 270, 6, 0, 6.283); x.fill(); x.beginPath(); x.moveTo(800, 175); x.lineTo(800, 365); x.moveTo(650, 270); x.lineTo(950, 270); x.stroke();
+});
+// 計算用紙（数字が書き込まれていく：writeK、×で消して書き直す：fixK）。数字は演出用の例（実際の記録ではない）
+const padC = document.createElement("canvas"); padC.width = 1024; padC.height = 1320;
+const padTex = new THREE.CanvasTexture(padC); padTex.encoding = THREE.sRGBEncoding; padTex.anisotropy = 16;
+const padRows = (() => { const r = S.rng(31), L = []; for (let i = 0; i < 28; i++) { const row = []; for (let c = 0; c < 4; c++) row.push((r() * (c === 0 ? 300 : 9999)).toFixed(c === 0 ? 0 : 3)); L.push(row); } return L; })();
+let padDrawn = "";
+function drawPad(writeK = 1, fixK = 0, curve = 0) {
+  const key_ = [Math.round(writeK * 120), Math.round(fixK * 10), Math.round(curve * 40)].join(); if (key_ === padDrawn) return; padDrawn = key_;
+  const x = padC.getContext("2d"), w = padC.width, h = padC.height, r = S.rng(41);
+  x.fillStyle = "#e6e0cc"; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2500; i++) { x.fillStyle = `rgba(120,100,70,${.02 + r() * .04})`; x.fillRect(r() * w, r() * h, 1 + r() * 4, 1); }
+  x.strokeStyle = "rgba(60,110,160,.35)"; x.lineWidth = 2; for (let i = 0; i < 30; i++) { x.beginPath(); x.moveTo(0, 120 + i * 40); x.lineTo(w, 120 + i * 40); x.stroke(); }
+  x.strokeStyle = "rgba(180,60,60,.4)"; x.beginPath(); x.moveTo(110, 0); x.lineTo(110, h); x.stroke();
+  x.fillStyle = "rgba(30,30,40,.88)"; x.font = "italic 30px serif";
+  const total = padRows.length * 4, n = Math.round(writeK * total);
+  for (let k = 0; k < n; k++) { const i = Math.floor(k / 4), c = k % 4, yy = 152 + i * 40;
+    if (yy > h - 40) break;
+    x.save(); x.translate(130 + c * 220, yy); x.rotate((r() - .5) * .03); x.fillText(padRows[i][c], 0, 0); x.restore(); }
+  if (fixK > 0) {   // 間違いを線で消し、横に書き直す
+    const yy = 152 + 9 * 40; x.strokeStyle = "rgba(30,30,40,.85)"; x.lineWidth = 3; x.beginPath(); x.moveTo(345, yy - 10); x.lineTo(345 + 140 * clamp(fixK * 2), yy - 10); x.stroke();
+    if (fixK > .5) { x.fillStyle = "rgba(30,30,40,.9)"; x.fillText("4718.205", 560, yy - 34); }
+  }
+  if (curve > 0) {   // 軌道の曲線（図）
+    x.strokeStyle = "rgba(30,30,40,.8)"; x.lineWidth = 3; x.beginPath();
+    for (let i = 0; i <= 100 * curve; i++) { const a = i / 100 * 6.283; const px = 700 + 220 * Math.cos(a), py = 1000 + 140 * Math.sin(a); i ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke();
+    x.beginPath(); x.arc(770, 1000, 40, 0, 6.283); x.stroke();
+  }
+  padTex.needsUpdate = true;
+}
+drawPad(1);
+const printTex = canvasTex(512, 1024, (x, w, h) => {   // 計算機の出力の紙（連続用紙、数字の列）
+  x.fillStyle = "#e8ecdf"; x.fillRect(0, 0, w, h); x.fillStyle = "rgba(150,190,150,.35)"; for (let i = 0; i < 32; i += 2) x.fillRect(0, i * 32, w, 32);
+  x.fillStyle = "#555"; for (let i = 0; i < 32; i++) { x.beginPath(); x.arc(14, 16 + i * 32, 5, 0, 6.283); x.fill(); x.beginPath(); x.arc(w - 14, 16 + i * 32, 5, 0, 6.283); x.fill(); }
+  x.fillStyle = "rgba(20,20,30,.85)"; x.font = "22px monospace"; const r = S.rng(51);
+  for (let i = 0; i < 30; i++) x.fillText(`${String(i * 30).padStart(4, "0")}  ${(r() * 9999).toFixed(3).padStart(9)}  ${(r() * 999).toFixed(4).padStart(9)}`, 40, 40 + i * 32);
+});
+const signTex = text_ => canvasTex(768, 128, (x, w, h) => { x.fillStyle = "#e8e4d6"; x.fillRect(0, 0, w, h); x.strokeStyle = "#333"; x.lineWidth = 6; x.strokeRect(6, 6, w - 12, h - 12);
+  x.fillStyle = "#222"; x.font = `700 ${Math.min(52, Math.floor(1300 / text_.length))}px sans-serif`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(text_, w / 2, h / 2 + 2); });
+
+// ---------------------------------------------------------------- 材質と形
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: C(c), roughness: .7, metalness: 0, ...o });
+const steel = M(0xc8ced4, { roughness: .2, metalness: .95 });
+const darkMetal = M(0x2a2e34, { roughness: .4, metalness: .7 });
+const deskM = new THREE.MeshStandardMaterial({ map: deskWood, roughness: .6 });
+const paperM = new THREE.MeshStandardMaterial({ map: padTex, roughness: .9 });
+const glowMat = c => new THREE.MeshStandardMaterial({ color: C(0x111111), emissive: C(c), emissiveIntensity: 2.2 });
+function box(w, h, d, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; if (parent) parent.add(m); return m; }
+function rbox(w, h, d, r, mat, x = 0, y = 0, z = 0, parent) {   // 角を丸めた箱（家具・機械）。CG らしい鋭い角を減らす
+  const s = new THREE.Shape(), a = w / 2 - r, b = h / 2 - r;
+  s.moveTo(-a, -h / 2); s.lineTo(a, -h / 2); s.quadraticCurveTo(w / 2, -h / 2, w / 2, -b); s.lineTo(w / 2, b); s.quadraticCurveTo(w / 2, h / 2, a, h / 2); s.lineTo(-a, h / 2); s.quadraticCurveTo(-w / 2, h / 2, -w / 2, b); s.lineTo(-w / 2, -b); s.quadraticCurveTo(-w / 2, -h / 2, -a, -h / 2);
+  const g = new THREE.ExtrudeGeometry(s, { depth: d - 2 * r, bevelEnabled: true, bevelThickness: r, bevelSize: r * .9, bevelSegments: 3, curveSegments: 6 }); g.translate(0, 0, -(d - 2 * r) / 2);
+  const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; if (parent) parent.add(m); return m;
+}
+function cyl(r, h, mat, x = 0, y = 0, z = 0, parent, rotZ = 0, seg = 32, r2 = null) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r2 ?? r, h, seg), mat); m.position.set(x, y, z); m.rotation.z = rotZ; m.castShadow = m.receiveShadow = true; if (parent) parent.add(m); return m; }
+function plane(w, h, mat, parent, x = 0, y = 0, z = 0, ry = 0) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.y = ry; m.receiveShadow = true; if (parent) parent.add(m); return m; }
+function floor(mat, parent, size = 40) { const f = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat); f.rotation.x = -Math.PI / 2; f.receiveShadow = true; parent.add(f); return f; }
+
+// ---------------------------------------------------------------- 人物（顔のない人形）と手
+const SKIN_K = 0x7d5a44;   // キャサリンと西区域計算部門の女性たちの肌の色（褐色）
+function person({ dress = null, hair = null, coat = null, scale = 1, skin = 0xd5dbe4, apron = false, shirt = null } = {}) {
+  const p = S.mochi3D(THREE, { color: skin }); const P = p.parts;
+  if (hair) {
+    const hm = M(hair, { roughness: .75 });
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(.216, 32, 14, 0, 6.283, 0, .75), hm); crown.rotation.x = -.45; P.head.add(crown);
+    const back = new THREE.Mesh(new THREE.SphereGeometry(.216, 32, 20, Math.PI, Math.PI, 0, 2.05), hm); P.head.add(back);
+    for (const s of [-1, 1]) { const curl = new THREE.Mesh(new THREE.TorusGeometry(.07, .035, 12, 24), hm); curl.position.set(s * .17, .02, -.06); curl.rotation.y = Math.PI / 2; P.head.add(curl); }   // 1950 年代のまとめ髪
+  }
+  if (dress) {
+    const dm = M(dress, { roughness: .85 });
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(.21, .32, .62, 32, 1, true), dm); skirt.position.y = .36; skirt.material.side = THREE.DoubleSide; P.body.add(skirt);
+    const bod = new THREE.Mesh(new THREE.CapsuleGeometry(.245, .28, 8, 24), dm); bod.position.y = .3; bod.scale.set(1.04, 1, .92); P.hips.add(bod);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(.13, .025, 8, 24), M(0xe8e4da, { roughness: .8 })); collar.rotation.x = Math.PI / 2; collar.position.y = .6; P.hips.add(collar);
+    for (const a of [P.armL, P.armR]) { const sl = new THREE.Mesh(new THREE.CapsuleGeometry(.083, .2, 6, 16), dm); sl.position.y = -.12; a.a.add(sl); }
+    for (const l of [P.legL, P.legR]) { const sh = new THREE.Mesh(new THREE.CapsuleGeometry(.06, .05, 6, 12), M(0x1a1612, { roughness: .4 })); sh.position.set(0, -.44, .03); sh.rotation.x = Math.PI / 2; l.a.add(sh); }
+    [skirt, bod].forEach(o => { o.castShadow = o.receiveShadow = true; });
+  }
+  if (apron) { const ap = new THREE.Mesh(new THREE.PlaneGeometry(.34, .5), M(0xe0d8c4, { roughness: .9 })); ap.position.set(0, .45, .3); ap.rotation.x = -.15; P.body.add(ap); }
+  if (coat || shirt) {
+    const cm = M(coat || shirt, { roughness: .75 });
+    const jk = new THREE.Mesh(new THREE.CapsuleGeometry(.27, .4, 8, 24), cm); jk.position.y = .27; jk.scale.set(1.06, 1, .97); P.hips.add(jk);
+    for (const a of [P.armL, P.armR]) { const sl = new THREE.Mesh(new THREE.CapsuleGeometry(.084, .2, 6, 16), cm); sl.position.y = -.12; a.a.add(sl); }
+    for (const l of [P.legL, P.legR]) { const tr = new THREE.Mesh(new THREE.CapsuleGeometry(.1, .22, 6, 16), M(0x2a2c30)); tr.position.y = -.14; l.a.add(tr); }
+    if (shirt) { const tie = new THREE.Mesh(new THREE.BoxGeometry(.05, .26, .02), M(0x3a2a24)); tie.position.set(0, .4, .26); P.hips.add(tie); }
+    jk.castShadow = true;
+  }
+  p.g.scale.setScalar(scale); p.S = scale;
+  const pose0 = p.pose; p.pose = o => { pose0({ ...o, sx: scale, sy: scale }); };
+  return p;
+}
+function hand(sleeve = 0x4a5a70, skin = SKIN_K) {   // 手と前腕（手もとのアップ用）。指先は +x。指は関節を曲げられる（fingers(k)）
+  const g = new THREE.Group(), sm = M(skin, { roughness: .55 });
+  const fore = new THREE.Mesh(new THREE.CapsuleGeometry(.032, .2, 8, 16), M(sleeve, { roughness: .85 })); fore.rotation.z = Math.PI / 2; fore.position.x = -.16; g.add(fore);
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(.036, .036, .02, 16), M(0xe8e4da)); cuff.rotation.z = Math.PI / 2; cuff.position.x = -.06; g.add(cuff);
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(.045, 20, 14), sm); palm.scale.set(1.25, .5, 1); g.add(palm);
+  const fs = [];
+  for (let i = 0; i < 4; i++) { const j = new THREE.Group(); j.position.set(.05, 0, -.03 + i * .02); g.add(j);
+    const f1 = new THREE.Mesh(new THREE.CapsuleGeometry(.0105, .022, 4, 10), sm); f1.rotation.z = Math.PI / 2; f1.position.x = .012; j.add(f1);
+    const j2 = new THREE.Group(); j2.position.x = .03; j.add(j2); const f2 = new THREE.Mesh(new THREE.CapsuleGeometry(.0095, .018, 4, 10), sm); f2.rotation.z = Math.PI / 2; f2.position.x = .01; j2.add(f2);
+    fs.push([j, j2]); }
+  const th = new THREE.Mesh(new THREE.CapsuleGeometry(.012, .035, 4, 10), sm); th.position.set(.03, -.005, .055); th.rotation.set(0, -.6, Math.PI / 2); g.add(th);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.userData.fingers = (k, press = -1, pk = 0) => fs.forEach(([j, j2], i) => { const c = k + (i === press ? pk : 0); j.rotation.z = -.5 * c; j2.rotation.z = -.7 * c; });
+  return g;
+}
+
+// ================================================================ 場面：発射台（夜明け）とロケット
+const pad = set("pad");
+const smoke = [];
+let flame, flameLight, rocket;
+{
+  floor(M(0x5a5650, { roughness: .95 }), pad, 600);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: {},
+    vertexShader: "varying vec3 vP; void main(){ vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+    fragmentShader: "varying vec3 vP; void main(){ float y=vP.y; vec3 hz=vec3(1.0,0.55,0.28), mid=vec3(0.32,0.38,0.55), top=vec3(0.04,0.07,0.16); vec3 c=mix(hz,mid,smoothstep(0.0,0.25,y)); c=mix(c,top,smoothstep(0.2,0.8,y));" +
+      " float sun=pow(max(dot(vP,normalize(vec3(0.75,0.08,-0.65))),0.0),400.0)*6.0+pow(max(dot(vP,normalize(vec3(0.75,0.08,-0.65))),0.0),8.0)*0.35; c+=vec3(1.0,0.75,0.5)*sun; gl_FragColor=vec4(c,1.0);" +
+      " #include <tonemapping_fragment>\n #include <encodings_fragment>\n }" }));
+  pad.add(sky);
+  // 発射台の鉄骨塔（格子）
+  const tower = new THREE.Group(); tower.position.set(-7, 0, -1); pad.add(tower);
+  const red = M(0x8a3a2a, { roughness: .6, metalness: .4 });
+  for (const x of [-1.5, 1.5]) for (const z of [-1.5, 1.5]) box(.25, 34, .25, red, x, 17, z, tower);
+  for (let i = 0; i < 17; i++) { const y = 1 + i * 2; box(3.2, .15, .15, red, 0, y, -1.5, tower); box(3.2, .15, .15, red, 0, y, 1.5, tower); box(.15, .15, 3.2, red, -1.5, y, 0, tower); box(.15, .15, 3.2, red, 1.5, y, 0, tower);
+    const d = box(.1, 2.8, .1, red, 0, y + 1, 1.5, tower); d.rotation.z = .8; }
+  box(14, 1.2, 14, M(0x6a665e, { roughness: .9 }), 0, .6, 0, pad);   // 発射台の土台
+}
+// Atlas ロケットと Mercury カプセル（簡略化した再現。単位はメートル）
+function mercury(parent, s = 1) {
+  const g = new THREE.Group(); g.scale.setScalar(s); parent.add(g);
+  const shingle = M(0x1a1c20, { roughness: .35, metalness: .6 }); g.userData.shingle = shingle;
+  cyl(.95, .25, M(0x3a3028, { roughness: .9 }), 0, 0, 0, g);                              // 熱シールド
+  const retro = cyl(.35, .3, M(0x8a8a86, { roughness: .4, metalness: .8 }), 0, -.25, 0, g);  // 逆噴射ロケット（帯で固定）
+  for (let i = 0; i < 3; i++) { const st = box(.04, .02, 1.7, M(0x9a9a96, { metalness: .8, roughness: .3 }), 0, -.12, 0, g); st.rotation.y = i * 2.094; }
+  cyl(.42, 2.0, shingle, 0, 1.12, 0, g, 0, 48, .95);                                         // 円錐（波板の外板）
+  cyl(.42, .6, shingle, 0, 2.42, 0, g, 0, 48);
+  cyl(.3, .35, M(0x2a2c30, { roughness: .4, metalness: .6 }), 0, 2.9, 0, g, 0, 32, .42);
+  const win_ = new THREE.Mesh(new THREE.PlaneGeometry(.22, .3), new THREE.MeshPhysicalMaterial({ color: C(0x223040), roughness: .05, metalness: .2, clearcoat: 1 }));
+  win_.position.set(0, 1.55, .72); win_.rotation.x = -.27; g.add(win_);
+  return g;
+}
+{
+  rocket = new THREE.Group(); pad.add(rocket);
+  const atlasMat = M(0xd8dde2, { roughness: .22, metalness: .9 });
+  cyl(1.5, 18, atlasMat, 0, 11, 0, rocket, 0, 64);                      // 本体（ステンレスの風船タンク）
+  cyl(1.5, 3, atlasMat, 0, 21.5, 0, rocket, 0, 64, 1.5); cyl(.95, 2.2, atlasMat, 0, 24.1, 0, rocket, 0, 64, 1.5);
+  const skirt = cyl(2.4, 2.2, atlasMat, 0, 1.1, 0, rocket, 0, 64, 1.6);  // 下部のブースター部
+  for (let i = 0; i < 3; i++) { const n = cyl(.5, 1.2, darkMetal, 1.2 * Math.cos(i * 2.1), -.4, 1.2 * Math.sin(i * 2.1), rocket, 0, 24, .7); }   // ノズル
+  const cap = mercury(rocket, 1.15); cap.position.y = 25.3;
+  const towerM = M(0xc8402e, { roughness: .5, metalness: .4 });            // 脱出用ロケットの塔
+  for (let i = 0; i < 3; i++) { const l = box(.06, 4.2, .06, towerM, .32 * Math.cos(i * 2.094), 30.9, .32 * Math.sin(i * 2.094), rocket); }
+  cyl(.12, 1.2, M(0xe8e8e8, { roughness: .4 }), 0, 33.6, 0, rocket, 0, 16);
+  const flameMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uT: { value: 0 }, uK: { value: 0 } },
+    vertexShader: "varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+    fragmentShader: "uniform float uT; uniform float uK; varying vec2 vUv; float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);} " +
+      "void main(){ float y=vUv.y; float n=h(vec2(floor(vUv.x*12.0),floor((y-uT*6.0)*14.0))); float core=pow(y,1.5); float a=uK*core*(0.75+0.25*n); vec3 c=mix(vec3(1.0,0.45,0.12),vec3(1.0,0.92,0.75),pow(y,3.0)); gl_FragColor=vec4(c*a*1.6,1.0); }" });
+  flame = new THREE.Mesh(new THREE.CylinderGeometry(1.4, .35, 14, 32, 1, true), flameMat); flame.position.y = -7.5; rocket.add(flame); FX.push(flame);
+  flameLight = new THREE.PointLight(C(0xffa060), 0, 80, 2); flameLight.position.y = -3; rocket.add(flameLight);
+  const sm = M(0xc8c4bc, { roughness: 1 }), r = S.rng(61);
+  for (let i = 0; i < 70; i++) { const s = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), sm); s.userData = { a: r() * 6.283, sp: .5 + r() * 1.2, y: r() * 3, d: r() }; s.castShadow = false; pad.add(s); smoke.push(s); }
+}
+
+// ================================================================ 場面：暗い部屋の机（計算）・1950 年代の机
+const desk = set("desk");
+let lampLight;
+{
+  floor(new THREE.MeshStandardMaterial({ map: floorWood, roughness: .8 }), desk, 30);
+  plane(30, 8, new THREE.MeshStandardMaterial({ map: wallTex, roughness: .95 }), desk, 0, 4, -1.4);
+  rbox(1.7, .04, .95, .012, deskM, 0, .758, 0, desk); for (const x of [-.78, .78]) for (const z of [-.4, .4]) box(.06, .74, .06, deskM, x, .37, z, desk);   // 天板の上面 ≈ .79
+  const lamp = new THREE.Group(); lamp.position.set(-.6, .79, -.25); desk.add(lamp);
+  const lampM = M(0x2a4a3a, { roughness: .35, metalness: .5 });
+  cyl(.08, .03, lampM, 0, 0, 0, lamp); cyl(.012, .38, steel, 0, .2, 0, lamp);
+  const shade = cyl(.06, .14, lampM, .08, .42, 0, lamp, 0, 24, .14); shade.rotation.z = .9;
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(.035, 16, 12), glowMat(0xffd8a0)); bulb.position.set(.13, .38, 0); lamp.add(bulb);
+  lampLight = new THREE.PointLight(C(0xffcf96), 0, 3, 2); lampLight.position.set(-.45, 1.15, -.25); desk.add(lampLight);
+}
+const pad1 = new THREE.Mesh(new THREE.BoxGeometry(.42, .004, .54), [M(0xe6e0cc), M(0xe6e0cc), paperM, M(0xe6e0cc), M(0xe6e0cc), M(0xe6e0cc)]); pad1.castShadow = pad1.receiveShadow = true; scene.add(pad1);
+const stackP = new THREE.Group(); scene.add(stackP); for (let i = 0; i < 6; i++) { const s = box(.42, .003, .54, M(0xdcd6c2, { roughness: .95 }), .03 * Math.sin(i), .004 * i, 0, stackP); s.rotation.y = .04 * Math.sin(i * 3); }
+const printout = new THREE.Mesh(new THREE.PlaneGeometry(.3, .6), new THREE.MeshStandardMaterial({ map: printTex, roughness: .9, side: THREE.DoubleSide })); printout.rotation.x = -Math.PI / 2; printout.castShadow = true; scene.add(printout);
+const pencil = new THREE.Group(); scene.add(pencil);
+{ cyl(.0045, .16, M(0xd8a83a, { roughness: .5 }), 0, .08, 0, pencil, 0, 6); const tip = new THREE.Mesh(new THREE.ConeGeometry(.0045, .02, 6), M(0xd8c8a8)); tip.rotation.x = Math.PI; tip.position.y = -.01; pencil.add(tip);
+  const lead = new THREE.Mesh(new THREE.ConeGeometry(.0015, .006, 6), M(0x222)); lead.rotation.x = Math.PI; lead.position.y = -.021; pencil.add(lead);
+  cyl(.005, .012, M(0xc89090, { roughness: .8 }), 0, .166, 0, pencil); }
+// 機械式の卓上計算機（形を簡略化した再現。商標は描かない）
+const calc = new THREE.Group(); scene.add(calc);
+const calcKeys = [];
+{
+  const body = M(0x8a8f86, { roughness: .45, metalness: .3 });
+  rbox(.36, .1, .3, .02, body, 0, .05, 0, calc);
+  const deck = rbox(.34, .03, .2, .01, M(0x6a6e66, { roughness: .5, metalness: .3 }), 0, .1, .03, calc); deck.rotation.x = -.25;
+  rbox(.38, .07, .1, .02, body, 0, .13, -.12, calc);                                  // 上の移動台（キャリッジ）
+  for (let i = 0; i < 12; i++) { const d = cyl(.008, .012, M(0xe8e4d8), -.15 + i * .027, .17, -.12, calc, Math.PI / 2, 12); d.rotation.x = Math.PI / 2; }   // 結果の数字の窓
+  const keyM = [M(0xe8e4d8, { roughness: .4 }), M(0x3a3a3a, { roughness: .4 })];
+  for (let c = 0; c < 8; c++) for (let r = 0; r < 9; r++) { const k = cyl(.0085, .012, keyM[(c + r) % 3 === 0 ? 1 : 0], -.13 + c * .036, .118 - r * .005, .1 - r * .02, calc, 0, 12); calcKeys.push(k); }
+  const crank = cyl(.012, .06, steel, .2, .1, .05, calc, Math.PI / 2, 12);
+}
+const kHandR = hand(), kHandL = hand(); scene.add(kHandR); scene.add(kHandL);
+const katherine = person({ dress: 0x4a5a70, hair: 0x1a1410, skin: SKIN_K }); scene.add(katherine.g);
+
+// ================================================================ 場面：1930 年代の町（階段）
+const town = set("town");
+{
+  floor(M(0x6a7a4a, { roughness: 1 }), town, 120);
+  const house = new THREE.Group(); house.position.set(0, 0, -3); town.add(house);
+  const siding = canvasTex(512, 512, (x, w, h) => { x.fillStyle = "#e4dcc8"; x.fillRect(0, 0, w, h); for (let i = 0; i < 16; i++) { x.fillStyle = "rgba(90,80,60,.25)"; x.fillRect(0, i * 32 + 28, w, 4); } }, [3, 2]);
+  box(8, 5, 6, new THREE.MeshStandardMaterial({ map: siding, roughness: .9 }), 0, 2.5, -2, house);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(5.6, 2.2, 4), M(0x4a3a34, { roughness: .9 })); roof.position.set(0, 6.1, -2); roof.rotation.y = Math.PI / 4; roof.scale.set(1, 1, .8); house.add(roof);
+  for (const x of [-2.5, 2.5]) { const w_ = plane(1.1, 1.5, M(0x2a3440, { roughness: .1, metalness: .3 }), house, x, 3, 1.01); box(1.3, .1, .1, M(0xf0ece0), x, 3.8, 1.05, house); }
+  box(1.2, 2.3, .1, M(0x5a3a2a, { roughness: .7 }), 0, 1.15 + 1.2, 1.03, house);
+  const pw = new THREE.MeshStandardMaterial({ map: porchWood, roughness: .75 });
+  box(8, .2, 2.2, pw, 0, 1.2, 2.1, house);                                       // ポーチ
+  for (let i = 0; i < 6; i++) box(2.2, .2, .35, pw, 0, .1 + i * .2, 3.4 + (5 - i) * .3 - 1.5 + 1.6, house);   // 階段（6 段）
+  for (const x of [-3.8, 3.8, -1.3, 1.3]) cyl(.08, 2.4, M(0xf0ece0), x, 2.4, 3.1, house);
+  for (let i = 0; i < 5; i++) { const tr = new THREE.Group(); tr.position.set(-14 + i * 7, 0, -12 - (i % 2) * 4); town.add(tr); cyl(.25, 4, M(0x4a3a2a), 0, 2, 0, tr, 0, 10);
+    const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(2.4, 1), M(0x4a6a3a, { roughness: 1, flatShading: true })); cr.position.y = 5; tr.add(cr); }
+}
+const girl = person({ dress: 0xb07a5a, hair: 0x1a1410, skin: SKIN_K, scale: .6 }); town.add(girl.g);
+
+// ================================================================ 場面：大学の教室
+const college = set("college");
+{
+  floor(new THREE.MeshStandardMaterial({ map: floorWood, roughness: .8 }), college, 30);
+  plane(30, 8, new THREE.MeshStandardMaterial({ map: wallTex, roughness: .95, color: C(0xd8d0c0) }), college, 0, 4, -3);
+  const bd = plane(4, 2, new THREE.MeshStandardMaterial({ map: boardTex, roughness: .9 }), college, 0, 2.1, -2.95); box(4.2, .08, .12, deskM, 0, 1.06, -2.9, college);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) { rbox(.9, .05, .5, .015, deskM, -1.4 + c * 1.4, .74, -.5 + r * 1.2, college); for (const x of [-.4, .4]) box(.04, .74, .04, deskM, -1.4 + c * 1.4 + x, .37, -.5 + r * 1.2, college); }
+  for (let i = 0; i < 2; i++) { const w_ = plane(1.2, 2.2, new THREE.MeshBasicMaterial({ color: C(0xfff0d8) }), college, -4.5, 2.2, -1 + i * 2.5, Math.PI / 2); }
+}
+const student = person({ dress: 0x6a5a7a, hair: 0x1a1410, skin: SKIN_K }); college.add(student.g);
+
+// ================================================================ 場面：1950 年代の研究所の計算室・食堂
+const office = set("office");
+const computers = [];
+{
+  floor(new THREE.MeshStandardMaterial({ map: linoTex, roughness: .6 }), office, 40);
+  const wm = new THREE.MeshStandardMaterial({ map: wallTex, roughness: .95 });
+  plane(40, 6, wm, office, 0, 3, -5); plane(40, 6, wm, office, -6, 3, 0, Math.PI / 2);
+  for (let i = 0; i < 4; i++) { const w_ = plane(1.6, 2.2, new THREE.MeshBasicMaterial({ color: C(0xc8d8e4) }), office, -5.98, 2.3, -3.5 + i * 2.6, Math.PI / 2); }
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { const l = box(1.6, .05, .25, new THREE.MeshStandardMaterial({ color: C(0xf4f6f0), emissive: C(0xf4f6f0), emissiveIntensity: .9 }), -2 + j * 3.2, 3.6, -3 + i * 2.6, office); }
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) {
+    const x = -3 + c * 3.2, z = -3 + r * 2.4;
+    rbox(1.4, .05, .75, .015, M(0x5a6a5a, { roughness: .5, metalness: .2 }), x, .76, z, office); box(1.3, .7, .05, M(0x4a5a4a, { roughness: .6, metalness: .3 }), x, .4, z - .3, office);
+    const cc = calc.clone(); cc.position.set(x + .2, .785, z - .05); office.add(cc);
+    const pp = box(.3, .003, .4, M(0xe6e0cc, { roughness: .95 }), x - .35, .787, z, office);
+    const w = person({ dress: [0x5a6a80, 0x7a5a5a, 0x5a7a6a, 0x6a6a5a, 0x7a6a50, 0x55607a][r * 2 + c], hair: 0x1a1410, skin: [SKIN_K, 0x6a4a38, 0x8a6650][(r + c) % 3] }); w.g.position.set(x, 0, z + .62); office.add(w.g); computers.push(w);
+  }
+  const sign = plane(1.4, .35, new THREE.MeshStandardMaterial({ map: signTex("WEST AREA COMPUTING"), roughness: .6 }), office, 1.2, 2.6, -4.97);
+}
+const cafe = set("cafe");
+{
+  floor(new THREE.MeshStandardMaterial({ map: linoTex, roughness: .55 }), cafe, 40);
+  const wm = new THREE.MeshStandardMaterial({ map: wallTex, roughness: .95, color: C(0xc8ccc0) });
+  plane(40, 6, wm, cafe, 0, 3, -6); plane(40, 6, wm, cafe, 5, 3, 0, -Math.PI / 2);
+  for (let r = 0; r < 4; r++) { rbox(2.2, .05, .9, .02, M(0xc8c4b4, { roughness: .4 }), 0, .74, -4.6 + r * 1.9, cafe); for (const x of [-.95, .95]) cyl(.04, .74, steel, x, .37, -4.6 + r * 1.9, cafe);
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const ch = new THREE.Group(); ch.position.set(-.7 + k * .7, 0, -4.6 + r * 1.9 + s * .65); cafe.add(ch); rbox(.4, .04, .4, .01, M(0x6a3a2a, { roughness: .5 }), 0, .45, 0, ch); cyl(.02, .45, steel, 0, .22, 0, ch); } }
+  const card = new THREE.Group(); card.position.set(.3, .77, -4.6); card.rotation.y = .2; cafe.add(card);   // 奥のテーブルの札（NASA の資料の記述の再現）
+  for (const s of [-1, 1]) { const p = plane(.32, .12, new THREE.MeshStandardMaterial({ map: signTex("COLORED"), roughness: .6, side: THREE.DoubleSide }), card, 0, .06, s * .02); p.rotation.x = s * .35; }
+}
+
+// ================================================================ 場面：電子計算機の部屋（1960 年代のイメージ。機種・商標は描かない）
+const mroom = set("mroom");
+const reels = [], lamps = [];
+{
+  floor(M(0xb8bcb4, { roughness: .45 }), mroom, 40);
+  plane(40, 6, M(0xd4d8d0, { roughness: .9 }), mroom, 0, 3, -4);
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) box(1.6, .05, .25, new THREE.MeshStandardMaterial({ color: C(0xf4f6f0), emissive: C(0xf4f6f0), emissiveIntensity: 1 }), -2 + j * 3, 3.2, -3 + i * 2.2, mroom);
+  const cab = M(0x6a7a8a, { roughness: .4, metalness: .4 }), cab2 = M(0x2a3038, { roughness: .4, metalness: .5 });
+  for (let i = 0; i < 6; i++) {
+    const x = -4 + i * 1.4; rbox(1.2, 1.9, .8, .03, i % 3 === 0 ? cab : cab2, x, .95, -3, mroom);
+    if (i % 3 !== 0) for (let k = 0; k < 2; k++) { const rl = new THREE.Group(); rl.position.set(x, 1.4 - k * .55, -2.58); mroom.add(rl);
+      const disk = cyl(.2, .03, M(0xc8ccd0, { metalness: .8, roughness: .3 }), 0, 0, 0, rl, 0, 32); disk.rotation.x = Math.PI / 2;
+      for (let s = 0; s < 3; s++) { const sp = box(.02, .36, .035, M(0x2a2a2a), 0, 0, .01, rl); sp.rotation.z = s * 1.047; } reels.push(rl); }
+    else for (let k = 0; k < 24; k++) { const l = new THREE.Mesh(new THREE.SphereGeometry(.018, 8, 6), new THREE.MeshStandardMaterial({ color: C(0x111), emissive: C(0xffc070), emissiveIntensity: 0 })); l.position.set(x - .4 + (k % 8) * .11, 1.5 - Math.floor(k / 8) * .12, -2.58); mroom.add(l); lamps.push(l); }
+  }
+  rbox(2.4, .9, .9, .03, cab, 0, .45, -.6, mroom); box(2.2, .06, .7, M(0x3a4048), 0, .92, -.6, mroom);   // 操作卓
+}
+const engineers = [person({ shirt: 0xe8e8e4 }), person({ shirt: 0xdce0e4 })]; engineers.forEach(e => mroom.add(e.g));
+
+// ================================================================ 場面：宇宙（地球・大気・雲・宇宙船）
+const space = set("space");
+const EARTH_R = 100;
+const texLoader = new THREE.TextureLoader();
+const texReady = [];
+const loadTex = url => { let res; texReady.push(new Promise(r => res = r)); return texLoader.load(url, () => res(), undefined, () => res()); };
+const dayTex = loadTex(EARTH_TEX.land), cloudTex = loadTex(EARTH_TEX.clouds);
+window.READY = Promise.all(texReady);   // render_frames.js が撮影の前に待つ（画像が届く前のコマに地球が欠けないように）
+dayTex.anisotropy = cloudTex.anisotropy = 16; cloudTex.wrapS = THREE.RepeatWrapping;
+const SUN = new THREE.Vector3(.8, .35, .5).normalize();
+const earthMat = new THREE.ShaderMaterial({ uniforms: { day: { value: dayTex }, clouds: { value: cloudTex }, sunDir: { value: SUN }, uT: { value: 0 } },
+  vertexShader: "varying vec2 vUv; varying vec3 vN; varying vec3 vW; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }",
+  fragmentShader: `uniform sampler2D day; uniform sampler2D clouds; uniform vec3 sunDir; uniform float uT; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+    void main(){ vec3 N=normalize(vN); vec3 V=normalize(cameraPosition-vW);
+      vec3 c=pow(texture2D(day,vUv).rgb,vec3(2.2));
+      float water=smoothstep(0.03,0.12,c.b-max(c.r,c.g));
+      c=mix(c*1.15,vec3(0.006,0.025,0.06),water*0.85);                      // 海を深い色に
+      float cl=pow(texture2D(clouds,vUv+vec2(uT*0.0015,0.0)).r,1.6);
+      float ndl=dot(N,sunDir); float lit=max(ndl,0.0);
+      vec3 col=c*lit*2.2;
+      col=mix(col,vec3(1.0)*lit*1.9,cl*0.85);                               // 雲
+      vec3 Rf=reflect(-sunDir,N); float sp=pow(max(dot(Rf,V),0.0),60.0)*water*(1.0-cl)*2.5; col+=vec3(1.0,0.92,0.8)*sp;   // 海の太陽の反射
+      float term=smoothstep(-0.12,0.0,ndl)*smoothstep(0.25,0.0,ndl); col+=vec3(1.0,0.45,0.2)*term*0.12;                  // 昼夜の境目の暖色
+      float fr=pow(1.0-max(dot(N,V),0.0),3.0); col+=vec3(0.25,0.55,1.0)*fr*smoothstep(-0.2,0.3,ndl)*0.9;                  // 大気の縁
+      col+=vec3(0.002,0.004,0.01);
+      gl_FragColor=vec4(col,1.0);
+      #include <tonemapping_fragment>
+      #include <encodings_fragment>
+    }` });
+const earth = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 128, 96), earthMat); space.add(earth);
+const atmo = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.025, 96, 64), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { sunDir: { value: SUN } },
+  vertexShader: "varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }",
+  fragmentShader: "uniform vec3 sunDir; varying vec3 vN; varying vec3 vW; void main(){ vec3 V=normalize(cameraPosition-vW); float i=pow(clamp(0.72+dot(normalize(vN),V),0.0,1.0),5.0); float d=smoothstep(-0.3,0.4,dot(-normalize(vN),sunDir)); gl_FragColor=vec4(vec3(0.3,0.6,1.0)*i*d*1.4,1.0); }" }));
+space.add(atmo); FX.push(atmo);
+const stars = (() => { const n = 2500, r = S.rng(71), p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const u = r() * 2 - 1, a = r() * 6.283, s = Math.sqrt(1 - u * u); p[i * 3] = 1500 * s * Math.cos(a); p[i * 3 + 1] = 1500 * u; p[i * 3 + 2] = 1500 * s * Math.sin(a); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3));
+  return new THREE.Points(g, new THREE.PointsMaterial({ color: C(0xc8d4e8), size: 1.6, sizeAttenuation: false, fog: false })); })();
+space.add(stars);
+const orbitLine = (() => { const pts = []; for (let i = 0; i <= 256; i++) { const a = i / 256 * 6.283; pts.push(V3(Math.cos(a) * EARTH_R * 1.06, 0, Math.sin(a) * EARTH_R * 1.06)); }
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: C(0x8fdcff), transparent: true, opacity: .9 })); l.rotation.set(.56, 0, .2); return l; })();
+space.add(orbitLine);
+const capsuleSpace = mercury(space, 1); const capLight = new THREE.DirectionalLight(C(0xfff4e4), 5.5); space.add(capLight); space.add(capLight.target);
+const earthShine = new THREE.DirectionalLight(C(0x6a9ad8), 1.2); space.add(earthShine); space.add(earthShine.target);   // 地球の照り返し（下からの青い光）
+
+function hideProps() {
+  [pad1, stackP, printout, pencil, calc, kHandR, kHandL, katherine.g].forEach(o => o.visible = false);
+  lampLight.intensity = 0; flameLight.intensity = 0;
+}
+
+// ================================================================ 映像品質（cine.js）
+Cine.init(THREE, R);
+{
+  const done = new Set(), up = (m, kind, o) => { if (!m || done.has(m) || !m.isMeshStandardMaterial) return; done.add(m); Cine.surface(m, kind, o); };
+  up(deskM, "wood", { repeat: [3, 3], normal: .25 });
+  scene.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || !m.map) continue;
+    if (m.map === floorWood || m.map === porchWood) up(m, "wood", { repeat: [4, 4], normal: .4 });
+    else if (m.map === wallTex) up(m, "plaster", { repeat: [5, 2], normal: .8 });
+    else if (m.map === linoTex) up(m, "stone", { repeat: [8, 8], normal: .35 });
+    else if (m.map === padTex || m.map === printTex) up(m, "paper", { repeat: [2, 2], normal: .35 }); } });
+  up(steel, "metal", { repeat: [3, 1], normal: .25, metal: .95 }); up(darkMetal, "metal", { repeat: [2, 2], normal: .4, metal: .7 });
+  rocket.traverse(o => { if (o.isMesh && o.material.isMeshStandardMaterial && o.material.metalness > .8) up(o.material, "metal", { repeat: [1, 6], normal: .2, metal: .9 }); });
+  for (const cap of [rocket.children.find(c => c.userData.shingle), capsuleSpace]) if (cap) up(cap.userData.shingle, "metal", { repeat: [1, 24], normal: 1.2, metal: .6 });
+  for (const p of [katherine, girl, student, ...computers, ...engineers]) p.g.traverse(o => { if (!o.isMesh) return;
+    if (o.material === p.mat) up(o.material, "skin", { repeat: [2, 2], normal: .12 }); else up(o.material, "fabric", { repeat: [6, 6], normal: .8 }); });
+  [kHandR, kHandL].forEach(h => h.traverse(o => { if (o.isMesh) up(o.material, o.geometry.type === "CapsuleGeometry" && o.position.x < -.1 ? "fabric" : "skin", { repeat: [2, 2], normal: .2 }); }));
+}
+// 窓から机に差し込む光の筋と埃（終盤の決定的な静けさ）
+const deskShaft = Cine.shaft({ from: [1.6, 2.6, -1.2], to: [-.1, .76, .1], r0: .35, r1: .9, color: 0xffd8a8, opacity: .32 }); desk.add(deskShaft); FX.push(deskShaft);
+const deskDust = Cine.dust({ min: [-1, .8, -1], max: [1.6, 2.4, .8], count: 500, size: .008, seed: 21 }); desk.add(deskDust.points); FX.push(deskDust.points);
+const officeShafts = [0, 1, 2, 3].map(i => { const s = Cine.shaft({ from: [-5.9, 3.1, -3.5 + i * 2.6], to: [-2.6, 0, -3.2 + i * 2.6], r0: .7, r1: 1.3, color: 0xdce8f4, opacity: .14 }); office.add(s); FX.push(s); return s; });
+// 窓（終盤の後ろ姿）：机の部屋の壁に、夜明けの空の見える窓
+const skyTex = canvasTex(256, 512, (x, w, h) => { const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#3a5a8a"); g.addColorStop(.55, "#c8a888"); g.addColorStop(.8, "#ffcf98"); g.addColorStop(1, "#ffe0b8"); x.fillStyle = g; x.fillRect(0, 0, w, h); });
+const deskWin = plane(1.1, 1.6, new THREE.MeshBasicMaterial({ map: skyTex }), desk, .9, 1.75, -1.39);
+for (const [w_, h_, x_, y_] of [[1.2, .06, .9, 2.58], [1.2, .06, .9, .92], [.06, 1.7, .32, 1.75], [.06, 1.7, 1.48, 1.75], [1.1, .04, .9, 1.75], [.04, 1.6, .9, 1.75]]) box(w_, h_, .05, M(0xe8e4da), x_, y_, -1.37, desk);
+
+// ---------------------------------------------------------------- 画面の文字（1.2 倍）
+const grain = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = S.rng(99);
+  for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 16; } x.putImageData(d, 0, 0); return c; })();
+function addGrain(t) {
+  const ox = Math.floor(S.rng(Math.floor(t * 30) + 7)() * 256), oy = Math.floor(S.rng(Math.floor(t * 30) + 91)() * 256);
+  bg.save(); bg.globalCompositeOperation = "overlay"; bg.globalAlpha = .5; bg.fillStyle = bg.createPattern(grain, "repeat"); bg.translate(-ox, -oy); bg.fillRect(ox, oy, W, H); bg.restore();
+}
+function uiCard(lines, x, y, k = 1, { accent = "#8fdcff" } = {}) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha *= clamp(k);
+  const ws = lines.map(([s, sz, w = 700]) => { ui.font = `${w} ${sz}px ${S.FONT}`; return ui.measureText(s).width; });
+  const pw = Math.max(...ws) + 64, ph = lines.reduce((a, [, sz]) => a + sz * 1.32, 0) + 36;
+  const x0 = x - pw / 2, y0 = y - ph / 2 + 10 * (1 - easeOut(clamp(k)));
+  rrect(ui, x0, y0, pw, ph, 12); ui.fillStyle = "rgba(8,14,26,.78)"; ui.fill(); ui.strokeStyle = "rgba(143,220,255,.35)"; ui.lineWidth = 1.5; ui.stroke();
+  ui.fillStyle = accent; ui.fillRect(x0, y0 + 14, 4, ph - 28);
+  S.group(() => { let yy = y0 + 18; lines.forEach(([s, sz, w = 700, col = "#EAF2F8"]) => { yy += sz * 1.32 / 2; text(ui, s, x0 + pw / 2, yy + 2, sz, col, { weight: w }); yy += sz * 1.32 / 2; }); },
+    [x0, y0, x0 + pw, y0 + ph]);
+  ui.restore();
+}
+function uiNote(s, x, y, k = 1, size = Math.round(24 * TS)) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha *= clamp(k); ui.font = `500 ${size}px ${S.FONT}`; const w = ui.measureText(s).width + 28;
+  rrect(ui, x - w / 2, y - size * .8, w, size * 1.6, 8); ui.fillStyle = "rgba(8,14,26,.6)"; ui.fill();
+  S.group(() => text(ui, s, x, y + 1, size, "#B8C7D6", { weight: 500 }), [x - w / 2, y - size * .8, x + w / 2, y + size * .8]); ui.restore();
+}
+
+// ---------------------------------------------------------------- 場面の描画
+let extraDip = 0;
+const ORB_A0 = -.1;   // 地球を回る宇宙船の位置（角度）：昼の側（太陽の方向との内積 0.86）
+const ORB_UI = 1.3;   // 軌道の図で、光点が動き始める位置（カメラから見える側）
+function ringPoint(a, r = EARTH_R * 1.06) { orbitLine.updateMatrixWorld(true); return orbitLine.localToWorld(V3(Math.cos(a) * r, 0, Math.sin(a) * r)); }
+function deskShot(t, { write = 1, fix = 0, curve = 0, warm = 0, lamp = 1 } = {}) {   // 机の上（計算用紙・計算機・手）
+  show("desk"); drawPad(write, fix, curve);
+  lights({ keyPos: warm ? [1.6, 2.6, -1.2] : [-.45, 1.25, -.25], keyAt: [0, .76, .05], keyI: warm ? 30 : 16, angle: .9, keyCol: warm ? 0xffd8a8 : 0xffcf96, rimPos: [2, 2.5, -2], rimI: .5, rimCol: warm ? 0xffe0c0 : 0x9fc4e8,
+    hemiI: warm ? .35 : .12, hemiSky: warm ? 0xe8d8c0 : 0x6a7a90, fog: .05, fogC: warm ? 0x18120c : 0x07090c, exp: 1.2 });
+  lampLight.intensity = lamp * 2.2;
+  pad1.visible = true; pad1.position.set(.02, .792, .06); pad1.rotation.set(0, .06, 0);
+}
+function writeHand(t, x, z, speed = 1) {   // 鉛筆で書く右手（紙の上を小さく動く）
+  const wx = x + .03 * Math.sin(t * 7 * speed) + .02 * Math.sin(t * 2.3), wz = z + .012 * Math.cos(t * 9 * speed);
+  pencil.visible = true; pencil.position.set(wx, .797, wz); pencil.rotation.set(-.45, 0, -.55);
+  kHandR.visible = true; kHandR.position.set(wx + .035, .81, wz + .055); kHandR.rotation.set(.1, -Math.PI / 2 - .5, -.45); kHandR.userData.fingers(.55);
+}
+function calcHands(t, rate = 1, stop = 1e9) {   // 計算機を打つ手（キーを押す指が順に動く）
+  calc.visible = true; calc.position.set(.42, .79, -.08); calc.rotation.set(0, -.25, 0);
+  const tt = Math.min(t, stop), k = Math.floor(tt * 6 * rate), ph = (tt * 6 * rate) % 1, press = ph < .4 ? Math.sin(ph / .4 * Math.PI) : 0;
+  kHandL.visible = true; kHandL.position.set(.36 + .03 * Math.sin(k * 1.7), .9 - .012 * press, .03 + .02 * Math.cos(k * 2.3)); kHandL.rotation.set(0, Math.PI / 2 + .35, -.55); kHandL.userData.fingers(.35, k % 4, .6 * press);
+  calcKeys.forEach((ky, i) => ky.position.y = .118 - (i % 9) * .005 - (i === (k * 7) % calcKeys.length ? .004 * press : 0));
+}
+function drawScene(t, name) {
+  extraDip = 0; hideProps(); key.castShadow = true; orbitLine.visible = false; capsuleSpace.visible = true;
+  const [a, b] = S.sceneRange(name);
+  if (name === "hook") {
+    if (t < CUE.cut) {                                    // 夜明けの発射台：点火 → 上昇を見上げる
+      show("pad");
+      lights({ keyPos: [60, 8, -50], keyAt: [0, 14, 0], keyI: 60, angle: .5, keyCol: 0xffc890, rimPos: [-40, 30, 40], rimI: .8, rimCol: 0x8fa8d0, hemiI: .5, hemiSky: 0x6a7ca8, hemiGround: 0x3a2a20, fog: .004, fogC: 0x8a7a78, exp: 1.05 });
+      const ign = easeOut(prog(t, 0, .55)), lt = Math.max(0, t - CUE.lift), y = 6 * lt * lt + 1.2 * lt;
+      rocket.position.set(0, 1.2 + y, 0); rocket.rotation.set(0, .5, 0);
+      flame.material.uniforms.uT.value = t; flame.material.uniforms.uK.value = ign; flameLight.intensity = 40 * ign;
+      smoke.forEach(s => { const u = s.userData, age = t - .15 - u.d * .5; s.visible = age > 0; if (!s.visible) return;
+        const d = 2.5 + u.sp * age * 4, sc = 1.2 + age * 2.2 * (.6 + u.sp); s.position.set(Math.cos(u.a) * d, .8 + u.y * age * .8 + sc * .4, Math.sin(u.a) * d); s.scale.setScalar(sc); });
+      const u = easeInOut(prog(t, 0, CUE.cut));
+      setCam(V3(16 - 2 * u, 1.6, 20 - 3 * u), V3(0, 14 + y * .9 + 4 * u, 0), 52);
+      draw3D(null);
+    } else {                                              // 暗い部屋：計算用紙を走る鉛筆（轟音が消え、鉛筆の音だけ）
+      deskShot(t, { write: .35 + .25 * prog(t, CUE.cut, 2.8) });
+      writeHand(t, .05, .02);
+      const u = easeOut(prog(t, CUE.cut, 2.6));
+      setCam(V3(-.3 + .04 * u, 1.0 - .03 * u, .06), V3(.06, .79, .02), 30);   // 左から：鉛筆の先と数字が見える
+      draw3D({ focus: cam.position.distanceTo(V3(.06, .79, .02)), slab: .05, far: 8, near: 8 });
+      extraDip = Math.max(0, 1 - (t - CUE.cut) / .08);
+    }
+  } else if (name === "girl") {
+    if (t < CUE.count) {                                  // 机に向かう女性（後ろ姿）。引いていく
+      deskShot(t, { write: .6 });
+      katherine.g.visible = true; katherine.pose({ x: -.05, z: .62, yaw: Math.PI, lean: .35, nod: .4, armFL: .9, armFR: 1.0, elbowL: .8, elbowR: .9 });
+      writeHand(t, .05, .02, .6);
+      const u = easeInOut(prog(t, a, CUE.count - a));
+      setCam(lerpV(V3(.7, 1.55, 1.7), V3(1.6, 1.85, 2.9), u), V3(0, 1.0, .25), 38); fitB([P_(katherine)], 470);
+      draw3D({ focus: cam.position.distanceTo(V3(0, 1.0, .5)), slab: .6, far: 4, near: 4 }); guardP(katherine);
+    } else if (t < CUE.shapes) {                          // 1930 年代の家の階段を上る少女
+      show("town"); girl.g.visible = true;
+      lights({ keyPos: [8, 10, 9], keyAt: [0, 1, 0], keyI: 55, angle: .8, keyCol: 0xfff0d8, rimPos: [-6, 5, -6], rimI: .6, rimCol: 0xd8e8ff, hemiI: .65, hemiSky: 0xbcd0e8, hemiGround: 0x5a5a3a, fog: .012, fogC: 0xc8d4dc, exp: 1.05 });
+      const u = prog(t, CUE.count + .2, CUE.shapes - CUE.count - .5), z = lerp(2.5, .5, u), step = clamp(Math.floor((2.15 - z) / .3 + 1), 0, 6);
+      girl.pose({ x: .1, z, y: step * .2, yaw: Math.PI, walk: t * 6, stride: .3, nod: .15 });
+      const v = easeInOut(prog(t, CUE.count, CUE.shapes - CUE.count));
+      setCam(V3(3.4 - .4 * v, 1.9, 3.3 + .2 * v), V3(0, 1.0, 1.2), 40); fitB([P_(girl)]);
+      draw3D(null); guardP(girl);
+    } else if (t < CUE.campus) {                          // ノートの数字が図形に、図形が軌道の曲線に
+      deskShot(t, { write: 1, curve: prog(t, CUE.shapes + .2, 1.0), warm: 1, lamp: .5 });
+      setCam(V3(.12, 1.25, .25), V3(.1, .79, .12), 34);
+      draw3D(null);
+    } else {                                              // 大学の黒板と、前を向く学生
+      show("college"); student.g.visible = true;
+      lights({ keyPos: [-4, 3.5, 1], keyAt: [0, 1.5, -2], keyI: 45, angle: 1.0, keyCol: 0xfff0d8, rimPos: [3, 3, -3], rimI: .5, hemiI: .5, hemiSky: 0xd8e0e8, fog: .02, fogC: 0x3a3830, exp: 1.1 });
+      student.pose({ x: 0, z: .1, yaw: Math.PI, lean: .1, nod: -.08, armFL: .7, armFR: .7, elbowL: .6, elbowR: .6 });
+      const u = easeInOut(prog(t, CUE.campus, b - CUE.campus));
+      setCam(V3(.6 - .2 * u, 1.85, 2.5 - .3 * u), V3(0, 1.6, -2.9), 40); fitB([P_(student)]);
+      draw3D({ focus: cam.position.distanceTo(V3(0, 2.0, -2.9)), slab: 1.2, far: 2, near: 5 }); guardP(student);
+    }
+  } else if (name === "naca") {
+    if (t < CUE.cafe) {                                   // 1950 年代の計算室
+      show("office");
+      lights({ keyPos: [-5.5, 3.2, 0], keyAt: [-2, 0, 0], keyI: 55, angle: 1.0, keyCol: 0xe8f0f8, rimPos: [4, 4, 4], rimI: .5, rimCol: 0xd8e4f0, hemiI: .55, hemiSky: 0xd0d8e0, hemiGround: 0x4a4a44, fog: .03, fogC: 0x5a6068, exp: 1.1 });
+      computers.forEach((w, i) => w.pose({ x: w.g.position.x, z: w.g.position.z, yaw: Math.PI, lean: .3, nod: .4, armFL: .85 + .08 * Math.sin(t * 5 + i), armFR: .9 + .08 * Math.cos(t * 4 + i), elbowL: .7, elbowR: .8 }));
+      if (t < CUE.room) { const u = easeInOut(prog(t, a, CUE.room - a)); setCam(V3(2.6 - .4 * u, 2.4, 4.2 - 1.2 * u), V3(-1.5, .9, -2.4), 44); fitB(computers.map(P_)); }
+      else if (t < CUE.west) { const u = easeInOut(prog(t, CUE.room, CUE.west - CUE.room)); setCam(V3(-.2 - .3 * u, 1.7, 1.9 - .3 * u), V3(-3, .95, -.6), 34); fitB([P_(computers[2]), P_(computers[4])]); }
+      else { const u = easeInOut(prog(t, CUE.west, CUE.cafe - CUE.west)); setCam(V3(1.0, 1.9, 1.8 - .5 * u), V3(.6, 1.9, -5), 42); }
+      draw3D(null);
+      if (t < CUE.room) computers.forEach(guardP); else if (t < CUE.west) [computers[2], computers[4]].forEach(guardP);   // 札の場面は札が主役（人物は背景）
+    } else if (t < CUE.work) {                            // 人のいない食堂。奥のテーブルの札
+      show("cafe");
+      lights({ keyPos: [0, 3.5, 0], keyAt: [0, .7, -3], keyI: 40, angle: 1.1, keyCol: 0xd8e4f0, rimPos: [3, 3, -6], rimI: .7, hemiI: .3, hemiSky: 0x9aa8b8, fog: .04, fogC: 0x30363c, exp: 1.05 });
+      const u = easeInOut(prog(t, CUE.cafe, CUE.work - CUE.cafe));
+      setCam(lerpV(V3(1.6, 1.6, 2.5), V3(.9, 1.15, -3.0), u), V3(.3, .8, -4.6), lerp(42, 34, u));
+      draw3D({ focus: cam.position.distanceTo(V3(.3, .8, -4.6)), slab: .5 + 2 * (1 - u), far: 5, near: 5 });
+    } else {                                              // 計算機を打ち、数字を書き、見直して書き直す
+      deskShot(t, { write: .7 + .2 * prog(t, CUE.work, 3), fix: prog(t, CUE.work + 1.8, 1.2) });
+      calcHands(t); writeHand(t, -.03, .05, .8);
+      const u = easeInOut(prog(t, CUE.work, CUE.orbit - CUE.work));
+      setCam(V3(.35 - .1 * u, 1.12, .55 - .05 * u), V3(.15, .8, 0), 34);
+      draw3D({ focus: cam.position.distanceTo(V3(.15, .8, 0)), slab: .12, far: 6, near: 6 });
+    }
+  } else if (name === "orbit") {
+    if (t < CUE.orbit + .9) {                             // 計算用紙の曲線（上から）→ 宇宙へ
+      deskShot(t, { write: 1, curve: 1, lamp: .8 });
+      const u = easeIn(prog(t, CUE.orbit, .9));
+      setCam(V3(.1, 1.15 + .4 * u, .14), V3(.1, .79, .12), 34 - 8 * u);
+      draw3D(null); extraDip = sstep(.55, 1, u) * .95;
+    } else if (t < CUE.team) {                            // 地球と軌道。宇宙船の光点が進み、帰還の地点へ線が下りる
+      show("space"); spaceLights(); capsuleSpace.visible = false;
+      const u = easeOut(prog(t, CUE.orbit + .9, CUE.team - CUE.orbit - .9));
+      const dir = V3(.55, .45, .7).normalize();
+      setCam(dir.clone().multiplyScalar(lerp(680, 560, u)), V3(0, -48, 0), 40, .5, 4000);   // 地球と軌道の線が画面に収まる距離。地球を上寄りに（手前の弧が字幕にかからないように）
+      orbitLine.material.opacity = .85 * k_(t, "orbit", .8, 1.0);
+      draw3D(null);
+      extraDip = Math.max(0, 1 - (t - CUE.orbit - .9) / .25) * .95;
+    } else {                                              // 机に戻る：紙をめくる
+      deskShot(t, { write: 1, curve: 1 });
+      stackP.visible = true; stackP.position.set(-.38, .79, -.05); stackP.rotation.y = .2;
+      const fl = prog(t, CUE.team + .5, .8);
+      kHandL.visible = true; kHandL.position.set(lerp(-.2, .05, fl), .81 + .05 * Math.sin(fl * Math.PI), .1); kHandL.rotation.set(0, -Math.PI / 2, 0); kHandL.userData.fingers(.3);
+      writeHand(t, .08, .0, .7);
+      const u = easeInOut(prog(t, CUE.team, b - CUE.team));
+      setCam(V3(.45 - .15 * u, 1.3, .7 - .1 * u), V3(.0, .8, .0), 36);
+      draw3D({ focus: cam.position.distanceTo(V3(.0, .8, .05)), slab: .2, far: 5, near: 5 });
+    }
+  } else if (name === "trust") {
+    if (t < CUE.machine) {                                // 発射台の宇宙船（朝）
+      show("pad");
+      lights({ keyPos: [60, 30, 40], keyAt: [0, 14, 0], keyI: 55, angle: .5, keyCol: 0xfff0dc, rimPos: [-40, 30, -40], rimI: .8, hemiI: .6, hemiSky: 0x9ab4d8, hemiGround: 0x4a4038, fog: .003, fogC: 0xa8b4c4, exp: 1.0 });
+      rocket.position.set(0, 1.2, 0); rocket.rotation.set(0, .5, 0); flame.material.uniforms.uK.value = 0; smoke.forEach(s => s.visible = false);
+      const u = easeInOut(prog(t, a, CUE.machine - a));
+      setCam(V3(9 - 2 * u, 3 + 18 * u, 14 - 4 * u), V3(0, 16 + 10 * u, 0), 44);
+      draw3D(null);
+    } else if (t < CUE.ask) {                             // 電子計算機の部屋：回る磁気テープ、点滅する表示
+      show("mroom");
+      lights({ keyPos: [0, 3.1, 1], keyAt: [0, 1, -2.5], keyI: 40, angle: 1.1, keyCol: 0xf0f4f8, rimPos: [-3, 3, 3], rimI: .5, hemiI: .55, hemiSky: 0xe0e6ec, fog: .03, fogC: 0x5a6068, exp: 1.05 });
+      reels.forEach((r, i) => r.rotation.z = t * (i % 2 ? 3 : -2.4) * (1 + .3 * Math.sin(t * .7 + i)));
+      lamps.forEach((l, i) => l.material.emissiveIntensity = S.rng(i * 31 + Math.floor(t * 6))() > .55 ? 2.0 : .05);
+      engineers.forEach((e, i) => e.pose({ x: -.6 + i * 1.2, z: .1, yaw: Math.PI, lean: .15, nod: .35, armFL: .5, armFR: .4 }));
+      const u = easeInOut(prog(t, CUE.machine, CUE.ask - CUE.machine));
+      setCam(V3(2.6 - 1.2 * u, 1.7, 2.6 - .4 * u), V3(-.8, 1.2, -2.6), 42); fitB(engineers.map(P_));
+      draw3D(null); engineers.forEach(guardP);
+    } else if (t < CUE.check) {                           // 出力の紙が、彼女の机に置かれる
+      deskShot(t, { write: .5 });
+      const k = easeOut(prog(t, CUE.ask + .6, 1.4));
+      printout.visible = true; printout.position.set(lerp(.6, .18, k), .796 + .1 * (1 - k), lerp(-.35, -.02, k)); printout.rotation.set(-Math.PI / 2, 0, lerp(.6, .1, k));
+      kHandL.visible = true; kHandL.position.set(printout.position.x - .12, printout.position.y + .02, printout.position.z + .2); kHandL.rotation.set(0, -Math.PI / 2 + .3, 0); kHandL.userData.fingers(.2);
+      const u = easeInOut(prog(t, CUE.ask, CUE.check - CUE.ask));
+      setCam(V3(.12, 1.5 - .08 * u, .78), V3(.1, .8, -.05), 34);
+      draw3D({ focus: cam.position.distanceTo(V3(.12, .8, -.02)), slab: .25, far: 5, near: 5 });
+    } else {                                              // 計算機を打ち、ペン先が止まる。手もとから顔へゆっくり寄る（間）
+      deskShot(t, { write: .5 + .4 * prog(t, CUE.check, 3.5) });
+      printout.visible = true; printout.position.set(.18, .796, -.02); printout.rotation.set(-Math.PI / 2, 0, .1);
+      calcHands(t, .8, CUE.quiet); writeHand(Math.min(t, CUE.quiet), -.04, .07, .6);
+      const u = easeInOut(prog(t, CUE.check, b - CUE.check - .2));
+      katherine.g.visible = u > .4; katherine.pose({ x: -.05, z: .62, yaw: Math.PI, lean: .35, nod: .42 + .06 * sstep(CUE.quiet, CUE.quiet + 1, t), armFL: .9, armFR: 1.0, elbowL: .8, elbowR: .9 });
+      if (katherine.g.visible) { kHandL.visible = kHandR.visible = pencil.visible = false; }   // 人形の腕と二重にならないように
+      setCam(lerpV(V3(.22, .98, -.32), V3(.6, 1.5, -1.35), u), lerpV(V3(.12, .8, .05), V3(-.05, 1.25, .5), u), lerp(32, 38, u));   // 机の向こう側から：手もと → 顔へ
+      draw3D({ focus: cam.position.distanceTo(lerpV(V3(.12, .8, .05), V3(-.05, 1.45, .62), u)), slab: .18, far: 6, near: 6 });
+    }
+  } else if (name === "space") drawSpace(t, a, b);
+  else if (name === "end") {
+    if (t < CUE.desk2) {                                  // 地球へゆっくり寄る。雲の流れ
+      show("space"); spaceLights(); capsuleSpace.visible = false;
+      const u = easeInOut(prog(t, CUE.end, CUE.desk2 - CUE.end));
+      const dir = V3(.75, .3, .6).normalize();
+      setCam(dir.clone().multiplyScalar(lerp(340, 255, u)), V3(0, 4 * u, 0), 40, .5, 4000);
+      draw3D(null);
+    } else {                                              // 机の計算用紙に光 → 窓辺の後ろ姿 → ゆっくり引く
+      deskShot(t, { write: 1, curve: 1, warm: 1, lamp: 0 });
+      if (t < CUE.window) {
+        const u = easeInOut(prog(t, CUE.desk2, CUE.window - CUE.desk2));
+        setCam(V3(.35 - .2 * u, 1.1, .5 - .1 * u), V3(.0, .79, .05), 32);
+        draw3D({ focus: cam.position.distanceTo(V3(.02, .79, .06)), slab: .15, far: 5, near: 5 });
+      } else {
+        katherine.g.visible = true; katherine.pose({ x: .75, z: -.75, yaw: Math.PI, nod: -.1, armFL: .1, armFR: .25, elbowR: .4 });
+        const u = easeInOut(prog(t, CUE.window, b - CUE.window));
+        setCam(V3(-.3 - .5 * u, 1.55 + .1 * u, 1.6 + 1.0 * u), V3(.7, 1.45, -1.0), 40); fitB([P_(katherine)]);
+        draw3D(null); guardP(katherine);
+        extraDip = sstep(b - 1.2, b - .05, t) * .9;           // ゆっくり暗転
+      }
+    }
+  }
+}
+function spaceLights() {
+  lights({ keyPos: [0, 10, 0], keyAt: [0, 0, 0], keyI: 0, angle: .5, rimI: 0, hemiI: .02, fog: 0, fogC: 0x000000, exp: 1.15 });
+  earthMat.uniforms.uT.value = TL ? (S.CUE ? 0 : 0) : 0;
+}
+function drawSpace(t, a, b) {
+  show("space"); spaceLights(); earthMat.uniforms.uT.value = t;
+  earth.rotation.y = -1.2 + t * .004;
+  const P = ringPoint(ORB_A0 + (t - CUE.space) * .004), n = P.clone().normalize(), T = ringPoint(ORB_A0 + (t - CUE.space) * .004 + .001).sub(P).normalize(), Bv = n.clone().cross(T);
+  const Pc = n.clone().multiplyScalar(EARTH_R * 1.15);   // 寄りの画のための宇宙船の位置（軌道の線より少し高い：地球の画像がぼやけないように。演出）
+  capsuleSpace.position.copy(Pc); capsuleSpace.quaternion.setFromUnitVectors(V3(0, 1, 0), T.clone().negate());
+  capLight.position.copy(Pc.clone().add(SUN.clone().multiplyScalar(60))); capLight.target.position.copy(Pc); capLight.target.updateMatrixWorld();
+  earthShine.position.copy(Pc.clone().sub(n.clone().multiplyScalar(30))); earthShine.target.position.copy(Pc); earthShine.target.updateMatrixWorld();
+  if (t < CUE.ground) {
+    const ang = .9 + .35 * prog(t, CUE.space, CUE.ground - CUE.space);
+    const near = Pc.clone().add(n.clone().multiplyScalar(.6)).add(T.clone().multiplyScalar(-7.5 + 1.2 * Math.sin(ang - .9))).add(Bv.clone().multiplyScalar(1.6 * Math.cos(ang)));   // 宇宙船の後ろから、進む先の地平線を見る
+    const far = n.clone().multiplyScalar(.55).add(SUN.clone().multiplyScalar(.8)).normalize().multiplyScalar(320);
+    const w = easeInOut(prog(t, CUE.wide - .2, CUE.ground - CUE.wide));
+    const wp = easeOut(prog(t, CUE.wide - .2, CUE.ground - CUE.wide));   // 位置は先に外へ離れる（近くの地球がぼやけたまま長く映らないように）
+    setCam(lerpV(near, far, wp).normalize().multiplyScalar(lerp(near.length(), far.length(), wp)),   // 地球の中心からの距離は単調に増える（地表をかすめない）
+       lerpV(Pc.clone().add(T.clone().multiplyScalar(12)).sub(n.clone().multiplyScalar(5.2)), V3(0, 0, 0), w * w), lerp(44, 40, w), .05, 4000, lerpV(n, V3(0, 1, 0), w).normalize());   // 少し下を向き、宇宙船の後ろに地球の弧
+    draw3D(null); drawRing2D(sstep(.3, .8, w));
+    if (w > .4) { const [x, y] = proj(P); const g = bg.createRadialGradient(x, y, 0, x, y, 22); g.addColorStop(0, `rgba(255,240,210,${.9 * sstep(.4, .8, w)})`); g.addColorStop(1, "rgba(255,240,210,0)"); bg.fillStyle = g; bg.beginPath(); bg.arc(x, y, 22, 0, 6.283); bg.fill(); }
+  } else {                                                // 地上へ戻る：朝の光の机で、計算用紙を手に仕事を続ける
+    deskShot(t, { write: 1, warm: 1, lamp: 0 });
+    katherine.g.visible = true; katherine.pose({ x: -.05, z: .62, yaw: Math.PI, lean: .3, nod: .35, armFL: .9, armFR: 1.0, elbowL: .8, elbowR: .9 });
+    writeHand(t, .05, .02, .5);
+    const u = easeInOut(prog(t, CUE.ground, b - CUE.ground));
+    setCam(V3(1.4 - .2 * u, 1.65, 2.2 - .2 * u), V3(0, 1.0, .3), 38); fitB([P_(katherine)]);
+    draw3D(null); guardP(katherine);
+  }
+}
+// 軌道の線（2D、太さ 3px）：3D の線は 1.5 倍で描いて縮めると細すぎて消えた。地球の裏側に回る部分は描かない
+function drawRing2D(k) {
+  if (k <= 0) return;
+  const c = cam.position, N = 180; let prev = null;
+  bg.save(); bg.strokeStyle = `rgba(143,220,255,${.85 * k})`; bg.lineWidth = 3; bg.shadowColor = "rgba(80,200,255,.7)"; bg.shadowBlur = 10;
+  for (let i = 0; i <= N; i++) {
+    const p = ringPoint(i / N * 6.283), d = p.clone().sub(c), L = d.length(); d.multiplyScalar(1 / L);
+    const b = c.dot(d), disc = b * b - (c.lengthSq() - EARTH_R * EARTH_R), hidden = disc > 0 && (-b - Math.sqrt(disc)) > 0 && (-b - Math.sqrt(disc)) < L;   // 線の点までの間に地球がある
+    const q = hidden ? null : proj(p);
+    if (q && prev) { bg.beginPath(); bg.moveTo(prev[0], prev[1]); bg.lineTo(q[0], q[1]); bg.stroke(); }
+    prev = q;
+  }
+  bg.restore();
+}
+// 軌道の図（2D）：宇宙船の光点、帰還の線と地点
+function drawOrbitUI(t) {
+  if (!(t >= CUE.orbit + .9 && t < CUE.team)) return;
+  drawRing2D(k_(t, "orbit", .8, 1.0));
+  const sp = (t - CUE.path) * .18, Pa = ringPoint(ORB_UI + Math.max(0, sp));
+  const vis = proj(Pa); const k = k_(t, "path", .6);
+  if (k > 0) { bg.save(); bg.globalAlpha = k; const g = bg.createRadialGradient(vis[0], vis[1], 0, vis[0], vis[1], 26); g.addColorStop(0, "rgba(255,240,210,1)"); g.addColorStop(1, "rgba(255,240,210,0)"); bg.fillStyle = g; bg.beginPath(); bg.arc(vis[0], vis[1], 26, 0, 6.283); bg.fill(); bg.restore(); }
+  const bk = prog(t, CUE.back + .3, 1.6);
+  if (bk > 0) {                                           // 帰還の線：軌道から地表へ下りる
+    const a0 = ORB_UI + Math.max(0, (CUE.back + .3 - CUE.path) * .18);
+    bg.save(); bg.strokeStyle = "rgba(255,200,140,.95)"; bg.lineWidth = 4; bg.shadowColor = "rgba(255,180,120,.8)"; bg.shadowBlur = 12; bg.beginPath();
+    const N = 40; for (let i = 0; i <= N * bk; i++) { const f = i / N, p = ringPoint(a0 + .55 * f, EARTH_R * (1.06 - .06 * f * f)); const [x, y] = proj(p); i ? bg.lineTo(x, y) : bg.moveTo(x, y); }
+    bg.stroke(); bg.restore();
+    if (bk >= 1) { const [x, y] = proj(ringPoint(a0 + .55, EARTH_R)); bg.save(); bg.strokeStyle = "rgba(255,210,150,.95)"; bg.lineWidth = 3; bg.beginPath(); bg.arc(x, y, 14 + 4 * Math.sin(t * 4), 0, 6.283); bg.stroke(); bg.restore(); }
+  }
+}
+function drawUI(t, name) {
+  const T = s => Math.round(s * TS);
+  if (name === "girl") {
+    uiNote("※人物と場面は再現CG", 540, 250, win(t, CUE.girl + .3, CUE.girl + 2.8, .3, .4));
+    if (t < CUE.count) uiCard([["Katherine Johnson", T(40), 700], ["1918–2020", T(26), 500, "#B8C7D6"]], 540, 340, k_(t, "girl", .45, .8) * (1 - prog(t, CUE.count - .4, .35)));
+  }
+  if (name === "naca" && t < CUE.room) uiCard([["NACA ラングレー研究所", T(36), 800], ["1953年", T(26), 500, "#B8C7D6"]], 540, 340, k_(t, "naca", .45, .4) * (1 - prog(t, CUE.room - .4, .35)));
+  if (name === "trust" && t < CUE.machine) uiCard([["1962年　ジョン・グレン", T(34), 800], ["Friendship 7", T(26), 500, "#B8C7D6"]], 540, 340, k_(t, "trust", .45, .4) * (1 - prog(t, CUE.machine - .4, .35)));
+  if (name === "orbit" && t >= CUE.path && t < CUE.team) {
+    uiNote("軌道（模式）", 540, 300, win(t, CUE.path + .3, CUE.team, .4, .3), T(26));
+  }
+}
+// 色調の時間割：夜明け → 暗い部屋 → 少女時代のやわらかな光 → 研究所の寒色 → 隔離の札で冷たく → 宇宙の深い黒 → 確認の緊張（彩度を抑える）→ 成功 → 冷たい色から温かい光へ
+function buildMood() {
+  const c = CUE;
+  MOOD = [
+    [0, { cool: .05, warm: .18, sat: 1.05, vig: .45 }], [c.cut - .05, { cool: .05, warm: .18, sat: 1.05, vig: .45 }], [c.cut, { cool: .3, sat: .8, vig: .65 }],
+    [c.girl, { cool: .25, sat: .85, vig: .6 }], [c.count - .2, { cool: .25, sat: .85, vig: .6 }], [c.count + .3, { cool: 0, warm: .22, sat: 1.0, vig: .35 }],
+    [c.naca - .3, { cool: 0, warm: .15, sat: 1.0, vig: .4 }], [c.naca + .5, { cool: .3, sat: .82, vig: .5 }],
+    [c.cafe - .1, { cool: .3, sat: .82, vig: .5 }], [c.cafe + .5, { cool: .5, sat: .55, vig: .68 }], [c.work - .1, { cool: .5, sat: .55, vig: .68 }], [c.work + .4, { cool: .3, sat: .8, vig: .55 }],
+    [c.orbit + .8, { cool: .3, sat: .8, vig: .55 }], [c.orbit + 1.0, { cool: .08, sat: 1.05, vig: .5 }], [c.team - .1, { cool: .08, sat: 1.05, vig: .5 }], [c.team + .3, { cool: .3, sat: .8, vig: .55 }],
+    [c.trust, { cool: .1, warm: .05, sat: 1.0, vig: .45 }], [c.check, { cool: .3, sat: .75, vig: .6 }], [c.quiet, { cool: .38, sat: .58, vig: .7 }],
+    [c.space - .1, { cool: .38, sat: .58, vig: .7 }], [c.space + 1.2, { cool: .05, sat: 1.08, glow: .15, glowX: .8, glowY: .2, vig: .45 }],
+    [c.ground - .1, { cool: .05, sat: 1.08, vig: .45 }], [c.ground + .6, { cool: 0, warm: .2, sat: 1.0, glow: .2, glowX: .8, glowY: .15, vig: .4 }],
+    [c.end, { cool: .15, sat: 1.0, vig: .5 }], [c.desk2, { cool: .05, warm: .22, sat: 1.0, glow: .3, glowX: .8, glowY: .2, vig: .45 }],
+    [c.window + .5, { cool: 0, warm: .3, sat: 1.0, glow: .35, glowX: .65, glowY: .25, vig: .5 }], [c.last + 2.5, { cool: 0, warm: .28, sat: .95, glow: .3, glowX: .65, glowY: .25, vig: .6 }],
+  ];
+}
+function envFor(t, name) {
+  if (name === "hook") return t < CUE.cut ? ["warm", .8] : ["lamp", .5];
+  if (name === "girl") return t >= CUE.count && t < CUE.shapes ? ["studio", .5] : t >= CUE.campus ? ["studio", .45] : ["lamp", .5];
+  if (name === "naca") return t >= CUE.work ? ["lamp", .5] : ["cold", .6];
+  if (name === "orbit") return t >= CUE.team ? ["lamp", .5] : ["cold", .4];
+  if (name === "trust") return t < CUE.machine ? ["studio", .7] : t < CUE.ask ? ["studio", .6] : ["lamp", .5];
+  if (name === "space") return t < CUE.ground ? ["cold", .35] : ["warm", .5];
+  return t >= CUE.desk2 ? ["warm", .55] : ["cold", .35];
+}
+function atmos(t, name) {
+  const endDesk = (name === "end" && t >= CUE.desk2) || (name === "space" && t >= CUE.ground);
+  deskShaft.userData.set(t, endDesk ? .9 : 0); deskDust.update(t, endDesk ? .9 : 0);
+  officeShafts.forEach(s => s.userData.set(t, .7));
+  const [e, ek] = envFor(t, name); Cine.useEnv(scene, e, ek);
+}
+function bloomK(t, name) { return name === "hook" && t < CUE.cut ? .5 : name === "space" && t < CUE.ground ? .4 : name === "orbit" ? .35 : .25; }
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start;
+  if (t >= es) {
+    const e = TL.lines.filter(x => x.ending);
+    drawEnding(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits, brand: "", techno: true });
+    ui.getImageData(0, 0, 1, 1); return;
+  }
+  const name = S.sceneAt(t);
+  Cine.motionBlur(bg, t, { n: 3, shutter: 1 / 60 }, tk => { const nm = S.sceneAt(tk); atmos(tk, nm); drawScene(tk, nm); if (nm === "orbit") drawOrbitUI(tk); });
+  S.moodGrade(bg, t, MOOD); Cine.bloom(bg, bloomK(t, name)); addGrain(t);
+  drawUI(t, name);
+  S.header(ui, false);
+  S.docSub(ui, t, { endAt: TL.ending_start });
+  const [a] = S.sceneRange(name), i = SCN.indexOf(name);
+  if (i > 0) { const k = 1 - prog(t, a, .3); if (k > 0) { bg.fillStyle = `rgba(4,8,14,${.85 * k})`; bg.fillRect(0, 0, W, H); } }
+  if (extraDip > 0) { bg.fillStyle = `rgba(4,8,14,${extraDip})`; bg.fillRect(0, 0, W, H); }
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const t = CUE.space + 3; atmos(t, "space"); drawScene(t, "space"); S.moodGrade(bg, 0, [[0, { cool: .05, sat: 1.08, vig: .45 }]]); Cine.bloom(bg, .4); addGrain(0);
+  text(ui, "宇宙飛行士が信じた", 540, 1360, 88, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 });
+  text(ui, "一人の女性の計算", 540, 1490, 96, "#FFE2A8", { weight: 900, stroke: "#06101c", sw: 14 });
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; buildMood(); }
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>

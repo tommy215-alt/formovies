@@ -648,8 +648,25 @@ def sfx_bank_soft():
         d = np.sin(2 * np.pi * np.cumsum(f0 * (1 + 0.6 * np.exp(-t(0.06) / 0.015))) / SR) * np.exp(-t(0.06) / 0.018)
         drops[i:i + len(d)] += d[: len(drops) - i] * 0.35
     bank["water"] = _add(flow, drops)
+    # 宇宙と計算の音（pilot_013〜）：ロケットの轟音（低い帯域のうなり、高い音は丸める）、鉛筆が紙を走る音、卓上計算機の機械音、磁気テープの回転
+    nr2 = _noise(int(3.0 * SR), 150)
+    bank["roar"] = (_lp(nr2, 260) * 1.6 + (_lp(nr2, 900) - _lp(nr2, 300)) * 0.5) * np.minimum(1, t(3.0) / 0.25) * np.minimum(1, (3.0 - t(3.0)) / 1.2) * (0.8 + 0.2 * np.sin(2 * np.pi * 7 * t(3.0)))
+    pc = np.zeros(int(0.9 * SR)); r4 = np.random.default_rng(151)
+    for k in range(7):                                                      # 鉛筆：短いこすれが続く（字を書くリズム）
+        i = int((0.04 + k * 0.12 + r4.uniform(0, 0.03)) * SR); m = int(r4.uniform(0.05, 0.09) * SR); nn = _noise(m, 152 + k)
+        pc[i:i + m] += (_lp(nn, 3500) - _lp(nn, 1200)) * np.sin(np.pi * np.arange(m) / m) * 0.8
+    bank["pencil"] = pc
+    cc = np.zeros(int(1.3 * SR))
+    for k in range(9):                                                      # 卓上計算機：キーを打つ低い打音と、機構の回る音
+        i = int(k * 0.11 * SR); m = int(0.03 * SR)
+        cc[i:i + m] += _add(_lp(_noise(m, 160 + k), 1600) * np.exp(-np.arange(m) / SR / 0.006), _bell(210 + 15 * (k % 3), 0.03, 0.35, 0.008, 0.001))
+    cr = _noise(int(0.35 * SR), 170)
+    cc[int(0.9 * SR):int(0.9 * SR) + len(cr)] += (_lp(cr, 1200) - _lp(cr, 250)) * (0.6 + 0.4 * np.sin(2 * np.pi * 30 * t(0.35)))[:len(cr)] * 0.8
+    bank["calc"] = cc
+    tp = np.sin(2 * np.pi * np.cumsum(90 + 10 * np.sin(2 * np.pi * 0.8 * t(2.5))) / SR) * 0.3 + (_lp(_noise(int(2.5 * SR), 171), 700) - _lp(_noise(int(2.5 * SR), 171), 200)) * 0.5
+    bank["tape"] = tp * np.minimum(1, t(2.5) / 0.3) * np.minimum(1, (2.5 - t(2.5)) / 0.4)
     bank["glow"] = _add(*[np.concatenate([np.zeros(int(k * 0.07 * SR)), _bell(f, 1.8, 0.2, 0.7, 0.05)]) for k, f in enumerate((174.61, 220.0, 261.63, 349.23))])
-    level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09, "water": 0.04, "glow": 0.05,
+    level = {"waves": 0.05, "wind": 0.04, "rustle": 0.035, "step": 0.03, "deep": 0.09, "water": 0.04, "glow": 0.05, "roar": 0.12, "pencil": 0.035, "calc": 0.045, "tape": 0.03,
              "paper": 0.04, "cut": 0.04, "machine": 0.06, "gear": 0.035, "unroll": 0.035, "room": 0.02, "loom": 0.04,
              "impact": 0.11, "hit": 0.08, "alarm": 0.08, "stab": 0.08, "brake": 0.06, "rewind": 0.06, "revswell": 0.05,
              "sweep_up": 0.045, "sweep_down": 0.045, "riser": 0.04, "tick": 0.05, "scan": 0.04}

@@ -74,4 +74,5 @@
   - VOICEVOX は**アプリ版 0.26.0**（クラウドは ENGINE 0.24.1）。声が少し変わることがあるので、PC で声を作ったら `qc_report.md` の「文末の音程」「読み上げの照合」を見直す。
   - fontconfig がないので、`textcheck` の「フォントにない文字」は PC では未確認になる（必要ならクラウドで確認）。ImageMagick もない（一覧画像は Pillow）。外部コマンドの出力・JSON は UTF-8 で読む（cp932 で止まった）。
 - **pilot_011「紙袋を変えた女性、マーガレット・ナイト」**（`production/pilot_011/`、99.5 秒）：**完成**（ユーザーの判断で f0bc12a の版。L14 の語尾と最初のコマの直しは入っていない。サムネイルは `thumbnail.png`、タイトル・説明文は `youtube_metadata.md`）。YouTube へのアップロードはユーザーの指示まで行わない。
+- **pilot_013「宇宙飛行士の命を、数字で支えた女性——キャサリン・ジョンソン」**（`production/pilot_013/`、95.7 秒、標準ルール v4 で cine.js を最初から使った回）：決定的な映像は地球を回るカプセル（NASA Visible Earth の画像＋自前の地球シェーダー。画像は file:// だと WebGL に渡せないので `common/vendor/earth/earth_tex.js` の data URI）。書き出しは同時 2 本（`"workers": 2`。3 本では起動直後にブラウザが閉じた）。YouTube へのアップロードはユーザーの指示まで行わない。
 - **pilot_012「手を洗うだけで、救える命があった」**（ゼンメルワイス、`production/pilot_012/`、99.9 秒、標準ルール v3 の最初の回）：PC で書き出し。事実確認は `scripts/pilot_012/fact_check.md`（WebFetch で本文から抜き出し。数字は著書の表の転載ページ）。YouTube へのアップロードはユーザーの指示まで行わない。

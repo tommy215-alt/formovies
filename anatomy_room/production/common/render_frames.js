@@ -31,6 +31,7 @@ async function open(browser) {
     await Promise.all(["900 52px \"Noto Sans CJK JP\"", "800 52px \"Noto Sans CJK JP\"", "700 52px \"Noto Sans CJK JP\"", "500 40px \"Noto Sans CJK JP\""]
       .map(f => document.fonts.load(f, "あ漢A−×")));
     window.setTimeline(t);
+    if (window.READY) await window.READY;   // 画像などの読み込みを待つ（READY のない描画ファイルは待たない）
   }, tl);
   const ok = await page.evaluate(() => document.fonts.check("700 52px \"Noto Sans CJK JP\"", "あ"));
   if (!ok) throw new Error("Noto Sans CJK JP が読み込めない");
