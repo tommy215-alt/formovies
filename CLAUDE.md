@@ -61,6 +61,38 @@
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
 - YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。
 
+## 書き出しの時短と、トークンの節約（rv、2026-10-28〜。ユーザーの指示「制作パイプラインの時間とトークン消費の最適化」）
+
+**この節を読めば、毎回プロジェクトを探さなくてよい。** 書き出しは原則 `rv` で行う（従来の `production_script.py all` もそのまま使える）。
+
+- **構成**：テンプレート＝`anatomy_room/templates/*.md`（制作ルール）と `production/common/`（`pipeline.py`・`render_frames.js`・`stage.js`・`cine.js`・`music.py`・`standard.py`・`ending.js`・`voices.json`）。各話の入力＝`production/pilot_NNN/` の `lines.json`（セリフ・字幕）、`production_script.py`（きっかけ・効果音・BGM・場面の区切り）、`renderer.html`（映像）。`rv` は外付けの `anatomy_room/tools/rv.py` で、テンプレートを書き換えない。
+- **コマンド**（PC の PowerShell、リポジトリの直下で。番号は `production_script.py` の `scenes` と同じ。0 番は最初のセリフの前の数コマ）：
+  - `python anatomy_room/tools/rv.py 014 scenes`：場面の番号・名前・時間・セリフ ID・mp4 の有無
+  - `python anatomy_room/tools/rv.py 014 render all`：完成版まで（mux・docs・qc・video_qa も）。変わった場面だけを書き出す。`--full` で全場面を作り直す（完成前の最後や、心配な変更のとき）
+  - `python anatomy_room/tools/rv.py 014 render scene 3`：場面 3 だけを最終の画質で書き出し、音つきで `work/rv/scene_03.mp4` に（完成版は `render all` でつなぐ。書いた場面は使い回される）
+  - `python anatomy_room/tools/rv.py 014 preview scene 3`：場面 3 だけを 10 fps・540×960 で軽く（`work/rv/preview_scene_03.mp4`。確認用。完成版には使わない）
+- **画面に出るのは進捗の 1 行と結果だけ**（「シーン3/9 完了（所要 X秒）／残り約Y分」）。各工程のログは `work/rv/log/`。失敗したら末尾 5 行だけが出る。**ログの全文は、原因がそれで分からないときだけ読む。**
+- **キャッシュ**：
+  - audio は、セリフの時刻と音声・BGM の区間・効果音の時刻・`music.py`・`pipeline.py` が同じなら作り直さない（BGM の合成結果は `work/rv/bgm/`）。
+  - textcheck は、描画のファイルとタイムラインが同じなら飛ばす。必要なときは audio と同時に動かす。
+  - 映像は、描画のファイル（renderer.html・共通の JS）が変わったら、各場面の見本のコマ（0.5 秒ごと＋最初と最後）を新しいコードで描いて前回と比べ、差がすべて 2 階調以下の場面は前回の mp4 を使う。前に作った版に戻したときも、その版の mp4 を使う。記録は `work/rv/state.json`、見本は `work/rv/samples/`（1 話 約 400 MB）。
+- **実測（pilot_014、111.6 秒・3349 コマ）**：全場面の書き出し 約 27 分＋audio 約 7 分＋textcheck 約 6.6 分 → 変更なしの作り直し 0.8 分、映像を 1 場面だけ直した作り直し 11.3 分（textcheck の作り直しは除く）。どちらも使い回した場面は基準の動画と framemd5 で全コマ一致。
+- **知っておくこと**：
+  - 共通部品の描画は前のコマの状態を少し引き継ぐ。そのため、同じコードでも書き出すたびに画素がわずかに変わる（PSNR 45〜58 dB、SSIM 0.99 以上）。作り直した場面の一致は SSIM と PSNR で確かめる。
+  - セリフの長さが変わると、それより後ろの場面は時刻がずれるので作り直しになる。
+  - `pipeline.py` の場面のハッシュには `cine.js`・`vendor/earth` が入っていない（`rv` は含めて判定する）。
+- **「シーン N を直して」と言われたときの手順**：
+  1. `rv.py NNN scenes` で場面の範囲とセリフ ID を確かめる。
+  2. 直すのは、セリフなら `lines.json` の該当行の `speech`・`sub` だけ、映像なら renderer.html の `name === "<場面名>"` の部分だけ。Grep で探し、ファイル全体は読まない。
+  3. 直したら `rv.py NNN preview scene N` で確かめる。頼まれたとき、または問題が疑われるときだけ、静止画やプレビューを見る。
+  4. 最後に `rv.py NNN render all` を 1 回だけ実行する。
+- **禁止事項（ユーザーの絶対条件）**：
+  - 最終出力の設定を変えない：1080×1920・30 fps・x264 medium・CRF 18・yuv420p、AAC 192k・48 kHz・−14 LUFS。GPU エンコード、preset の変更、画質を下げた合成は、完成版には使わない。
+  - テンプレートのファイル・構成・演出・実行方法を変えない。変えないとできない改善は、変更箇所・理由・影響を示してユーザーの承認を得てから行う。
+  - 速くするための変更は、基準の動画と比べて品質が変わらないことを確かめる。
+- **進捗の報告**：大きな作業（調査・実装・全編の書き出し・検証）のたびに「✅ 〇〇完了（所要 約X分）／残り：△△ ／ 残り時間の見積もり：約Y分」と 1 行で報告する。見積もりは実測で更新する。
+- **作業前のバックアップ**は `anatomy_room/_backup/`、基準の動画は `production/pilot_NNN/baseline/`（どちらも git に入れない）。
+
 ## 制作の分担と PC（Windows）での作業（2026-10-27〜）
 
 - **書き出しはユーザーの PC**（Windows、NVIDIA RTX 3070、`render_frames.js` が GPU を自動で使う。pilot_010 の静止画で 1 コマ 0.67 秒、クラウドは約 3 秒）。PC のセッションは `claude remote-control`（`~\formovies`、same-dir）で、ユーザーはスマホから指示する。PC がスリープ・シャットダウン中は動かない。
