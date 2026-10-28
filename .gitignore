@@ -10,3 +10,5 @@ anatomy_room/output/*/audio_check.*
 
 # Node の部品（anatomy_room で npm install すると作られる）
 node_modules/
+
+.claude/settings.local.json
