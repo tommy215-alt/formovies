@@ -115,5 +115,20 @@
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(end[0], end[1], 26, 0, 6.283); ctx.fill(); ctx.restore();
   }
 
-  root.HUD = { title, lens, tag, scanBox, readout, ring, ink, route };
+  // 共通エンディングの短い版（2026-10-29〜、案 2）：本編の最後の画の上に、ロゴ・決めゼリフ・音声のクレジットを重ねる。
+  //   t は ending_start からの秒、o = { end1, end2（決めゼリフの 2 句の始まり、ending_start からの秒）, credits }
+  function endingOverlay(ctx, t, o) {
+    const k = easeOut(clamp(t / .35)), k2 = easeOut(clamp((t - o.end2) / .35));
+    ctx.save(); const g = ctx.createLinearGradient(0, 600, 0, 1400); g.addColorStop(0, "rgba(4,8,14,0)"); g.addColorStop(.3, `rgba(4,8,14,${.72 * k})`); g.addColorStop(.7, `rgba(4,8,14,${.72 * k})`); g.addColorStop(1, "rgba(4,8,14,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 600, W, 800); ctx.restore();
+    ctx.save(); ctx.globalAlpha = k; const s = .9 + .1 * k;
+    ctx.translate(540, 900); ctx.scale(s, s); ctx.translate(-540, -900);
+    S.rewindIcon(ctx, 540, 790, 46, "#8FDCFF");
+    S.group(() => S.text(ctx, "リバース", 540, 905, 120, "#FFFFFF", { weight: 900, stroke: "#04101c", sw: 14 }));
+    ctx.restore();
+    if (k2 > 0) { ctx.save(); ctx.globalAlpha = k2; S.group(() => S.text(ctx, "世界の仕組みを、はじめから。", 540, 1030, 50, "#A8E6FF", { weight: 800, stroke: "#04101c", sw: 8 })); ctx.restore(); }
+    if (o.credits && o.credits.length) { ctx.save(); ctx.globalAlpha = k * .9; S.group(() => S.text(ctx, "音声：" + o.credits.join("／"), 540, 1150, 28, "#B8C7D6", { weight: 500 })); ctx.restore(); }
+  }
+
+  root.HUD = { title, lens, tag, scanBox, readout, ring, ink, route, endingOverlay };
 })(window);
