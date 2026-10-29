@@ -514,7 +514,7 @@ function drawScene(t, name) {
         setCam(V3(.3, 1.45 - .1 * u, -.05 - .05 * u), V3(.05, .777, -.5), 36); draw3D({ focus: cam.position.distanceTo(V3(.05, .777, -.5)), slab: .1, far: 5, near: 5 }); }
       else if (t < CUE.thesis) { deskShot(t, { lamp: 1, night: 1, letter: 1 }); const u = easeOut(prog(t, CUE.letterread, CUE.thesis - CUE.letterread));
         setCam(V3(.02, .778 + .9 - .12 * u, -.53 + .3 - .06 * u), V3(.0, .778, -.53), 34); draw3D({ focus: cam.position.distanceTo(V3(0, .778, -.53)), slab: .12, far: 5, near: 5 }); }
-      else { const pg = t >= CUE.p188; deskShot(t, { lamp: 1, night: 1, table: pg ? 0 : 1, page: pg ? 1 : 0 }); const u = easeOut(prog(t, pg ? CUE.p188 : CUE.thesis, pg ? b - CUE.p188 : CUE.p188 - CUE.thesis));
+      else { const pg = false; /* 構成の変更（2026-10-29）：188 ページは見せず、表 XXVIII のまま */ deskShot(t, { lamp: 1, night: 1, table: pg ? 0 : 1, page: pg ? 1 : 0 }); const u = easeOut(prog(t, pg ? CUE.p188 : CUE.thesis, pg ? b - CUE.p188 : CUE.p188 - CUE.thesis));
         setCam(V3(.0, .78 + (pg ? .9 - .12 * u : .9 - .08 * u), -.52 + .3 - .06 * u), V3(.0, .78, -.52), 34); draw3D({ focus: cam.position.distanceTo(V3(0, .78, -.52)), slab: .12, far: 5, near: 5 }); }
     } else if (name === "after" && t >= CUE.assist) {      // 扉の名札：技術助手 → 教授
       show("door"); door.add(cecilia.g); cecilia.g.visible = true;
@@ -598,8 +598,13 @@ function drawDiagram(t, name) {
   if (name === "letter") {
     if (t >= CUE.letterread && t < CUE.thesis) { const bx = LETTER.box(); if (bx) { const p0 = paperPoint(letterMesh, LETTER.tex, bx[0], bx[1]), p1 = paperPoint(letterMesh, LETTER.tex, bx[2], bx[3]);
       HUD.ink(bg, Math.min(p0[0], p1[0]), Math.min(p0[1], p1[1]), Math.max(p0[0], p1[0]), Math.max(p0[1], p1[1]), k_(t, "impossible", .45, .25)); } }
-    if (t >= CUE.notreal) { const bx = PAGE188.box(); if (bx) { const p0 = paperPoint(pageMesh, PAGE188.tex, bx[0], bx[1]), p1 = paperPoint(pageMesh, PAGE188.tex, bx[2], bx[3]);
-      S.hudBox(bg, Math.min(p0[0], p1[0]) - 24, Math.min(p0[1], p1[1]) - 24, Math.max(p0[0], p1[0]) + 24, Math.max(p0[1], p1[1]) + 24, k_(t, "notreal", .5, .1)); } }
+    if (t >= CUE.p188) {                                   // 表 XXVIII の水素の行（H … 11）に注目し、L17 で温かく光る（消さずに残した答え）
+      const p0 = paperPoint(tableMesh, TABLEPAGE, 440, 292), p1 = paperPoint(tableMesh, TABLEPAGE, 770, 348), x0 = Math.min(p0[0], p1[0]), y0 = Math.min(p0[1], p1[1]), x1 = Math.max(p0[0], p1[0]), y1 = Math.max(p0[1], p1[1]);
+      const lit = sstep(CUE.notreal, CUE.notreal + 1.2, t);
+      if (lit > 0) { const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, g = bg.createRadialGradient(cx, cy, 10, cx, cy, 320); g.addColorStop(0, `rgba(255,220,160,${.22 * lit})`); g.addColorStop(1, "rgba(255,200,130,0)");
+        bg.save(); bg.globalCompositeOperation = "screen"; bg.fillStyle = g; bg.fillRect(0, 0, W, H); bg.restore(); }
+      S.hudBox(bg, x0 - 22, y0 - 22, x1 + 22, y1 + 22, k_(t, "p188", .5, .2), lit > .5 ? "255,214,150" : "143,220,255");
+      HUD.ring(bg, (x0 + x1) / 2, (y0 + y1) / 2, prog(t, CUE.notreal + .1, 1.0), 260, "255,214,150"); }
   }
   if (name === "after" && t < CUE.assist) {                 // 1929：再び H の線が光る
     const sx0 = 80, sx1 = 1000, sy0 = 820, sy1 = 1000, gk = sstep(CUE.y1929, CUE.y1929 + 1.0, t);
@@ -629,7 +634,7 @@ function drawUI(t, name) {
   if (name === "harvard" && t < CUE.plate) uiCard([["ハーバード大学天文台", T(34), 800], ["アメリカ", T(26), 500, "#B8C7D6"]], 540, 340, k_(t, "harvard", .45, .3) * (1 - prog(t, CUE.plate - .3, .35)));
   if (name === "method" && t >= CUE.lines && t < CUE.temp) uiNote("※説明のための図", 540, 250, win(t, CUE.lines, CUE.temp, .3, .3));
   if (name === "letter" && t < CUE.letterread) uiCard([["1925年1月", T(34), 800]], 540, 340, k_(t, "letter", .45, .3));
-  if (name === "letter" && t >= CUE.thesis && t < CUE.notreal) uiCard([["博士論文（1925）", T(32), 800], [t >= CUE.p188 ? "188ページ" : "表 XXVIII（184ページ）", T(26), 500, "#B8C7D6"]], 540, 320, k_(t, "thesis", .45, .3));
+  if (name === "letter" && t >= CUE.thesis) uiCard([["博士論文（1925）", T(32), 800], ["表 XXVIII（184ページ）", T(26), 500, "#B8C7D6"]], 540, 320, k_(t, "thesis", .45, .3));
   if (name === "after" && t < CUE.assist) uiCard([["1929年", T(36), 800]], 540, 360, k_(t, "y1929", .45));
   if (name === "after" && t >= CUE.prof) uiCard([["1956年", T(36), 800]], 540, 340, k_(t, "prof", .45, .2));
 }
@@ -642,7 +647,7 @@ function buildMood() {
     [c.cambridge, { cool: .3, sat: .7, vig: .55 }], [c.ship, { cool: .45, sat: .75, vig: .6 }], [c.harvard, { cool: .05, warm: .2, sat: .9, vig: .55 }],
     [c.method, { cool: .25, sat: 1.0, vig: .5 }], [c.saha, { cool: .3, sat: .8, vig: .6 }], [c.result, { cool: .25, sat: .95, vig: .5 }],
     [c.hhe - .1, { cool: .2, sat: 1.0, vig: .5 }], [c.hhe + 1.5, { cool: 0, warm: .25, sat: 1.05, glow: .35, glowX: .5, glowY: .4, vig: .45 }], [c.letter - .1, { cool: .05, warm: .15, sat: 1.0, vig: .5 }],
-    [c.letter + .6, { cool: .45, sat: .7, vig: .65 }], [c.notreal + .5, { cool: .55, sat: .6, vig: .72 }], [c.after - .1, { cool: .45, sat: .7, vig: .65 }],
+    [c.letter + .6, { cool: .45, sat: .7, vig: .65 }], [c.notreal, { cool: .4, sat: .72, vig: .65 }], [c.notreal + 1.8, { cool: .05, warm: .2, sat: 1.0, glow: .12, glowX: .55, glowY: .3, vig: .55 }], [c.after - .1, { cool: .1, warm: .15, sat: .95, vig: .5 }],
     [c.y1929 + 1.2, { cool: .1, warm: .2, sat: 1.0, glow: .25, glowX: .5, glowY: .45, vig: .5 }], [c.assist, { cool: .25, sat: .85, vig: .55 }], [c.prof + 1.5, { cool: 0, warm: .22, sat: 1.0, glow: .2, glowX: .7, glowY: .3, vig: .5 }],
     [c.today, { cool: 0, warm: .2, sat: 1.05, vig: .45 }], [c.sky, { cool: .1, warm: .05, sat: 1.0, vig: .45 }], [c.back, { cool: 0, warm: .25, sat: 1.05, glow: .25, glowX: .5, glowY: .45, vig: .5 }],
   ];

@@ -44,8 +44,8 @@ EP = standard.config({
             ("reveal", "twoel", 0.8), ("bloom", "hhe", 1.0, -0.1), ("glow", "hhe", 0.6, 0.6), ("riser", "bars", 0.5), ("impact", "million", 0.8),
             ("ring", "million", 0.5, 0.2),
             ("whoosh", "letter", 0.5, -0.1), ("paper", "letter", 0.5, 0.3), ("typer", "letterread", 0.6), ("stamp", "impossible", 0.9, 0.25),
-            ("lock", "impossible", 0.6, 0.45), ("deep", "theory", 0.5), ("flip", "thesis", 0.7, 0.1), ("zoom", "p188", 0.7), ("lock", "notreal", 0.7, 0.1),
-            ("deep", "notreal", 0.4, 0.6),
+            ("lock", "impossible", 0.6, 0.45), ("deep", "theory", 0.5), ("flip", "thesis", 0.7, 0.1), ("zoom", "p188", 0.7), ("lock", "p188", 0.6, 0.3), ("bloom", "notreal", 0.8, 0.2),
+            ("glow", "notreal", 0.5, 0.9),
             ("whoosh", "after", 0.6, -0.1), ("reveal", "y1929", 0.7), ("glow", "y1929", 0.5, 0.4), ("lock", "assist", 0.45, 0.4), ("tick", "assist", 0.35, 1.0),
             ("ok", "prof", 0.6, 0.4), ("glow", "prof2", 0.5),
             ("whoosh", "today", 0.5, -0.1), ("tagpop", "today", 0.5, 0.8), ("zoom", "core", 0.7), ("shimmer", "core", 0.6, 0.5), ("shimmer", "sky", 0.5),
@@ -54,11 +54,11 @@ EP = standard.config({
     #   冒頭（謎と期待）→ 背景（穏やか）→ 方法（集中）→ 発見（明るく開く）→ 手紙と留保（少し陰る → 一瞬の間）→ 再評価（前へ）→ 現代（安心と余韻）
     "music": {"style": "warm_drive", "sections": [
         ("t0", 0.0, "w_hook"), ("cambridge", -0.1, "w_story"), ("method", -0.1, "w_focus"), ("twoel", -0.2, "w_discover"),
-        ("letter", -0.2, "w_shade"), ("notreal", 0.0, "w_hold"), ("after", -0.1, "w_rise"), ("today", -0.1, "w_warm"),
+        ("letter", -0.2, "w_shade"), ("notreal", -0.1, "w_rise"), ("after", -0.1, "w_rise"), ("today", -0.1, "w_warm"),
         ("card", 0.0, "w_end"), ("end1", -0.6, "ending")]},
     "segments": ["hook", "cambridge", "harvard", "method", "result", "letter", "after", "today"],
     "extra_files": ["../ext/hud_ext.js", "../common/cine.js"],
-    "final_hold": 2.4,   # 最後のセリフのあと、太陽の光から引いていく余韻（秒）
+    "final_hold": 1.2,   # 最後のセリフのあと、太陽の光から引いていく余韻（秒）。全体を 120 秒以内に収める
     "workers": 2,
     "qc_frames": [("t0", 0.4), ("t0", 1.5), ("who", 1.0), ("stamp", 0.6), ("cambridge", 1.5), ("lecture", 2.0), ("degree", 2.0), ("ship", 2.0),
                   ("harvard", 1.5), ("plate", 1.5), ("method", 1.0), ("lines", 1.5), ("temp", 1.0), ("ion", 1.0), ("saha", 1.5), ("night", 1.5),
@@ -70,7 +70,7 @@ EP = standard.config({
         ("3 ハーバード", "harvard", "method", "乾板の棚 → 1 枚の乾板を拡大鏡で", "w_story"),
         ("4 方法", "method", "result", "光がプリズムで虹の帯に → 黒い線に元素の札 → 温度で原子の状態が変わる → 机の後ろ姿 → 夜と朝", "w_focus"),
         ("5 結果", "result", "letter", "表の数字 → 地球と似た並び → H と He の線だけが光る（決定的な映像）→ 水素の棒が画面を突き抜ける", "w_focus → w_discover"),
-        ("6 手紙と留保", "letter", "after", "1925 の封筒 → 手紙の一文に赤い丸 → 論文 188 ページ → 一文に照準", "w_shade → w_hold"),
+        ("6 手紙と論文", "letter", "after", "1925 の封筒 → 手紙の一文に赤い丸 → 論文の表 XXVIII、水素の値に注目 → 温かく光る（消さずに残した答え）", "w_shade → w_rise"),
         ("7 その後", "after", "today", "1929 → 再び H の線 → 扉の札 TECHNICAL ASSISTANT → PROFESSOR", "w_rise"),
         ("8 現代", "today", "endcard", "太陽の成分の円グラフ → 中心の核融合 → 夜空の星に H・He の札 → 冒頭の光へ引く", "w_warm → w_end"),
         ("9 共通エンディング", "endcard", None, "リバース。世界の仕組みを、はじめから。", "BGM ending"),
