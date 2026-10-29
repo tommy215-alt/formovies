@@ -7,7 +7,9 @@
 - pilot_016（ヴェーゲナー）は完成（BGM lab_melodic・CG の質の向上を入れた版、コミット 43238e2）。YouTube へのアップロードはユーザーの指示まで行わない。
 - **最新版の設定は `templates/REVERSE_GUIDELINE_v2.4.md`**（いまの設定の一覧つき）。
 - **pilot_017（ヘンリエッタ・リービット）は完成**（90.0 秒、video_qa OK、BGM lab_dub）。
-- **pilot_018（パスツールと少年）は完成**（80.4 秒、video_qa OK、BGM lab_break）。**派手な演出と文字の試し**：ユーザーの反応待ち（よければガイドラインに入れる。部品は pilot_018 の renderer.html の slam・popSub・punch）。v2.4 を最初に使った回：Blender 5.2＋MPFB で人体（`production/pilot_017/assets/make_human.py`）、Poly Haven の HDRI・質感、SSAO・ボケ（`production/ext/vendor/three147/`）。素材をまとめ直すときは `assets/make_scene_assets.py`。事実確認 `scripts/pilot_017/fact_check.md`、権利 `assets.md`。
+- **pilot_018（パスツールと少年）は完成**（80.4 秒、video_qa OK、BGM lab_break）。
+- **2 つの設計（2026-10-30、ユーザーが命名）**：「知的設計」（pilot_017 の落ち着いた作り）と「ドパ設計」（pilot_018 の派手な作り）。どちらも採用。一覧は `templates/DESIGN_MODES.md`。新しい動画でどちらか指定がなければ聞く。
+- **返事待ち**：叫ぶナレーションの聞き比べ（`production/voice_tests/shout/` の 0〜5。おすすめは 2＝青山龍星「熱血」を強く、山場の行だけ）。v2.4 を最初に使った回：Blender 5.2＋MPFB で人体（`production/pilot_017/assets/make_human.py`）、Poly Haven の HDRI・質感、SSAO・ボケ（`production/ext/vendor/three147/`）。素材をまとめ直すときは `assets/make_scene_assets.py`。事実確認 `scripts/pilot_017/fact_check.md`、権利 `assets.md`。
 
 ## 次の動画でやること（ガイドライン v2.4）
 
