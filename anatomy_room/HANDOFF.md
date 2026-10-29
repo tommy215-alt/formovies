@@ -13,7 +13,7 @@
 - [x] `production/ext/bgm_lab.py` に `bgm_style(total, sections, style)`（パートごとに作り、モードで厚さを変える）と短調の進行を足し、`music_ext.py` から 5 つの曲調を登録する
 - [x] pilot_016 の `production_script.py` の `music.style` を `lab_melodic`（人物のドラマ）に
 - [x] `renderer.html` の CG を上げる（holoDraw・studyShot・吹雪。静止画で確認済み）：地図を 3D のホログラムの台に貼る（傾き・奥行き・光の粒・走査の光）、冒頭の合わさる瞬間に衝撃波とカメラの揺れ、夜の書斎の場面（地図に向かう後ろ姿、L04〜L06 と L09 に）、吹雪の強化（風の筋・前かがみ）
-- [ ] 静止画で確認 → `python anatomy_room/tools/rv.py 016 render all` → video_qa・全コマの確認 → 自己レビュー更新 → commit・push → URL を報告
+- [x] 静止画で確認 → `python anatomy_room/tools/rv.py 016 render all`（完了：2026-10-29、20.9 分） → video_qa・全コマの確認 → 自己レビュー更新 → commit・push → URL を報告
 
 ## 決まったこと（この会話で）
 
