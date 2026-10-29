@@ -150,7 +150,7 @@ class RV:
         return fr
 
     def render_samples(self, segs, tl):
-        """各場面の見本を、場面ごとに新しいページで描く（2 本同時）。戻り値：{場面の番号: 一時フォルダ}"""
+        """各場面の見本を、場面ごとに新しいページで描く（2 本同時。workers が 1 の回は 1 本ずつ）。戻り値：{場面の番号: 一時フォルダ}"""
         fps, out = tl["fps"], {}
         stills = self.work / "stills"
         stills.mkdir(exist_ok=True)
@@ -168,10 +168,13 @@ class RV:
                 ts = [f"{i / fps:.6f}" for i in fr]
                 with lock, open(log, "a", encoding="utf-8") as f:
                     f.write(f"scene {s['no']}: {len(ts)} frames\n")
-                r = subprocess.run(["node", str(COMMON / "render_frames.js"), "--dir", str(self.here), "--stills", ",".join(ts)],
-                                   capture_output=True, text=True, encoding="utf-8", errors="replace", env=ENV)
-                with lock, open(log, "a", encoding="utf-8") as f:
-                    f.write(r.stdout + r.stderr)
+                for attempt in range(3):   # ブラウザがまれに落ちる（重い 3D の回）ので、2 回まで撮り直す
+                    r = subprocess.run(["node", str(COMMON / "render_frames.js"), "--dir", str(self.here), "--stills", ",".join(ts)],
+                                       capture_output=True, text=True, encoding="utf-8", errors="replace", env=ENV)
+                    with lock, open(log, "a", encoding="utf-8") as f:
+                        f.write(r.stdout + r.stderr + (f"\n（撮り直し {attempt + 1}）\n" if r.returncode and attempt < 2 else ""))
+                    if not r.returncode:
+                        break
                 if r.returncode:
                     raise RuntimeError(f"samples scene {s['no']}")
                 d = self.rv / "samples" / f"_new_{s['no']:02d}"
@@ -182,7 +185,7 @@ class RV:
                     shutil.move(str(src), str(d / f"{i:06d}.png"))
                 out[s["no"]] = d
 
-        ths = [threading.Thread(target=worker) for _ in range(min(2, len(segs)))]
+        ths = [threading.Thread(target=worker) for _ in range(max(1, min(2, self.cfg.get("workers", 2), len(segs))))]   # 重い回は workers に合わせて 1 本ずつ
         for th in ths:
             th.start()
         for th in ths:

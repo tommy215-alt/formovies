@@ -6,6 +6,7 @@
 
 - pilot_016（ヴェーゲナー）は完成（BGM lab_melodic・CG の質の向上を入れた版、コミット 43238e2）。YouTube へのアップロードはユーザーの指示まで行わない。
 - **最新版の設定は `templates/REVERSE_GUIDELINE_v2.4.md`**（いまの設定の一覧つき）。
+- **pilot_017（ヘンリエッタ・リービット）は完成**（90.0 秒、video_qa OK、BGM lab_dub）。v2.4 を最初に使った回：Blender 5.2＋MPFB で人体（`production/pilot_017/assets/make_human.py`）、Poly Haven の HDRI・質感、SSAO・ボケ（`production/ext/vendor/three147/`）。素材をまとめ直すときは `assets/make_scene_assets.py`。事実確認 `scripts/pilot_017/fact_check.md`、権利 `assets.md`。
 
 ## 次の動画でやること（ガイドライン v2.4）
 

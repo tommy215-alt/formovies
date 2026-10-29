@@ -17,3 +17,6 @@ node_modules/
 anatomy_room/_backup/
 anatomy_room/production/*/baseline/
 
+
+# 素材の元ファイル（make_assets.py で作り直せる。出典は scripts/pilot_NNN/assets.md）
+anatomy_room/production/*/assets/src_*
