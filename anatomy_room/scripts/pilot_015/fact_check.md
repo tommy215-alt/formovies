@@ -1,0 +1,161 @@
+# pilot_015：事実確認リスト（太陽は何でできているか——セシリア・ペイン）
+
+調査日：2026-10-29（ユーザーの PC のセッション）。確認方法の定義は `docs/FACT_CHECK_POLICY.md`。
+
+**確認の流れ**：ChatGPT の報告（ユーザーが貼り付け。依頼文は `gpt_fact_check_prompt.md`）を下書きにし、Claude が主な出典に当たり直した。項目ごとに「Claude が本文を読んだ」「ChatGPT の報告のみ」「検索抜粋」を分けて書く。ChatGPT の報告だけで確かめたものは「確認済み」とは書かない。
+
+## 物語の核（ガイドライン v2.1 の 5：台本の前に整理）
+
+- **最も大きな困難**：計算で出た答え（水素とヘリウムが桁違いに多い）が、当時の理解と真っ向から食い違った。権威のラッセルは手紙で「明らかにありえない」と書き、彼女自身も論文に「ほぼ確実に本当ではない」と書き添えた（S1・S2）。あわせて、女性であるための制度の壁があった（ケンブリッジでは男性と同じ学位を得られない、ハーバードでは長く技術助手の肩書：S3・S5）。
+- **具体的な出来事**：1925 年 1 月 14 日付のラッセルの手紙（S2）。博士論文 188 ページの一文（S1）。
+- **本人がしたこと**：膨大な写真乾板のスペクトルに、サハの電離の理論を当てはめ、温度の違いを計算に入れて元素の量を求めた（S1）。ほぼ 1 年、疲れと絶望の中で夜遅くまで働いたと振り返っている（S4）。結果の数字は論文に残した（S1、表 XXVIII）。
+- **何が変わったか**：4 年後の 1929 年、ラッセル自身も水素が多いという結論の論文を出した（S6）。星の主成分が水素とヘリウムであることは、いまの天文学の基本になった。本人は 1956 年、ハーバードで内部から昇進した初めての女性の正教授になった（S5）。
+- **資料で確認できるか**：論文の一文と表は Claude が本文で確認。手紙は二次資料の書き起こしで確認。
+
+## 出典
+
+| ID | 資料 | URL | 確認方法 |
+|---|---|---|---|
+| S1 | Cecilia H. Payne『Stellar Atmospheres』（Harvard Observatory Monograph No. 1、1925）。Project Gutenberg #73996 | https://www.gutenberg.org/ebooks/73996 | **Claude が本文を読んだ**（全文を保存し、該当箇所を検索して読んだ：188 ページ、184 ページの表 XXVIII、184〜185 ページ、187 ページの表 XXIX、序文） |
+| S2 | ラッセルからペインへの手紙（1925-01-14）の書き起こし。University of Notre Dame「Studying the Thesis of Cecilia Payne」 | https://socialconcerns.nd.edu/virtue-assignments/studying-thesis-of-cecelia-payne/ | WebFetch（本文から抜き出し）。**ページは手紙の所蔵先を示していない**（検索抜粋では、プリンストン大学の所蔵を伝記作家 DeVorkin が見つけたとされる） |
+| S3 | Newnham College「No Ordinary 'Rag': the attack on the Clough gates」 | （ChatGPT の報告による） | ChatGPT の報告のみ（Claude は未確認） |
+| S4 | American Physical Society（APS News 2015 年 1 月）「This Month in Physics History: January 1925」 | https://www.aps.org/publications/apsnews/201501/physicshistory.cfm | WebFetch（本文から抜き出し）。本人の回想の引用を確認（回想の元の本のページは未確認） |
+| S5 | Harvard University Archives（Papers of Cecilia Helena Payne-Gaposchkin）、Harvard Library「Women at Harvard」、Harvard Crimson（2016）、Britannica、SNAC | （各ページ） | ChatGPT の報告（本文を読んだとのこと）＋ Claude の検索抜粋 |
+| S6 | H. N. Russell「On the Composition of the Sun's Atmosphere」ApJ 70, 11（1929） | DOI 10.1086/143197 | ChatGPT の報告（書誌と一部）＋検索抜粋。**論文本文での彼女への言及は未確認** |
+| S7 | 太陽の組成：OpenStax の天文学の教科書（質量で水素 約 73%、ヘリウム 約 25%）、NASA Goddard の資料（約 70〜71%） | （検索結果） | 検索抜粋。資料で 70〜74% と幅がある |
+| S8 | H. A. Bethe「Energy Production in Stars」Phys. Rev. 55（1939） | （ChatGPT の報告による） | ChatGPT の報告（要旨）。台本では使わない |
+
+## 事実確認リスト
+
+### FACT-01
+- **主張**：1900 年、イギリスに生まれた（1900 年 5 月 10 日、ウェンドーバー）。
+- **台本中の該当箇所**：L02
+- **出典**：S5
+- **検証結果**：PARTIALLY_VERIFIED（ChatGPT がハーバードの資料の本文で確認。Claude は未確認）。台本では年と国だけ。
+
+### FACT-02
+- **主張**：ケンブリッジ大学（ニューナム・カレッジ）で学び、エディントンの日食観測についての講演がきっかけで天文学へ進んだ。
+- **台本中の該当箇所**：L02、L03
+- **出典**：S5
+- **検証結果**：PARTIALLY_VERIFIED（ChatGPT の報告）
+- **注意点**：「日食を見て」ではなく「日食の観測を伝える講演」。
+
+### FACT-03
+- **主張**：当時のケンブリッジでは、女性は学業を修めても、男性と同じ正式な学位を得られなかった（完全な構成員資格は 1948 年）。
+- **台本中の該当箇所**：L04
+- **出典**：S3
+- **検証結果**：PARTIALLY_VERIFIED（ChatGPT の報告。よく知られた事実だが Claude は本文未確認）
+- **注意点**：「試験を受けられなかった」「卒業できなかった」は誤り。
+
+### FACT-04
+- **主張**：1923 年、アメリカのハーバード大学天文台へ移った。
+- **台本中の該当箇所**：L05、L06
+- **出典**：S5
+- **検証結果**：PARTIALLY_VERIFIED（奨学金の名前は確定できないので言わない）
+
+### FACT-05
+- **主張**：1925 年、博士論文『Stellar Atmospheres』がラドクリフ・カレッジの博士号の論文として受理された。
+- **台本中の該当箇所**：（台本では「博士論文」とだけ言う）
+- **出典**：S1 の序文（"accepted as a thesis fulfilling the requirements for the degree of Doctor of Philosophy in Radcliffe College"）
+- **検証結果**：VERIFIED（Claude が本文で確認）
+- **注意点**：「ハーバードから博士号」と言わない。「世界初の女性の天文学博士」と言わない。
+
+### FACT-06
+- **主張**：ハーバード天文台の写真乾板のスペクトルに、サハの電離の理論を当てはめ、星の温度の違いを計算に入れて元素の量を求めた。スペクトルの線の濃さは、原子の量だけでは決まらない。
+- **台本中の該当箇所**：L06〜L09
+- **出典**：S1（第 I 部の理論、第 XIII 章「The Relative Abundance of the Elements」）
+- **検証結果**：VERIFIED（論文の構成と該当章を Claude が確認）
+- **注意点**：乾板の枚数は言わない（論文で使った数を確定できない）。「膨大な乾板」まで。
+
+### FACT-07
+- **主張**：多くの元素の割合は地球とよく似ていた。水素とヘリウムだけが桁違いに多かった。表 XXVIII では水素 11、鉄 4.8（いずれも相対量の対数）＝水素は鉄の 10^6.2 ≒ 約 160 万倍。
+- **台本中の該当箇所**：L11〜L13
+- **出典**：S1（184 ページの表 XXVIII。188 ページ「the inferred composition displays a striking parallel with the composition of the earth」、「The outstanding discrepancies between the astrophysical and terrestrial abundances are displayed for hydrogen and helium.」）
+- **検証結果**：VERIFIED（Claude が本文で確認。倍率は表の値からの計算）
+- **注意点**：「地球の 100 万倍」と言わない（比べたのは星の大気の中の水素と金属）。台本は「鉄の 100 万倍を超えていた」。
+
+### FACT-08
+- **主張**：当時は、星の大気と地球の物質の元素の割合が似ていると考えられていた（ラッセルの 1914 年の研究）。
+- **台本中の該当箇所**：L11（間接的に）
+- **出典**：S1（184 ページ：「A distinct parallelism ... has already been suggested by Russell」）
+- **検証結果**：VERIFIED（ペインの論文の記述として）
+- **注意点**：「太陽は鉄でできていると信じられていた」と言わない。
+
+### FACT-09
+- **主張**：1925 年 1 月 14 日付の手紙で、ラッセルは「水素が金属の 100 万倍も多いということは、明らかにありえない」と書いた。同じ手紙で「いまの理論に何か深刻な誤りがあると確信している」とも書いた。
+- **台本中の該当箇所**：L01、L14、L15
+- **出典**：S2（"It is clearly impossible that hydrogen should be a million times more abundant than the metals"、"Here I am convinced that there is something seriously wrong with the present theory."）
+- **検証結果**：PARTIALLY_VERIFIED（二次資料の書き起こし。原本は未確認）
+- **注意点**：面と向かって言った場面にしない。「手紙に書いた」とする。
+
+### FACT-10
+- **主張**：ペインは論文 188 ページに、水素とヘリウムの大きな量は「ほぼ確実に本当ではない」と書き添えた。計算の結果（表 XXVIII）は論文に残っている。
+- **台本中の該当箇所**：L17、L18
+- **出典**：S1（"The enormous abundance derived for these elements in the stellar atmosphere is almost certainly not real."）
+- **検証結果**：VERIFIED（Claude が本文で確認）
+- **注意点**：「結果を削除した」と言わない（APS の記事は「論文から外すよう説得した」と書くが、論文の本文には数字が残っている）。「ラッセルに命令されて」と断定しない。
+
+### FACT-11
+- **主張**：1929 年、ラッセルは別の方法で、太陽の大気に水素が多いという結論の論文を出した。
+- **台本中の該当箇所**：L19
+- **出典**：S6
+- **検証結果**：PARTIALLY_VERIFIED（論文の存在と結論。彼女への言及の有無は未確認なので言わない）
+- **注意点**：「手柄を盗んだ」と言わない。
+
+### FACT-12
+- **主張**：ストルーヴェとゼバーグスが「天文学で書かれた最も優れた博士論文」と評した。
+- **台本中の該当箇所**：使わない
+- **検証結果**：PARTIALLY_VERIFIED（原著のページ未確認）
+
+### FACT-13
+- **主張**：博士論文のあとも長く「技術助手」の肩書で働いた（1938 年に「天文学者」の肩書）。
+- **台本中の該当箇所**：L20
+- **出典**：S5
+- **検証結果**：PARTIALLY_VERIFIED（ChatGPT はハーバードの年表で 1927〜1938 年、検索抜粋の百科事典は 1925〜1938 年。台本では年を言わない）
+
+### FACT-14
+- **主張**：1956 年、ハーバード大学で、内部から正教授に昇進した初めての女性になり、天文学科の学科長になった。
+- **台本中の該当箇所**：L21
+- **出典**：S5（"the first woman member of the Faculty of Arts and Sciences to be promoted to full professor in 1956"）
+- **検証結果**：PARTIALLY_VERIFIED（ChatGPT がハーバード図書館の本文で確認、Claude の検索抜粋でも一致）
+- **注意点**：「ハーバードで初めての女性の教授」と広げない。「内部から昇進した」を付ける。
+
+### FACT-15
+- **主張**：いま、太陽の質量のおよそ 7 割は水素と考えられている。ほとんどの星の主成分は水素とヘリウム。
+- **台本中の該当箇所**：L22、L23
+- **出典**：S7
+- **検証結果**：PARTIALLY_VERIFIED（資料で 70〜74%。台本は「およそ 7 割」）
+
+### FACT-16
+- **主張**：太陽が光るのは、中心で水素がヘリウムに変わる核融合による。
+- **台本中の該当箇所**：L22
+- **出典**：一般的な天文学の知識（S8 は関連）
+- **検証結果**：VERIFIED（教科書の事実）
+- **注意点**：彼女が核融合を発見したとは言わない。
+
+### FACT-17
+- **主張**：本人は、研究の時期を「ほぼ 1 年、途方に暮れた」と振り返っている。
+- **台本中の該当箇所**：L10
+- **出典**：S4
+- **検証結果**：PARTIALLY_VERIFIED（APS の記事に引用された本人の回想。元の本のページは未確認）
+
+## 本人の回想（S4、二次資料経由）
+
+- 「There followed months, almost a year as I remember, of utter bewilderment.」（それから何か月も、記憶ではほぼ 1 年、まったく途方に暮れていた）。ChatGPT の報告では、この続きに「疲れと絶望の中で、一日中、夜遅くまで働くことも多かった」という趣旨の文がある（Claude は前半だけを確認）。台本では「ほぼ 1 年、途方に暮れたと振り返っている」まで。
+
+## 言ってはいけない言い方
+
+- 「ラッセルが手柄を盗んだ」「女性だから否定された」（原因を断定できない）
+- 「太陽は鉄でできていると信じられていた」
+- 「結果を論文から消した」
+- 「彼女が核融合を発見した」
+- 「数十万枚の乾板を一人で解析した」
+- 「地球の 100 万倍」
+
+## 演出（事実ではないもの）
+
+| 箇所 | 内容 | 扱い |
+|---|---|---|
+| 人物 | 顔のない人形。後ろ姿・遠景（手のアップは使わない） | 注記「※人物と場面は再現CG」を最初に 1 回 |
+| 手紙 | 文面は書き起こしの英文の一部を、手紙の再現として見せる | 演出（筆跡は再現しない） |
+| スペクトルの帯 | 線の位置は説明のための図（実際の星のスペクトルの正確な再現ではない） | 必要なら「※説明のための図」を 1 回 |
