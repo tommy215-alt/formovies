@@ -11,6 +11,8 @@
 - **2 つの設計（2026-10-30、ユーザーが命名）**：「知的設計」（pilot_017 の落ち着いた作り）と「ドパ設計」（pilot_018 の派手な作り）。どちらも採用。一覧は `templates/DESIGN_MODES.md`。新しい動画でどちらか指定がなければ聞く。
 - **返事待ち**：叫ぶナレーションの聞き比べ（`production/voice_tests/shout/` の 0〜5。おすすめは 2＝青山龍星「熱血」を強く、山場の行だけ）。v2.4 を最初に使った回：Blender 5.2＋MPFB で人体（`production/pilot_017/assets/make_human.py`）、Poly Haven の HDRI・質感、SSAO・ボケ（`production/ext/vendor/three147/`）。素材をまとめ直すときは `assets/make_scene_assets.py`。事実確認 `scripts/pilot_017/fact_check.md`、権利 `assets.md`。
 
+- **pilot_019（ジョン・ハリソン、経度の時計）を開始（2026-10-30）**：ドパ設計（ユーザーの指示）。ChatGPT への事実確認の依頼文 `scripts/pilot_019/gpt_fact_check_prompt.md` を渡した → 結果待ち。BGM は直前が lab_break なので lab_electro を優先。
+
 ## 次の動画でやること（ガイドライン v2.4）
 
 1. 題材を決める（候補：伊能忠敬、ジョン・スノウ、ジョン・ハリソン、リービット、八木秀次など。前の会話のリスト）。
