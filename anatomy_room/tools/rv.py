@@ -36,6 +36,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent          # anatomy_room
 COMMON = ROOT / "production" / "common"
+EXT = ROOT / "production" / "ext"          # テンプレートの外に足した部品（music_ext.py・hud_ext.js）
 SAMPLE_STEP = 15          # 見本の間隔（コマ）。30 fps で 0.5 秒
 TOL = 2                   # 見本の画素の差の許容（階調）。同じ順で描いた静止画の揺れは最大 1
 ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
@@ -136,8 +137,8 @@ class RV:
 
     def ext_hash(self):
         """描画に使うファイルをすべて含むハッシュ（pipeline の判定に入っていない cine.js・vendor の画像も含める）"""
-        files = sorted([self.here / "renderer.html", *[self.here / f for f in self.cfg.get("extra_files", [])],
-                        *COMMON.glob("*.js"), *(COMMON / "vendor").rglob("*.js")])
+        files = sorted({(self.here / "renderer.html").resolve(), *[(self.here / f).resolve() for f in self.cfg.get("extra_files", [])],
+                        *COMMON.glob("*.js"), *(COMMON / "vendor").rglob("*.js"), *EXT.glob("*.js")})
         return fsha(*files)
 
     def seg_path(self, tl, s, code):
@@ -281,7 +282,7 @@ class RV:
         sfx = [[x[0], cues[x[1]], *x[2:]] for x in self.cfg["sfx"]]
         lines = [[x["id"], x["start"], x["end"], fsha(self.work / "voice" / f"{x['id']}.wav")] for x in tl["lines"]]
         return sha(cfg, sfx, self.ep.sections(tl), lines, tl["duration"], tl["ending_start"],
-                   fsha(COMMON / "music.py", COMMON / "pipeline.py"))
+                   fsha(COMMON / "music.py", COMMON / "pipeline.py", *sorted(EXT.glob("*.py"))))
 
     def audio(self, tl):
         key = self.audio_key(tl)
@@ -289,7 +290,7 @@ class RV:
         if self.state.get("audio") == key and all(p.exists() for p in outs):
             return "キャッシュ"
         music = self.pipeline.music
-        mkey = fsha(COMMON / "music.py")
+        mkey = fsha(COMMON / "music.py", *sorted(EXT.glob("*.py")))   # 外付けの曲調（production/ext/music_ext.py）を変えたら BGM も作り直す
 
         def memo(fn):
             def wrap(*a, **k):
