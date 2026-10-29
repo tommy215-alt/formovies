@@ -450,7 +450,7 @@ function drawScene(t, name) {
   const [a, b] = S.sceneRange(name);
   if (name === "hook") {
     if (t < CUE.who) {                                     // 暗闇に太陽の光が差し込む：強いコントラスト、すばやく寄る
-      show("space"); sunMat.uniforms.uT.value = t; sunMat.uniforms.uGain.value = easeOut(prog(t, 0, .5));
+      show("space"); sunMat.uniforms.uT.value = t; sunMat.uniforms.uGain.value = .6 + .4 * easeOut(prog(t, 0, .4));   // 1 コマ目から太陽が見える（最初のコマが黒くならない）
       lights({ keyPos: [0, 10, 0], keyAt: [0, 0, 0], keyI: 0, rimI: 0, hemiI: 0, fog: 0, fogC: 0x000000, exp: 1.0 });
       const u = easeOut(prog(t, 0, CUE.who)); sun.position.set(6, -14, -60);
       setCam(V3(0, 0, 40 - 18 * u), V3(2, -6, -60), 40, .5, 2000); draw3D(null);
@@ -458,7 +458,7 @@ function drawScene(t, name) {
       deskShot(t, { lamp: 1, night: 1, fig: 1, papers: .3 });
       cecilia.pose({ x: -.1, z: .05, yaw: Math.PI, lean: .3, nod: .45, armFL: .8, armFR: .8, elbowL: .5, elbowR: .5 });
       const u = easeInOut(prog(t, CUE.who, CUE.letter0 - CUE.who));
-      setCam(V3(1.5 - .3 * u, 1.75, 3.0 - .5 * u), V3(-.1, .95, -.4), 38); draw3D({ focus: cam.position.distanceTo(V3(-.1, 1.0, .05)), slab: .6, far: 3, near: 3 }); guardP(cecilia);
+      setCam(V3(2.0 - .3 * u, 2.2, 3.9 - .5 * u), V3(-.1, .45, -.4), 38); draw3D({ focus: cam.position.distanceTo(V3(-.1, 1.0, .05)), slab: .6, far: 3, near: 3 }); guardP(cecilia);
     } else {                                               // 手紙の一文に寄る
       deskShot(t, { lamp: 1, night: 1, letter: 1 });
       const u = easeOut(prog(t, CUE.letter0, b - CUE.letter0));
@@ -469,15 +469,15 @@ function drawScene(t, name) {
       show("campus"); cecilia.g.visible = true; campus.add(cecilia.g);
       lights({ keyPos: [6, 8, 4], keyAt: [0, 2, -8], keyI: 26, angle: 1.0, keyCol: 0xdde4ee, rimPos: [-5, 6, -12], rimI: .7, hemiI: .5, hemiSky: 0x9aa8bc, fog: .055, fogC: 0x5a6474, exp: 1.05 });
       const u = easeInOut(prog(t, a, CUE.lecture - a));
-      cecilia.pose({ x: .3, z: -1.2 - 1.6 * u, yaw: Math.PI, walk: t * 3.4, stride: .22, armFL: .2 });
-      setCam(V3(.6, 1.1, 4.4 - .6 * u), V3(0, 5.2, -9), 46); draw3D(null); guardP(cecilia);
+      cecilia.pose({ x: .3, z: -4.6 - 1.0 * u, yaw: Math.PI, walk: t * 3.4, stride: .22, armFL: .2 });
+      setCam(V3(.6, 2.6, 4.4 - .6 * u), V3(0, 1.4, -9), 46); draw3D(null); guardP(cecilia);
     } else if (t < CUE.degree) {                            // 講堂のスクリーンに日食の写真（講演）
       show("hall"); hall.add(cecilia.g); cecilia.g.visible = true;
       audience.forEach((p, i) => { p.g.visible = true; p.pose({ x: -2.2 + (i % 4) * 1.4 + (i > 3 ? .7 : 0), z: -1.9 + Math.floor(i / 4) * 1.1, yaw: Math.PI, nod: .1 }); });
-      cecilia.pose({ x: .5, z: .3, yaw: Math.PI, nod: .05 });
+      cecilia.pose({ x: .5, z: -3.0, yaw: Math.PI, nod: .05 });
       lights({ keyPos: [0, 5, 2], keyAt: [0, 2, -5], keyI: 10, angle: .7, keyCol: 0xc8d4e4, rimPos: [0, 3, -5.5], rimI: 1.2, rimCol: 0xd8e4ff, hemiI: .14, fog: .05, fogC: 0x07090c, exp: 1.15 });
       const u = easeInOut(prog(t, CUE.lecture, CUE.degree - CUE.lecture));
-      setCam(V3(.9 - .3 * u, 1.9, 3.0 - .9 * u), V3(0, 2.6, -6), 40); draw3D({ focus: cam.position.distanceTo(V3(.5, 1.2, .3)), slab: 1.2, far: 2.5, near: 3 }); guardP(cecilia);
+      setCam(V3(.7 - .2 * u, 4.6, 6.8 - .8 * u), V3(0, .9, -3.6), 40); draw3D({ focus: cam.position.distanceTo(V3(.5, 1.2, -3.0)), slab: 1.4, far: 2.5, near: 3 }); guardP(cecilia);
     } else if (t < CUE.ship) {                              // 学位の枠：一つだけ空いている
       show("wall");
       lights({ keyPos: [1.5, 3.5, 2.5], keyAt: [0, 2, -1], keyI: 26, angle: .8, keyCol: 0xe8e0d0, rimI: .3, hemiI: .3, hemiSky: 0xb0b0b8, fog: .03, fogC: 0x14161a, exp: 1.05 });
@@ -502,7 +502,7 @@ function drawScene(t, name) {
       deskShot(t, { lamp: 1, night: 1, fig: 1, papers: .4 });
       cecilia.pose({ x: -.1, z: .05, yaw: Math.PI, lean: .35, nod: .5, armFL: .85, armFR: .75, elbowL: .5, elbowR: .55 });
       const u = easeInOut(prog(t, CUE.saha, CUE.night - CUE.saha));
-      setCam(V3(-1.6 + .3 * u, 1.8, 3.0 - .3 * u), V3(-.05, .95, -.4), 40); draw3D({ focus: cam.position.distanceTo(V3(-.1, 1.0, .05)), slab: .5, far: 3, near: 3 }); guardP(cecilia);
+      setCam(V3(-2.0 + .3 * u, 2.2, 3.9 - .3 * u), V3(-.05, .45, -.4), 40); draw3D({ focus: cam.position.distanceTo(V3(-.1, 1.0, .05)), slab: .5, far: 3, near: 3 }); guardP(cecilia);
     } else {                                               // 窓の外が夜と朝を繰り返し、紙が積み上がる
       const ph = (t - CUE.night) / (b - CUE.night), night = .5 + .5 * Math.cos(ph * 6.283 * 2);
       deskShot(t, { lamp: .4 + .6 * night, night, papers: .3 + .7 * ph });
@@ -548,7 +548,7 @@ function drawDiagram(t, name) {
   const T = s => Math.round(s * TS);
   if (name === "hook") {
     if (t < CUE.who) {                                     // 光の筋と、画面いっぱいの問い
-      const sp = proj(sun.position), k = easeOut(prog(t, 0, .6));
+      const sp = proj(sun.position), k = .5 + .5 * easeOut(prog(t, 0, .5));
       bg.save(); bg.globalCompositeOperation = "screen";
       const g = bg.createRadialGradient(sp[0], sp[1], 20, sp[0], sp[1], 1100); g.addColorStop(0, `rgba(255,220,160,${.9 * k})`); g.addColorStop(.25, `rgba(255,170,90,${.35 * k})`); g.addColorStop(1, "rgba(255,140,60,0)");
       bg.fillStyle = g; bg.fillRect(0, 0, W, H);
@@ -622,10 +622,10 @@ function drawDiagram(t, name) {
 }
 function drawUI(t, name) {
   const T = s => Math.round(s * TS);
-  if (name === "hook" && t < CUE.who + .2) HUD.title(ui, [["太陽は", T(110), "#FFF4E0"], ["何でできている？", T(96), "#FFD58A"]], 540, 760, k_(t, "t0", .45, .05), t);   // 冒頭の見出し（この間は字幕を出さない）
+  if (name === "hook" && t < CUE.who) HUD.title(ui, [["太陽は", T(110), "#FFF4E0"], ["何でできている？", T(96), "#FFD58A"]], 540, 640, k_(t, "t0", .4, .02), t);   // 冒頭の見出し（この間は字幕を出さない）
   if (name === "hook" && t >= CUE.who) uiNote("※人物と場面は再現CG", 540, 250, win(t, CUE.who + .2, CUE.letter0, .3, .3));
   if (name === "cambridge" && t < CUE.lecture) uiCard([["ケンブリッジ大学", T(34), 800], ["イギリス", T(26), 500, "#B8C7D6"]], 540, 340, k_(t, "cambridge", .45, .4) * (1 - prog(t, CUE.lecture - .4, .35)));
-  if (name === "cambridge" && t >= CUE.lecture && t < CUE.degree) uiCard([["1919年の日食の観測", T(30), 800]], 540, 330, k_(t, "lecture", .45, .5) * (1 - prog(t, CUE.degree - .4, .35)));
+  if (name === "cambridge" && t >= CUE.lecture && t < CUE.degree) uiCard([["1919年の日食の観測", T(30), 800]], 540, 790, k_(t, "lecture", .45, .5) * (1 - prog(t, CUE.degree - .4, .35)));
   if (name === "harvard" && t < CUE.plate) uiCard([["ハーバード大学天文台", T(34), 800], ["アメリカ", T(26), 500, "#B8C7D6"]], 540, 340, k_(t, "harvard", .45, .3) * (1 - prog(t, CUE.plate - .3, .35)));
   if (name === "method" && t >= CUE.lines && t < CUE.temp) uiNote("※説明のための図", 540, 250, win(t, CUE.lines, CUE.temp, .3, .3));
   if (name === "letter" && t < CUE.letterread) uiCard([["1925年1月", T(34), 800]], 540, 340, k_(t, "letter", .45, .3));
