@@ -9,9 +9,9 @@
 - **pilot_017（ヘンリエッタ・リービット）は完成**（90.0 秒、video_qa OK、BGM lab_dub）。
 - **pilot_018（パスツールと少年）は完成**（80.4 秒、video_qa OK、BGM lab_break）。
 - **2 つの設計（2026-10-30、ユーザーが命名）**：「知的設計」（pilot_017 の落ち着いた作り）と「ドパ設計」（pilot_018 の派手な作り）。どちらも採用。一覧は `templates/DESIGN_MODES.md`。新しい動画でどちらか指定がなければ聞く。
-- **返事待ち**：叫ぶナレーションの聞き比べ（`production/voice_tests/shout/` の 0〜5。おすすめは 2＝青山龍星「熱血」を強く、山場の行だけ）。v2.4 を最初に使った回：Blender 5.2＋MPFB で人体（`production/pilot_017/assets/make_human.py`）、Poly Haven の HDRI・質感、SSAO・ボケ（`production/ext/vendor/three147/`）。素材をまとめ直すときは `assets/make_scene_assets.py`。事実確認 `scripts/pilot_017/fact_check.md`、権利 `assets.md`。
+- 叫ぶナレーションの聞き比べ（`production/voice_tests/shout/` の 0〜5）は 2 番に決定（2026-10-30）。v2.4 を最初に使った回：Blender 5.2＋MPFB で人体（`production/pilot_017/assets/make_human.py`）、Poly Haven の HDRI・質感、SSAO・ボケ（`production/ext/vendor/three147/`）。素材をまとめ直すときは `assets/make_scene_assets.py`。事実確認 `scripts/pilot_017/fact_check.md`、権利 `assets.md`。
 
-- **pilot_019（ジョン・ハリソン、経度の時計）を開始（2026-10-30）**：ドパ設計（ユーザーの指示）。ChatGPT への事実確認の依頼文 `scripts/pilot_019/gpt_fact_check_prompt.md` を渡した → 結果待ち。BGM は直前が lab_break なので lab_electro を優先。
+- **pilot_019（ジョン・ハリソン、経度の時計）を開始（2026-10-30）**：ドパ設計（ユーザーの指示）。ChatGPT への事実確認の依頼文 `scripts/pilot_019/gpt_fact_check_prompt.md` を渡した → 結果待ち。BGM は直前が lab_break なので lab_electro を優先。ユーザーの指示（2026-10-30）：叫ぶ声は要所だけ、青山龍星「熱血」を強く（聞き比べの 2 番、「一旦」なので仕上がりを見て再確認）／**閃光は入れない**（まぶしい）。`DESIGN_MODES.md` に反映済み。
 
 ## 次の動画でやること（ガイドライン v2.4）
 

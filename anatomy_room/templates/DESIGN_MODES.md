@@ -9,10 +9,10 @@
 | 字幕 | `S.docSub`（暗い帯＋シアンの線、Noto Sans） | `popSub()`：飛び出して跳ねる、斜めの黒い帯＋赤〜黄の縁、強調は黄色、太い縁取り（Dela Gothic One） |
 | 画面の文字 | `HUD.title`・`uiCard`・札（落ち着いた色） | `slam()`：極太の文字を叩きつける（大きく出て縮む・色ずれ・揺れ・光・グラデーション）。山場ごとに 1 語 |
 | フォント | Noto Sans CJK JP | Dela Gothic One・Mochiy Pop One（OFL。`assets/make_assets.py` で使う文字だけを埋め込む） |
-| 画面の動き | ゆっくりした寄り・回り込み、決定的な瞬間だけスローや光の転換 | 山場ごとにズームの一打と揺れ（`punch()`・`HITS`）、色つきの閃光、グリッチ、スピード線、場面の切り替えは白い閃光 |
+| 画面の動き | ゆっくりした寄り・回り込み、決定的な瞬間だけスローや光の転換 | 山場ごとにズームの一打と揺れ（`punch()`・`HITS`）、グリッチ、スピード線。**閃光（白・色つき）は使わない**（2026-10-30、ユーザー「まぶしい」。pilot_019〜。場面の切り替えは閃光以外で：速い寄り・グリッチ・暗転など） |
 | 効果音 | 45〜65 か所（やわらかい） | 約 90 か所（impact・stamp・hit・glitch・riser を多め） |
 | BGM | lab_melodic・lab_dub など落ち着いた曲調 | lab_break・lab_electro などビートの強い曲調 |
-| 声 | 玄野武宏 ノーマル、話速 1.15 | 同じ（叫ぶ声は試し中：`production/voice_tests/shout/`。山場だけ青山龍星「熱血」を強く、が候補） |
+| 声 | 玄野武宏 ノーマル、話速 1.15 | 同じ。**要所（山場の数行）だけ叫ぶ声**：青山龍星「熱血」を強く（聞き比べ `production/voice_tests/shout/2_aoyama_nekketsu_strong.mp3`。2026-10-30 にユーザーが「一旦 2 番」で選択、pilot_019〜） |
 | 部品の場所 | `production/pilot_017/renderer.html` | `production/pilot_018/renderer.html` の `slam`・`popSub`・`punch`・`fx` |
 
 - ドパ設計でも事実は誇張しない（叩きつける言葉も台本と事実確認の範囲で）。文字の自動検査・顔が映らないことの確認は同じように行う。
