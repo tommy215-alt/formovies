@@ -188,10 +188,14 @@ def sfx_extra():
 # ---------------------------------------------------------------- 登録（この回の処理の中だけ）
 if not getattr(music, "_EXT_LOADED", False):
     music._EXT_LOADED = True
+    import bgm_lab   # 2026-10-29〜：ユーザーが選んだ 5 つの曲調（lab_*、短調）。REVERSE_GUIDELINE_v2.3.md
     music.TECH_STYLES.update({k: {"bpm": v["bpm"], "chords": v["chords"], "seed": v["seed"]} for k, v in WARM_STYLES.items()})
+    music.TECH_STYLES.update({k: {"bpm": bgm_lab.STYLES[b]["bpm"], "chords": [], "seed": 0} for k, (b, _) in bgm_lab.LAB.items()})
     _orig_techno, _orig_soft = music.bgm_techno, music.sfx_bank_soft
 
     def bgm_techno(total, sections, style="tech_air"):
+        if style in bgm_lab.LAB:
+            return bgm_lab.bgm_style(total, sections, style)
         return bgm_warm(total, sections, style) if style in WARM_STYLES else _orig_techno(total, sections, style)
 
     def sfx_bank_soft():

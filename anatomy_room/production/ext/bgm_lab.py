@@ -107,6 +107,10 @@ PROG = {
     "F":  [(43.65, [349.23, 440.0, 523.25]), (65.41, [329.63, 392.0, 523.25]), (73.42, [293.66, 349.23, 440.0]), (58.27, [293.66, 349.23, 466.16])],
     "Em": [(41.2, [329.63, 392.0, 493.88]), (65.41, [329.63, 392.0, 523.25]), (49.0, [293.66, 392.0, 493.88]), (73.42, [293.66, 369.99, 440.0])],
     "Cm": [(65.41, [311.13, 392.0, 523.25]), (51.91, [311.13, 415.3, 523.25]), (58.27, [293.66, 349.23, 466.16]), (49.0, [293.66, 392.0, 466.16])],
+    # 短調の進行（i–iv–VI–v。2026-10-29、ユーザーの指示「コードを短調に」）
+    "Dm_min": [(73.42, [293.66, 349.23, 440.0]), (49.0, [293.66, 392.0, 466.16]), (58.27, [293.66, 349.23, 466.16]), (55.0, [261.63, 329.63, 440.0])],
+    "Cm_min": [(65.41, [311.13, 392.0, 523.25]), (43.65, [349.23, 415.3, 523.25]), (51.91, [311.13, 415.3, 523.25]), (49.0, [293.66, 392.0, 466.16])],
+    "Em_min": [(41.2, [329.63, 392.0, 493.88]), (55.0, [329.63, 440.0, 523.25]), (65.41, [329.63, 392.0, 523.25]), (61.74, [293.66, 369.99, 493.88])],
 }
 
 # 16 分の打ち込み（x＝鳴らす、o＝弱く）。1 小節＝16 文字
@@ -144,8 +148,12 @@ STYLES = {
 }
 
 
-def render(st, bars=16):
-    beat = 60 / st["bpm"]; step = beat / 4; n = N_(bars * 4 * beat) + SR
+def render(st, bars=16, modes=None, total=None):
+    """modes：[(秒, モード名), …] を渡すと、聴き比べ用の流れの代わりに、場面のモード（MODES）で各パートの厚さを変える（動画の BGM）"""
+    beat = 60 / st["bpm"]; step = beat / 4
+    if total:
+        bars = int(np.ceil(total / (4 * beat))) + 1
+    n = N_(bars * 4 * beat) + SR
     prog = PROG[st["prog"]]; P = {k: np.zeros(n) for k in ("kick", "clap", "hat", "ohat", "bass", "chords", "lead", "pad", "perc")}
     K = kick(st["kick"]); CL = clap(); OH = _hat(open_=True, seed=42)
     def put(name, t, x, a=1.0):
@@ -247,18 +255,51 @@ def render(st, bars=16):
     # 曲の流れ：1〜4 小節＝入り（ビートとパッド）、5〜12＝本編、13〜14＝引き（キックとベースを抜く）、15〜16＝戻り
     t = np.arange(n) / SR; bar_i = (t / (beat * 4)).astype(int)
     g = {k: np.ones(n) for k in P}
-    intro, brk = bar_i < 4, (bar_i >= 12) & (bar_i < 14)
-    for k in ("bass", "lead", "chords", "perc", "clap", "ohat"):
-        g[k][intro] = 0.0
-    for k in ("kick", "bass", "clap"):
-        g[k][brk] = 0.0
     lev = {"kick": .62, "clap": .3, "hat": .18, "ohat": .12, "bass": .5, "chords": .5, "lead": .45, "pad": .5, "perc": .4}
-    ker = np.ones(N_(.03)) / N_(.03)
-    mix = sum(P[k] * np.convolve(g[k], ker, mode="same") * lev[k] for k in P)
+    if modes is None:                                      # 聴き比べ用の流れ
+        intro, brk = bar_i < 4, (bar_i >= 12) & (bar_i < 14)
+        for k in ("bass", "lead", "chords", "perc", "clap", "ohat"):
+            g[k][intro] = 0.0
+        for k in ("kick", "bass", "clap"):
+            g[k][brk] = 0.0
+        ker = np.ones(N_(.03)) / N_(.03)
+        mix = sum(P[k] * np.convolve(g[k], ker, mode="same") * lev[k] for k in P)
+        end = N_(bars * 4 * beat)
+    else:                                                  # 動画の BGM：場面のモードで厚さを変える（旋律のパートは 0.6 秒、打楽器は 0.05 秒でなめらかに）
+        sec = sorted(modes) + [(n / SR + 1, None)]
+        for (a, m), (b, _) in zip(sec, sec[1:]):
+            ia, ib = max(0, int(a * SR)), min(n, int(b * SR))
+            for k in P:
+                g[k][ia:ib] = MODES[m].get(k, 0.0)
+        kd, km = np.ones(N_(.05)) / N_(.05), np.ones(N_(.6)) / N_(.6)
+        mix = sum(P[k] * (music._smooth(g[k], km) if k in ("bass", "chords", "lead", "pad") else np.convolve(g[k], kd, mode="same")) * lev[k] for k in P)
+        end = N_(total)
     mix = np.tanh(1.2 * mix) / 1.2
-    end = N_(bars * 4 * beat)
     mix = mix[:end] * np.clip(t[:end] / .01, 0, 1) * np.clip((end / SR - t[:end]) / 1.5, 0, 1)
     return mix
+
+
+# 動画の BGM の曲調（2026-10-29、ユーザーが試聴で選んだ 5 つ。和音は短調）。REVERSE_GUIDELINE_v2.3.md
+LAB = {"lab_melodic": ("B03", "Dm_min"), "lab_electro": ("B06", "Em_min"), "lab_break": ("B08", "Dm_min"), "lab_2step": ("B10", "Cm_min"), "lab_dub": ("B14", "Cm_min")}
+_m = lambda **kw: {k: kw.get(k, 0.0) for k in ("kick", "clap", "hat", "ohat", "bass", "chords", "lead", "pad", "perc")}
+MODES = {   # 場面のモード → パートの厚さ（music_ext の warm_drive と同じ名前）
+    "w_hook": _m(kick=1, clap=.6, hat=.8, ohat=.5, bass=1, chords=.8, lead=.7, pad=.8, perc=.6),
+    "w_story": _m(kick=.8, clap=.5, hat=.7, ohat=.3, bass=.8, chords=.6, lead=.3, pad=.6, perc=.5),
+    "w_focus": _m(kick=.9, clap=.6, hat=.9, ohat=.6, bass=.9, chords=.5, lead=.8, pad=.5, perc=.6),
+    "w_discover": _m(kick=1, clap=1, hat=1, ohat=1, bass=1, chords=1, lead=1, pad=1, perc=1),
+    "w_shade": _m(kick=.5, hat=.5, bass=.6, chords=.5, pad=.9, perc=.3),
+    "w_hold": _m(hat=.3, bass=.3, chords=.7, pad=1, lead=.2),
+    "w_rise": _m(kick=.9, clap=.6, hat=.8, ohat=.6, bass=.9, chords=.7, lead=.6, pad=.7, perc=.6),
+    "w_warm": _m(kick=.7, clap=.4, hat=.6, ohat=.3, bass=.7, chords=.7, lead=.4, pad=.9, perc=.4),
+    "w_end": _m(kick=.4, hat=.4, bass=.4, chords=.7, pad=1),
+    "ending": _m(hat=.3, bass=.3, chords=.7, pad=1),
+}
+
+
+def bgm_style(total, sections, style):
+    base, prog = LAB[style]
+    st = {**STYLES[base], "prog": prog}
+    return render(st, modes=sections, total=total), {}
 
 
 def music_ext_ep(f, dur, amp):

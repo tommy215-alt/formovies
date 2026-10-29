@@ -132,6 +132,59 @@ let snowTex;
 Cine.init(THREE, R);
 for (const p of [...audience, speaker, ...walkers]) p.g.traverse(o => { if (!o.isMesh) return; if (o.material === p.mat) Cine.surface(o.material, "skin", { repeat: [2, 2], normal: .12 }); else if (o.material.isMeshStandardMaterial) Cine.surface(o.material, "fabric", { repeat: [6, 6], normal: .8 }); });
 const snow = Cine.dust({ min: [-8, 0, -30], max: [8, 6, 4], count: 2400, size: .035, seed: 61 }); ice.add(snow.points);
+const snow2 = Cine.dust({ min: [-6, 0, -14], max: [6, 4, 2], count: 5000, size: .06, seed: 62 }); ice.add(snow2.points);   // 吹雪を強く（ガイドライン v2.3）
+
+// ---------------------------------------------------------------- ホログラムの台（2D の図を 3D の板に貼る：ガイドライン v2.3 の 2）
+const mapC = document.createElement("canvas"); mapC.width = W; mapC.height = H; const mapX = mapC.getContext("2d");
+const mapTex = new THREE.CanvasTexture(mapC); mapTex.encoding = THREE.sRGBEncoding; mapTex.anisotropy = 16;
+const holo = set("holo");
+holo.add(new THREE.Mesh(new THREE.PlaneGeometry(10.8, 19.2), new THREE.MeshBasicMaterial({ map: mapTex, toneMapped: false })));
+holo.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(10.95, 19.35)), new THREE.LineBasicMaterial({ color: C(0x8fdcff), transparent: true, opacity: .85 })));
+const holoRoot = new THREE.Group(); scene.add(holoRoot); holoRoot.add(holo);
+const floorGrid = new THREE.GridHelper(120, 120, 0x2a7aa0, 0x10304a); floorGrid.position.set(0, -12, 0); holoRoot.add(floorGrid); sets.grid = floorGrid;
+const holoDust = Cine.dust({ min: [-10, -12, -8], max: [10, 12, 8], count: 1600, size: .05, seed: 71 }); holoRoot.add(holoDust.points); sets.hdust = holoDust.points;
+const shock = new THREE.Mesh(new THREE.RingGeometry(.92, 1, 128), new THREE.MeshBasicMaterial({ color: C(0xffd8a0), transparent: true, opacity: 0, side: THREE.DoubleSide, toneMapped: false })); holo.add(shock);
+function holoDraw(t, { tilt = -.2, yaw = 0, dist = 27, shake = 0, shockK = -1, sx = 0, sy = 0, flash = 0 } = {}) {
+  mapTex.needsUpdate = true; show("holo", "grid", "hdust");
+  holo.rotation.set(tilt, yaw, 0);
+  if (shockK >= 0 && shockK < 1) { const s = 1 + 10 * easeOut(shockK); shock.scale.set(s, s, 1); shock.material.opacity = .9 * (1 - shockK); shock.position.set(sx, sy, .06); } else shock.material.opacity = 0;
+  holoDust.update(t, 1);
+  lights({ keyPos: [0, 10, 10], keyAt: [0, 0, 0], keyI: 0, rimI: 0, hemiI: .3, fog: .012, fogC: 0x02060c, exp: 1.0 });
+  const r = S.rng(Math.floor(t * 30) + 5), j = shake * .35;
+  setCam(V3((r() - .5) * j, -1.2 + (r() - .5) * j, dist), V3(0, -.6, 0), 40); draw3D();
+  if (flash > 0) { bg.save(); bg.globalCompositeOperation = "screen"; bg.fillStyle = `rgba(255,226,180,${.45 * flash})`; bg.fillRect(0, 0, W, H); bg.restore(); }
+}
+
+// ---------------------------------------------------------------- 夜の書斎（人物の思い：地図に向かう後ろ姿。ガイドライン v2.3 の 2）
+const study = set("study"); const studyMapC = document.createElement("canvas"); studyMapC.width = 1080; studyMapC.height = 1920;
+let studyLamp, wegener;
+{ const fl = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), M(0x3a2a1e, { roughness: .8 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; study.add(fl);
+  const wl = new THREE.Mesh(new THREE.PlaneGeometry(12, 5), M(0x4a443c, { roughness: .95 })); wl.position.set(0, 2.5, -1.6); study.add(wl);
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.4), new THREE.MeshBasicMaterial({ color: C(0x16264a) })); win.position.set(-1.1, 1.8, -1.58); study.add(win);
+  box(1.8, .06, .9, M(0x4a3222, { roughness: .55 }), 0, .78, -.4, study); for (const x of [-.85, .85]) for (const z of [-.8, 0]) box(.06, .78, .06, M(0x4a3222), x, .39, z - .05, study);
+  const mapM = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(studyMapC), roughness: .9 }); mapM.map.encoding = THREE.sRGBEncoding;
+  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(.6, 1.06), mapM); sheet.rotation.set(-Math.PI / 2, 0, Math.PI / 2 - .1); sheet.position.set(-.1, .812, -.42); sheet.receiveShadow = true; study.add(sheet); study.userData.sheet = sheet;
+  for (let i = 0; i < 4; i++) box(.24, .05, .32, M([0x5a2a1e, 0x2a3a52, 0x4a3a1e, 0x3a2a3a][i], { roughness: .6 }), .68, .835 + i * .052, -.55 + (i % 2) * .02, study);   // 改訂を重ねた本（1915・1920・1922・1929）
+  const g = new THREE.Mesh(new THREE.SphereGeometry(.16, 48, 32), M(0x2a5a7a, { roughness: .4 })); g.position.set(-.68, 1.03, -.6); study.add(g); box(.04, .12, .04, M(0x6a5a3a, { metalness: .6, roughness: .4 }), -.68, .87, -.6, study);
+  studyLamp = new THREE.PointLight(C(0xffc88a), 0, 6, 2); studyLamp.position.set(.45, 1.25, -.5); study.add(studyLamp);
+  wegener = person({ coat: 0x262a30, hair: 0x5a5a56, scale: 1.0 }); study.add(wegener.g); }
+for (const o of [wegener]) o.g.traverse(m => { if (m.isMesh && m.material.isMeshStandardMaterial && m.material !== o.mat) Cine.surface(m.material, "fabric", { repeat: [6, 6], normal: .8 }); });
+const studyDust = Cine.dust({ min: [-1.4, .8, -1.4], max: [1.2, 2.4, .8], count: 500, size: .01, seed: 81 }); study.add(studyDust.points);
+const studyShaft = Cine.shaft({ from: [-1.1, 2.3, -1.5], to: [-.1, .8, -.4], r0: .4, r1: .9, color: 0x9ab8ff, opacity: .22 }); study.add(studyShaft);
+mapShot(studyMapC.getContext("2d"), 0, .2, { sc: 6.5, cy: 960 }); study.userData.sheet.material.map.needsUpdate = true;   // 机の上の地図
+function photoGlow(t) {   // 本物の写真に、斜めの光と小さな粒を重ねて物語の空気になじませる
+  const k = k_(t, "photo", .8); if (k <= 0) return; bg.save(); bg.globalCompositeOperation = "screen";
+  const g = bg.createLinearGradient(140, 330, 700, 1100); g.addColorStop(0, `rgba(160,210,255,${.18 * k})`); g.addColorStop(1, "rgba(160,210,255,0)"); bg.fillStyle = g; bg.fillRect(140, 330, 800, 970);
+  const r = S.rng(23); for (let i = 0; i < 90; i++) { const x = 140 + r() * 800, y = 330 + (((r() * 970 - t * 20 * (.5 + r())) % 970) + 970) % 970; bg.fillStyle = `rgba(220,240,255,${.3 * k * r()})`; bg.fillRect(x, y, 2, 2); }
+  bg.restore();
+}
+function studyShot(t, t0, t1) {
+  show("study"); wegener.g.visible = true; studyLamp.intensity = 2.6 * (1 + .04 * Math.sin(t * 13));
+  wegener.pose({ x: -.05, z: .38, yaw: Math.PI, lean: .5, nod: .55, armFL: .75, armFR: .7, elbowL: .45, elbowR: .5 });
+  studyDust.update(t, .8); studyShaft.userData.set(t, .7);
+  lights({ keyPos: [.6, 1.7, -.2], keyAt: [0, .8, -.4], keyI: 24, angle: .9, keyCol: 0xffc98a, rimPos: [-2, 2.5, -2.5], rimI: 1.0, rimCol: 0x8fb8ff, hemiI: .08, fog: .09, fogC: 0x04060a, exp: 1.12 });
+  const u = easeInOut(prog(t, t0, t1 - t0)); setCam(V3(2.6 - .7 * u, 2.9 - .3 * u, 3.6 - .6 * u), V3(-.15, .5, -.45), 36); /* 斜め上から：机の地図と、向かう後ろ姿が両方見える */ Cine.useEnv(scene, "lamp", .5); draw3D();
+}
 
 // ---------------------------------------------------------------- 2D の図
 function grainLayer(t) { /* 細かい粒（3D の場面以外にも） */ }
@@ -234,8 +287,10 @@ function gpsShot(ctx, t) {
 
 // ---------------------------------------------------------------- 場面
 function drawScene(t, name) {
-  audience.forEach(a => a.g.visible = false); speaker.g.visible = false; walkers.forEach(w => w.g.visible = false);
+  audience.forEach(a => a.g.visible = false); speaker.g.visible = false; walkers.forEach(w => w.g.visible = false); wegener.g.visible = false; studyLamp.intensity = 0;
   if (name === "hook" && t >= CUE.man) { iceShot(t, true); return "3d"; }
+  if (name === "evidence" && t < CUE.fossil) { studyShot(t, CUE.evidence, CUE.fossil); return "3d"; }   // 夜の書斎：地図に向かう後ろ姿（彼が集めた証拠は…）
+  if (name === "wall" && t >= CUE.book && t < CUE.quote) { studyShot(t, CUE.book, CUE.quote); return "3d"; }   // 本を改訂し続ける夜
   if (name === "wall" && t >= CUE.meeting && t < CUE.book) {   // 1926 年の会議：暗い講堂
     show("hall"); audience.forEach((p, i) => { p.g.visible = true; p.pose({ x: -2.2 + (i % 5) * 1.1, z: -2.0 + Math.floor(i / 5) * 1.3, yaw: Math.PI, nod: .1 + .05 * Math.sin(t * 2 + i) }); });
     speaker.g.visible = true; speaker.pose({ x: 0, z: -5.2, yaw: 0, armFR: .6 + .3 * Math.sin(t * 3), elbowR: .4 });
@@ -248,21 +303,32 @@ function drawScene(t, name) {
 function iceShot(t, hook) {   // 吹雪の氷床、小さな基地、遠ざかる二つの人影（後ろ姿）
   show("ice"); const base = ice.userData.base; base.userData.flag.rotation.y = .3 * Math.sin(t * 6);
   const t0 = hook ? CUE.man : CUE.ice, u = easeInOut(prog(t, t0, (hook ? CUE.announce : CUE.dive) - t0));
-  walkers.forEach((w, i) => { w.g.visible = true; w.pose({ x: -1.2 + i * .7, z: -13 + 1.2 * u - i * .4, yaw: Math.PI * 1.05, walk: t * 2.6 + i, stride: .2, lean: .25 }); });
-  snow.update(t * 3, 1);
-  lights({ keyPos: [-20, 18, -30], keyAt: [0, 0, -12], keyI: 22, angle: 1.0, keyCol: 0xd8e4f4, rimPos: [10, 6, -30], rimI: .6, rimCol: 0xc8d8ff, hemiI: .7, hemiSky: 0xc8d4e4, hemiGround: 0x8a98a8, fog: .06, fogC: 0xb8c6d6, exp: .95 });
-  setCam(V3(.5, 1.6, -4 + 2 * u), V3(-1.5, 1.0, -16), 40); Cine.useEnv(scene, "cold", .5); draw3D();
+  walkers.forEach((w, i) => { w.g.visible = true; w.pose({ x: -1.2 + i * .7, z: -13 - 2.2 * u - i * .4, yaw: Math.PI * 1.05, walk: t * 2.4 + i, stride: .22, lean: .45 + .05 * Math.sin(t * 3 + i) }); });   // 風に向かって前かがみで遠ざかる
+  snow.update(t * 3, 1); snow2.update(t * 5, 1);
+  lights({ keyPos: [6, 4, -70], keyAt: [0, 0, -12], keyI: 26, angle: 1.0, keyCol: 0xffc89a, rimPos: [4, 3, -40], rimI: 1.1, rimCol: 0xffd2a8, hemiI: .55, hemiSky: 0xb8c8dc, hemiGround: 0x7a889a, fog: .075, fogC: 0xaab8ca, exp: .95 });   // 低い太陽の逆光
+  const r = S.rng(Math.floor(t * 30) + 9), j = .04;
+  setCam(V3(.5 + (r() - .5) * j, 1.5 + (r() - .5) * j, -5 + 1.5 * u), V3(-1.5, 1.0, -16), 40); Cine.useEnv(scene, "cold", .5); draw3D();
+  bg.save(); bg.strokeStyle = "rgba(235,242,250,.35)"; bg.lineWidth = 2; const rr = S.rng(17);   // 風の筋
+  for (let i = 0; i < 70; i++) { const y = rr() * H, sp = .6 + rr(), x = ((rr() * W * 2 - t * 900 * sp) % (W + 300) + W + 300) % (W + 300) - 150; bg.beginPath(); bg.moveTo(x, y); bg.lineTo(x - 120 * sp, y + 18 * sp); bg.stroke(); }
+  bg.restore();
 }
 function draw2D(t, name) {
-  if (name === "hook") { const fit = easeOut(prog(t, 0, .6)), glow = Math.max(0, 1 - prog(t, .6, 1.2)) * (t >= .6 ? 1 : 0);   // 最初の 1 秒：南アメリカがアフリカにぴたりと合わさる
-    const z = lerp(1.25, 1.0, easeOut(prog(t, 0, CUE.man))); mapShot(bg, t, .55 + .45 * fit, { sc: 7.2 * z, glow }); if (t >= .6) HUD.ring(bg, 560, 860, prog(t, .6, 1.0), 300, "255,214,150"); return; }
-  if (name === "announce") { if (t < CUE.bridge) { bg.fillStyle = "#05080d"; bg.fillRect(0, 0, W, H); photo(bg, IMG.portrait, k_(t, "announce", .5), 1.0, 1.15, easeInOut(prog(t, CUE.announce, CUE.bridge - CUE.announce)), { box: [140, 330, 940, 1300], cy: .38 }); }
-    else bridgeShot(bg, t); return; }
-  if (name === "evidence") { if (t < CUE.paper) evidenceShot(bg, t); else paperShot(bg, t); return; }
-  if (name === "wall") { if (t < CUE.meeting) forceShot(bg, t); else if (t >= CUE.book) bookShot(bg, t); return; }
-  if (name === "ice") { if (t >= CUE.dive) iceTransition(bg, t); return; }
-  if (name === "sea") { if (t < CUE.stripes) ridgeShot(bg, t); else if (t < CUE.plates) stripesShot(bg, t); else platesShot(bg, t); return; }
-  if (name === "today") { if (t < CUE.back) gpsShot(bg, t); else { const sep = .35 * sstep(CUE.back, TL.duration, t); mapShot(bg, t, 1 - sep, { sc: 7.2 }); } }   // 冒頭の二つの大陸に戻り、ゆっくり離れる
+  // 図は mapX（ホログラムの台のテクスチャ）に描き、holoDraw で 3D の板として見せる。写真・本の図・海の中への場面転換だけは画面に直接描く
+  const X = mapX; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, W, H);
+  let o = { yaw: .07 * Math.sin(t * .23), tilt: -.2 - .03 * Math.sin(t * .17) };
+  if (name === "hook") { const fit = easeOut(prog(t, 0, .6)), glow = Math.max(0, 1 - prog(t, .6, 1.2)) * (t >= .6 ? 1 : 0);   // 最初の 1 秒：南アメリカがアフリカにぴたりと合わさる（衝撃波・光・カメラの揺れ）
+    mapShot(X, t, .55 + .45 * fit, { sc: 7.2, glow }); if (t >= .6) HUD.ring(X, 560, 860, prog(t, .6, 1.0), 300, "255,214,150");
+    o = { tilt: lerp(-.55, -.2, easeOut(prog(t, 0, 1.4))), yaw: lerp(.25, .04, easeOut(prog(t, 0, 1.4))), dist: lerp(19, 27, easeOut(prog(t, 0, CUE.man))),
+          shake: t >= .6 ? Math.max(0, 1 - prog(t, .6, .7)) : 0, shockK: t >= .6 ? prog(t, .6, 1.1) : -1, sx: .2, sy: 1.0, flash: t >= .6 ? Math.max(0, 1 - prog(t, .6, .35)) : 0 }; }
+  else if (name === "announce") { if (t < CUE.bridge) { bg.fillStyle = "#05080d"; bg.fillRect(0, 0, W, H); photo(bg, IMG.portrait, k_(t, "announce", .5), 1.0, 1.15, easeInOut(prog(t, CUE.announce, CUE.bridge - CUE.announce)), { box: [140, 330, 940, 1300], cy: .38 }); photoGlow(t); return; }
+    bridgeShot(X, t); if (t >= CUE.sink) o.shake = Math.max(0, .5 - prog(t, CUE.sink, 1.0)); }
+  else if (name === "evidence") { if (t < CUE.paper) evidenceShot(X, t); else paperShot(X, t); }
+  else if (name === "wall") { if (t < CUE.meeting) forceShot(X, t); else if (t >= CUE.book) { bookShot(bg, t); return; } }
+  else if (name === "ice") { if (t >= CUE.dive) { iceTransition(bg, t); return; } }
+  else if (name === "sea") { if (t < CUE.stripes) ridgeShot(X, t); else if (t < CUE.plates) stripesShot(X, t); else platesShot(X, t);
+    if (t >= CUE.right && t < CUE.right + 1.2) { o.flash = .5 * Math.max(0, 1 - prog(t, CUE.right, .5)); o.shockK = prog(t, CUE.right, 1.2); o.sx = 0; o.sy = 1.5; } }
+  else if (name === "today") { if (t < CUE.back) gpsShot(X, t); else { const sep = .35 * sstep(CUE.back, TL.duration, t); mapShot(X, t, 1 - sep, { sc: 7.2 }); } }   // 冒頭の二つの大陸に戻り、ゆっくり離れる
+  holoDraw(t, o);
 }
 function drawUI(t, name) {
   if (name === "hook" && t < CUE.man) HUD.title(ui, [["この二つの大陸は", T(84), "#EAF2F8"], ["もとは一つだった", T(92), "#FFD58A"]], 540, 360, k_(t, "t0", .35, .5), t);   // 見出し（この間は字幕を出さない）
@@ -270,7 +336,7 @@ function drawUI(t, name) {
   if (name === "hook" && t >= CUE.man) uiNote("※人物と場面は再現CG", 540, 250, win(t, CUE.man + .2, CUE.announce, .3, .3));
   if (name === "announce" && t < CUE.bridge) { uiCard([["1912年1月", T(34), 800], ["フランクフルト", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "announce", .45, .2)); credit("写真：Bildarchiv Foto Marburg（Wikimedia Commons）", k_(t, "photo", .5), 1340); }
   if (name === "wall" && t >= CUE.meeting && t < CUE.book) uiCard([["1926年　ニューヨーク", T(32), 800]], 540, 250, k_(t, "meeting", .45, .2));
-  if (name === "wall" && t >= CUE.book) { uiCard([["『大陸と海洋の起源』", T(32), 800], ["第2版（1920）の図", T(26), 500, "#B8C7D6"]], 540, 380, k_(t, "book", .45, .3)); credit("図：A. Wegener（1920）／Project Gutenberg", k_(t, "book", .5, .4), 1190); }
+  if (name === "wall" && t >= CUE.quote) { uiCard([["『大陸と海洋の起源』", T(32), 800], ["第2版（1920）の図", T(26), 500, "#B8C7D6"]], 540, 380, k_(t, "book", .45, .3)); credit("図：A. Wegener（1920）／Project Gutenberg", k_(t, "book", .5, .4), 1190); }
   if (name === "ice" && t < CUE.dive) uiCard([["1930年11月", T(34), 800], ["グリーンランド", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "ice", .45, .2));
   if (name === "sea" && t < CUE.stripes) uiCard([["1960年代", T(34), 800]], 540, 250, k_(t, "sea", .45, .2));
 }
