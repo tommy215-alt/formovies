@@ -52,7 +52,8 @@
     ctx.beginPath(); ctx.arc(x0, y0, 7, 0, 6.283); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(lerp(x0, x1, Math.min(1, e * 1.6)), lerp(y0, y1, Math.min(1, e * 1.6))); ctx.stroke(); ctx.restore();
     if (k < .45) return;
-    const a = clamp((k - .45) / .35), w = name ? 150 : 84, h = name ? 104 : 74;
+    ctx.save(); ctx.font = `900 48px ${S.FONT}`; const sw_ = ctx.measureText(sym).width; ctx.restore();   // 記号が長い札（「化石」など）は幅を広げる（1 文字の札は 84 のまま）
+    const a = clamp((k - .45) / .35), w = name ? Math.max(150, sw_ + 40) : Math.max(84, sw_ + 24), h = name ? 104 : 74;
     ctx.save(); ctx.globalAlpha *= a; ctx.translate(x1, y1); ctx.scale(.85 + .15 * a, .85 + .15 * a);
     S.rrect(ctx, -w / 2, -h / 2, w, h, 12); ctx.fillStyle = "rgba(6,14,26,.86)"; ctx.fill(); ctx.strokeStyle = `rgba(${col},.95)`; ctx.lineWidth = 2.5; ctx.stroke();
     ctx.fillStyle = `rgba(${col},.95)`; ctx.fillRect(-w / 2, -h / 2 + 12, 4, h - 24);
