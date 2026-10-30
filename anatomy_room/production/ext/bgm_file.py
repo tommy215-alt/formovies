@@ -54,32 +54,61 @@ def _wind(n, seed=11):
     return y * WIND_RMS / (np.sqrt(np.mean(y ** 2)) + 1e-9)
 
 
+def _horror(n, seed=5):
+    """オープニング用の不安定な音（2026-10-30〜、pilot_021）：うなる低音、半音でぶつかる高い音の揺れ、音程のずれたオルゴールの音"""
+    r = np.random.default_rng(seed)
+    t = np.arange(n) / SR
+    drone = np.sin(2 * np.pi * 55 * t) + .8 * np.sin(2 * np.pi * 58.3 * t) + .5 * np.sin(2 * np.pi * 82.4 * t + np.sin(2 * np.pi * .3 * t))
+    drone += .6 * (music._lp(r.standard_normal(n), 220) * 8)
+    hi = sum(np.sin(2 * np.pi * f0 * (1 + .006 * np.sin(2 * np.pi * (.4 + .13 * k) * t)) * t) for k, f0 in enumerate((740.0, 784.0, 1046.5, 1108.7))) * .25
+    hi *= .5 + .5 * np.sin(2 * np.pi * .5 * t - 1.2)
+    box = np.zeros(n)
+    notes = (659.3, 622.3, 523.3, 493.9, 466.2, 659.3, 698.5, 392.0)   # 半音で下がって戻る、少しずつ音程がずれる
+    for i, f0 in enumerate(notes):
+        s = int((.18 + i * .42) * SR)
+        if s >= n:
+            break
+        d = np.arange(min(n - s, int(1.2 * SR))) / SR
+        f1 = f0 * (1 + .012 * r.standard_normal())
+        box[s:s + len(d)] += (np.sin(2 * np.pi * f1 * d) + .35 * np.sin(2 * np.pi * 2.01 * f1 * d)) * np.exp(-d / .35) * np.minimum(1, d / .004)
+    y = drone / (np.sqrt(np.mean(drone ** 2)) + 1e-9) * .5 + hi / (np.sqrt(np.mean(hi ** 2)) + 1e-9) * .35 + box / (np.sqrt(np.mean(box ** 2)) + 1e-9) * .6
+    return y * .11 / (np.sqrt(np.mean(y ** 2)) + 1e-9)
+
+
 def _gains(f, m):
-    """モード → (曲, 吹雪)"""
-    k = re.fullmatch(r"m(\d+)w(\d+)", m or "")
+    """モード → (曲, 吹雪, ホラー調の音)"""
+    k = re.fullmatch(r"m(\d+)w(\d+)(?:h(\d+))?", m or "")
     if k:
-        return int(k.group(1)) / 100, int(k.group(2)) / 100
+        return int(k.group(1)) / 100, int(k.group(2)) / 100, int(k.group(3) or 0) / 100
     v = f["gains"].get(m, GAIN.get(m))
-    return _gains({"gains": {}}, v) if isinstance(v, str) else (v, 0.0)
+    return _gains({"gains": {}}, v) if isinstance(v, str) else (v, 0.0, 0.0)
 
 
 def bgm_file(total, sections, style):
+    """モード "mXXwYYhZZ"：h はオープニング用のホラー調の音（h が 0 でない区間は曲を止め、曲は h が終わったところから始める）"""
     f = FILES[style]
-    x = _decode(f["path"], f["start"])
-    x *= RMS / (np.sqrt(np.mean(x ** 2)) + 1e-9)
     n = int(total * SR)
-    if len(x) < n:
-        x = np.tile(x, n // len(x) + 1)
-    x = x[:n]
-    g, gw = np.ones(n), np.zeros(n)
+    g, gw, gh = np.ones(n), np.zeros(n), np.zeros(n)
     sec = sorted(sections) + [(total + 1, None)]
     for (a, m), (b, _) in zip(sec, sec[1:]):
         i, j = max(0, int(a * SR)), min(n, int(b * SR))
-        g[i:j], gw[i:j] = _gains(f, m)
+        g[i:j], gw[i:j], gh[i:j] = _gains(f, m)
+    hmask = gh > 0
+    start = int(np.argmin(hmask)) if hmask[0] else 0   # オープニング（h の区間）が終わるところ
+    x = _decode(f["path"], f["start"])
+    x *= RMS / (np.sqrt(np.mean(x ** 2)) + 1e-9)
+    x = np.concatenate([np.zeros(start), x])
+    if len(x) < n:
+        x = np.concatenate([x, np.tile(x[start:], (n - len(x)) // max(1, len(x) - start) + 1)])
+    x = x[:n]
     ker = np.ones(int(f["smooth"] * SR)) / int(f["smooth"] * SR)
     g, gw = music._smooth(g, ker), music._smooth(gw, ker)
+    g[hmask] = 0.0
+    if start:
+        g[start:start + int(.3 * SR)] *= np.linspace(0, 1, len(g[start:start + int(.3 * SR)]))
+    kh = np.ones(int(.2 * SR)) / int(.2 * SR)
     t = np.arange(n) / SR
-    out = x * g + (_wind(n) * gw if gw.max() > 0 else 0)
+    out = x * g + (_wind(n) * gw if gw.max() > 0 else 0) + (_horror(n) * music._smooth(gh, kh) if hmask.any() else 0)
     return out * np.clip(t / .01, 0, 1) * np.clip((total - t) / 1.5, 0, 1), {}
 
 

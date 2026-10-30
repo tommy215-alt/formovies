@@ -16,7 +16,7 @@
 - **悲劇用（2026-10-30、3 つ目の設計）**：`templates/DESIGN_MODES.md`。ギャンブルは**テンションだけ**（器具・オッズの表示は出さない）。1 本目は **pilot_020 スコットの南極点**（ユーザーが選択）。ChatGPT への依頼文 `scripts/pilot_020/gpt_fact_check_prompt.md`（BGM の候補探しも含む）→ 結果を出典で確かめ直して `fact_check.md`・`assets.md`、台本の下書き `script_draft.md`（本編 約 72 秒）→ ユーザーの「OK」（話速を聞き取れる限界近くまで上げる、台本も書き直してよい）→ **完成**：`production/pilot_020/reverse_020_scott.mp4`（66.0 秒、話速 1.5＝約 10 モーラ/秒、BGM は Kevin MacLeod「Blown Away」CC BY 4.0、外の曲の部品 `production/ext/bgm_file.py`、人体は `assets/make_human.py`〔そりを引く姿勢〕）。声と曲はユーザーが選ばなかったので Claude が選んだ（玄野武宏＋要所だけ青山龍星「熱血」）→ ユーザー「おおよそ完璧」＋直し → **設計「悲劇」として保存**（`templates/DESIGN_MODES.md`）し、**v2 を完成**（65.0 秒）：後半 2/3 から声・色・BGM を少しずつ暗く、最後の日記から BGM 無音、短調の曲（Black Vortex）、冷たい色調、共通エンディングなし（`ext/noend_ext.py`）。感想待ち。ナレーションはハイテンション気味（話者は聞き比べで決める）。
 
 - **pilot_020 は v3 で完成**（ユーザー「完璧」）。**設計「悲劇」を 3 回目の更新**（2026-10-30、`templates/DESIGN_MODES.md`）：ナレーターはずっと同じ人、最後の一言はゆっくりはっきり、BGM は短調でリズミカル、序盤はコテコテで派手な色、1/3 くらいから起承転結に合わせて少しずつシリアスに、最後は環境音と静かなナレーションと暗めの画面。
-- **pilot_021 アンドレーの北極気球（1897）、設計「悲劇」**：ChatGPT への依頼文 `scripts/pilot_021/gpt_fact_check_prompt.md`（短調でリズミカルな BGM の候補探しも含む）→ 結果待ち。
+- **pilot_021 アンドレーの北極気球（1897）、設計「悲劇」**：ChatGPT への依頼文 `scripts/pilot_021/gpt_fact_check_prompt.md`（短調でリズミカルな BGM の候補探しも含む）→ 事実確認・台本 → ユーザーの「OK」＋BGM は Machinations ＋冒頭 3 秒のオープニング（結論の文字・別の声・本物の写真・ホラー調の音）→ **完成**：`production/pilot_021/reverse_021_andree.mp4`（71.0 秒）。オープニングは lines.json の L00（W の声）と bgm_file.py のモード h。renderer は pilot_020 の部品を組み立て直したもの（組み立てのスクリプトはスクラッチにあったので、直すときは renderer.html を直接直す）。感想待ち。オープニングを「悲劇」の設定に入れるかは未確認。
 
 ## 次の動画でやること（ガイドライン v2.4）
 
