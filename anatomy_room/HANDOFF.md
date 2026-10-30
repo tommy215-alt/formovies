@@ -13,6 +13,8 @@
 
 - **pilot_019（ジョン・ハリソン、経度の時計）を開始（2026-10-30）**：ドパ設計（ユーザーの指示）。ChatGPT への事実確認の依頼文 `scripts/pilot_019/gpt_fact_check_prompt.md` → 結果を出典で確かめ直して `fact_check.md`・`assets.md`、台本の下書き `script_draft.md`（本編 約 80 秒、実測）→ ユーザーの「OK」（2026-10-30）→ 制作中：`production/pilot_019/`（renderer.html はドパ設計の部品を pilot_018 から流用、閃光なし。人体の GLB と Poly Haven の素材は pilot_018 のものを複製。嵐の海・帆船・岩・H1〜H4 は自前の 3D）。叫ぶ声は lines.json の voice_override の style "shout"（青山龍星「熱血」id 81、抑揚 1.5）。**完成**（82.6 秒、video_qa は「最初のコマが暗い」だけ → thumbnail.png を使う）。ユーザーの感想待ち（叫ぶ声は「一旦 2 番」）。BGM は直前が lab_break なので lab_electro を優先。ユーザーの指示（2026-10-30）：叫ぶ声は要所だけ、青山龍星「熱血」を強く（聞き比べの 2 番、「一旦」なので仕上がりを見て再確認）／**閃光は入れない**（まぶしい）。`DESIGN_MODES.md` に反映済み。
 
+- **悲劇用（2026-10-30、3 つ目の設計）**：`templates/DESIGN_MODES.md`。ギャンブルは**テンションだけ**（器具・オッズの表示は出さない）。1 本目は **pilot_020 スコットの南極点**（ユーザーが選択）。ChatGPT への依頼文 `scripts/pilot_020/gpt_fact_check_prompt.md`（BGM の候補探しも含む）→ 結果待ち。ナレーションはハイテンション気味（話者は聞き比べで決める）。
+
 ## 次の動画でやること（ガイドライン v2.4）
 
 1. 題材を決める（候補：伊能忠敬、ジョン・スノウ、ジョン・ハリソン、リービット、八木秀次など。前の会話のリスト）。
