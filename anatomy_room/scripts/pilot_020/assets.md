@@ -23,6 +23,7 @@ Kevin MacLeod（incompetech.com）の曲。**CC BY 4.0**（クレジットを書
 
 - クレジットの書き方：「"曲名" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License」
 - 決めた曲は `production/pilot_020/assets/bgm/` に置き、ここに記録する。
+- **使った曲：Blown Away**（Kevin MacLeod、170 BPM、ISRC USUAN1200100）。2026-10-30 に https://incompetech.com/music/royalty-free/mp3-royaltyfree/Blown%20Away.mp3 から取得。ユーザーが曲を指定しなかったので Claude が選んだ（話速を上げた台本の勢いに合う、ギター抜きのエレクトロ）。クレジットは動画のエンディングと説明文に書く。BGM の部品は `production/ext/bgm_file.py`。
 
 ## 使わないもの
 
