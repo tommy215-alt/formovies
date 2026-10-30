@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_022 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="assets/scene_assets.js"></script>
+<script>
+// pilot_022「自分で細菌を飲んだ医師——ピロリ菌」のレンダラー（知的設計＋ガイドライン v2.4＋冒頭のオープニング）。
+// 知的設計（templates/DESIGN_MODES.md、参考 pilot_017）：落ち着いた科学ドキュメンタリー。字幕は S.docSub、見出しは uiCard、ゆっくりした寄り、決定的な瞬間だけ光の転換。
+// オープニング（L00）：結論の文字を上〜中ほどに大きく、本物の写真（A1：ピロリ菌の電子顕微鏡写真、Wellcome Collection、CC BY 4.0）を中央、背景は漂う菌の 3D。
+// CG：Poly Haven の HDRI・PBR、SSAO・ボケ、MPFB の人体（pilot_020 の GLB。顔は映さない、手のアップなし）。小瓶・顕微鏡・培養皿・胃・メダルは再現・模式。
+// 自己実験はまねしないよう、L01〜L09 の画面に注意書き。共通エンディングは短い版（HUD.endingOverlay）。
+const S = Stage, { W, H, clamp, lerp, easeOut, easeIn, easeInOut, prog, win, text, rrect } = Stage;
+const TS = S.TEXT_SCALE, T = s => Math.round(s * TS);
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["open", "hook", "find", "grow", "self", "proof", "today"];
+let TL, CUE, MOOD = [];
+const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const b64buf = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+
+// ---------------------------------------------------------------- 本物の写真
+const IMG = {}; const imgReady = [];
+for (const k of ["sem"]) { const im = new Image(); imgReady.push(new Promise(r => { im.onload = r; im.onerror = r; })); im.src = window.ASSETS[k]; IMG[k] = im; }
+function photo(ctx, im, k, z0, z1, u, { cx = .5, cy = .45, box = [90, 330, 990, 1290], gray = 1, frame = true, bright = .92 } = {}) {   // ゆっくり寄る・暗い縁取り
+  if (k <= 0 || !im.width) return;
+  const [x0, y0, x1, y1] = box, bw = x1 - x0, bh = y1 - y0, z = lerp(z0, z1, u), sc = Math.max(bw / im.width, bh / im.height) * z;
+  const dw = im.width * sc, dh = im.height * sc;
+  ctx.save(); ctx.globalAlpha *= clamp(k); rrect(ctx, x0, y0, bw, bh, 10); ctx.clip();
+  ctx.filter = `grayscale(${gray}) contrast(1.05) brightness(${bright})`; ctx.drawImage(im, x0 + bw / 2 - dw * cx, y0 + bh / 2 - dh * cy, dw, dh); ctx.filter = "none";
+  const g = ctx.createRadialGradient((x0 + x1) / 2, (y0 + y1) / 2, Math.min(bw, bh) * .35, (x0 + x1) / 2, (y0 + y1) / 2, Math.max(bw, bh) * .75); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(2,6,12,.75)");
+  ctx.fillStyle = g; ctx.fillRect(x0, y0, bw, bh); ctx.restore();
+  if (frame) { ctx.save(); ctx.globalAlpha *= clamp(k); ctx.strokeStyle = "rgba(143,220,255,.45)"; ctx.lineWidth = 2; rrect(ctx, x0, y0, bw, bh, 10); ctx.stroke(); ctx.restore(); }
+}
+function credit(s, k, y = 1300) {
+  if (k <= 0) return;
+  ui.save(); ui.globalAlpha = clamp(k) * .9; S.group(() => text(ui, s, 540, y, 26, "#B8C7D6", { weight: 500, stroke: "#04101c", sw: 5 })); ui.restore();
+}
+function photoGlow(t, cue, box) {   // 本物の写真に、斜めの光と小さな粒を重ねる
+  const k = k_(t, cue, .8); if (k <= 0) return; const [x0, y0, x1, y1] = box; bg.save(); bg.globalCompositeOperation = "screen";
+  const g = bg.createLinearGradient(x0, y0, x0 + (x1 - x0) * .7, y1); g.addColorStop(0, `rgba(160,210,255,${.16 * k})`); g.addColorStop(1, "rgba(160,210,255,0)"); bg.fillStyle = g; bg.fillRect(x0, y0, x1 - x0, y1 - y0);
+  const r = S.rng(23); for (let i = 0; i < 90; i++) { const x = x0 + r() * (x1 - x0), y = y0 + (((r() * (y1 - y0) - t * 20 * (.5 + r())) % (y1 - y0)) + (y1 - y0)) % (y1 - y0); bg.fillStyle = `rgba(220,240,255,${.3 * k * r()})`; bg.fillRect(x, y, 2, 2); }
+  bg.restore();
+}
+
+// ---------------------------------------------------------------- 3D の土台（pilot_017 と同じ）
+const SS = 1.5, GW = W * SS, GH = H * SS;
+const glc = document.createElement("canvas"); glc.width = GW; glc.height = GH;
+const R = new THREE.WebGLRenderer({ canvas: glc, antialias: true, alpha: false, preserveDrawingBuffer: true });
+R.setPixelRatio(1); R.setSize(GW, GH, false); R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.0;
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
+Cine.init(THREE, R);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, W / H, .02, 300);
+const C = c => new THREE.Color(c).convertSRGBToLinear();
+let FOGC = C(0x05070b); scene.fog = new THREE.FogExp2(FOGC, .02);
+const hemi = new THREE.HemisphereLight(C(0x8ea2bd), C(0x1a1612), .3); scene.add(hemi);
+const key = new THREE.SpotLight(C(0xffd9a8), 2, 0, .7, .55, 1); key.castShadow = true; scene.add(key); scene.add(key.target);
+key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -.0003; key.shadow.normalBias = .01; key.shadow.camera.near = .2; key.shadow.camera.far = 30;
+const rim = new THREE.DirectionalLight(C(0x9fd4ff), .6); scene.add(rim); scene.add(rim.target);
+const sets = {}; function set(n) { const g = new THREE.Group(); g.visible = false; scene.add(g); sets[n] = g; return g; }
+function show(...n) { for (const k in sets) sets[k].visible = n.includes(k); }
+function setCam(pos, look, fov = 40, near = .02, far = 300) { cam.position.copy(pos); cam.fov = fov; cam.near = near; cam.far = far; cam.lookAt(look); cam.updateProjectionMatrix(); cam.updateMatrixWorld(); }
+function lights({ hemiI = .3, keyI = 30, keyPos = [0, 5, 0], keyAt = [0, 0, 0], keyCol = 0xffd9a8, angle = .7, rimI = .6, rimCol = 0x9fd4ff, rimPos = [3, 4, -4], fog = .02, fogC = 0x05070b, exp = 1.0, hemiSky = 0x8ea2bd, hemiGround = 0x1a1612 } = {}) {
+  hemi.intensity = hemiI; hemi.color = C(hemiSky); hemi.groundColor = C(hemiGround); key.intensity = keyI * .085; key.color = C(keyCol); key.angle = angle;
+  key.position.set(...keyPos); key.target.position.set(...keyAt); key.target.updateMatrixWorld(); rim.intensity = rimI; rim.color = C(rimCol); rim.position.set(...rimPos);
+  FOGC = C(fogC); scene.fog.color = FOGC; scene.fog.density = fog; OUT.uniforms.exposure.value = exp;
+}
+const OUT = new THREE.ShaderPass({   // 仕上げ：ACES の色調と sRGB（composer の中間は線形のため、最後にここで変換する）
+  uniforms: { tDiffuse: { value: null }, exposure: { value: 1.0 } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float exposure; varying vec2 vUv;
+    vec3 rvFit(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
+    vec3 rvAces(vec3 c){ const mat3 I = mat3(vec3(0.59719,0.07600,0.02840), vec3(0.35458,0.90834,0.13383), vec3(0.04823,0.01566,0.83777));
+      const mat3 O = mat3(vec3(1.60475,-0.10208,-0.00327), vec3(-0.53108,1.10813,-0.07276), vec3(-0.07367,-0.00605,1.07602));
+      c *= exposure / 0.6; c = I * c; c = rvFit(c); c = O * c; return clamp(c, 0.0, 1.0); }
+    vec3 rvSRGB(vec3 c){ return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308)))); }
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); gl_FragColor = vec4(rvSRGB(rvAces(c.rgb)), 1.0); }` });
+const composer = new THREE.EffectComposer(R); composer.setPixelRatio(1); composer.setSize(GW, GH);
+const rpass = new THREE.RenderPass(scene, cam);
+const ssao = new THREE.SSAOPass(scene, cam, GW, GH); ssao.kernelRadius = .22; ssao.minDistance = .0004; ssao.maxDistance = .02;
+{ const ro = ssao.renderOverride.bind(ssao); ssao.renderOverride = (...a) => { const hid = []; scene.traverse(o => { if (o.visible && (o.isPoints || o.userData.noAO)) { o.visible = false; hid.push(o); } }); ro(...a); hid.forEach(o => o.visible = true); }; }
+const bokeh = new THREE.BokehPass(scene, cam, { focus: 1, aperture: .002, maxblur: .008, width: GW, height: GH });
+composer.addPass(rpass); composer.addPass(ssao); composer.addPass(bokeh); composer.addPass(OUT);
+function draw3D({ ao = true, dof = null } = {}) {   // dof＝{ focus：焦点までの距離（m）, aperture, maxblur }
+  R.shadowMap.needsUpdate = true; R.setClearColor(FOGC, 1);
+  rpass.enabled = !ao; ssao.enabled = ao; bokeh.enabled = !!dof;
+  if (dof) { bokeh.uniforms.focus.value = dof.focus; bokeh.uniforms.aperture.value = dof.aperture ?? .002; bokeh.uniforms.maxblur.value = dof.maxblur ?? .008; bokeh.uniforms.nearClip.value = cam.near; bokeh.uniforms.farClip.value = cam.far; bokeh.uniforms.aspect.value = cam.aspect; }
+  composer.render(); bg.imageSmoothingQuality = "high"; bg.drawImage(glc, 0, 0, W, H);
+}
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: C(c), roughness: .7, metalness: 0, ...o });
+function box(w, h, d, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; if (parent) parent.add(m); return m; }
+
+// ---------------------------------------------------------------- Poly Haven の質感（PBR：色・凹凸・粗さ）と HDRI
+const TEX = {}; const texLoader = new THREE.TextureLoader();
+function pbr(name, rep, o = {}) {
+  const t = k => { const key_ = name + "_" + k, tx = TEX[key_] || (TEX[key_] = texLoader.load(window.ASSETS3D.tex[key_])); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 16; return tx; };
+  const map = t("Diffuse").clone(), nm = t("nor_gl").clone(), rm = t("Rough").clone(); map.encoding = THREE.sRGBEncoding;
+  for (const x of [map, nm, rm]) { x.repeat.set(...rep); x.needsUpdate = true; }
+  return new THREE.MeshStandardMaterial({ map, normalMap: nm, roughnessMap: rm, roughness: 1, normalScale: new THREE.Vector2(o.normal ?? 1, o.normal ?? 1), color: C(o.tint ?? 0xffffff), envMapIntensity: o.env ?? .6 });
+}
+let ENV_ROOM = null;
+function loadEnv() {
+  const d = new THREE.RGBELoader().parse(b64buf(window.ASSETS3D.hdr));
+  const tx = new THREE.DataTexture(d.data, d.width, d.height, THREE.RGBAFormat, d.type); tx.flipY = true; tx.minFilter = tx.magFilter = THREE.LinearFilter; tx.generateMipmaps = false; tx.mapping = THREE.EquirectangularReflectionMapping; tx.needsUpdate = true;
+  const pm = new THREE.PMREMGenerator(R); ENV_ROOM = pm.fromEquirectangular(tx).texture; pm.dispose();
+}
+
+// ---------------------------------------------------------------- 人体（MPFB の GLB、pilot_020 と同じ作り。男性・白衣）
+const HUMANS = {};
+function loadHumans() { const L = new THREE.GLTFLoader(); return Promise.all(Object.entries(window.ASSETS3D.glb).map(([k, s]) => new Promise(res => L.parse(b64buf(s), "", g => { HUMANS[k] = g.scene; res(); }, e => { console.error(e); res(); })))); }
+function human(kindKey, { coat = 0x2a2a30, hair = 0x3a2a20 } = {}) {
+  const g = new THREE.Group(), body = HUMANS[kindKey].clone(true);
+  const coatM = M(coat, { roughness: .85 }), hairM = M(hair, { roughness: .5 }); hairM.color.multiplyScalar(.55); Cine.surface(coatM, "fabric", { repeat: [8, 8], normal: .7 }); Cine.surface(hairM, "wood", { repeat: [1, 6], normal: .9, roughness: 1 });
+  const bb = new THREE.Box3(); let bodyMesh = null;
+  body.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = true; const n = o.name.toLowerCase();
+    if (/short|hair/.test(n)) o.material = hairM; else if (/suit/.test(n)) o.material = coatM; else if (/shoe/.test(n)) o.material = M(0x141010, { roughness: .4 });
+    else { o.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .8 }); Cine.surface(o.material, "fabric", { repeat: [8, 8], normal: .5 }); bodyMesh = o; } });
+  bb.setFromObject(body); body.position.y = -bb.min.y; g.add(body);
+  let hb0 = null; body.traverse(o => { if (o.isMesh && o.material === hairM) hb0 = new THREE.Box3().setFromObject(o); });
+  if (bodyMesh && hb0) { const P = bodyMesh.geometry.attributes.position, col = new Float32Array(P.count * 3), cs = C(0xc9a08a), cc = C(coat), hc = new THREE.Vector3(); hb0.getCenter(hc); hc.y = hb0.max.y - .11;
+    for (let i = 0; i < P.count; i++) { const d = Math.hypot(P.getX(i) - hc.x, (P.getY(i) - hc.y) * .8, P.getZ(i) - hc.z), k = clamp((.135 - d) / .02) * clamp((P.getY(i) - (hc.y - .16)) / .02); const cl = cc.clone().lerp(cs, k); col.set([cl.r, cl.g, cl.b], i * 3); }
+    bodyMesh.geometry.setAttribute("color", new THREE.BufferAttribute(col, 3)); }
+  return g;
+}
+
+// ---------------------------------------------------------------- 研究室（1980 年代の病院の研究室、再現）：実験台・小瓶・顕微鏡・培養皿・窓の光
+const lab = set("lab"); let vial, vialLiquid, scope, dishes = [], dishTex = [], doc1, doc2, labLamp, labDust;
+function dishCanvas(seed) { const c = document.createElement("canvas"); c.width = c.height = 256; const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; tx.userData = { c, seed, k: -1 }; return tx; }
+function paintDish(tx, k) {   // 培養皿の寒天（赤みの血液寒天、模式）に、小さな灰色のコロニーが k（0〜1）に応じて広がる
+  if (Math.abs(tx.userData.k - k) < .01) return; tx.userData.k = k; const x = tx.userData.c.getContext("2d");
+  const g = x.createRadialGradient(128, 128, 10, 128, 128, 128); g.addColorStop(0, "#9a2a2a"); g.addColorStop(1, "#6a1818"); x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  const r = S.rng(tx.userData.seed); for (let i = 0; i < 260; i++) { const a = r() * 6.283, d = Math.sqrt(r()) * 110, s = (1 + r() * 3) * clamp(k * 1.4 - r() * .4); if (s <= .1) continue;
+    x.fillStyle = `rgba(210,210,200,${.6 + .3 * r()})`; x.beginPath(); x.arc(128 + Math.cos(a) * d, 128 + Math.sin(a) * d, s, 0, 6.283); x.fill(); } tx.needsUpdate = true; }
+function buildLab() {
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), pbr("old_wood_floor", [6, 6], { tint: 0x7a7066 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; lab.add(floor);
+  const wallM = M(0xc8ccc4, { roughness: .95 }); Cine.surface(wallM, "plaster", { repeat: [4, 2], normal: .4 });
+  for (const [x, z, ry] of [[0, -3, 0], [-3.5, 0, Math.PI / 2], [3.5, 0, -Math.PI / 2]]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(10, 4.5), wallM); w.position.set(x, 2.25, z); w.rotation.y = ry; w.receiveShadow = true; lab.add(w); }
+  const topM = M(0x2a3238, { roughness: .35 }); Cine.surface(topM, "stone", { repeat: [4, 2], normal: .3 }); box(3.2, .06, 1.1, topM, 0, .9, -.7, lab); box(3.2, .84, 1.0, M(0x8a8a82, { roughness: .6 }), 0, .44, -.75, lab);   // 実験台
+  for (let i = 0; i < 6; i++) box(.5, .02, .3, M(0xe8e4d8, { roughness: .9 }), 1.1 + (i % 2) * .05, .94 + i * .01, -.4 - (i % 3) * .05, lab);   // 書類の束
+  // 小瓶（濁った液体、再現）
+  vial = new THREE.Group(); const gl = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .11, 48, 1, true), Cine.glass({ thickness: .003, roughness: .03 })); gl.position.y = .055; gl.userData.noAO = true; vial.add(gl);
+  const bot = new THREE.Mesh(new THREE.CylinderGeometry(.031, .031, .006, 48), Cine.glass({ thickness: .006 })); bot.position.y = .003; vial.add(bot);
+  vialLiquid = new THREE.Mesh(new THREE.CylinderGeometry(.027, .027, .07, 48), new THREE.MeshStandardMaterial({ color: C(0xb8a070), roughness: .55, emissive: C(0x2a2010), emissiveIntensity: .3 })); vialLiquid.position.y = .04; vial.add(vialLiquid);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(.032, .032, .022, 32), M(0x2a5aa8, { roughness: .5 })); cap.position.y = .12; vial.add(cap);
+  vial.position.set(-.15, .93, -.45); lab.add(vial);
+  // 顕微鏡（再現）
+  scope = new THREE.Group(); const sm = M(0x1a1e22, { roughness: .35, metalness: .4 }), chrome = M(0xc8ccd2, { metalness: 1, roughness: .2 });
+  box(.22, .03, .28, sm, 0, .015, 0, scope); const arm = box(.05, .3, .06, sm, 0, .17, -.08, scope); arm.rotation.x = -.15; box(.14, .015, .12, sm, 0, .14, .03, scope);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(.022, .022, .2, 32), sm); tube.position.set(0, .32, .02); tube.rotation.x = .35; scope.add(tube);
+  const ep = new THREE.Mesh(new THREE.CylinderGeometry(.016, .016, .06, 24), chrome); ep.position.set(0, .43, -.02); ep.rotation.x = .35; scope.add(ep);
+  for (let i = 0; i < 3; i++) { const ob = new THREE.Mesh(new THREE.CylinderGeometry(.008, .01, .04, 16), chrome); ob.position.set(-.02 + i * .02, .2, .05); scope.add(ob); }
+  scope.position.set(.6, .93, -.75); lab.add(scope);
+  // 培養皿（5 枚）
+  for (let i = 0; i < 5; i++) { const g = new THREE.Group(), tx = dishCanvas(11 + i); dishTex.push(tx); paintDish(tx, 0);
+    const agar = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, .006, 48), new THREE.MeshStandardMaterial({ map: tx, roughness: .4 })); agar.position.y = .005; g.add(agar);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(.048, .048, .014, 48, 1, true), Cine.glass({ thickness: .002 })); rim.position.y = .007; rim.userData.noAO = true; g.add(rim);
+    g.position.set(-.55 + (i % 3) * .13, .93, -.8 + Math.floor(i / 3) * .13); lab.add(g); dishes.push(g); }
+  const win_ = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), new THREE.MeshBasicMaterial({ color: C(0xdfe8f0) })); win_.position.set(-3.48, 2.0, -.8); win_.rotation.y = Math.PI / 2; win_.userData.noAO = true; lab.add(win_);
+  labLamp = new THREE.PointLight(C(0xfff0d8), 0, 5, 2); labLamp.position.set(.2, 1.7, -.3); lab.add(labLamp);
+  labDust = Cine.dust({ min: [-2, .5, -2.5], max: [2, 2.4, 1.5], count: 700, size: .01, seed: 81 }); lab.add(labDust.points);
+  const sh = Cine.shaft({ from: [-3.4, 2.6, -.8], to: [-.4, .5, -.5], r0: .5, r1: 1.3, color: 0xe8f0ff, opacity: .16 }); lab.add(sh); lab.userData.shaft = sh;
+  doc1 = human("man_sit", { coat: 0xe6e6e0, hair: 0x6a6a64 }); doc1.position.set(.6, 0, -.05); doc1.rotation.y = Math.PI; lab.add(doc1);   // 顕微鏡の前（ウォレン、後ろ姿）
+  doc2 = human("man_stand", { coat: 0xe6e6e0, hair: 0x3a2a20 }); doc2.position.set(-.2, 0, .15); doc2.rotation.y = Math.PI; lab.add(doc2);   // 実験台の前（マーシャル、後ろ姿）
+}
+function labShot(t, { w1 = false, w2 = false, warm = .6, exp = 1.0 } = {}) {
+  show("lab"); doc1.visible = w1; doc2.visible = w2; labLamp.intensity = 2.0; labDust.update(t, 1); lab.userData.shaft.userData.set(t, .7);
+  lights({ keyPos: [-3.3, 3, -.8], keyAt: [0, .9, -.6], keyI: 16, angle: .6, keyCol: 0xf4f0e8, rimPos: [2, 3, 3], rimI: .5, rimCol: 0x9fc8ff, hemiI: .35, hemiSky: 0xb8c4d0, hemiGround: 0x2a2620, fog: .04, fogC: 0x0a0e12, exp }); envOn(.7);
+}
+function envOn(k = .7) { scene.environment = ENV_ROOM; scene.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m && "envMapIntensity" in m) m.envMapIntensity = k; }); }
+
+// ---------------------------------------------------------------- 胃（模式）と、らせん形の菌
+const gut = set("gut"); let stomach, stomachM, bugs = [], acidPts;
+function helix(len = .5, r = .05, turns = 2.5) { const pts = []; for (let i = 0; i <= 40; i++) { const u = i / 40, a = u * turns * 6.283; pts.push(V3(Math.cos(a) * r, (u - .5) * len, Math.sin(a) * r)); } return new THREE.CatmullRomCurve3(pts); }
+function buildGut() {
+  // 胃：J の形の管（太さを変える）。説明のための模式
+  const curve = new THREE.CatmullRomCurve3([V3(-.9, 1.6, 0), V3(-.6, 1.2, 0), V3(-.5, .4, 0), V3(-.1, -.4, 0), V3(.6, -.6, 0), V3(1.1, -.2, 0), V3(1.3, .3, 0)]);
+  const geo = new THREE.TubeGeometry(curve, 160, 1, 64, false), P = geo.attributes.position, N = 161;
+  const base = geo.attributes.position.array.slice(); for (let i = 0; i < P.count; i++) { const seg = Math.floor(i / 65), u = seg / (N - 1), c = curve.getPointAt(Math.min(1, u)); const rad = .25 + .55 * Math.sin(Math.PI * Math.min(1, u * 1.15)) * (1 - .55 * u);
+    P.setXYZ(i, c.x + (base[i * 3] - c.x) * rad, c.y + (base[i * 3 + 1] - c.y) * rad, c.z + (base[i * 3 + 2] - c.z) * rad); } geo.computeVertexNormals();
+  stomachM = new THREE.MeshPhysicalMaterial({ color: C(0xd88a86), roughness: .35, clearcoat: .6, transmission: .15, thickness: .5, side: THREE.DoubleSide }); Cine.surface(stomachM, "skin", { repeat: [6, 6], normal: .8 });
+  stomach = new THREE.Mesh(geo, stomachM); stomach.castShadow = true; gut.add(stomach);
+  const bm = M(0x5ac8a0, { roughness: .4, emissive: C(0x1a6a50), emissiveIntensity: .3 });
+  for (let i = 0; i < 46; i++) { const r = S.rng(300 + i), u = .15 + r() * .7, c = curve.getPointAt(u), b = new THREE.Mesh(new THREE.TubeGeometry(helix(.18, .025, 2.2), 30, .012, 8, false), bm);
+    const a = r() * 6.283, rad = .25 + .55 * Math.sin(Math.PI * Math.min(1, u * 1.15)) * (1 - .55 * u) - .03; b.position.set(c.x + Math.cos(a) * rad * .2, c.y + Math.sin(a) * rad * .2, c.z + rad * .95 * (r() > .5 ? 1 : -1)); b.rotation.set(r() * 3, r() * 3, r() * 3); b.userData.ph = r() * 6; gut.add(b); bugs.push(b); }
+  { const n = 1600, p = new Float32Array(n * 3), r = S.rng(9); for (let i = 0; i < n; i++) { const u = .1 + r() * .8, c = curve.getPointAt(u); p.set([c.x + (r() - .5) * .5, c.y + (r() - .5) * .5, c.z + (r() - .5) * .5], i * 3); }
+    const geo2 = new THREE.BufferGeometry(); geo2.setAttribute("position", new THREE.BufferAttribute(p, 3)); acidPts = new THREE.Points(geo2, new THREE.PointsMaterial({ color: C(0xd8f060), size: .02, transparent: true, opacity: .55, depthWrite: false })); gut.add(acidPts); }
+}
+function gutShot(t, { inflam = 0, bugsK = 0, acid = 1, yaw = 0, dist = 5.2 } = {}) {
+  show("gut"); scene.environment = ENV_ROOM; stomachM.color = C(0xd88a86).lerp(C(0xc8282a), inflam); stomachM.emissive = C(0x601010).multiplyScalar(inflam * .6);
+  bugs.forEach(b => { b.visible = bugsK > S.rng(Math.floor(b.userData.ph * 100))(); b.rotation.y += 0; b.position.y += Math.sin(t * 2 + b.userData.ph) * .0004; }); acidPts.visible = acid > 0; acidPts.material.opacity = .55 * acid;
+  lights({ keyPos: [2, 4, 4], keyAt: [0, 0, 0], keyI: 22, angle: .6, keyCol: 0xfff0e8, rimPos: [-3, 2, -3], rimI: 1.2, rimCol: 0x8fdcff, hemiI: .3, hemiSky: 0x6a8aa8, hemiGround: 0x1a1014, fog: .02, fogC: 0x04080e, exp: 1.0 });
+  setCam(V3(Math.sin(yaw) * dist, .3, Math.cos(yaw) * dist), V3(.2, .3, 0), 40, .05, 100); draw3D({ ao: false, dof: { focus: dist, aperture: .002, maxblur: .006 } });
+}
+
+// ---------------------------------------------------------------- オープニングの背景（漂うらせん形の菌）・会議の机・メダル
+const drift = set("drift"); const floaters = [];
+{ const bm = new THREE.MeshPhysicalMaterial({ color: C(0x9a7ad8), roughness: .3, clearcoat: .5, emissive: C(0x2a1a50), emissiveIntensity: .4 });
+  for (let i = 0; i < 70; i++) { const r = S.rng(500 + i), b = new THREE.Mesh(new THREE.TubeGeometry(helix(.9, .1, 2.5), 40, .05, 10, false), bm); b.position.set((r() - .5) * 8, (r() - .5) * 14, -2 - r() * 10); b.rotation.set(r() * 3, r() * 3, r() * 3); b.userData = { ph: r() * 6, sp: .2 + r() * .4 }; drift.add(b); floaters.push(b); } }
+function driftShot(t) { show("drift"); scene.environment = null; floaters.forEach(b => { b.rotation.x += 0; b.rotation.z = b.userData.ph + t * b.userData.sp; b.position.y += 0; });
+  lights({ keyPos: [3, 5, 6], keyAt: [0, 0, -5], keyI: 18, angle: .8, keyCol: 0xc8b8ff, rimPos: [-3, 2, -8], rimI: 1.0, rimCol: 0x8fdcff, hemiI: .25, hemiSky: 0x4a3a8a, hemiGround: 0x0a0a1a, fog: .06, fogC: 0x06061a, exp: .9 });
+  setCam(V3(Math.sin(t * .2) * .6, Math.cos(t * .15) * .4, 4), V3(0, 0, -6), 44, .05, 100); draw3D({ ao: false, dof: { focus: 6, aperture: .004, maxblur: .01 } }); }
+const meet = set("meet"); const medal = set("medal"); let medalObj;
+function buildMeet() {
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), pbr("old_wood_floor", [6, 6], { tint: 0x6a5a48 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; meet.add(floor);
+  const wallM = M(0x4a4e54, { roughness: .9 }); Cine.surface(wallM, "plaster", { repeat: [5, 2], normal: .4 }); const w = new THREE.Mesh(new THREE.PlaneGeometry(14, 6), wallM); w.position.set(0, 3, -6); meet.add(w);
+  const woodM = pbr("wood_table_001", [4, 1], { tint: 0x5a3a24 }); box(1.6, .08, 6, woodM, 0, .78, -1.5, meet);
+  for (let i = 0; i < 8; i++) box(.22, .01, .3, M(0xece4d0, { roughness: .9 }), (i % 2 ? .45 : -.45), .825, .6 - i * .6, meet);
+  for (let i = 0; i < 4; i++) { const h = human(i % 2 ? "man_stand" : "man_walk", { coat: [0x24282e, 0x2e2a26][i % 2], hair: [0x3a3028, 0x8a8a84][i % 2] }); h.position.set(-1.1 + i * .75, 0, -4.4 + (i % 2) * .3); h.rotation.y = Math.PI; meet.add(h); }   // 窓（奥）の方を向く：顔を映さない
+  const wv = new THREE.Mesh(new THREE.PlaneGeometry(6, 3), new THREE.MeshBasicMaterial({ color: C(0xd8e4f0) })); wv.position.set(0, 2.6, -5.98); wv.userData.noAO = true; meet.add(wv);
+  const gold = M(0xd8a848, { metalness: 1, roughness: .25 }); Cine.surface(gold, "metal", { repeat: [2, 2], normal: .3 }); medalObj = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(.33, .33, .03, 96), gold); disc.rotation.x = Math.PI / 2; medalObj.add(disc); const ring = new THREE.Mesh(new THREE.TorusGeometry(.33, .015, 16, 96), gold); medalObj.add(ring);
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(.27, .27, .036, 96), M(0xc89838, { metalness: 1, roughness: .4 })); inner.rotation.x = Math.PI / 2; medalObj.add(inner); medal.add(medalObj);
+}
+
+// ---------------------------------------------------------------- 2D の図（ホログラムの台）：顕微鏡の視野・連休の暦・不採用・日付・除菌の模式図
+const holoC = document.createElement("canvas"); holoC.width = W; holoC.height = H; const holoX = holoC.getContext("2d");
+const holoTex = new THREE.CanvasTexture(holoC); holoTex.encoding = THREE.sRGBEncoding; holoTex.anisotropy = 16;
+const holo = set("holo");
+{ holo.add(new THREE.Mesh(new THREE.PlaneGeometry(10.8, 19.2), new THREE.MeshBasicMaterial({ map: holoTex, toneMapped: false, transparent: true })));
+  holo.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(10.95, 19.35)), new THREE.LineBasicMaterial({ color: C(0x8fdcff), transparent: true, opacity: .8 })));
+  const grid = new THREE.GridHelper(120, 120, 0x2a7aa0, 0x10304a); grid.position.y = -12; holo.add(grid);
+  const hd = Cine.dust({ min: [-10, -12, -8], max: [10, 12, 8], count: 1400, size: .05, seed: 71 }); holo.add(hd.points); holo.userData.dust = hd; }
+function holoDraw(t, { tilt = -.18, yaw = 0, dist = 23 } = {}) {
+  holoTex.needsUpdate = true; show("holo"); scene.environment = null; holo.children[0].rotation.set(tilt, yaw, 0); holo.children[1].rotation.set(tilt, yaw, 0); holo.userData.dust.update(t, 1);
+  lights({ keyI: 0, rimI: 0, hemiI: .3, fog: .006, fogC: 0x02060c, exp: 1.0 }); setCam(V3(0, -1.0, dist), V3(0, -.5, 0), 40); draw3D({ ao: false });
+}
+function panel(ctx) { ctx.fillStyle = "rgba(4,14,26,.82)"; rrect(ctx, 90, 330, 900, 950, 18); ctx.fill(); ctx.strokeStyle = "rgba(143,220,255,.35)"; ctx.lineWidth = 2; ctx.stroke(); }
+function lab2(ctx, s, x, y, size, col = "#B8DFF2", w = 800) { S.group(() => text(ctx, s, x, y, size, col, { weight: w, stroke: "#04101c", sw: 6 })); }
+function scopeView(ctx, t) {   // 顕微鏡の視野（模式）：胃の表面の細胞と、らせん形の菌
+  ctx.fillStyle = "#020408"; ctx.fillRect(0, 0, W, H); const cx = 540, cy = 800, R0 = 400, k = k_(t, "spiral", .8);
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R0, 0, 6.283); ctx.clip(); ctx.fillStyle = "#f2e2e8"; ctx.fillRect(cx - R0, cy - R0, R0 * 2, R0 * 2);
+  const r = S.rng(4); for (let i = 0; i < 60; i++) { const x = cx - R0 + (i % 8) * 110 + (r() - .5) * 20, y = cy - R0 + Math.floor(i / 8) * 110 + (r() - .5) * 20; ctx.fillStyle = `rgba(200,120,170,${.35 + .2 * r()})`; ctx.beginPath(); ctx.ellipse(x, y, 50, 40, r(), 0, 6.283); ctx.fill(); ctx.fillStyle = "rgba(90,40,120,.6)"; ctx.beginPath(); ctx.arc(x, y, 12, 0, 6.283); ctx.fill(); }
+  ctx.strokeStyle = `rgba(40,30,110,${.85 * k})`; ctx.lineWidth = 5; ctx.lineCap = "round"; for (let i = 0; i < 40; i++) { const x = cx - 300 + r() * 600, y = cy - 300 + r() * 600, a = r() * 6.283; ctx.beginPath(); for (let j = 0; j <= 20; j++) { const u = j / 20, px = x + Math.cos(a) * u * 60 + Math.sin(u * 14) * 6 * Math.sin(a), py = y + Math.sin(a) * u * 60 - Math.sin(u * 14) * 6 * Math.cos(a); j ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); }
+  ctx.restore(); ctx.strokeStyle = "rgba(143,220,255,.6)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, R0, 0, 6.283); ctx.stroke();
+  if (k > .3) S.hudTarget(ui, cx + 60, cy - 40, 70, k, t);
+}
+function easterCal(ctx, t) {   // 連休の暦（模式）
+  panel(ctx); const u = clamp((t - CUE.easter) / 1.6), n = Math.min(4, Math.floor(u * 5));
+  lab2(ctx, "1982年 イースターの連休", 540, 420, T(36), "#FFE2A8", 900);
+  for (let i = 0; i < 4; i++) { const x = 230 + i * 205, y = 720, on = i < n; ctx.fillStyle = on ? "rgba(255,226,168,.18)" : "rgba(143,220,255,.06)"; rrect(ctx, x - 85, y - 110, 170, 220, 14); ctx.fill(); ctx.strokeStyle = on ? "rgba(255,226,168,.8)" : "rgba(143,220,255,.3)"; ctx.lineWidth = 2; ctx.stroke();
+    lab2(ctx, ["休", "休", "休", "休"][i], x, y, T(64), on ? "#FFE2A8" : "#6a8aa0", 900); }
+  lab2(ctx, "培養皿は そのまま", 540, 1010, T(34), "#B8DFF2", 800); }
+function rejectDoc(ctx, t) {   // 不採用（とされる）
+  ctx.fillStyle = "#06090e"; ctx.fillRect(0, 0, W, H); ctx.save(); ctx.translate(540, 820); ctx.rotate(-.03); ctx.fillStyle = "#ece6d6"; ctx.fillRect(-330, -430, 660, 860);
+  ctx.fillStyle = "#3a3a3a"; for (let i = 0; i < 16; i++) ctx.fillRect(-270, -330 + i * 44, 540 * (i % 5 === 4 ? .6 : 1), 10);
+  S.group(() => text(ctx, "学会への発表の要旨", 0, -390, T(30), "#2a2a2a", { weight: 800 }));
+  const k = clamp((t - CUE.stampc) / .25); if (k > 0) { ctx.save(); ctx.globalAlpha = k; ctx.rotate(-.18); const s = 1 + .4 * (1 - k); ctx.scale(s, s); ctx.strokeStyle = "#b02828"; ctx.lineWidth = 10; rrect(ctx, -190, -70, 380, 140, 12); ctx.stroke(); S.group(() => text(ctx, "不採用", 0, 4, T(80), "#b02828", { weight: 900 })); ctx.restore(); }
+  ctx.restore(); }
+function dayCount(ctx, t) {   // 日付（模式）：1 日目 → 3 日目 → 数日後
+  panel(ctx); const u = t - CUE.days, d = u < .6 ? "1日目" : u < 1.2 ? "2日目" : u < CUE.sick - CUE.days ? "3日目" : "数日後";
+  lab2(ctx, d, 540, 640, T(110), t >= CUE.sick ? "#FF9A8A" : "#EAF2F8", 900); lab2(ctx, t >= CUE.sick ? "激しい吐き気と嘔吐" : "何も起きない", 540, 860, T(40), t >= CUE.sick ? "#FFB8A8" : "#B8DFF2", 800); }
+function eradGraph(ctx, t) {   // 除菌の模式図：潰瘍の再発（除菌しない／した）。数字は出さない
+  panel(ctx); const k = easeOut(clamp((t - CUE.bars) / 1.0)); lab2(ctx, "潰瘍の再発（模式図）", 540, 420, T(34), "#B8DFF2", 800);
+  const base = 1120; [["除菌しない", 330, 520, "#FF9A8A"], ["除菌した", 750, 120, "#8FDCFF"]].forEach(([s, x, h, col]) => { ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 20; rrect(ctx, x - 110, base - h * k, 220, h * k, 10); ctx.fill(); ctx.shadowBlur = 0; lab2(ctx, s, x, base + 60, T(34), "#EAF2F8", 800); });
+  ctx.strokeStyle = "rgba(143,220,255,.5)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(180, base); ctx.lineTo(900, base); ctx.stroke(); }
+
+// ---------------------------------------------------------------- 場面
+function vialShot(t, back = false) {   // 実験台の上の濁った液体の小瓶（再現）
+  labShot(t, { w2: false }); const u = back ? 1 - easeInOut(clamp((t - CUE.back) / 2.4)) : easeInOut(clamp((t - CUE.hook) / 4)), wp = vial.position;
+  const cp = V3(wp.x + lerp(.16, .55, u), wp.y + lerp(.08, .3, u), wp.z + lerp(.28, .9, u)); setCam(cp, V3(wp.x, wp.y + .06, wp.z), lerp(30, 40, u), .02, 30);
+  draw3D({ ao: true, dof: { focus: cp.distanceTo(V3(wp.x, wp.y + .06, wp.z)), aperture: .012, maxblur: .012 } }); }
+function drawScene(t, name) {
+  if (name === "open") { driftShot(t); return "3d"; }
+  if (name === "hook") { if (t < CUE.acid) { vialShot(t); return "3d"; } gutShot(t, { acid: 1, yaw: (t - CUE.acid) * .12 }); return "3d"; }
+  if (name === "find") { if (t < CUE.spiral) { labShot(t, { w1: true }); const u = easeInOut(clamp((t - CUE.find) / (CUE.spiral - CUE.find))); setCam(V3(1.3 - .3 * u, 1.45, 1.2 - .3 * u), V3(.6, 1.05, -.75), 40, .05, 30); draw3D({ ao: true, dof: { focus: 1.6, aperture: .004, maxblur: .01 } }); return "3d"; }   // 顕微鏡をのぞく後ろ姿
+    if (t < CUE.join) return "2d";
+    labShot(t, { w2: true }); dishTex.forEach(tx => paintDish(tx, 0)); const u = easeInOut(clamp((t - CUE.join) / (CUE.grow - CUE.join)));   // 何も生えない培養皿
+    setCam(V3(-.45 + .1 * u, 1.25 - .1 * u, -.3 - .1 * u), V3(-.42, .93, -.74), 40, .02, 30); draw3D({ ao: true, dof: { focus: .55, aperture: .008, maxblur: .012 } }); return "3d"; }
+  if (name === "grow") { if (t < CUE.easter + .2) { labShot(t); setCam(V3(-.42, 1.2, -.35), V3(-.42, .93, -.74), 40, .02, 30); draw3D({ ao: true }); return "3d"; }
+    if (t < CUE.colony) return "2d";
+    if (t < CUE.reject) { const k = clamp((t - CUE.colony) / 1.6); labShot(t); dishTex.forEach((tx, i) => paintDish(tx, clamp(k * 1.2 - i * .05))); setCam(V3(-.42, 1.08, -.55), V3(-.42, .93, -.76), 38, .02, 30);   // 広がる菌のコロニー（光の転換）
+      lights({ keyPos: [-.4, 1.6, -.4], keyAt: [-.42, .93, -.76], keyI: 10 + 30 * k, angle: .5, keyCol: 0xfff4e0, rimPos: [2, 3, 3], rimI: .5, rimCol: 0x9fc8ff, hemiI: .35, hemiSky: 0xb8c4d0, hemiGround: 0x2a2620, fog: .04, fogC: 0x0a0e12, exp: 1.0 }); draw3D({ ao: true, dof: { focus: .26, aperture: .012, maxblur: .012 } }); return "3d"; }
+    return "2d"; }
+  if (name === "self") { if (t < CUE.decide) return "2d";
+    if (t < CUE.days) { labShot(t, { w2: true }); const u = easeInOut(clamp((t - CUE.decide) / (CUE.days - CUE.decide))); setCam(V3(1.0 - .2 * u, 1.75, 2.6 - .4 * u), V3(-.15, 1.0, -.45), 40, .05, 30); draw3D({ ao: true, dof: { focus: 2.8, aperture: .004, maxblur: .01 } }); return "3d"; }   // 小瓶を前にした後ろ姿
+    if (t < CUE.inflam) return "2d";
+    gutShot(t, { inflam: easeInOut(clamp((t - CUE.inflam) / 1.2)), bugsK: 1, acid: .5, yaw: .4 + (t - CUE.inflam) * .1, dist: 4.4 }); return "3d"; }   // 赤く腫れる胃（模式）
+  if (name === "proof") { if (t < CUE.nih) return "2d";
+    if (t < CUE.nobel) { show("meet"); scene.environment = null; lights({ keyPos: [0, 3, -5.8], keyAt: [0, .8, 0], keyI: 18, angle: .9, keyCol: 0xdde8ff, rimPos: [0, 3, -8], rimI: 1.4, rimCol: 0xc8d8ff, hemiI: .12, fog: .04, fogC: 0x08090c, exp: 1.0 });
+      const u = easeInOut(clamp((t - CUE.nih) / (CUE.nobel - CUE.nih))); setCam(V3(.25, 1.2, 3.4 - 1 * u), V3(0, 1.1, -4.5), 38, .05, 60); draw3D({ ao: true }); return "3d"; }
+    show("medal"); scene.environment = ENV_ROOM; const u = clamp((t - CUE.nobel) / (CUE.today - CUE.nobel)); medalObj.rotation.y = -.6 + u * .9;   // メダルの光（再現）
+    lights({ keyPos: [1, 1.5, 2], keyAt: [0, 0, 0], keyI: 8 + 12 * k_(t, "medal", .8), angle: .5, keyCol: 0xfff0d0, rimPos: [-2, 1, -2], rimI: 1.2, rimCol: 0xffe0a0, hemiI: .1, fog: .02, fogC: 0x06050a, exp: 1.0 });
+    setCam(V3(0, 0, 2.4 - .3 * u), V3(0, 0, 0), 38, .02, 30); draw3D({ ao: false, dof: { focus: 2.3 - .3 * u, aperture: .004, maxblur: .008 } }); return "3d"; }
+  if (name === "today") { if (t < CUE.back) { gutShot(t, { inflam: 0, bugsK: 1 - clamp((t - CUE.today) / 2), acid: .6, yaw: -.3 + (t - CUE.today) * .08 }); return "3d"; } vialShot(t, true); return "3d"; }
+  return "2d";
+}
+function draw2D(t, name) {
+  const X = holoX; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, W, H);
+  if (name === "find") { scopeView(bg, t); return; }
+  if (name === "grow") { if (t < CUE.colony) { easterCal(X, t); holoDraw(t, {}); return; } rejectDoc(bg, t); return; }
+  if (name === "self") { if (t < CUE.decide) { panel(X); lab2(X, "見つかった", 540, 600, T(56), "#EAF2F8", 900); lab2(X, "＝ 原因？", 540, 780, T(88), "#FFE2A8", 900); holoDraw(t, {}); return; } dayCount(X, t); holoDraw(t, {}); return; }
+  if (name === "proof") { eradGraph(X, t); holoDraw(t, {}); return; }
+  bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H);
+}
+
+// ---------------------------------------------------------------- 画面の文字（オープニング・見出し・札・注記）
+function project(v) { const p = v.clone().project(cam); return [(p.x * .5 + .5) * W, (-p.y * .5 + .5) * H]; }
+function openingUI(t) {   // 結論の文字を大きく（上〜中ほど）
+  const k = k_(t, "t0", .4, .05);
+  HUD.title(ui, [["胃潰瘍の大きな原因は", T(66), "#EAF2F8"], ["細菌だった", T(96), "#FFD58A"]], 540, 420, k, t);
+  credit("写真：D. Gregory & D. Marshall／Wellcome Collection", k, 1340); credit("CC BY 4.0（切り抜き・明るさ調整）", k, 1380); }
+function drawUI(t, name) {
+  if (name === "open") { openingUI(t); return; }
+  if (name !== "open" && t >= CUE.hook && t < CUE.find) uiNote("※再現CGを含みます", 540, 1250, win(t, CUE.hook + .3, CUE.acid, .3, .3));
+  if (t >= CUE.hook && t < CUE.proof) uiNote("※細菌を飲むなどの自己実験は危険です。まねしないでください", 540, 1320, (name === "hook" && t < CUE.acid) || name === "self" ? .95 : 0, T(22));
+  if (name === "hook") { if (t < CUE.acid) uiCard([["1984年", T(34), 800], ["オーストラリア・パース", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "hook", .45, .3));
+    else { const k = k_(t, "acid", .5, 1.0); HUD.tag(ui, 380, 820, 250, 560, "ス", "ストレス？", k); HUD.tag(ui, 680, 900, 820, 620, "酸", "胃酸？", k_(t, "acid", .5, 1.4)); if (t >= CUE.notaccepted) uiCard([["細菌が原因？", T(34), 800], ["広く認められていなかった", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "notaccepted", .45)); } }
+  if (name === "find") { if (t < CUE.spiral) uiCard([["1979年ごろ", T(34), 800], ["病理医 ロビン・ウォレン", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "find", .45, .2));
+    else if (t < CUE.join) uiCard([["らせん形の細菌", T(34), 800], ["顕微鏡の視野（模式図）", T(24), 500, "#B8C7D6"]], 540, 250, k_(t, "spiral", .45));
+    else uiCard([["若い医師 バリー・マーシャル", T(32), 800], [t >= CUE.nogrow ? "菌が育たない" : "菌を育てる", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "join", .45)); }
+  if (name === "grow" && t >= CUE.colony && t < CUE.reject) { uiCard([["菌が育っていた", T(34), 800], ["（とされる）", T(24), 500, "#B8C7D6"]], 540, 250, k_(t, "colony", .45, .4)); uiNote("※培養皿は再現", 540, 1250, k_(t, "colony", .4, .4)); }
+  if (name === "grow" && t >= CUE.reject) uiNote("※採用されなかったとされる（再現）", 540, 1300, k_(t, "reject", .4, .3));
+  if (name === "self" && t >= CUE.decide && t < CUE.days) uiCard([["自分の胃で確かめる", T(34), 800]], 540, 250, k_(t, "decide", .45, .2));
+  if (name === "self" && t >= CUE.inflam) { uiCard([["胃の炎症と菌を確認", T(32), 800], ["模式図", T(24), 500, "#B8C7D6"]], 540, 250, k_(t, "inflam", .45, .3)); }
+  if (name === "proof") { if (t >= CUE.nih && t < CUE.nobel) uiCard([["1994年", T(34), 800], ["アメリカ国立衛生研究所の会議", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "nih", .45, .2));
+    if (t >= CUE.nobel) { uiCard([["2005年", T(34), 800], ["ノーベル生理学・医学賞", T(28), 600, "#FFE2A8"]], 540, 250, k_(t, "nobel", .45, .2)); uiNote("※メダルは再現", 540, 1250, k_(t, "medal", .4)); } }
+  if (name === "today" && t < CUE.back) uiCard([["いま", T(30), 600, "#B8C7D6"], ["薬で菌を除いて治せる", T(34), 800]], 540, 250, k_(t, "today", .45, .3));
+}
+
+function uiCard(lines, x, y, k = 1) {
+  if (k <= 0) return; ui.save(); ui.globalAlpha *= clamp(k);
+  const ws = lines.map(([s, sz, w = 700]) => { ui.font = `${w} ${sz}px ${S.FONT}`; return ui.measureText(s).width; });
+  const pw = Math.max(...ws) + 64, ph = lines.reduce((a, [, sz]) => a + sz * 1.32, 0) + 36, x0 = x - pw / 2, y0 = y - ph / 2;
+  rrect(ui, x0, y0, pw, ph, 12); ui.fillStyle = "rgba(8,14,26,.78)"; ui.fill(); ui.strokeStyle = "rgba(143,220,255,.35)"; ui.lineWidth = 1.5; ui.stroke(); ui.fillStyle = "#8fdcff"; ui.fillRect(x0, y0 + 14, 4, ph - 28);
+  S.group(() => { let yy = y0 + 18; lines.forEach(([s, sz, w = 700, col = "#EAF2F8"]) => { yy += sz * 1.32 / 2; text(ui, s, x, yy + 2, sz, col, { weight: w }); yy += sz * 1.32 / 2; }); }, [x0, y0, x0 + pw, y0 + ph]);
+  ui.restore();
+}
+function uiNote(s, x, y, k = 1, size = Math.round(24 * TS)) {
+  if (k <= 0) return; ui.save(); ui.globalAlpha *= clamp(k); ui.font = `500 ${size}px ${S.FONT}`; const w = ui.measureText(s).width + 28;
+  rrect(ui, x - w / 2, y - size * .8, w, size * 1.6, 8); ui.fillStyle = "rgba(8,14,26,.6)"; ui.fill();
+  S.group(() => text(ui, s, x, y + 1, size, "#B8C7D6", { weight: 500 }), [x - w / 2, y - size * .8, x + w / 2, y + size * .8]); ui.restore();
+}
+const grain = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = S.rng(99);
+  for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 14; } x.putImageData(d, 0, 0); return c; })();
+function addGrain(t) { const ox = Math.floor(S.rng(Math.floor(t * 30) + 7)() * 256), oy = Math.floor(S.rng(Math.floor(t * 30) + 91)() * 256);
+  bg.save(); bg.globalCompositeOperation = "overlay"; bg.globalAlpha = .5; bg.fillStyle = bg.createPattern(grain, "repeat"); bg.translate(-ox, -oy); bg.fillRect(ox, oy, W, H); bg.restore(); }
+
+function buildMood() {
+  const c = CUE;
+  MOOD = [[0, { cool: .25, sat: 1.05, vig: .6 }], [c.hook, { cool: .1, warm: .1, sat: 1.0, vig: .55 }], [c.acid, { cool: .3, sat: .95, vig: .6 }], [c.find, { cool: .1, warm: .15, sat: .95, vig: .55 }],
+    [c.grow, { cool: .2, sat: .95, vig: .55 }], [c.colony, { warm: .2, sat: 1.05, glow: .25, glowX: .4, glowY: .5, vig: .5 }], [c.reject, { cool: .4, sat: .75, vig: .65 }],
+    [c.self, { cool: .3, sat: .9, vig: .6 }], [c.sick, { cool: .35, sat: .85, vig: .68 }], [c.proof, { cool: .15, sat: 1.0, vig: .55 }], [c.medal, { warm: .25, sat: 1.05, glow: .3, glowX: .5, glowY: .45, vig: .5 }],
+    [c.today, { cool: .1, warm: .15, sat: 1.0, vig: .5 }], [c.back, { cool: .2, warm: .05, sat: 1.0, vig: .55 }]];
+}
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start, name = S.sceneAt(Math.min(t, es - .001));
+  const kind = drawScene(t, name); if (kind === "2d") draw2D(t, name);
+  if (name === "open") { bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); const box_ = [140, 720, 940, 1258]; photo(bg, IMG.sem, k_(t, "t0", .5, .1), 1.0, 1.08, clamp(t / 3), { box: box_, cy: .5, gray: 0, bright: 1.0 }); photoGlow(t, "t0", box_); }   // オープニング：本物の写真を中央に
+  S.moodGrade(bg, t, MOOD); Cine.bloom(bg, name === "proof" && t >= CUE.medal ? .42 : .28); addGrain(t);
+  if (t < es) { drawUI(t, name); if (name !== "open") S.docSub(ui, t, { endAt: es }); }
+  else { const e = TL.lines.filter(x => x.ending); HUD.endingOverlay(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits }); }
+  const [a] = S.sceneRange(name), i = SCN.indexOf(name);
+  if (i > 0 && t < es) { const k = 1 - prog(t, a, .25); if (k > 0) { bg.fillStyle = `rgba(4,8,14,${.85 * k})`; bg.fillRect(0, 0, W, H); } }
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); CUE = CUE || {}; CUE.t0 = 0;
+  driftShot(1); bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); photo(bg, IMG.sem, 1, 1.0, 1.08, .5, { box: [140, 720, 940, 1258], cy: .5, gray: 0, bright: 1.0 });
+  S.moodGrade(bg, 0, [[0, { cool: .25, sat: 1.05, vig: .55 }]]); Cine.bloom(bg, .3); addGrain(0);
+  HUD.title(ui, [["胃潰瘍の大きな原因は", 84, "#EAF2F8"], ["細菌だった", 120, "#FFD58A"]], 540, 420, 1, 9);
+  text(ui, "自分で飲んで確かめた医師", 540, 1420, 64, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 });
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; buildMood(); }
+window.READY = Promise.all([...imgReady, loadHumans()]).then(() => { loadEnv(); buildLab(); buildGut(); buildMeet(); });
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>
