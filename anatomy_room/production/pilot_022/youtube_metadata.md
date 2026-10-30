@@ -21,7 +21,7 @@
 ・NIH Consensus Development Conference "Helicobacter pylori in peptic ulcer disease"（1994）
 
 ▼ 写真
-・ピロリ菌の電子顕微鏡写真："SEM of colony of Helicobacter" by David Gregory & Debbie Marshall, Wellcome Collection, CC BY 4.0（切り抜き・明るさ調整）
+・胃の図：Henry Vandyke Carter, Gray's Anatomy (1918) Fig. 1046（Wikimedia Commons、パブリックドメイン、注記を外す）
 ・3D の素材：Poly Haven（CC0）、MakeHuman / MPFB（CC0）
 ※人物・研究室・胃・メダルは再現CG（胃は模式図）です。
 

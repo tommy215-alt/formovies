@@ -2,7 +2,9 @@
 """pilot_022「自分で細菌を飲んだ医師——ピロリ菌」（チャンネル「リバース」知的設計＋ガイドライン v2.4）の制作スクリプト。
 
 知的設計（templates/DESIGN_MODES.md、参考 pilot_017）：落ち着いた科学ドキュメンタリー。字幕は S.docSub、見出しは uiCard、効果音はやわらかく、ゆっくりした寄り。
-冒頭のオープニング（約 3 秒、ユーザーの指示）：結論の文字を大きく、W の声（冥鳴ひまり）が読み、本物の写真を中央、背景は動く CG、やさしい音（ext/opening_bgm.py のモード open_soft）。
+冒頭のオープニング（約 3 秒、ユーザーの指示）：結論の文字を大きく、W の声（冥鳴ひまり）が読み、本物の図（グレイ解剖学の胃の図、1918、パブリックドメイン）を中央、
+背景は動く CG、ゆっくりで少し不気味な、気を引く音（ext/opening_bgm.py のモード open_eerie。2026-10-30 の直し：電子顕微鏡写真はグロテスク、やさしい音は物足りない）。
+話が大きく変わるところ（L08 自分の体で試す）は、カットを切り替えて大きく演出する（ユーザーの指示）。
 共通エンディングは短い版（ending_ext）。BGM は lab_melodic（落ち着いた曲調。直前の知的設計は lab_dub）。
 処理の本体は production/common/pipeline.py、標準の既定値は production/common/standard.py。素材は assets/（scripts/pilot_022/assets.md）。
 """
@@ -39,15 +41,16 @@ EP = standard.config({
             ("whoosh", "acid", 0.5), ("scanline", "acid", 0.4, 0.4), ("tagpop", "acid", 0.4, 1.2), ("tagpop", "acid", 0.4, 1.6), ("deep", "notaccepted", 0.45),
             ("room", "find", 0.4), ("scan", "spiral", 0.5), ("lock", "spiral", 0.5, 0.6), ("paper", "join", 0.35), ("tick", "nogrow", 0.35), ("tick", "nogrow", 0.35, 0.6),
             ("flip", "easter", 0.4), ("flip", "easter", 0.35, 0.25), ("reveal", "colony", 0.6), ("bloom", "colony", 0.5, 0.2), ("paper", "reject", 0.35), ("stamp", "stampc", 0.55),
-            ("deep", "self", 0.45), ("scanline", "self", 0.35, 0.4), ("room", "decide", 0.35), ("glow", "decide", 0.35, 0.8),
+            ("deep", "self", 0.45), ("scanline", "self", 0.35, 0.4), ("riser", "self", 0.5, 1.0),
+            ("impact", "decide", 1.0), ("deep", "decide", 0.8, 0.02), ("hit", "decide", 0.7, 0.55), ("whoosh", "decide", 0.6, 0.5), ("impact", "decide", 0.8, 1.15), ("hit", "decide", 0.6, 1.8), ("zoom", "decide", 0.6, 1.8),
             ("tick", "days", 0.35), ("tick", "days", 0.35, 0.5), ("tick", "days", 0.35, 1.0), ("deep", "sick", 0.5), ("scan", "inflam", 0.45), ("data", "inflam", 0.4, 0.4),
             ("whoosh", "proof", 0.45), ("data", "bars", 0.45), ("ring", "bars", 0.35, 0.8), ("room", "nih", 0.35), ("paper", "nih", 0.3, 0.6),
             ("bloom", "medal", 0.6), ("discover", "medal", 0.5, 0.1), ("shimmer", "medal", 0.4, 0.5),
             ("glow", "today", 0.45), ("prism", "today", 0.35, 0.6), ("zoom", "back", 0.4, 0.4), ("shimmer", "card", 0.5), ("discover", "card", 0.4, 0.1)],
-    # BGM：オープニングはやさしい音（open_soft）→ 冒頭（謎）→ 常識（陰り）→ 発見（物語）→ 培養（集中）→ 不採用（陰り）→ 自己実験（集中・間）→ 証明（高まり）→ ノーベル（発見）→ 現代（温かく）→ 冒頭へ
+    # BGM：オープニングはゆっくりで少し不気味な音（open_eerie）→ 冒頭（謎）→ 常識（陰り）→ 発見（物語）→ 培養（集中）→ 不採用（陰り）→ 自己実験（集中・間）→ 証明（高まり）→ ノーベル（発見）→ 現代（温かく）→ 冒頭へ
     "music": {"style": "lab_melodic", "sections": [
-        ("t0", 0.0, "open_soft"), ("hook", -0.05, "w_hook"), ("notaccepted", -0.1, "w_shade"), ("find", -0.1, "w_story"), ("grow", -0.1, "w_focus"), ("colony", -0.1, "w_discover"),
-        ("reject", -0.1, "w_shade"), ("self", -0.1, "w_focus"), ("sick", -0.15, "w_hold"), ("proof", -0.1, "w_rise"), ("medal", -0.1, "w_discover"),
+        ("t0", 0.0, "open_eerie"), ("hook", -0.05, "w_hook"), ("notaccepted", -0.1, "w_shade"), ("find", -0.1, "w_story"), ("grow", -0.1, "w_focus"), ("colony", -0.1, "w_discover"),
+        ("reject", -0.1, "w_shade"), ("self", -0.1, "w_focus"), ("decide", -0.5, "w_hold"), ("decide", 0.0, "w_discover"), ("days", -0.1, "w_focus"), ("sick", -0.15, "w_hold"), ("proof", -0.1, "w_rise"), ("medal", -0.1, "w_discover"),
         ("today", -0.1, "w_warm"), ("back", -0.1, "w_hook"), ("end1", -0.6, "ending")]},
     "segments": ["open", "hook", "find", "grow", "self", "proof", "today"],
     "extra_files": ["../ext/hud_ext.js", "../common/cine.js", "assets/assets.js", "assets/scene_assets.js"] + V3,
@@ -56,11 +59,11 @@ EP = standard.config({
                   ("easter", 0.6), ("colony", 0.8), ("reject", 0.6), ("stampc", 0.5), ("self", 0.8), ("decide", 1.0), ("days", 0.6), ("sick", 0.8), ("inflam", 0.8),
                   ("proof", 0.6), ("bars", 1.0), ("nih", 1.0), ("medal", 0.8), ("today", 1.0), ("back", 1.0), ("card", 0.3)],
     "scenes": [
-        ("0 オープニング（約 3 秒）", None, "hook", "結論の文字を大きく、本物の写真（A1：ピロリ菌の電子顕微鏡写真）を中央、背景はゆっくり漂う菌の 3D。やさしい音", "open_soft"),
+        ("0 オープニング（約 3 秒）", None, "hook", "結論の文字を大きく、本物の図（A2：グレイ解剖学の胃の図）を中央、背景はゆっくり漂う菌の 3D。ゆっくりで少し不気味な音", "open_eerie"),
         ("1 冒頭（フック）", "hook", "find", "最初の 1 秒：実験台の上の濁った液体の小瓶（再現）→ 酸の満ちた胃の 3D、ストレス・胃酸の札", "w_hook → w_shade"),
         ("2 発見", "find", "grow", "顕微鏡をのぞく後ろ姿 → 視野の中のらせん形の菌（模式）→ 何も生えない培養皿", "w_story"),
         ("3 培養と不採用", "grow", "self", "連休の暦 → 培養皿に広がる菌のコロニー → 不採用の判", "w_focus → w_discover → w_shade"),
-        ("4 自分の胃で", "self", "proof", "「原因？」→ 小瓶を前にした後ろ姿（手のアップなし）→ 日付 → 赤く腫れる胃（模式）。まねしないで、の注意", "w_focus → w_hold"),
+        ("4 自分の胃で", "self", "proof", "「原因？」→ **大きな転換（L08）：一瞬の無音 → 暗転に「自分の体で」→ 小瓶の極端な寄り → 見上げる後ろ姿 → 小瓶の真上、と一打ずつカットを切り替える** → 日付 → 赤く腫れる胃（模式）。まねしないで、の注意", "w_focus → 無音 → w_discover → w_focus → w_hold"),
         ("5 証明", "proof", "today", "除菌の模式図 → 会議の机（顔なし）→ メダルの光（再現）", "w_rise → w_discover"),
         ("6 現代と冒頭へ", "today", "endcard", "元の色に戻る胃 → 冒頭の小瓶", "w_warm → w_hook"),
         ("7 共通エンディング（短い版）", "endcard", None, "最後の画の上にロゴと決めゼリフ", "BGM ending"),
@@ -68,7 +71,7 @@ EP = standard.config({
     "plan_notes": [
         "## 演出の方針（知的設計＋ガイドライン v2.4＋オープニング）",
         "",
-        "- オープニング：結論の文字を画面の上〜中ほどに大きく、W の声ではっきり読む。本物の写真（ピロリ菌の電子顕微鏡写真、CC BY 4.0）を中央に。背景は動く CG。やさしい音。",
+        "- オープニング：結論の文字を画面の上〜中ほどに大きく、W の声ではっきり読む。本物の図（グレイ解剖学の胃の図、パブリックドメイン）を中央に。背景は動く CG。ゆっくりで少し不気味な音。",
         "- 冒頭（本編）の最初の 1 秒：実験台の上の濁った液体の小瓶（決定的な映像）。",
         "- 知的設計：字幕は S.docSub、見出しは uiCard、効果音はやわらかく、ゆっくりした寄り。決定的な瞬間（菌のコロニーが広がる、胃が腫れる）だけ光の転換。",
         "- 最後の一文と画を冒頭につなげる：小瓶に戻る。",
