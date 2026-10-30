@@ -11,7 +11,7 @@
 - **2 つの設計（2026-10-30、ユーザーが命名）**：「知的設計」（pilot_017 の落ち着いた作り）と「ドパ設計」（pilot_018 の派手な作り）。どちらも採用。一覧は `templates/DESIGN_MODES.md`。新しい動画でどちらか指定がなければ聞く。
 - 叫ぶナレーションの聞き比べ（`production/voice_tests/shout/` の 0〜5）は 2 番に決定（2026-10-30）。v2.4 を最初に使った回：Blender 5.2＋MPFB で人体（`production/pilot_017/assets/make_human.py`）、Poly Haven の HDRI・質感、SSAO・ボケ（`production/ext/vendor/three147/`）。素材をまとめ直すときは `assets/make_scene_assets.py`。事実確認 `scripts/pilot_017/fact_check.md`、権利 `assets.md`。
 
-- **pilot_019（ジョン・ハリソン、経度の時計）を開始（2026-10-30）**：ドパ設計（ユーザーの指示）。ChatGPT への事実確認の依頼文 `scripts/pilot_019/gpt_fact_check_prompt.md` → 結果を出典で確かめ直して `fact_check.md`・`assets.md`、台本の下書き `script_draft.md`（本編 約 80 秒、実測）→ **ユーザーの「OK」待ち**。BGM は直前が lab_break なので lab_electro を優先。ユーザーの指示（2026-10-30）：叫ぶ声は要所だけ、青山龍星「熱血」を強く（聞き比べの 2 番、「一旦」なので仕上がりを見て再確認）／**閃光は入れない**（まぶしい）。`DESIGN_MODES.md` に反映済み。
+- **pilot_019（ジョン・ハリソン、経度の時計）を開始（2026-10-30）**：ドパ設計（ユーザーの指示）。ChatGPT への事実確認の依頼文 `scripts/pilot_019/gpt_fact_check_prompt.md` → 結果を出典で確かめ直して `fact_check.md`・`assets.md`、台本の下書き `script_draft.md`（本編 約 80 秒、実測）→ ユーザーの「OK」（2026-10-30）→ 制作中：`production/pilot_019/`（renderer.html はドパ設計の部品を pilot_018 から流用、閃光なし。人体の GLB と Poly Haven の素材は pilot_018 のものを複製。嵐の海・帆船・岩・H1〜H4 は自前の 3D）。叫ぶ声は lines.json の voice_override の style "shout"（青山龍星「熱血」id 81、抑揚 1.5）。BGM は直前が lab_break なので lab_electro を優先。ユーザーの指示（2026-10-30）：叫ぶ声は要所だけ、青山龍星「熱血」を強く（聞き比べの 2 番、「一旦」なので仕上がりを見て再確認）／**閃光は入れない**（まぶしい）。`DESIGN_MODES.md` に反映済み。
 
 ## 次の動画でやること（ガイドライン v2.4）
 

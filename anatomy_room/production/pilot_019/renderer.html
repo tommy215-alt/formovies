@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_019 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="assets/scene_assets.js"></script>
+<script>
+// pilot_019「海の上の時計——ジョン・ハリソン」のレンダラー（ドパ設計＋ガイドライン v2.4）。
+// ドパ設計（templates/DESIGN_MODES.md）：叩きつける文字（slam）・跳ねる字幕（popSub）・画面の一打（punch）。部品は pilot_018 と同じ。
+//   閃光は使わない（2026-10-30 ユーザー「まぶしい」）：場面の切り替えは一打と短い暗転、山場はズーム・揺れ・グリッチ・スピード線・光の色の転換。
+// CG：Poly Haven の HDRI・PBR、SSAO・ボケ、MPFB の人体（pilot_018 の GLB。顔は映さない、手のアップなし）。嵐の海・帆船・岩・H1〜H4 は再現。
+// 本物の写真・図：ハリソンの肖像の版画（A2）、1767 年の H4 の図版（A1）。※注記は冒頭に 1 回だけ。
+const S = Stage, { W, H, clamp, lerp, easeOut, easeIn, easeInOut, prog, win, text, rrect } = Stage;
+const bg = document.getElementById("bg").getContext("2d");
+const ui = document.getElementById("ui").getContext("2d");
+const SCN = ["hook", "lon", "harrison", "h4", "trial", "today"];
+let TL, CUE, MOOD = [];
+const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const b64buf = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
+
+// ---------------------------------------------------------------- 派手な文字（フォント：Dela Gothic One＝DG、Mochiy Pop One＝MP）
+const DG = '"DelaGothic", "Noto Sans CJK JP", sans-serif', MP = '"MochiyPop", "Noto Sans CJK JP", sans-serif';
+const fontReady = Promise.all([["DelaGothic", "font_dela"], ["MochiyPop", "font_mochiy"]].map(([n, k]) => new FontFace(n, b64buf(window.ASSETS[k])).load().then(f => document.fonts.add(f))));
+let GSEQ = 500000;
+function logBox(ctx, s, x0, y0, x1, y1, size) {   // 文字の検査用（stage.js の text() と同じ形で記録）
+  if (ctx.globalAlpha < .35 || !s.trim()) return; const m = ctx.getTransform(), pts = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+  S.TEXTLOG.push({ s, box: [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))], size: size * Math.hypot(m.a, m.b), group: ++GSEQ, container: null, ignore: false });
+}
+// 叩きつける文字：大きく出て一瞬で縮み（行き過ぎて戻る）、色ずれ・揺れ・光。cols＝[上の色, 下の色]
+function slam(ctx, s, x, y, size, t0, t, { cols = ["#FFF36A", "#FF9A1F"], stroke = "#120606", rot = -.05, font = DG, dur = 99, out = .25, glow = "rgba(255,170,60,.9)", sub = null } = {}) {
+  const u = t - t0; if (u < 0 || u > dur + out) return;
+  { ctx.save(); ctx.font = `400 ${size}px ${font}`; const w0 = ctx.measureText(s).width; ctx.restore(); if (w0 > 860) size = Math.floor(size * 860 / w0); }   // 安全な範囲に収める：幅 860 まで、上端は 200＋文字の高さ
+  y = Math.max(y, 210 + size * .7); if (y > 860 && y < 1660) x = Math.min(x, 950 - Math.min(430, (size * s.length) / 2));
+  const kin = clamp(u / .16), e = 1 + 1.6 * Math.pow(1 - kin, 3) - .12 * Math.sin(kin * Math.PI) * (1 - kin * .3);
+  const a = Math.min(clamp(u / .06), 1 - clamp((u - dur) / out)); if (a <= 0) return;
+  const sh = Math.max(0, 1 - u / .35) * 18, r = S.rng(Math.floor(t * 30) + s.length), dx = (r() - .5) * sh, dy = (r() - .5) * sh;
+  ctx.save(); ctx.globalAlpha *= a; ctx.translate(x + dx, y + dy); ctx.rotate(rot); ctx.scale(e, e);
+  ctx.font = `400 ${size}px ${font}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; const w = ctx.measureText(s).width;
+  if (u < .25) { ctx.save(); ctx.globalAlpha *= .7 * (1 - u / .25); ctx.fillStyle = "#ff2a4a"; ctx.fillText(s, -10, 0); ctx.fillStyle = "#2af0ff"; ctx.fillText(s, 10, 0); ctx.restore(); }   // 色ずれ
+  ctx.lineJoin = "round"; ctx.shadowColor = glow; ctx.shadowBlur = 40; ctx.strokeStyle = stroke; ctx.lineWidth = size * .2; ctx.strokeText(s, 0, 0); ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = size * .06; ctx.strokeText(s, 0, 0);
+  const g = ctx.createLinearGradient(0, -size * .5, 0, size * .5); g.addColorStop(0, cols[0]); g.addColorStop(1, cols[1]); ctx.fillStyle = g; ctx.fillText(s, 0, 0);
+  logBox(ctx, s, -w / 2 - size * .1, -size * .55, w / 2 + size * .1, size * .55, size);
+  if (sub) { ctx.font = `400 ${size * .32}px ${MP}`; const w2 = ctx.measureText(sub).width; ctx.lineWidth = size * .08; ctx.strokeStyle = stroke; ctx.strokeText(sub, 0, size * .98); ctx.fillStyle = "#ffffff"; ctx.fillText(sub, 0, size * .98);
+    logBox(ctx, sub, -w2 / 2, size * .98 - size * .19, w2 / 2, size * .98 + size * .19, size * .32); }
+  ctx.restore();
+}
+// 跳ねる字幕：塊が変わるたびに飛び出す。斜めの黒い帯＋色の縁、強調は黄色、太い縁取り
+function popSub(ctx, t, endAt) {
+  const line = S.currentLine(t); if (!line || t >= endAt) return;
+  const subs = Array.isArray(line.sub) ? line.sub : [line.sub], lens = subs.map(s => s.replace(/\*\*/g, "").replace(/ \/ /g, "").length), tot = lens.reduce((a, b) => a + b, 0);
+  const kk = clamp((t - line.start) / (line.end - line.start)) * tot; let acc = 0, idx = subs.length - 1, cs = 0;
+  for (let i = 0; i < lens.length; i++) { if (kk < acc + lens[i]) { idx = i; break; } acc += lens[i]; }
+  { let a2 = 0; for (let i = 0; i < idx; i++) a2 += lens[i]; cs = line.start + (line.end - line.start) * a2 / tot; }
+  const rows = subs[idx].split(" / "), u = t - cs, pop = 1 + .35 * Math.pow(1 - clamp(u / .14), 2), cx = 495, cy = 1495;
+  let size = 66; ctx.font = `400 ${size}px ${DG}`; const wOf = () => Math.max(...rows.map(r => ctx.measureText(r.replace(/\*\*/g, "")).width)); let wmax = wOf();
+  if (wmax > 800) { size = Math.floor(size * 800 / wmax); ctx.font = `400 ${size}px ${DG}`; wmax = wOf(); }
+  const lh = size * 1.3, bw = wmax + 80, bh = rows.length * lh + 34;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(pop, pop); ctx.rotate(-.025);
+  ctx.save(); ctx.transform(1, 0, -.12, 1, 0, 0); ctx.fillStyle = "rgba(8,4,14,.82)"; ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+  const g = ctx.createLinearGradient(-bw / 2, 0, bw / 2, 0); g.addColorStop(0, "#2ad8ff"); g.addColorStop(1, "#ffd23d"); ctx.fillStyle = g; ctx.fillRect(-bw / 2, bh / 2 - 7, bw, 7); ctx.fillRect(-bw / 2, -bh / 2, 10, bh); ctx.restore();
+  rows.forEach((r, i) => { const parts = r.split("**"), ws = parts.map(p => ctx.measureText(p).width), tw = ws.reduce((a, b) => a + b, 0); let x = -tw / 2; const y = -(rows.length - 1) * lh / 2 + i * lh + 3;
+    parts.forEach((p, j) => { if (!p) return; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.lineJoin = "round"; ctx.lineWidth = size * .22; ctx.strokeStyle = "#0a0408"; ctx.strokeText(p, x, y);
+      ctx.fillStyle = j % 2 ? "#FFE14A" : "#FFFFFF"; ctx.fillText(p, x, y); x += ws[j]; });
+    logBox(ctx, r.replace(/\*\*/g, ""), -tw / 2, y - size * .58, tw / 2, y + size * .58, size); });
+  ctx.restore();
+}
+// 画面全体の一打：ズーム（拡大して戻る）と揺れ（閃光は使わない）
+const tmpC = document.createElement("canvas"); tmpC.width = W; tmpC.height = H; const tmpX = tmpC.getContext("2d");
+function punch(ctx, z, sx = 0, sy = 0) { if (z <= 1.001 && !sx && !sy) return; tmpX.clearRect(0, 0, W, H); tmpX.drawImage(ctx.canvas, 0, 0); ctx.clearRect(0, 0, W, H);
+  ctx.save(); ctx.translate(W / 2 + sx, H / 2 + sy); ctx.scale(z, z); ctx.drawImage(tmpC, -W / 2, -H / 2); ctx.restore(); }
+const HITS = [];   // [きっかけ, 強さ]：ここで画面がズームして揺れる
+function hitAmt(t) { let z = 0, s = 0; for (const [c, k] of HITS) { const u = t - CUE[c]; if (u >= 0 && u < .45) { const e = Math.exp(-u * 9); z += .09 * k * e; s += 26 * k * e; } } return [1 + z, s]; }
+function label(ctx, s, x, y, size, col = "#fff", { font = MP, align = "center", stroke = "#06080e", sw = .2 } = {}) {   // 図の中の文字（縁取りつき、検査に記録）
+  ctx.save(); ctx.font = `400 ${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.lineJoin = "round"; ctx.lineWidth = size * sw; ctx.strokeStyle = stroke; ctx.strokeText(s, x, y); ctx.fillStyle = col; ctx.fillText(s, x, y);
+  const w = ctx.measureText(s).width, x0 = align === "center" ? x - w / 2 : align === "right" ? x - w : x; logBox(ctx, s, x0, y - size * .58, x0 + w, y + size * .58, size); ctx.restore();
+}
+
+// ---------------------------------------------------------------- 本物の写真・図
+const IMG = {}; const imgReady = [];
+for (const k of ["portrait", "plate"]) { const im = new Image(); imgReady.push(new Promise(r => { im.onload = r; im.onerror = r; })); im.src = window.ASSETS[k]; IMG[k] = im; }
+function photo(ctx, im, k, z0, z1, u, { cx = .5, cy = .45, box = [90, 330, 990, 1290], gray = 1, rot = 0, sepia = 0, frame = "#fff", invert = 0, bright = .95 } = {}) {
+  if (k <= 0 || !im.width) return; const [x0, y0, x1, y1] = box, bw = x1 - x0, bh = y1 - y0, z = lerp(z0, z1, u), sc = Math.max(bw / im.width, bh / im.height) * z, dw = im.width * sc, dh = im.height * sc;
+  ctx.save(); ctx.globalAlpha *= clamp(k); ctx.translate((x0 + x1) / 2, (y0 + y1) / 2); ctx.rotate(rot); ctx.translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+  if (frame) { ctx.fillStyle = frame; ctx.fillRect(x0 - 14, y0 - 14, bw + 28, bh + 28); } rrect(ctx, x0, y0, bw, bh, 4); ctx.clip();
+  ctx.filter = `grayscale(${gray}) sepia(${sepia}) invert(${invert}) contrast(1.12) brightness(${bright})`; ctx.drawImage(im, x0 + bw / 2 - dw * cx, y0 + bh / 2 - dh * cy, dw, dh); ctx.filter = "none"; ctx.restore();
+}
+function credit(s, k, y = 1300) { if (k <= 0) return; ui.save(); ui.globalAlpha = clamp(k) * .9; S.group(() => text(ui, s, 540, y, 26, "#E8DCC8", { weight: 500, stroke: "#100808", sw: 6 })); ui.restore(); }
+
+// ---------------------------------------------------------------- 3D の土台（pilot_018 と同じ：超解像度 1.5 倍、SSAO・ボケ、ACES の色調）
+const SS = 1.5, GW = W * SS, GH = H * SS;
+const glc = document.createElement("canvas"); glc.width = GW; glc.height = GH;
+const R = new THREE.WebGLRenderer({ canvas: glc, antialias: true, alpha: false, preserveDrawingBuffer: true });
+R.setPixelRatio(1); R.setSize(GW, GH, false); R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.ACESFilmicToneMapping;
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap; R.shadowMap.autoUpdate = false;
+Cine.init(THREE, R);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, W / H, .02, 300);
+const C = c => new THREE.Color(c).convertSRGBToLinear();
+let FOGC = C(0x05070b); scene.fog = new THREE.FogExp2(FOGC, .02);
+const hemi = new THREE.HemisphereLight(C(0x8ea2bd), C(0x1a1612), .3); scene.add(hemi);
+const key = new THREE.SpotLight(C(0xffd9a8), 2, 0, .7, .55, 1); key.castShadow = true; scene.add(key); scene.add(key.target);
+key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -.0003; key.shadow.normalBias = .01; key.shadow.camera.near = .2; key.shadow.camera.far = 60;
+const rim = new THREE.DirectionalLight(C(0x9fd4ff), .6); scene.add(rim); scene.add(rim.target);
+const sets = {}; function set(n) { const g = new THREE.Group(); g.visible = false; scene.add(g); sets[n] = g; return g; }
+function show(...n) { for (const k in sets) sets[k].visible = n.includes(k); }
+function setCam(pos, look, fov = 40, near = .02, far = 300) { cam.position.copy(pos); cam.fov = fov; cam.near = near; cam.far = far; cam.lookAt(look); cam.updateProjectionMatrix(); cam.updateMatrixWorld(); }
+const OUT = new THREE.ShaderPass({
+  uniforms: { tDiffuse: { value: null }, exposure: { value: 1.0 } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float exposure; varying vec2 vUv;
+    vec3 rvFit(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
+    vec3 rvAces(vec3 c){ const mat3 I = mat3(vec3(0.59719,0.07600,0.02840), vec3(0.35458,0.90834,0.13383), vec3(0.04823,0.01566,0.83777));
+      const mat3 O = mat3(vec3(1.60475,-0.10208,-0.00327), vec3(-0.53108,1.10813,-0.07276), vec3(-0.07367,-0.00605,1.07602));
+      c *= exposure / 0.6; c = I * c; c = rvFit(c); c = O * c; return clamp(c, 0.0, 1.0); }
+    vec3 rvSRGB(vec3 c){ return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308)))); }
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); gl_FragColor = vec4(rvSRGB(rvAces(c.rgb)), 1.0); }` });
+function lights({ hemiI = .3, keyI = 30, keyPos = [0, 5, 0], keyAt = [0, 0, 0], keyCol = 0xffd9a8, angle = .7, rimI = .6, rimCol = 0x9fd4ff, rimPos = [3, 4, -4], fog = .02, fogC = 0x05070b, exp = 1.0, hemiSky = 0x8ea2bd, hemiGround = 0x1a1612 } = {}) {
+  hemi.intensity = hemiI; hemi.color = C(hemiSky); hemi.groundColor = C(hemiGround); key.intensity = keyI * .085; key.color = C(keyCol); key.angle = angle;
+  key.position.set(...keyPos); key.target.position.set(...keyAt); key.target.updateMatrixWorld(); rim.intensity = rimI; rim.color = C(rimCol); rim.position.set(...rimPos);
+  FOGC = C(fogC); scene.fog.color = FOGC; scene.fog.density = fog; OUT.uniforms.exposure.value = exp;
+}
+const composer = new THREE.EffectComposer(R); composer.setPixelRatio(1); composer.setSize(GW, GH);
+const rpass = new THREE.RenderPass(scene, cam);
+const ssao = new THREE.SSAOPass(scene, cam, GW, GH); ssao.kernelRadius = .22; ssao.minDistance = .0004; ssao.maxDistance = .02;
+{ const ro = ssao.renderOverride.bind(ssao); ssao.renderOverride = (...a) => { const hid = []; scene.traverse(o => { if (o.visible && (o.isPoints || o.isSprite || o.isLine || o.userData.noAO)) { o.visible = false; hid.push(o); } }); ro(...a); hid.forEach(o => o.visible = true); }; }
+const bokeh = new THREE.BokehPass(scene, cam, { focus: 1, aperture: .002, maxblur: .008, width: GW, height: GH });
+composer.addPass(rpass); composer.addPass(ssao); composer.addPass(bokeh); composer.addPass(OUT);
+function draw3D({ ao = true, dof = null } = {}) {
+  R.shadowMap.needsUpdate = true; R.setClearColor(FOGC, 1); rpass.enabled = !ao; ssao.enabled = ao; bokeh.enabled = !!dof;
+  if (dof) { bokeh.uniforms.focus.value = dof.focus; bokeh.uniforms.aperture.value = dof.aperture ?? .002; bokeh.uniforms.maxblur.value = dof.maxblur ?? .008; bokeh.uniforms.nearClip.value = cam.near; bokeh.uniforms.farClip.value = cam.far; bokeh.uniforms.aspect.value = cam.aspect; }
+  composer.render(); bg.imageSmoothingQuality = "high"; bg.drawImage(glc, 0, 0, W, H);
+}
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: C(c), roughness: .7, metalness: 0, ...o });
+function box(w, h, d, mat, x = 0, y = 0, z = 0, parent) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; if (parent) parent.add(m); return m; }
+function cyl(r0, r1, h, mat, seg = 32) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg), mat); m.castShadow = m.receiveShadow = true; return m; }
+const TEX = {}; const texLoader = new THREE.TextureLoader();
+function pbr(name, rep, o = {}) {
+  const t = k => { const key_ = name + "_" + k, tx = TEX[key_] || (TEX[key_] = texLoader.load(window.ASSETS3D.tex[key_])); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 16; return tx; };
+  const map = t("Diffuse").clone(), nm = t("nor_gl").clone(), rm = t("Rough").clone(); map.encoding = THREE.sRGBEncoding;
+  for (const x of [map, nm, rm]) { x.repeat.set(...rep); x.needsUpdate = true; }
+  return new THREE.MeshStandardMaterial({ map, normalMap: nm, roughnessMap: rm, roughness: 1, normalScale: new THREE.Vector2(o.normal ?? 1, o.normal ?? 1), color: C(o.tint ?? 0xffffff), envMapIntensity: o.env ?? .6 });
+}
+let ENV_ROOM = null;
+function loadEnv() { const d = new THREE.RGBELoader().parse(b64buf(window.ASSETS3D.hdr)); const tx = new THREE.DataTexture(d.data, d.width, d.height, THREE.RGBAFormat, d.type);
+  tx.flipY = true; tx.minFilter = tx.magFilter = THREE.LinearFilter; tx.generateMipmaps = false; tx.mapping = THREE.EquirectangularReflectionMapping; tx.needsUpdate = true; const pm = new THREE.PMREMGenerator(R); ENV_ROOM = pm.fromEquirectangular(tx).texture; pm.dispose(); }
+function envOn(k = .8) { scene.environment = ENV_ROOM; scene.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m && "envMapIntensity" in m) m.envMapIntensity = k; }); }
+const brassM = () => { const m = M(0xc0913e, { metalness: 1, roughness: .32 }); Cine.surface(m, "metal", { repeat: [2, 2], normal: .35 }); return m; };
+const steelM = () => { const m = M(0xc8ccd2, { metalness: 1, roughness: .22 }); Cine.surface(m, "metal", { repeat: [2, 2], normal: .25 }); return m; };
+
+// ---------------------------------------------------------------- 人体（MPFB の GLB、pilot_018 と同じ作り）：服・髪・肌の材質を名前で決める。肌は頭のまわりだけ
+const HUMANS = {};
+function loadHumans() { const L = new THREE.GLTFLoader(); return Promise.all(Object.entries(window.ASSETS3D.glb).map(([k, s]) => new Promise(res => L.parse(b64buf(s), "", g => { HUMANS[k] = g.scene; res(); }, e => { console.error(e); res(); })))); }
+function human(kindKey, { coat = 0x2a2a30, hair = 0x3a2a20 } = {}) {
+  const g = new THREE.Group(), body = HUMANS[kindKey].clone(true);
+  const coatM = M(coat, { roughness: .85 }), hairM = M(hair, { roughness: .5 }); hairM.color.multiplyScalar(.55); Cine.surface(coatM, "fabric", { repeat: [8, 8], normal: .7 }); Cine.surface(hairM, "wood", { repeat: [1, 6], normal: .9, roughness: 1 });
+  const bb = new THREE.Box3(); let bodyMesh = null;
+  body.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = true; const n = o.name.toLowerCase();
+    if (/braid|ponytail|bob|short|hair/.test(n)) o.material = hairM; else if (/suit/.test(n)) o.material = coatM; else if (/shoe/.test(n)) o.material = M(0x141010, { roughness: .4 });
+    else { o.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .8 }); Cine.surface(o.material, "fabric", { repeat: [8, 8], normal: .5 }); bodyMesh = o; } });
+  bb.setFromObject(body); body.position.y = -bb.min.y; g.add(body);
+  let hb0 = null; body.traverse(o => { if (o.isMesh && o.material === hairM) hb0 = new THREE.Box3().setFromObject(o); });
+  if (bodyMesh && hb0) { const P = bodyMesh.geometry.attributes.position, col = new Float32Array(P.count * 3), cs = C(0xc9a08a), cc = C(coat), hc = new THREE.Vector3(); hb0.getCenter(hc); hc.y = hb0.max.y - .11;
+    for (let i = 0; i < P.count; i++) { const d = Math.hypot(P.getX(i) - hc.x, (P.getY(i) - hc.y) * .8, P.getZ(i) - hc.z), k = clamp((.135 - d) / .02) * clamp((P.getY(i) - (hc.y - .16)) / .02); const cl = cc.clone().lerp(cs, k); col.set([cl.r, cl.g, cl.b], i * 3); }
+    bodyMesh.geometry.setAttribute("color", new THREE.BufferAttribute(col, 3)); }
+  return g;
+}
+
+// ---------------------------------------------------------------- 嵐の海（再現）：波は頂点を毎コマ動かす。帆船・岩・雨・しぶき
+const sea = set("sea"); let ocean, oceanBase, rocks = [], hero, fleet = [], rain, spray, skyMesh, SKY = {};
+function waveH(x, z, t, a) { return a * (.42 * Math.sin(.33 * x + 1.05 * t) + .3 * Math.sin(.42 * z + .31 * x - 1.5 * t) + .14 * Math.sin(1.25 * x - .85 * z + 2.2 * t) + .07 * Math.sin(2.3 * z + 3.1 * t + x)); }
+function updateOcean(t, a) { const P = ocean.geometry.attributes.position; for (let i = 0; i < P.count; i++) { const x = oceanBase[i * 3], z = oceanBase[i * 3 + 2]; P.setY(i, waveH(x, z, t, a)); } P.needsUpdate = true; ocean.geometry.computeVertexNormals(); }
+function skyTex(stops, cloud) { const c = document.createElement("canvas"); c.width = 256; c.height = 512; const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 512); stops.forEach(([p, col]) => g.addColorStop(p, col)); x.fillStyle = g; x.fillRect(0, 0, 256, 512);
+  const r = S.rng(17); for (let i = 0; i < 60; i++) { x.fillStyle = cloud; x.globalAlpha = .08 + r() * .12; x.beginPath(); x.ellipse(r() * 256, 80 + r() * 300, 40 + r() * 90, 8 + r() * 18, 0, 0, 6.283); x.fill(); }
+  const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; return tx; }
+function ship(sc = .55) {   // 18 世紀の軍艦（再現・大まか）：船体は側面の形を押し出し、へさきに向けて細くする
+  const g = new THREE.Group(), s = new THREE.Shape();
+  s.moveTo(-4.6, 2.3); s.lineTo(-3.2, 1.7); s.lineTo(3.4, 1.45); s.lineTo(5.4, 2.0); s.quadraticCurveTo(4.9, .1, 3.0, -.65); s.lineTo(-3.5, -.65); s.quadraticCurveTo(-4.7, -.2, -4.6, 2.3);
+  const geo = new THREE.ExtrudeGeometry(s, { depth: 2.2, bevelEnabled: true, bevelThickness: .25, bevelSize: .25, bevelSegments: 3, curveSegments: 16 }); geo.translate(0, 0, -1.1);
+  const P = geo.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), tp = 1 - .88 * Math.pow(clamp((x - 2.2) / 3.4), 1.4), st = 1 - .12 * clamp((-x - 3.4) / 1.4), bot = 1 - .45 * clamp((.2 - y) / .9); P.setZ(i, P.getZ(i) * tp * st * bot); } geo.computeVertexNormals();
+  const hull = new THREE.Mesh(geo, pbr("wood_table_001", [.4, .4], { tint: 0xa07858, env: .3 })); hull.castShadow = hull.receiveShadow = true; g.add(hull);
+  for (const zs of [1, -1]) { const band = box(7.6, .28, .04, M(0xb8903e, { roughness: .6 }), -.3, .95, zs * 1.32, g); band.scale.x = .98; }   // 砲門の列の黄土色の帯（当時の軍艦の塗り）
+  const deck = box(7.4, .08, 1.9, pbr("old_wood_floor", [2, 1], { tint: 0x5a4a38 }), -.2, 1.5, 0, g); deck.scale.z = .95;
+  const blackM = M(0x0a0806, { roughness: .9 }), lit = new THREE.MeshBasicMaterial({ color: C(0xffb050) }); lit.color.multiplyScalar(2.2);
+  for (const zs of [1, -1]) for (let i = 0; i < 9; i++) box(.22, .2, .05, blackM, -3 + i * .72, .95, zs * (1.36 - .05 * Math.max(0, i - 6)), g);
+  for (let i = 0; i < 3; i++) { const w = new THREE.Mesh(new THREE.PlaneGeometry(.35, .3), lit); w.position.set(-4.72, 1.75, -.6 + i * .6); w.rotation.y = -Math.PI / 2; w.userData.noAO = true; g.add(w); }
+  const mastM = pbr("wood_table_001", [.2, 2], { tint: 0x3a2a1c }), sailM = M(0xb8ad94, { roughness: .95, side: THREE.DoubleSide }); Cine.surface(sailM, "fabric", { repeat: [3, 3], normal: .8 });
+  const masts = [];
+  for (const [x, h] of [[-2.6, 8.5], [.5, 10.5], [3.1, 7.5]]) { const mg = new THREE.Group(); mg.position.set(x, 1.5, 0); g.add(mg); masts.push(mg); const m = cyl(.09, .14, h, mastM, 12); m.position.y = h / 2; mg.add(m);
+    for (let k = 0; k < 3; k++) { const yy = h * (.38 + k * .22), w = 3.2 - k * .7, yard = cyl(.05, .05, w, mastM, 8); yard.rotation.x = Math.PI / 2; yard.position.y = yy; mg.add(yard);
+      const sg = new THREE.PlaneGeometry(w * .95, h * .2, 10, 8), SP = sg.attributes.position; for (let i = 0; i < SP.count; i++) { const u = SP.getX(i) / (w * .95) + .5, v = SP.getY(i) / (h * .2) + .5; SP.setZ(i, Math.sin(Math.PI * u) * Math.sin(Math.PI * (v * .8 + .1)) * .45); } sg.computeVertexNormals();
+      const sail = new THREE.Mesh(sg, sailM); sail.rotation.y = Math.PI / 2; sail.position.set(.12, yy - h * .1, 0); sail.castShadow = true; mg.add(sail); } }
+  const bs = cyl(.07, .1, 4, mastM, 8); bs.rotation.z = -1.1; bs.position.set(6.0, 2.6, 0); g.add(bs);
+  const lantern = new THREE.PointLight(C(0xffa040), 4, 9, 2); lantern.position.set(-4.9, 2.6, 0); g.add(lantern);
+  g.scale.setScalar(sc); g.userData = { masts, lantern }; return g;
+}
+function buildSea() {
+  const og = new THREE.PlaneGeometry(140, 140, 170, 170); og.rotateX(-Math.PI / 2); oceanBase = og.attributes.position.array.slice();
+  const om = new THREE.MeshPhysicalMaterial({ color: C(0x16323c), roughness: .22, metalness: 0, clearcoat: .7, clearcoatRoughness: .15 });
+  ocean = new THREE.Mesh(og, om); ocean.receiveShadow = true; ocean.userData.noAO = true; sea.add(ocean);
+  const rockM = M(0x2a2826, { roughness: .95 }); Cine.surface(rockM, "stone", { repeat: [3, 3], normal: 1.2 });
+  for (const [x, z, r, h] of [[0, -3.6, 1.7, 2.4], [-2.2, -4.6, 1.2, 1.6], [-1.6, -7.2, 1.0, 1.3], [5.5, 1.5, 1.0, 1.5], [-4.5, -2.0, .8, 1.0], [-5, -10, 1.6, 2.2]]) {
+    const geo = new THREE.IcosahedronGeometry(r, 4), P = geo.attributes.position, rr = S.rng(Math.floor(x * 10 + z * 7 + 99)), ph = rr() * 9;   // 凹凸は頂点の位置から決める（同じ位置の頂点は同じだけ動く：面が割れない）
+    for (let i = 0; i < P.count; i++) { const vx = P.getX(i) / r, vy = P.getY(i) / r, vz = P.getZ(i) / r, k = .86 + .1 * Math.sin(3.1 * vx + ph) * Math.cos(2.7 * vz - ph) + .06 * Math.sin(7.3 * vy + 5.1 * vx + ph) + .04 * Math.sin(13 * vz + 11 * vy);
+      P.setXYZ(i, P.getX(i) * k, P.getY(i) * k * h / r, P.getZ(i) * k); } geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, rockM); m.position.set(x, h * .35, z); m.rotation.set(rr(), rr() * 6, rr()); m.castShadow = m.receiveShadow = true; sea.add(m); rocks.push(m); }
+  hero = ship(.55); sea.add(hero);
+  for (let i = 0; i < 3; i++) { const f = ship(.55); sea.add(f); fleet.push(f); }
+  { const n = 2600, p = new Float32Array(n * 6); const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3)); rain = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: C(0x9fb4c4), transparent: true, opacity: .35, fog: false })); rain.frustumCulled = false; rain.userData.noAO = true; sea.add(rain); }
+  { const n = 800, p = new Float32Array(n * 3); const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));   // しぶき：丸いぼかしの粒
+    const dc = document.createElement("canvas"); dc.width = dc.height = 64; const dx = dc.getContext("2d"), gr = dx.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(.5, "rgba(255,255,255,.5)"); gr.addColorStop(1, "rgba(255,255,255,0)"); dx.fillStyle = gr; dx.fillRect(0, 0, 64, 64);
+    spray = new THREE.Points(geo, new THREE.PointsMaterial({ color: C(0xe0eef4), size: .045, map: new THREE.CanvasTexture(dc), transparent: true, opacity: .8, depthWrite: false, fog: false })); spray.material.size = .08; spray.frustumCulled = false; sea.add(spray); }
+  SKY.storm = skyTex([[0, "#0a1218"], [.45, "#1e303a"], [.72, "#4a6472"], [.85, "#5a7482"], [1, "#2a3c46"]], "#6a8494"); SKY.dawn = skyTex([[0, "#1a2a4a"], [.5, "#6a5a6a"], [.8, "#e89a5a"], [1, "#ffd08a"]], "#ffe0c0");
+  skyMesh = new THREE.Mesh(new THREE.PlaneGeometry(400, 160), new THREE.MeshBasicMaterial({ map: SKY.storm, fog: false })); skyMesh.userData.noAO = true; sea.add(skyMesh);
+}
+function updateRain(t, on, cp) { const P = rain.geometry.attributes.position, r = S.rng(23); rain.visible = on; if (!on) return;
+  for (let i = 0; i < P.count / 2; i++) { const x = cp.x + (r() - .5) * 24, z = cp.z - 2 - r() * 22, y0 = 14 - ((t * 18 + r() * 14) % 14), dx = -.18, dy = -.75; P.setXYZ(i * 2, x, y0, z); P.setXYZ(i * 2 + 1, x + dx, y0 + dy, z); } P.needsUpdate = true; }
+function updateSpray(t, t0, at, k = 1) { const P = spray.geometry.attributes.position, u = t - t0, r = S.rng(41); spray.visible = u > 0 && u < 2.2; if (!spray.visible) return; spray.material.opacity = .85 * (1 - u / 2.2);
+  for (let i = 0; i < P.count; i++) { const a = r() * 6.283, sp = (.4 + r() * 2.2) * k, up = (1.5 + r() * 5) * k; P.setXYZ(i, at.x + Math.cos(a) * sp * u, at.y + up * u - 4.9 * u * u, at.z + Math.sin(a) * sp * u * .6 + 1.2 * u); } P.needsUpdate = true; }
+function placeShip(s, x, z, t, a, { roll = 0, pitch = 0, yaw = -Math.PI / 2 } = {}) { s.position.set(x, waveH(x, z, t, a) * .7 - .32, z); s.rotation.set(0, yaw, 0); s.rotateX(roll + .06 * a * Math.sin(t * 1.3 + x)); s.rotateZ(pitch + .05 * a * Math.sin(t * .9 + z)); }
+function stormLights(exp = 1.35) {   // 雲の切れ間の月明かり（手前の左上から）＋船の輪郭を浮かせる後ろからの光
+  lights({ keyPos: [12, 20, 14], keyAt: [0, 1, -5], keyI: 26, angle: .5, keyCol: 0xa8c4e0, rimPos: [-6, 8, -30], rimI: 2.2, rimCol: 0x9ab8d0, hemiI: .5, hemiSky: 0x5a7486, hemiGround: 0x0a1418, fog: .026, fogC: 0x1a2a34, exp }); }
+// 衝突の時間の流れ：激突の前後だけスローにする（tc＝激突のコマ）
+function slowT(t, tc) { const a = tc - .3, b = tc + .9, s = .3; if (t < a) return t; if (t < b) return a + s * (t - a); return a + s * (b - a) + (t - b); }
+function wreckPose(t, tc, tc2) { const tau = slowT(t, tc), tauC = slowT(tc, tc), V = 4, zc = -7.6; let z, roll = 0, pitch = 0;   // zc：へさきが岩の裏側に当たる位置
+  if (tau < tauC) z = zc - V * (tauC - tau); else { const u = tau - tauC; z = zc + .35 * (1 - Math.exp(-u * 3)) - .35 * u * Math.exp(-u * 2); roll = .22 * easeOut(clamp(u / 1.2)); pitch = -.08 * easeOut(clamp(u / .8)); }
+  if (t > tc2) { const u2 = t - tc2; roll += .2 * easeOut(clamp(u2 / 1.0)); }
+  return { z, roll, pitch, tau }; }
+function seaShot(t, { mode = "storm", wreck = null, camPos, camLook, fov = 40, amp = 1, fleetOn = false, dof = null, sprayAt = null } = {}) {
+  show("sea"); scene.environment = null; const storm = mode === "storm", tau = wreck ? wreck.tau : t; rocks.forEach(r => r.visible = storm);
+  updateOcean(tau, amp); skyMesh.material.map = storm ? SKY.storm : SKY.dawn; skyMesh.position.set(camPos.x * .5, 50, camPos.z - 150); skyMesh.lookAt(camPos.x, 50, camPos.z);
+  hero.visible = !!wreck; if (wreck) placeShip(hero, 0, wreck.z, tau, amp, { roll: wreck.roll, pitch: wreck.pitch }); hero.userData.masts[1].rotation.x = storm && wreck && t > CUE.crash2 ? -.5 * easeIn(clamp((t - CUE.crash2) / 1.1)) : 0;
+  fleet.forEach((f, i) => { f.visible = fleetOn; if (fleetOn) placeShip(f, [-9, 7, -16][i], [-22, -30, -38][i] + 1.2 * t, t, amp); });
+  hero.userData.lantern.intensity = storm ? 1.5 * (1 + .1 * Math.sin(t * 17)) : 0;
+  updateRain(t, storm, camPos); if (sprayAt) updateSpray(t, sprayAt[0], sprayAt[1], sprayAt[2] ?? 1); else spray.visible = false;
+  if (storm) stormLights(); else lights({ keyPos: [-30, 8, -60], keyAt: [0, 0, 0], keyI: 40, angle: .4, keyCol: 0xffb070, rimPos: [-20, 5, -60], rimI: 2.2, rimCol: 0xffc080, hemiI: .5, hemiSky: 0x8aa0c0, hemiGround: 0x2a2018, fog: .014, fogC: 0x6a5a62, exp: 1.0 });
+  setCam(camPos, camLook, fov, .05, 400); draw3D({ ao: true, dof });
+}
+
+// ---------------------------------------------------------------- 工房（木の床と壁、作業台、H1〜H3 の再現、ハリソンの後ろ姿）
+const shop = set("shop"); let shopLamp, shopDust, harLean, harStand, clocks = {};
+function gearWheel(r, mat, spokes = 6) { const g = new THREE.Group(); const ring = new THREE.Mesh(new THREE.TorusGeometry(r, r * .07, 8, 48), mat); g.add(ring);
+  for (let i = 0; i < spokes; i++) { const s = box(r * 1.9, r * .06, r * .04, mat); s.rotation.z = i / spokes * Math.PI; g.add(s); } const hub = cyl(r * .14, r * .14, r * .12, mat, 16); hub.rotation.x = Math.PI / 2; g.add(hub);
+  const teeth = Math.round(r * 260); for (let i = 0; i < teeth; i++) { const a = i / teeth * 6.283, tth = box(r * .05, r * .09, r * .05, mat); tth.position.set(Math.cos(a) * r * 1.07, Math.sin(a) * r * 1.07, 0); tth.rotation.z = a; g.add(tth); } return g; }
+function dialMesh(r) { const c = document.createElement("canvas"); c.width = c.height = 512; const x = c.getContext("2d"); x.fillStyle = "#f2ece0"; x.beginPath(); x.arc(256, 256, 256, 0, 6.283); x.fill();
+  x.strokeStyle = "#1a1612"; x.lineWidth = 6; x.beginPath(); x.arc(256, 256, 236, 0, 6.283); x.stroke(); for (let i = 0; i < 60; i++) { const a = i / 60 * 6.283, l = i % 5 ? 12 : 26; x.lineWidth = i % 5 ? 3 : 7; x.beginPath(); x.moveTo(256 + Math.sin(a) * 232, 256 - Math.cos(a) * 232); x.lineTo(256 + Math.sin(a) * (232 - l), 256 - Math.cos(a) * (232 - l)); x.stroke(); }
+  const RN = ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"]; x.fillStyle = "#14100c"; x.font = "600 46px serif"; x.textAlign = "center"; x.textBaseline = "middle"; RN.forEach((s, i) => { const a = i / 12 * 6.283; x.save(); x.translate(256 + Math.sin(a) * 178, 256 - Math.cos(a) * 178); x.rotate(a); x.fillText(s, 0, 0); x.restore(); });
+  x.strokeStyle = "#8a6a3a"; x.lineWidth = 2; for (let i = 0; i < 8; i++) { x.beginPath(); x.ellipse(256, 256, 70, 22, i / 8 * Math.PI, 0, 6.283); x.stroke(); }   // 中央の飾り（再現）
+  const tx = new THREE.CanvasTexture(c); tx.encoding = THREE.sRGBEncoding; tx.anisotropy = 16; const m = new THREE.MeshStandardMaterial({ map: tx, roughness: .25 }); Cine.surface(m, "porcelain", { repeat: [1, 1], normal: .15 });
+  return new THREE.Mesh(new THREE.CircleGeometry(r, 64), m); }
+function bigClock(kind) {   // H1〜H3（再現・大まか）：真鍮の枠と歯車、上に揺れる棒てんぷ（H1・H2）／大きな丸いてんぷ（H3）
+  const g = new THREE.Group(), br = brassM(), w = kind === "H2" ? .62 : .58, h = kind === "H2" ? .72 : .6, d = .38, anim = [];
+  for (const [x, z] of [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]) { const p = cyl(.012, .012, h, br, 10); p.position.set(x, h / 2, z); g.add(p); }
+  for (const y of [.01, h]) { const pl = box(w + .04, .012, d + .04, br); pl.position.y = y; g.add(pl); }
+  const base = box(w + .14, .08, d + .14, pbr("wood_table_001", [1, 1], { tint: 0x3a2414 }), 0, -.04, 0, g);
+  for (let i = 0; i < 5; i++) { const gw = gearWheel(.06 + (i % 3) * .035, br, 4 + (i % 3)); gw.position.set(-w * .3 + (i % 3) * w * .3, h * (.3 + .2 * Math.floor(i / 3)), (i % 2 ? .06 : -.06)); g.add(gw); anim.push(t => gw.rotation.z = t * (i % 2 ? .6 : -.9) * (1 + i * .3)); }
+  if (kind === "H3") { for (const x of [-.13, .13]) { const bw = new THREE.Group(); const ring = new THREE.Mesh(new THREE.TorusGeometry(.12, .012, 10, 64), br); bw.add(ring); for (let i = 0; i < 3; i++) { const s = box(.24, .008, .006, br); s.rotation.z = i * Math.PI / 3; bw.add(s); } bw.position.set(x, h * .62, d * .2); bw.rotation.x = Math.PI / 2 - .2; g.add(bw); anim.push(t => bw.rotation.z = Math.sin(t * 3.2 + x * 9) * .9); } }
+  else { for (const s of [1, -1]) { const bar = new THREE.Group(); const rod = cyl(.008, .008, .5, br, 8); rod.rotation.z = Math.PI / 2; bar.add(rod); for (const e of [-.25, .25]) { const ball = new THREE.Mesh(new THREE.SphereGeometry(.035, 24, 16), br); ball.position.x = e; ball.castShadow = true; bar.add(ball); } bar.position.set(0, h + .1, s * .07); g.add(bar); anim.push(t => bar.rotation.y = s * (.6 + .5 * Math.sin(t * 3.0))); } }
+  const dials = kind === "H1" ? 4 : 1; for (let i = 0; i < dials; i++) { const dm = dialMesh(dials > 1 ? .045 : .08); dm.position.set(dials > 1 ? -.15 + (i % 2) * .3 : 0, dials > 1 ? h * (.3 + .4 * Math.floor(i / 2)) : h * .45, d / 2 + .025); g.add(dm); }
+  const glassM = Cine.glass({ thickness: .004, roughness: .04 }); const gb = new THREE.Mesh(new THREE.BoxGeometry(w + .08, h + .05, d + .08), glassM); gb.position.y = h / 2; gb.userData.noAO = true; if (kind !== "H3") g.add(gb);
+  g.userData.anim = t => anim.forEach(f => f(t)); return g;
+}
+const watchSet = set("watch"); let H4, h4Hands = {}, h4Bal;
+function buildH4() {   // H4（再現）：銀のケース、白い文字盤、ガラス、上の輪。裏は真鍮の機械とてんぷ（ケースの実寸：直径 約 0.16 m）
+  H4 = new THREE.Group(); const silver = steelM(), br = brassM(), R0 = .066;
+  const prof = [[0, -.014], [.05, -.016], [.064, -.012], [.071, -.004], [.072, .006], [.068, .012]].map(([r, y]) => new THREE.Vector2(r, y)); const cs = new THREE.Mesh(new THREE.LatheGeometry(prof, 96), silver); cs.rotation.x = Math.PI / 2; cs.castShadow = true; H4.add(cs);
+  const bez = new THREE.Mesh(new THREE.TorusGeometry(R0 + .002, .0035, 16, 96), silver); bez.position.z = .012; H4.add(bez);
+  const dial = dialMesh(R0); dial.position.z = .0125; H4.add(dial);
+  const handM = M(0x101828, { metalness: .8, roughness: .3 }); for (const [k, len, w] of [["h", .032, .0035], ["m", .05, .0025], ["s", .056, .0012]]) { const hg = new THREE.Group(); const hb = box(w, len, .0008, k === "s" ? M(0x1a1a1a, { metalness: .6, roughness: .3 }) : handM); hb.position.y = len / 2 - .006; hg.add(hb); hg.position.z = .0135 + (k === "s" ? .001 : k === "m" ? .0005 : 0); H4.add(hg); h4Hands[k] = hg; }
+  const crystal = new THREE.Mesh(new THREE.SphereGeometry(.25, 64, 16, 0, 6.283, 0, .27), Cine.glass({ thickness: .002, roughness: .02 })); crystal.rotation.x = Math.PI / 2; crystal.position.z = .0125 - .25 * Math.cos(.27) + .004; crystal.userData.noAO = true; H4.add(crystal);
+  const pend = cyl(.008, .008, .012, silver, 24); pend.position.y = R0 + .012; H4.add(pend); const bow = new THREE.Mesh(new THREE.TorusGeometry(.017, .0028, 12, 48), silver); bow.position.y = R0 + .03; H4.add(bow);
+  const plate = new THREE.Mesh(new THREE.CircleGeometry(R0 - .004, 96), br); plate.rotation.y = Math.PI; plate.position.z = -.0145; H4.add(plate);
+  for (let i = 0; i < 4; i++) { const gw = gearWheel(.012 + i * .004, br, 5); gw.position.set(-.025 + i * .016, -.02 + (i % 2) * .03, -.016); gw.rotation.y = Math.PI; H4.add(gw); }
+  h4Bal = new THREE.Group(); const ring = new THREE.Mesh(new THREE.TorusGeometry(.022, .0018, 10, 64), br); h4Bal.add(ring); for (let i = 0; i < 2; i++) { const s = box(.044, .002, .001, br); s.rotation.z = i * Math.PI / 2; h4Bal.add(s); } h4Bal.position.set(.012, .018, -.018); H4.add(h4Bal);
+  const cock = box(.03, .006, .002, br); cock.position.set(.012, .018, -.0195); H4.add(cock);
+  watchSet.add(H4);
+}
+function animH4(t) { h4Hands.h.rotation.z = -(10 + t / 3600) / 12 * 6.283; h4Hands.m.rotation.z = -(9 + t / 60) / 60 * 6.283; h4Hands.s.rotation.z = -Math.floor(t * 5) / 5 / 60 * 6.283; h4Bal.rotation.z = Math.sin(t * 5 * Math.PI) * 1.4; }
+function buildShop() {
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), pbr("old_wood_floor", [6, 6], { tint: 0x8a7a68 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; shop.add(floor);
+  const wallM = M(0x5a544a, { roughness: .95 }); Cine.surface(wallM, "plaster", { repeat: [4, 2], normal: .5 });
+  for (const [x, z, ry] of [[0, -3, 0], [-3.5, 0, Math.PI / 2], [3.5, 0, -Math.PI / 2]]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(10, 4.5), wallM); w.position.set(x, 2.25, z); w.rotation.y = ry; w.receiveShadow = true; shop.add(w); }
+  const woodM = pbr("wood_table_001", [3, 1], { tint: 0x7a5a3a, env: .7 }); box(2.4, .06, 1.0, woodM, 0, .86, -.6, shop); for (const x of [-1.1, 1.1]) for (const z of [-1, -.2]) box(.06, .86, .06, woodM, x, .43, z, shop);
+  for (let row = 0; row < 3; row++) box(4, .04, .35, woodM, 0, 1.2 + row * .5, -2.8, shop);
+  const br = brassM(); for (let i = 0; i < 10; i++) { const gw = gearWheel(.025 + (i % 4) * .012, br, 5); gw.position.set(-.9 + i * .2, .9, -.25 - (i % 3) * .1); gw.rotation.x = -Math.PI / 2; shop.add(gw); }   // 作業台の上の歯車
+  for (let i = 0; i < 12; i++) { const gw = gearWheel(.05 + (i % 3) * .02, br, 5); gw.position.set(-1.7 + i * .3, 1.32 + (i % 3) * .5, -2.75); shop.add(gw); }   // 棚の部品
+  for (const k of ["H1", "H2", "H3"]) { const c = bigClock(k); c.position.set(0, .93, -.62); c.visible = false; shop.add(c); clocks[k] = c; }
+  const win_ = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 2.0), new THREE.MeshBasicMaterial({ color: C(0xffc27a) })); win_.position.set(-3.48, 2.0, -.8); win_.rotation.y = Math.PI / 2; win_.userData.noAO = true; shop.add(win_); shop.userData.win = win_;
+  shopLamp = new THREE.PointLight(C(0xffb060), 0, 6, 2); shopLamp.position.set(.3, 1.7, -.3); shop.add(shopLamp);
+  harLean = human("pasteur_lean", { coat: 0x3a3024, hair: 0xd8d4cc }); harLean.position.set(-.2, 0, .1); harLean.rotation.y = Math.PI; shop.add(harLean);
+  harStand = human("pasteur_stand", { coat: 0x3a3024, hair: 0xd8d4cc }); harStand.position.set(1.15, 0, -2.2); harStand.rotation.y = Math.PI - .3; shop.add(harStand);
+  shopDust = Cine.dust({ min: [-2, .5, -2.5], max: [2, 2.6, 1.5], count: 900, size: .012, seed: 81 }); shop.add(shopDust.points);
+  const sh = Cine.shaft({ from: [-3.4, 2.8, -.8], to: [-.6, .4, -.4], r0: .5, r1: 1.4, color: 0xffc27a, opacity: .2 }); shop.add(sh); shop.userData.shaft = sh;
+}
+function shopShot(t, { clock = null, lean = false, stand = false, warm = 1, cold = 0, exp = 1.0, lamp = 1 } = {}) {
+  show("shop", "watch"); H4.visible = false; harLean.visible = lean; harStand.visible = stand; for (const k in clocks) { clocks[k].visible = k === clock; clocks[k].userData.anim(t); }
+  shopLamp.intensity = 3.2 * lamp * (1 + .05 * Math.sin(t * 13)); shopLamp.color = C(0xffb060).lerp(C(0x7ab0ff), cold); shopDust.update(t, 1); shop.userData.shaft.userData.set(t, .8 * warm * (1 - cold));
+  lights({ keyPos: [-3.3, 3.2, -.8], keyAt: [0, .9, -.6], keyI: 18 * (warm * (1 - cold) + .5 * cold), angle: .6, keyCol: cold > 0 ? 0x8ab4ff : 0xffb870, rimPos: [2, 3, 3], rimI: .5 + cold, rimCol: 0x88aaff, hemiI: .25, hemiSky: 0x6a6a7a, hemiGround: 0x2a2018, fog: .05, fogC: cold > .5 ? 0x04070c : 0x0a0604, exp }); envOn(.8);
+}
+
+// ---------------------------------------------------------------- 委員会の部屋（長い机、逆光の人影。顔は映さない）
+const room = set("board"); let roomWins = [];
+function buildBoard() {
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), pbr("old_wood_floor", [6, 6], { tint: 0x6a5a48 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; room.add(floor);
+  const wallM = M(0x4a443c, { roughness: .95 }); Cine.surface(wallM, "plaster", { repeat: [5, 2], normal: .5 }); const w = new THREE.Mesh(new THREE.PlaneGeometry(14, 6), wallM); w.position.set(0, 3, -6); room.add(w);
+  for (let i = 0; i < 3; i++) { const wv = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 3.2), new THREE.MeshBasicMaterial({ color: C(0xc8d8ff) })); wv.material.color.multiplyScalar(1.6); wv.position.set(-2.6 + i * 2.6, 2.6, -5.98); wv.userData.noAO = true; room.add(wv); roomWins.push(wv); }
+  const woodM = pbr("wood_table_001", [4, 1], { tint: 0x4a2e1c }); box(1.6, .08, 7, woodM, 0, .78, -1.5, room); for (const z of [-4.6, 1.6]) for (const x of [-.7, .7]) box(.08, .78, .08, woodM, x, .39, z, room);
+  const paperM = M(0xece4d0, { roughness: .9 }); for (let i = 0; i < 8; i++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(.22, .3), paperM); p.rotation.set(-Math.PI / 2, 0, (i % 3 - 1) * .2); p.position.set((i % 2 ? .4 : -.4), .825, .8 - i * .7); room.add(p); }
+  const kinds = ["keeper_stand", "doctor_stand", "pasteur_stand", "doctor_stand", "keeper_stand"]; kinds.forEach((k, i) => { const h = human(k, { coat: [0x1e2026, 0x22201c, 0x1a1c22][i % 3], hair: [0xd0ccc4, 0x3a3028, 0xcfcac2][i % 3] }); h.position.set(-1.5 + i * .75, 0, -4.4 + (i % 2) * .3); h.rotation.y = Math.PI + .08 * (i - 2); room.add(h); });   // 窓の方を向く（顔を映さない）
+}
+function boardShot(t) { show("board"); scene.environment = null; const u = easeInOut(clamp((t - CUE.board) / (CUE.pay - CUE.board)));
+  lights({ keyPos: [0, 3, -5.8], keyAt: [0, .8, 0], keyI: 18, angle: .9, keyCol: 0xb8c8ff, rimPos: [0, 3, -8], rimI: 1.8, rimCol: 0xc8d8ff, hemiI: .06, fog: .05, fogC: 0x06080c, exp: 1.0 });
+  setCam(V3(.25, 1.15 - .1 * u, 3.6 - 1.2 * u), V3(0, 1.1, -4.5), 38, .05, 60); draw3D({ ao: true, dof: { focus: 7, aperture: .002, maxblur: .006 } }); }
+
+// ---------------------------------------------------------------- ホログラムの台（海図・地球・時計・航路・衛星）
+const holoC = document.createElement("canvas"); holoC.width = W; holoC.height = H; const holoX = holoC.getContext("2d");
+const holoTex = new THREE.CanvasTexture(holoC); holoTex.encoding = THREE.sRGBEncoding; holoTex.anisotropy = 16;
+const holo = set("holo");
+{ holo.add(new THREE.Mesh(new THREE.PlaneGeometry(10.8, 19.2), new THREE.MeshBasicMaterial({ map: holoTex, toneMapped: false, transparent: true })));
+  holo.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(10.95, 19.35)), new THREE.LineBasicMaterial({ color: C(0x40d8ff), transparent: true, opacity: .8 })));
+  const grid = new THREE.GridHelper(120, 120, 0x2080a0, 0x0a2836); grid.position.y = -12; holo.add(grid);
+  const hd = Cine.dust({ min: [-10, -12, -8], max: [10, 12, 8], count: 1400, size: .05, seed: 71, color: 0x90e0ff }); holo.add(hd.points); holo.userData.dust = hd; }
+function holoDraw(t, { tilt = -.16, yaw = 0, dist = 23, shake = 0, edge = 0x40d8ff } = {}) {
+  holoTex.needsUpdate = true; show("holo"); scene.environment = null; holo.children[0].rotation.set(tilt, yaw, 0); holo.children[1].rotation.set(tilt, yaw, 0); holo.children[1].material.color = C(edge); holo.userData.dust.update(t, 1);
+  lights({ keyI: 0, rimI: 0, hemiI: .3, fog: .006, fogC: 0x02060c, exp: 1.0 });
+  const r = S.rng(Math.floor(t * 30) + 5), j = shake * .3; setCam(V3((r() - .5) * j, -1.0 + (r() - .5) * j, dist), V3(0, -.5, 0), 40); draw3D({ ao: false });
+}
+function panel(ctx, col = "rgba(4,18,30,.86)") { ctx.fillStyle = col; rrect(ctx, 90, 330, 900, 950, 18); ctx.fill(); }
+function glowLine(ctx, col, w, blur, fn) { ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.shadowColor = col; ctx.shadowBlur = blur; ctx.beginPath(); fn(); ctx.stroke(); ctx.restore(); }
+// 海図（模式）：コーンウォールの先とシリー諸島。推定した位置（実際より南）と本当の位置
+const CORN = [[990, 520], [900, 560], [820, 600], [760, 660], [700, 700], [650, 760], [610, 800], [560, 820], [520, 860], [540, 900], [600, 920], [680, 900], [760, 880], [840, 840], [920, 800], [990, 780]];
+function chart(ctx, t) {
+  panel(ctx, "rgba(4,16,26,.9)"); ctx.save(); ctx.strokeStyle = "rgba(80,200,255,.15)"; ctx.lineWidth = 1; for (let x = 120; x < 990; x += 60) { ctx.beginPath(); ctx.moveTo(x, 340); ctx.lineTo(x, 1270); ctx.stroke(); } for (let y = 360; y < 1280; y += 60) { ctx.beginPath(); ctx.moveTo(100, y); ctx.lineTo(980, y); ctx.stroke(); } ctx.restore();
+  ctx.beginPath(); CORN.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.lineTo(990, 520); ctx.fillStyle = "rgba(60,120,100,.45)"; ctx.fill(); glowLine(ctx, "rgba(140,255,210,.9)", 3, 10, () => CORN.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  const isl = [[300, 820, 22], [330, 850, 14], [270, 860, 12], [345, 800, 10], [295, 885, 9]]; isl.forEach(([x, y, r]) => { ctx.fillStyle = "rgba(60,120,100,.6)"; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill(); ctx.strokeStyle = "rgba(140,255,210,.9)"; ctx.lineWidth = 2; ctx.stroke(); });
+  label(ctx, "シリー諸島", 310, 760, 38, "#BFFFE6"); label(ctx, "イギリス", 860, 660, 40, "#BFFFE6");
+  const ka = k_(t, "chart", .4, .35), kb = k_(t, "chart", .4, .85), pulse = .5 + .5 * Math.sin(t * 7);
+  if (ka > 0) { ctx.save(); ctx.globalAlpha = ka; ctx.setLineDash([14, 10]); glowLine(ctx, "#5ad8ff", 5, 14, () => ctx.arc(420, 1100, 46 + 6 * pulse, 0, 6.283)); ctx.restore(); ctx.save(); ctx.globalAlpha = ka; label(ctx, "ここだと思っていた", 420, 1190, 42, "#9EEBFF"); ctx.restore(); }
+  if (kb > 0) { ctx.save(); ctx.globalAlpha = kb; glowLine(ctx, "#ff4a6a", 7, 24, () => ctx.arc(318, 846, 40 + 8 * pulse, 0, 6.283)); ctx.setLineDash([10, 8]); glowLine(ctx, "rgba(255,120,140,.9)", 4, 8, () => { ctx.moveTo(400, 1060); ctx.lineTo(340, 890); }); ctx.restore();
+    ctx.save(); ctx.globalAlpha = kb; label(ctx, "本当はここ", 318, 960, 46, "#FF8A9E"); ctx.restore(); }
+  label(ctx, "1707年10月22日 夜（模式図）", 540, 1240, 34, "#E6F4FF");
+}
+// 地球（正射図法）：緯線は光り、経線は点滅して消える
+const LAND = [[[-10, 36], [3, 51], [10, 54], [25, 60], [40, 67], [60, 70], [90, 75], [140, 70], [170, 65], [140, 50], [122, 40], [120, 22], [105, 10], [100, 2], [90, 22], [78, 8], [70, 22], [56, 26], [44, 12], [35, 30], [28, 36], [18, 40], [8, 44], [-10, 36]],
+  [[-17, 15], [-10, 31], [10, 37], [32, 31], [43, 12], [51, 12], [40, -10], [35, -24], [20, -35], [12, -18], [9, 4], [-8, 5], [-17, 15]],
+  [[-80, 9], [-81, -5], [-70, -18], [-72, -40], [-68, -55], [-58, -38], [-40, -22], [-35, -6], [-50, 0], [-62, 10], [-80, 9]],
+  [[-125, 49], [-124, 40], [-117, 32], [-105, 20], [-90, 16], [-82, 9], [-80, 25], [-75, 36], [-67, 45], [-60, 47], [-80, 60], [-95, 62], [-140, 60], [-165, 62], [-150, 70], [-125, 70], [-125, 49]],
+  [[114, -22], [130, -12], [143, -11], [153, -27], [146, -39], [131, -32], [115, -34], [114, -22]], [[-5.5, 50], [-3, 53.5], [-4.5, 57.5], [-2, 58.5], [1.7, 52.7], [1.3, 51], [-5.5, 50]]];
+function globeBase(ctx, cx, cy, R0, lon0, lat0) {
+  const rad = Math.PI / 180, pr = ([lo, la]) => { const l = (lo - lon0) * rad, p = la * rad, p0 = lat0 * rad, c = Math.sin(p0) * Math.sin(p) + Math.cos(p0) * Math.cos(p) * Math.cos(l); return [cx + R0 * Math.cos(p) * Math.sin(l), cy - R0 * (Math.cos(p0) * Math.sin(p) - Math.sin(p0) * Math.cos(p) * Math.cos(l)), c]; };
+  const g = ctx.createRadialGradient(cx - R0 * .3, cy - R0 * .35, 20, cx, cy, R0); g.addColorStop(0, "#14406a"); g.addColorStop(1, "#04122a"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R0, 0, 6.283); ctx.fill();
+  for (const poly of LAND) { ctx.beginPath(); let f = true; for (let i = 0; i < poly.length - 1; i++) for (let s = 0; s < 6; s++) { const a = poly[i], b = poly[i + 1], q = [lerp(a[0], b[0], s / 6), lerp(a[1], b[1], s / 6)], [x, y, c] = pr(q); if (c < 0) { f = true; continue; } f ? ctx.moveTo(x, y) : ctx.lineTo(x, y); f = false; }
+    ctx.fillStyle = "rgba(90,180,140,.5)"; ctx.fill(); ctx.strokeStyle = "rgba(160,255,200,.75)"; ctx.lineWidth = 2; ctx.stroke(); }
+  return pr;
+}
+function pathOn(ctx, pr, pts) { let f = true; for (const q of pts) { const [x, y, c] = pr(q); if (c < 0) { f = true; continue; } f ? ctx.moveTo(x, y) : ctx.lineTo(x, y); f = false; } }
+function latlon(ctx, t) {
+  panel(ctx); const cx = 540, cy = 790, R0 = 380, pr = globeBase(ctx, cx, cy, R0, -20 + (t - CUE.lon) * 4, 22);
+  for (let la = -60; la <= 60; la += 20) { const pts = []; for (let lo = -180; lo <= 180; lo += 4) pts.push([lo, la]); glowLine(ctx, "rgba(90,230,255,.95)", la === 0 ? 5 : 3, 14, () => pathOn(ctx, pr, pts)); }
+  const q = t >= CUE.lonq ? clamp((t - CUE.lonq) / .6) : 0;
+  for (let lo = -180; lo < 180; lo += 30) { const pts = []; for (let la = -88; la <= 88; la += 4) pts.push([lo, la]); const fl = q > 0 ? (S.rng(Math.floor(t * 12) + lo)() > .5 ? .7 : .1) * (1 - .6 * q) : .5;
+    ctx.save(); ctx.setLineDash([12, 10]); glowLine(ctx, `rgba(255,90,120,${fl})`, 3, 10, () => pathOn(ctx, pr, pts)); ctx.restore(); }
+  label(ctx, "緯度（南北）：太陽で測れた", 540, 1230, 40, "#9EEBFF");
+}
+// 時差から経度：港の時計と、船の上の正午（例）
+function analog(ctx, cx, cy, r, h, m, col, lab, sub) {
+  ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 30; ctx.strokeStyle = col; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.283); ctx.stroke(); ctx.restore();
+  ctx.fillStyle = "rgba(6,20,32,.9)"; ctx.beginPath(); ctx.arc(cx, cy, r - 8, 0, 6.283); ctx.fill();
+  for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283; ctx.strokeStyle = col; ctx.lineWidth = i % 3 ? 3 : 7; ctx.beginPath(); ctx.moveTo(cx + Math.sin(a) * (r - 20), cy - Math.cos(a) * (r - 20)); ctx.lineTo(cx + Math.sin(a) * (r - 40), cy - Math.cos(a) * (r - 40)); ctx.stroke(); }
+  const hand = (a, len, w) => { ctx.strokeStyle = "#fff"; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(a) * len, cy - Math.cos(a) * len); ctx.stroke(); };
+  hand((h % 12 + m / 60) / 12 * 6.283, r * .5, 12); hand(m / 60 * 6.283, r * .75, 7); label(ctx, lab, cx, cy + r + 50, 40, "#fff"); label(ctx, sub, cx, cy + r + 105, 54, col, { font: DG });
+}
+function timeDiff(ctx, t) {
+  panel(ctx); analog(ctx, 310, 620, 170, 15, 0, "#FFD24A", "出発した港の時計", "15:00"); analog(ctx, 770, 620, 170, 12, 0, "#5AD8FF", "船の上の正午", "12:00");
+  label(ctx, "（例）", 540, 395, 34, "#E6F4FF");
+  const k = k_(t, "diff", .5); if (k <= 0) return; ctx.save(); ctx.globalAlpha = k;
+  glowLine(ctx, "#FFE14A", 6, 16, () => { ctx.moveTo(310, 990); ctx.lineTo(770, 990); }); label(ctx, "時差 3時間", 540, 960, 50, "#FFE14A", { font: DG });
+  label(ctx, "1時間 ＝ 15度", 540, 1075, 44, "#fff"); label(ctx, "経度 45度 西", 540, 1170, 64, "#7CFFB2", { font: DG }); ctx.restore();
+}
+// 航路（大西洋、模式）：イギリス → ジャマイカ。約 2 か月
+function voyage(ctx, t) {
+  panel(ctx, "rgba(4,14,26,.9)"); const pv = ([lo, la]) => [930 + (lo + 5) * 8.4, 1180 - (la - 5) * 13];
+  ctx.save(); ctx.beginPath(); rrect(ctx, 100, 340, 880, 930, 16); ctx.clip();
+  for (const poly of LAND) { ctx.beginPath(); poly.forEach((p, i) => { const [x, y] = pv(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.fillStyle = "rgba(60,120,100,.45)"; ctx.fill(); ctx.strokeStyle = "rgba(140,255,210,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
+  const route = [[-5, 50], [-14, 40], [-20, 30], [-40, 22], [-60, 17], [-76.8, 18]], k = easeInOut(clamp((t - CUE.trial - .4) / (CUE.arrive - CUE.trial - .5))), pts = [];
+  for (let i = 0; i < route.length - 1; i++) for (let s = 0; s < 20; s++) { const a = route[i], b = route[i + 1]; pts.push(pv([lerp(a[0], b[0], s / 20), lerp(a[1], b[1], s / 20)])); } pts.push(pv(route[route.length - 1]));
+  const n = Math.max(1, Math.floor(k * (pts.length - 1))); ctx.setLineDash([16, 10]); glowLine(ctx, "#FFD24A", 6, 18, () => pts.slice(0, n + 1).forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.setLineDash([]);
+  const [sx, sy] = pts[n]; ctx.fillStyle = "#fff"; ctx.shadowColor = "#FFD24A"; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(sx, sy, 16, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
+  const [ex, ey] = pv([-5, 50]), [jx, jy] = pv([-76.8, 18]); label(ctx, "イギリス", ex - 90, ey - 60, 40, "#BFFFE6"); label(ctx, "ジャマイカ", jx + 60, jy + 70, 44, "#FFE14A");
+  label(ctx, "航海 約2か月（1761〜62年）", 540, 1235, 38, "#E6F4FF");
+}
+// GPS：地球を回る衛星（模式）
+function gpsGlobe(ctx, t) {
+  panel(ctx, "rgba(4,10,24,.88)"); const cx = 540, cy = 800, R0 = 270, pr = globeBase(ctx, cx, cy, R0, 130 - (t - CUE.gps) * 5, 25), [px, py] = pr([139.7, 35.7]);
+  for (let i = 0; i < 6; i++) { const a = (t - CUE.gps) * .5 + i * 1.047, tilt = .35 + (i % 3) * .3, rx = 420, ry = 420 * Math.sin(tilt) * .55, x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry - 40 * (i % 2);
+    ctx.save(); ctx.strokeStyle = "rgba(120,200,255,.25)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(cx, cy - 40 * (i % 2), rx, ry, 0, 0, 6.283); ctx.stroke(); ctx.restore();
+    const k = k_(t, "gps", .4, .5 + i * .1); if (k > 0) { ctx.save(); ctx.globalAlpha = k * (.6 + .4 * Math.sin(t * 6 + i)); ctx.setLineDash([8, 8]); glowLine(ctx, "#7CFFB2", 3, 10, () => { ctx.moveTo(x, y); ctx.lineTo(px, py); }); ctx.restore(); }
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = "#e8eef8"; ctx.fillRect(-14, -10, 28, 20); ctx.fillStyle = "#2a6ad8"; ctx.fillRect(-46, -6, 28, 12); ctx.fillRect(18, -6, 28, 12); ctx.restore(); }
+  ctx.save(); const pk = .5 + .5 * Math.sin(t * 8); ctx.fillStyle = "#3a8aff"; ctx.shadowColor = "#3a8aff"; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(px, py, 14 + 6 * pk, 0, 6.283); ctx.fill(); ctx.restore();
+  label(ctx, "衛星に原子時計", 540, 1220, 44, "#9EEBFF");
+}
+
+// ---------------------------------------------------------------- 2D の場面（画面全体）
+function coins(ctx, t) {   // 賞金：金貨が積み上がる
+  ctx.fillStyle = "#0a0806"; ctx.fillRect(0, 0, W, H); S.rays(ctx, 540, 900, t, "rgba(255,200,90,.09)", 22);
+  const op = easeInOut(clamp((t - CUE.prize) / .8)); ctx.fillStyle = "#1a120c"; ctx.fillRect(140 - 260 * op, 420, 400, 800); ctx.fillRect(540 + 260 * op, 420, 400, 800);   // 議会の扉が開く
+  const n = Math.floor(40 * easeOut(clamp((t - CUE.prize - .4) / 2.2))), r = S.rng(7);
+  for (let i = 0; i < n; i++) { const col = i % 5, row = Math.floor(i / 5), x = 300 + col * 120 + (r() - .5) * 16, y = 1180 - row * 26; const g = ctx.createLinearGradient(x - 50, y - 18, x + 50, y + 18); g.addColorStop(0, "#ffe38a"); g.addColorStop(1, "#b8781e");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, 52, 17, 0, 0, 6.283); ctx.fill(); ctx.strokeStyle = "#6a4210"; ctx.lineWidth = 3; ctx.stroke(); }
+}
+function driftClock(ctx, t) {   // 揺れる船室で狂う振り子時計（説明の再現）
+  ctx.fillStyle = "#06080c"; ctx.fillRect(0, 0, W, H); const u = t - CUE.drift, roll = .2 * Math.sin(u * 2.3) + .08 * Math.sin(u * 5.1), heat = t >= CUE.heat ? clamp((t - CUE.heat) / .4) : 0;
+  ctx.save(); ctx.translate(540, 820); ctx.rotate(roll);
+  ctx.fillStyle = "#3a2414"; rrect(ctx, -220, -420, 440, 840, 24); ctx.fill(); ctx.strokeStyle = "#c0913e"; ctx.lineWidth = 8; ctx.stroke();
+  ctx.fillStyle = "#f0e6d0"; ctx.beginPath(); ctx.arc(0, -220, 160, 0, 6.283); ctx.fill(); ctx.strokeStyle = "#1a1210"; ctx.lineWidth = 6; ctx.stroke();
+  const spin = u * (3 + 6 * heat) + Math.sin(u * 7) * 1.5; for (const [a, len, w] of [[spin * .3, 80, 12], [spin * 2.2, 125, 7]]) { ctx.strokeStyle = "#1a1210"; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(0, -220); ctx.lineTo(Math.sin(a) * len, -220 - Math.cos(a) * len); ctx.stroke(); }
+  const pa = -roll * 1.6 + .5 * Math.sin(u * 4.3) * Math.sin(u * 1.1); ctx.save(); ctx.translate(0, -40); ctx.rotate(pa); ctx.strokeStyle = "#c0913e"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 300); ctx.stroke(); ctx.fillStyle = "#e0b050"; ctx.beginPath(); ctx.arc(0, 320, 46, 0, 6.283); ctx.fill(); ctx.restore();
+  ctx.restore();
+  if (heat > 0) { const th = .5 + .5 * Math.sin(u * 5); ctx.save(); ctx.globalAlpha = heat; ctx.fillStyle = "rgba(20,10,20,.9)"; rrect(ctx, 870, 520, 90, 560, 45); ctx.fill(); const g = ctx.createLinearGradient(0, 1060, 0, 540); g.addColorStop(0, "#3a8aff"); g.addColorStop(1, "#ff3a5a");
+    ctx.fillStyle = g; rrect(ctx, 890, 1060 - 500 * th, 50, 500 * th, 25); ctx.fill(); label(ctx, "暑", 915, 470, 48, "#FF8A9E", { font: DG }); label(ctx, "寒", 915, 1130, 48, "#9EEBFF", { font: DG }); ctx.restore(); }
+}
+function payCards(ctx, t) {   // 支払われた額と、受け取っていない経度法の賞金
+  ctx.fillStyle = "#08060a"; ctx.fillRect(0, 0, W, H); S.rays(ctx, 540, 760, t, "rgba(255,200,90,.06)", 18);
+  const card = (k, x, y, rot, big, small, col) => { if (k <= 0) return; const drop = (1 - easeOut(k)) * -500; ctx.save(); ctx.translate(x, y + drop); ctx.rotate(rot); ctx.fillStyle = "#f4ead2"; rrect(ctx, -330, -120, 660, 240, 18); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 10; ctx.stroke();
+    label(ctx, big, 0, -32, 100, "#2a1a0a", { font: DG, stroke: "#f4ead2", sw: .05 }); label(ctx, small, 0, 80, 36, "#5a3a1a", { stroke: "#f4ead2", sw: .05 }); ctx.restore(); };
+  card(clamp((t - CUE.pay) / .35), 520, 520, -.02, "£10,000", "1765年", "#c0913e"); card(clamp((t - CUE.pay2) / .35), 560, 820, .02, "£8,750", "1773年・議会から", "#c0913e");
+  const k = k_(t, "none", .4); if (k > 0) { ctx.save(); ctx.globalAlpha = k; ctx.translate(540, 1070); ctx.setLineDash([18, 12]); ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 6; rrect(ctx, -330, -110, 660, 220, 18); ctx.stroke(); ctx.setLineDash([]);
+    label(ctx, "£20,000", 0, -20, 96, "rgba(255,255,255,.55)", { font: DG }); label(ctx, "経度法の賞金", 0, 66, 38, "#ddd"); ctx.restore(); }
+}
+
+// ---------------------------------------------------------------- 場面
+function hookCam(t, back = false) { const r = S.rng(Math.floor(t * 30) + 3), hit = (c, k) => { const u = t - CUE[c]; return u >= 0 && u < .5 ? k * (1 - u / .5) : 0; }, sh = back ? 0 : hit("crash", .12) + hit("crash2", .08);
+  const pos = V3(10.5 + (r() - .5) * sh, 1.5 + (r() - .5) * sh, -4.2 - .8 * clamp(t / 4)), look = V3(0, 1.5, -5.3); return { pos, look }; }   // 真横から：右から来た船のへさきが、左の岩に当たる
+function hookShot(t) { const w = wreckPose(t, CUE.crash, CUE.crash2), c = hookCam(t), bow = V3(0, 1.3, -4.7);
+  seaShot(t, { wreck: w, camPos: c.pos, camLook: c.look, fov: 42, amp: 1, sprayAt: t >= CUE.crash2 ? [CUE.crash2, bow, .7] : [CUE.crash, bow, 1], dof: { focus: 7.5, aperture: .002, maxblur: .006 } }); }
+function fleetShot(t) { const u = easeInOut(clamp((t - CUE.storm) / (CUE.chart - CUE.storm))); const w = wreckPose(t, CUE.crash, CUE.crash2);
+  seaShot(t, { wreck: w, camPos: V3(12 - 3 * u, 4.5 - 1 * u, 16 - 3 * u), camLook: V3(-4, 1, -14), fov: 46, amp: 1.1, fleetOn: true }); }
+function backShot(t) {   // 冒頭の嵐の海へ戻る → H4 の文字盤へ寄る（冒頭とつながる）
+  if (t < CUE.answer) { const w = wreckPose(CUE.crash2 + 3 + (t - CUE.back) * .2, CUE.crash, CUE.crash2), u = easeOut(clamp((t - CUE.back) / (CUE.answer - CUE.back)));
+    seaShot(t, { wreck: w, camPos: V3(10.5 + 4 * u, 1.5 + 2.4 * u, -4.2 + 3 * u), camLook: V3(0, 1.6, -5.3), fov: 42, amp: .9, dof: { focus: 9, aperture: .0015, maxblur: .005 } }); return; }
+  const u = easeInOut(clamp((t - CUE.answer) / 2.4)); watchHero(t, { dist: lerp(.46, .19, u), yaw: lerp(-.5, -.05, u), warm: 1, sea: true }); }
+function watchHero(t, { dist = .4, yaw = -.3, pitch = .1, warm = 1, sea = false, back = 0 } = {}) {   // H4 の寄り（工房の暗がり or 嵐の海を背に）
+  if (sea) { show("sea", "watch"); updateOcean(t, .9); skyMesh.material.map = SKY.storm; hero.visible = false; fleet.forEach(f => f.visible = false); rain.visible = false; spray.visible = false; H4.position.set(0, 2.2, 4); }
+  else { show("shop", "watch"); harLean.visible = harStand.visible = false; for (const k in clocks) clocks[k].visible = false; H4.position.set(0, 1.32, .25); shopLamp.intensity = 0; shopDust.update(t, 1); shop.userData.shaft.userData.set(t, 0); }
+  H4.visible = true; H4.rotation.set(pitch * .3, yaw + back * Math.PI, 0); animH4(t);
+  const tgt = H4.position.clone(); lights({ keyPos: [tgt.x - .6, tgt.y + .7, tgt.z + .9], keyAt: [tgt.x, tgt.y, tgt.z], keyI: 30 * warm, angle: .35, keyCol: 0xffc070, rimPos: [tgt.x + 2, tgt.y + 1, tgt.z - 2], rimI: 1.6, rimCol: sea ? 0x8fb0d0 : 0xffd8a0, hemiI: .12, hemiSky: 0x6a6a7a, fog: sea ? .028 : .05, fogC: sea ? 0x0b161c : 0x0a0604, exp: 1.0 });
+  envOn(1.0); const ang = -yaw * .2; setCam(V3(tgt.x + Math.sin(ang) * dist, tgt.y + dist * pitch, tgt.z + Math.cos(ang) * dist), tgt.clone().add(V3(0, -.004, 0)), 36, .01, 400);
+  draw3D({ ao: false, dof: { focus: dist, aperture: .02, maxblur: .012 } });
+}
+function drawScene(t, name) {
+  if (name === "hook") { if (t < CUE.storm) { hookShot(t); return "3d"; } if (t < CUE.chart) { fleetShot(t); return "3d"; } return "2d"; }
+  if (name === "lon") return "2d";
+  if (name === "harrison") { if (t < CUE.portrait) { const u = easeInOut(clamp((t - CUE.harrison) / (CUE.portrait - CUE.harrison)));   // 作業台に向かう後ろ姿
+      shopShot(t, { lean: true }); setCam(V3(.9 - .5 * u, 1.55, 2.4 - .6 * u), V3(-.1, 1.05, -.5), 40, .05, 30); draw3D({ ao: true, dof: { focus: 2.3, aperture: .004, maxblur: .01 } }); return "3d"; }
+    if (t < CUE.h1) return "2d";
+    if (t < CUE.noans) { const k = t < CUE.h2 ? "H1" : t < CUE.h3 ? "H2" : "H3", u = (t - CUE.h1) * .35; shopShot(t, { clock: k, lean: false }); const yrs = t >= CUE.years ? easeOut(clamp((t - CUE.years) / .6)) : 0;   // H1 → H2 → H3：一打ずつ入れ替わる
+      setCam(V3(Math.sin(u) * (1.75 - .35 * yrs), 1.45 + .1 * Math.sin(u * .7), -.62 + Math.cos(u) * (1.75 - .35 * yrs)), V3(0, 1.24, -.62), 38, .05, 30); draw3D({ ao: true, dof: { focus: 1.7, aperture: .005, maxblur: .01 } }); return "3d"; }
+    const u = easeInOut(clamp((t - CUE.noans) / (CUE.h4 - CUE.noans))); shopShot(t, { clock: "H3", stand: true, warm: .5, cold: .8, exp: .95, lamp: .4 });   // 低い位置から：手前の H3、奥の小さな後ろ姿
+    setCam(V3(.35 - .1 * u, .98, .25 - .1 * u), V3(.55, 1.15, -1.6), 44, .02, 30); draw3D({ ao: true, dof: { focus: .9, aperture: .004, maxblur: .008 } }); return "3d"; }
+  if (name === "h4") { if (t < CUE.watch) {   // 決定的な瞬間：H3 の前から一気に寄り、手前に H4 が回り込む。冷たい光から金色の光へ（閃光なし）
+      const push = easeIn(clamp((t - CUE.h4) / (CUE.small - CUE.h4))), sw = easeOut(clamp((t - CUE.small + .15) / .7)), gold = easeInOut(clamp((t - CUE.small) / .8));
+      shopShot(t, { clock: "H3", stand: true, warm: gold, cold: 1 - gold, exp: 1.0, lamp: .4 + gold }); sets.watch.visible = true; H4.visible = sw > 0; H4.position.set(lerp(.9, .02, sw), lerp(1.6, 1.32, sw), lerp(-.2, .3, sw)); H4.rotation.set(0, lerp(-2.6, -.35, sw), lerp(.6, 0, sw)); animH4(t);
+      const pos = V3(lerp(.35, .03, push), lerp(.98, 1.33, push), lerp(.25, .64, push)), look = sw > 0 ? V3(.02, 1.32, .3).lerp(V3(.55, 1.15, -1.6), 1 - sw) : V3(.2, 1.1, -.62);
+      setCam(pos, look, 40, .01, 30); draw3D({ ao: true, dof: { focus: Math.max(.2, pos.distanceTo(look)), aperture: .01, maxblur: .012 } }); return "3d"; }
+    if (t < CUE.plate) { const u = t - CUE.watch; watchHero(t, { dist: .36 - .04 * clamp(u / 3), yaw: -.4 + u * .9, back: 0 }); return "3d"; }
+    return "2d"; }
+  if (name === "trial") { if (t < CUE.board) return "2d"; if (t < CUE.pay) { boardShot(t); return "3d"; } return "2d"; }
+  if (name === "today") { if (t < CUE.gps) { const u = easeInOut(clamp((t - CUE.today) / (CUE.gps - CUE.today)));   // クックの航海（夜明けの海、模式）
+      seaShot(t, { mode: "dawn", wreck: { z: -14 + 3 * u, roll: 0, pitch: 0, tau: t }, camPos: V3(7 - 2 * u, 1.6, 2 - 1 * u), camLook: V3(0, 2.5, -14 + 3 * u), fov: 44, amp: .45 }); return "3d"; }
+    if (t < CUE.back) return "2d"; backShot(t); return "3d"; }
+  return "2d";
+}
+function draw2D(t, name) {
+  const X = holoX; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, W, H);
+  if (name === "hook") { chart(X, t); holoDraw(t, { edge: t >= CUE.lost ? 0xff4a6a : 0x40d8ff, shake: t >= CUE.lost ? Math.max(0, 1 - (t - CUE.lost) / .6) : 0 }); return; }
+  if (name === "lon") { if (t < CUE.prize) { latlon(X, t); holoDraw(t, { shake: t >= CUE.lonq ? Math.max(0, 1 - (t - CUE.lonq) / .5) : 0 }); return; }
+    if (t < CUE.key) { coins(bg, t); return; } if (t < CUE.drift) { timeDiff(X, t); holoDraw(t, { edge: 0xffd24a }); return; } driftClock(bg, t); return; }
+  if (name === "harrison") { bg.fillStyle = "#0e0a06"; bg.fillRect(0, 0, W, H); S.rays(bg, 540, 820, t, "rgba(255,180,90,.07)", 20);   // 本物の肖像（傾けて叩きつける）
+    photo(bg, IMG.portrait, k_(t, "portrait", .25), 1.0, 1.08, easeInOut(clamp((t - CUE.portrait) / (CUE.h1 - CUE.portrait))), { box: [230, 420, 850, 1190], cy: .4, rot: lerp(-.22, -.03, easeOut(clamp((t - CUE.portrait) / .25))), sepia: .3, gray: .4 }); return; }
+  if (name === "h4") { bg.fillStyle = "#020a12"; bg.fillRect(0, 0, W, H);   // 1767 年の図版（白黒を反転してシアンの線に）
+    const u = easeInOut(clamp((t - CUE.plate) / (CUE.trial - CUE.plate))); photo(bg, IMG.plate, k_(t, "plate", .3), 1.0, 1.25, u, { box: [70, 420, 1010, 1180], cx: .55, cy: .4, frame: null, invert: 1, gray: 1, sepia: 0, bright: 1.2 });
+    bg.save(); bg.globalCompositeOperation = "multiply"; bg.fillStyle = "#5ae0ff"; bg.fillRect(70, 420, 940, 760); bg.restore(); return; }
+  if (name === "trial") { if (t < CUE.board) { voyage(X, t); holoDraw(t, { edge: 0xffd24a, shake: t >= CUE.arrive ? Math.max(0, 1 - (t - CUE.arrive) / .5) : 0 }); return; } payCards(bg, t); return; }
+  if (name === "today") { gpsGlobe(X, t); holoDraw(t, { edge: 0x7cffb2 }); return; }
+  bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H);
+}
+
+// ---------------------------------------------------------------- 画面の派手な文字（叩きつける言葉）と演出
+const RED = ["#FF7A8A", "#E8102E"], GOLD = ["#FFF36A", "#FF9A1F"], CYAN = ["#C8FFFF", "#2AC8FF"], GREEN = ["#D8FFB0", "#30E08A"], WHITE = ["#FFFFFF", "#C8C8D8"];
+function drawUI(t, name) {
+  if (name === "hook") { if (t < CUE.storm) { slam(ui, "1707", 540, 420, 230, .05, t, { cols: WHITE, glow: "rgba(120,200,255,.9)", rot: -.06, dur: CUE.crash2 - .05 }); slam(ui, "岩に砕けた", 540, 640, 130, CUE.crash2, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: .04 });
+      S.note(ui, "※再現CGを含みます", 540, 1290, win(t, .4, 4.6, .3, .3), 26, true); }
+    else if (t < CUE.chart) slam(ui, "悪天候", 540, 360, 130, CUE.storm + .2, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.04 });
+    else if (t >= CUE.lost) slam(ui, "1300人以上", 540, 300, 150, CUE.lost, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: -.06 }); }
+  if (name === "lon") { if (t < CUE.prize) { if (t >= CUE.lonq) slam(ui, "経度が分からない", 540, 330, 100, CUE.lonq + .1, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: .03 }); }
+    else if (t < CUE.key) { slam(ui, "1714年", 540, 330, 110, CUE.prize + .15, t, { cols: WHITE, rot: -.03, dur: CUE.money - CUE.prize - .3, sub: "イギリス議会" }); slam(ui, "£20,000", 540, 560, 200, CUE.money, t, { cols: GOLD, glow: "rgba(255,200,60,1)", rot: -.06, sub: "最高の賞金" }); }
+    else if (t < CUE.drift) slam(ui, "カギは時計", 540, 260, 110, CUE.key + .1, t, { cols: GOLD, rot: -.04 });
+    else { slam(ui, "揺れ", 300, 300, 150, CUE.drift + .5, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.08 }); if (t >= CUE.heat) slam(ui, "狂う", 700, 1250, 170, CUE.heat + .2, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: .06 }); } }
+  if (name === "harrison") { if (t < CUE.portrait) slam(ui, "ジョン・ハリソン", 540, 300, 100, CUE.harrison + .5, t, { cols: GOLD, rot: -.03, sub: "大工・時計作りは独学" });
+    else if (t < CUE.h1) { slam(ui, "1693 – 1776", 540, 300, 80, CUE.portrait + .05, t, { cols: WHITE, rot: -.03 }); credit("肖像（1768）：P. J. Tassaert／パブリックドメイン", k_(t, "portrait", .4, .3), 1250); }
+    else if (t < CUE.noans) { const k = t < CUE.h2 ? "H1" : t < CUE.h3 ? "H2" : "H3"; if (t < CUE.years) slam(ui, k, 540, 380, 230, CUE[k.toLowerCase()], t, { cols: GOLD, rot: -.06 }); else slam(ui, "19年", 540, 380, 230, CUE.years + .3, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: -.06, sub: "H3だけで" });
+      if (t < CUE.years) credit("H1〜H4 は再現CG（大まか）", 1, 1290); }
+    else slam(ui, "H3じゃない", 540, 300, 120, CUE.noans + .6, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.03 }); }
+  if (name === "h4") { if (t < CUE.watch) { if (t >= CUE.small) slam(ui, "小さな時計", 540, 330, 150, CUE.small + .1, t, { cols: GOLD, glow: "rgba(255,210,90,1)", rot: -.06 }); else slam(ui, "発想を変えた", 540, 330, 120, CUE.h4 + .2, t, { cols: WHITE, rot: -.04 }); }
+    else if (t < CUE.plate) slam(ui, "H4", 540, 330, 230, CUE.watch + .1, t, { cols: GOLD, rot: -.06, sub: "1759年・1.45キロ" });
+    else { slam(ui, "H4の設計図", 540, 300, 100, CUE.plate + .15, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.03, sub: "1767年の本の図版" }); credit("図版（1767）：Library of Congress／パブリックドメイン", k_(t, "plate", .4, .3), 1240); } }
+  if (name === "trial") { if (t < CUE.board) { if (t >= CUE.arrive) slam(ui, "5秒", 600, 700, 240, CUE.arrive, t, { cols: GOLD, glow: "rgba(255,210,90,1)", rot: -.06, sub: "遅れはわずか" }); else slam(ui, "1761年", 540, 300, 110, CUE.trial + .1, t, { cols: WHITE, rot: -.03 }); }
+    else if (t < CUE.pay) slam(ui, "もう一度", 540, 330, 150, CUE.board + 1.0, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: -.05, sub: "委員会は試験を求めた" });
+    else if (t >= CUE.none) slam(ui, "受け取らず", 540, 1290, 120, CUE.none + .3, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: .05 }); }
+  if (name === "today") { if (t < CUE.gps) slam(ui, "クックの航海", 540, 330, 110, CUE.today + .2, t, { cols: GOLD, rot: -.04, sub: "H4を写した時計 K1" });
+    else if (t < CUE.back) slam(ui, "GPS", 540, 330, 200, CUE.gps + .1, t, { cols: GREEN, glow: "rgba(60,255,150,1)", rot: -.06, sub: "正確な時計で位置を出す" });
+    else if (t >= CUE.answer) slam(ui, "答えは時計の中", 540, 330, 110, CUE.answer + .4, t, { cols: GOLD, rot: -.04 }); }
+}
+function fx(t, name) {   // 画面全体の一打（ズーム・揺れ）、グリッチ、スピード線。閃光は使わない
+  const [z, s] = hitAmt(t), r = S.rng(Math.floor(t * 30) + 11); punch(bg, z, (r() - .5) * s, (r() - .5) * s);
+  for (const [c, d, a] of [["crash", .2, 6], ["lonq", .35, 12], ["heat", .4, 16], ["noans", .25, 8], ["none", .3, 12]]) if (CUE[c] !== undefined && t >= CUE[c] && t < CUE[c] + d) S.glitch(bg, t, a * (1 - (t - CUE[c]) / d), 3);
+  if (name === "h4" && t >= CUE.h4 && t < CUE.small + .3) S.speedLines(bg, 540, 820, t, "rgba(255,230,180,.28)", 56, 360, 9);
+  if (name === "trial" && t < CUE.arrive) S.speedLines(bg, 540, 800, t, "rgba(180,230,255,.18)", 40, 400, 5);
+}
+const grain = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = S.rng(99);
+  for (let i = 0; i < d.data.length; i += 4) { const v = r() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 16; } x.putImageData(d, 0, 0); return c; })();
+function addGrain(t) { const ox = Math.floor(S.rng(Math.floor(t * 30) + 7)() * 256), oy = Math.floor(S.rng(Math.floor(t * 30) + 91)() * 256);
+  bg.save(); bg.globalCompositeOperation = "overlay"; bg.globalAlpha = .5; bg.fillStyle = bg.createPattern(grain, "repeat"); bg.translate(-ox, -oy); bg.fillRect(ox, oy, W, H); bg.restore(); }
+function buildMood() {
+  const c = CUE;
+  MOOD = [[0, { cool: .35, sat: 1.1, vig: .65 }], [c.chart, { cool: .2, sat: 1.1, vig: .6 }], [c.lon, { cool: .2, sat: 1.1, vig: .58 }], [c.prize, { warm: .3, sat: 1.15, vig: .6 }], [c.key, { cool: .1, sat: 1.1, vig: .58 }],
+    [c.drift, { cool: .3, sat: 1.0, vig: .65 }], [c.harrison, { warm: .3, sat: 1.1, vig: .6 }], [c.noans, { cool: .4, sat: .85, vig: .7 }], [c.small, { warm: .4, sat: 1.15, glow: .35, glowX: .5, glowY: .45, vig: .55 }],
+    [c.plate, { cool: .2, sat: 1.1, vig: .58 }], [c.trial, { cool: .1, sat: 1.1, vig: .58 }], [c.board, { cool: .35, sat: .9, vig: .7 }], [c.pay, { warm: .2, sat: 1.05, vig: .6 }],
+    [c.today, { warm: .35, sat: 1.15, vig: .55 }], [c.gps, { cool: .1, sat: 1.15, vig: .55 }], [c.back, { cool: .35, sat: 1.1, vig: .65 }], [c.answer, { warm: .4, sat: 1.15, glow: .3, glowX: .5, glowY: .45, vig: .6 }]];
+}
+function renderFrame(t) {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  const es = TL.ending_start, name = S.sceneAt(Math.min(t, es - .001));
+  const kind = drawScene(t, name); if (kind === "2d") draw2D(t, name);
+  S.moodGrade(bg, t, MOOD); Cine.bloom(bg, .38); fx(t, name); addGrain(t);
+  if (t < es) { drawUI(t, name); popSub(ui, t, es); }
+  else { const e = TL.lines.filter(x => x.ending); HUD.endingOverlay(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: [] });   // 声が 3 人で 1 行に収まらないので、クレジットは 2 行に分けてここで描く
+    const k = clamp((t - es) / .4); ui.save(); ui.globalAlpha = k * .9; const cr = TL.credits.join("／").split("／");
+    S.group(() => { text(ui, "音声：" + cr.slice(0, 2).join("／"), 540, 1150, 28, "#B8C7D6", { weight: 500 }); text(ui, cr.slice(2).join("／"), 540, 1192, 28, "#B8C7D6", { weight: 500 }); }); ui.restore(); }
+  const [a] = S.sceneRange(name), i = SCN.indexOf(name);
+  if (i > 0 && t < es) { const k = 1 - prog(t, a, .14); if (k > 0) { bg.fillStyle = `rgba(0,0,0,${.75 * k})`; bg.fillRect(0, 0, W, H); } }   // 場面の切り替えは短い暗転（閃光は使わない）
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function renderThumb() {
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); CUE = CUE || {};
+  watchHero(3.0, { dist: .3, yaw: -.25, sea: true }); S.moodGrade(bg, 0, [[0, { warm: .35, sat: 1.15, vig: .6 }]]); Cine.bloom(bg, .45); addGrain(0);
+  slam(ui, "海の上の時計", 540, 400, 150, 0, 5, { cols: GOLD, glow: "rgba(255,210,90,1)", rot: -.05 }); slam(ui, "4隻が沈んだ答え", 540, 1330, 100, 0, 5, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: .03 });
+  bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
+}
+function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; buildMood();
+  HITS.length = 0; for (const [c, k] of [["crash", 1.6], ["crash2", 1.0], ["chart", .4], ["lost", 1.2], ["lonq", .9], ["money", 1.4], ["diff", .7], ["heat", 1.0], ["portrait", 1.0], ["h1", .9], ["h2", .9], ["h3", 1.0], ["years", 1.3],
+    ["noans", .5], ["small", 1.5], ["watch", .6], ["plate", .8], ["arrive", 1.4], ["board", .4], ["pay", .8], ["pay2", .8], ["none", 1.0], ["gps", .9], ["answer", .7]]) if (CUE[c] !== undefined) HITS.push([c, k]); }
+window.READY = Promise.all([...imgReady, fontReady, loadHumans()]).then(() => { loadEnv(); buildSea(); buildShop(); buildH4(); buildBoard(); });
+window.renderFrame = renderFrame; window.renderThumb = renderThumb; window.setTimeline = setTimeline;
+</script>
+</body></html>
