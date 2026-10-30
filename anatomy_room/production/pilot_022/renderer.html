@@ -42,13 +42,15 @@ const ui = document.getElementById("ui").getContext("2d");
 const SCN = ["open", "hook", "find", "grow", "self", "proof", "today"];
 let TL, CUE, MOOD = [];
 const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
-const CUT = [.55, 1.15, 1.8];   // L08 の転換のカットの切れ目（秒、効果音の打点と同じ）
+const CUT = [.45, .95, 1.5];   // 起承転結のカットインの切れ目（秒、効果音の打点と同じ）：暗転に大きな文字 → カット A → カット B → 本来の画
+const CI = { acid: ["当時の", "常識"], find: ["胃の中に", "らせん形の菌"], decide: ["自分の体で", "確かめる"], proof: ["菌を除くと", "再発しにくく"] };   // 起・承・転・結
+function ciPhase(t) { for (const c in CI) { const d = t - CUE[c]; if (d >= 0 && d < CUT[2]) return { c, d, p: d < CUT[0] ? 0 : d < CUT[1] ? 1 : 2 }; } return null; }
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const b64buf = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
 
 // ---------------------------------------------------------------- 本物の写真
 const IMG = {}; const imgReady = [];
-for (const k of ["gray"]) { const im = new Image(); imgReady.push(new Promise(r => { im.onload = r; im.onerror = r; })); im.src = window.ASSETS[k]; IMG[k] = im; }
+for (const k of ["jar"]) { const im = new Image(); imgReady.push(new Promise(r => { im.onload = r; im.onerror = r; })); im.src = window.ASSETS[k]; IMG[k] = im; }
 function photo(ctx, im, k, z0, z1, u, { cx = .5, cy = .45, box = [90, 330, 990, 1290], gray = 1, frame = true, bright = .92 } = {}) {   // ゆっくり寄る・暗い縁取り
   if (k <= 0 || !im.width) return;
   const [x0, y0, x1, y1] = box, bw = x1 - x0, bh = y1 - y0, z = lerp(z0, z1, u), sc = Math.max(bw / im.width, bh / im.height) * z;
@@ -286,7 +288,15 @@ function vialShot(t, back = false) {   // 実験台の上の濁った液体の�
   labShot(t, { w2: false }); const u = back ? 1 - easeInOut(clamp((t - CUE.back) / 2.4)) : easeInOut(clamp((t - CUE.hook) / 4)), wp = vial.position;
   const cp = V3(wp.x + lerp(.16, .55, u), wp.y + lerp(.08, .3, u), wp.z + lerp(.28, .9, u)); setCam(cp, V3(wp.x, wp.y + .06, wp.z), lerp(30, 40, u), .02, 30);
   draw3D({ ao: true, dof: { focus: cp.distanceTo(V3(wp.x, wp.y + .06, wp.z)), aperture: .012, maxblur: .012 } }); }
+function ciShot(t, P) {   // カットインの 2 つのカット（起・承・結。転は self の中）
+  const u = easeOut(clamp((P.d - CUT[P.p - 1]) / (CUT[P.p] - CUT[P.p - 1])));
+  if (P.c === "acid") { gutShot(t, P.p === 1 ? { acid: 1, yaw: 1.0 + .25 * u, dist: 3.6 - .4 * u } : { acid: 1, yaw: -1.1 - .2 * u, dist: 4.4 - .5 * u }); return; }
+  if (P.c === "proof") { gutShot(t, P.p === 1 ? { acid: .4, bugsK: 0, yaw: .7 + .25 * u, dist: 3.6 - .4 * u } : { acid: .4, bugsK: 0, yaw: -.8 - .2 * u, dist: 4.4 - .5 * u }); return; }
+  labShot(t, { w1: true }); const sp = scope.position;   // find：顕微鏡の寄り → 見上げる後ろ姿
+  if (P.p === 1) { const cp = V3(sp.x + .45 - .1 * u, sp.y + .85 - .1 * u, sp.z + .6 - .12 * u); setCam(cp, V3(sp.x, sp.y + .15, sp.z), 34, .02, 30); draw3D({ ao: true, dof: { focus: cp.distanceTo(V3(sp.x, sp.y + .15, sp.z)), aperture: .004, maxblur: .008 } }); return; }   // 肩ごしに顕微鏡を見下ろす
+  setCam(V3(1.15 - .15 * u, .75, 1.0 - .25 * u), V3(.6, 1.35, -.75), 42 - 4 * u, .02, 30); draw3D({ ao: true }); }
 function drawScene(t, name) {
+  const P = ciPhase(t); if (P && P.p === 0) return "2d"; if (P && P.c !== "decide") { ciShot(t, P); return "3d"; }
   if (name === "open") { driftShot(t); return "3d"; }
   if (name === "hook") { if (t < CUE.acid) { vialShot(t); return "3d"; } gutShot(t, { acid: 1, yaw: (t - CUE.acid) * .12 }); return "3d"; }
   if (name === "find") { if (t < CUE.spiral) { labShot(t, { w1: true }); const u = easeInOut(clamp((t - CUE.find) / (CUE.spiral - CUE.find))); setCam(V3(1.3 - .3 * u, 1.45, 1.2 - .3 * u), V3(.6, 1.05, -.75), 40, .05, 30); draw3D({ ao: true, dof: { focus: 1.6, aperture: .004, maxblur: .01 } }); return "3d"; }   // 顕微鏡をのぞく後ろ姿
@@ -318,9 +328,9 @@ function drawScene(t, name) {
 }
 function draw2D(t, name) {
   const X = holoX; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, W, H);
+  { const P = ciPhase(t); if (P && P.p === 0) { bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H); return; } }   // カットインの暗転
   if (name === "find") { scopeView(bg, t); return; }
   if (name === "grow") { if (t < CUE.colony) { easterCal(X, t); holoDraw(t, {}); return; } rejectDoc(bg, t); return; }
-  if (name === "self" && t >= CUE.decide && t - CUE.decide < CUT[0]) { bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H); return; }   // 転換の暗転
   if (name === "self") { if (t < CUE.decide) { panel(X); lab2(X, "見つかった", 540, 600, T(56), "#EAF2F8", 900); lab2(X, "＝ 原因？", 540, 780, T(88), "#FFE2A8", 900); holoDraw(t, {}); return; } dayCount(X, t); holoDraw(t, {}); return; }
   if (name === "proof") { eradGraph(X, t); holoDraw(t, {}); return; }
   bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H);
@@ -331,7 +341,7 @@ function project(v) { const p = v.clone().project(cam); return [(p.x * .5 + .5) 
 function openingUI(t) {   // 結論の文字を大きく（上〜中ほど）
   const k = k_(t, "t0", .4, .05);
   HUD.title(ui, [["胃潰瘍の大きな原因は", T(66), "#EAF2F8"], ["細菌だった", T(96), "#FFD58A"]], 540, 420, k, t);
-  credit("図：H. V. カーター（グレイ解剖学 1918）", k, 1340); credit("パブリックドメイン（注記を外す）", k, 1380); }
+  credit("マーシャルが飲んだ培養液の瓶（ノーベル博物館）", k, 1340); credit("写真：Gaius Cornelius／CC BY 4.0", k, 1380); }
 function plate(ctx, im, k, u, box) {   // 古い解剖図を、紙の板にのせて中央に（ゆっくり寄る）
   if (k <= 0 || !im.width) return; const [x0, y0, x1, y1] = box, bw = x1 - x0, bh = y1 - y0, z = lerp(1, 1.05, u);
   ctx.save(); ctx.globalAlpha *= clamp(k); ctx.shadowColor = "rgba(120,190,255,.35)"; ctx.shadowBlur = 40; rrect(ctx, x0, y0, bw, bh, 10); ctx.fillStyle = "#E9E1CF"; ctx.fill(); ctx.shadowBlur = 0; ctx.clip();
@@ -347,16 +357,16 @@ function drawUI(t, name) {
   if (name === "open") { openingUI(t); return; }
   if (name !== "open" && t >= CUE.hook && t < CUE.find) uiNote("※再現CGを含みます", 540, 1250, win(t, CUE.hook + .3, CUE.acid, .3, .3));
   if (t >= CUE.hook && t < CUE.proof) uiNote("※細菌を飲むなどの自己実験は危険です。まねしないでください", 540, 1320, (name === "hook" && t < CUE.acid) || name === "self" ? .95 : 0, T(22));
+  { const P = ciPhase(t); if (P && P.p === 0) { HUD.title(ui, [[CI[P.c][0], T(110), "#FFD58A"], [CI[P.c][1], T(110), "#EAF2F8"]], 540, 820, easeOut(clamp(P.d / .1)), t); return; } }   // カットインの大きな文字
   if (name === "hook") { if (t < CUE.acid) uiCard([["1984年", T(34), 800], ["オーストラリア・パース", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "hook", .45, .3));
-    else { const k = k_(t, "acid", .5, 1.0); callout("ストレス？", 330, 560, 400, 800, k); callout("胃酸？", 760, 640, 690, 880, k_(t, "acid", .5, 1.4)); if (t >= CUE.notaccepted) uiCard([["細菌が原因？", T(34), 800], ["広く認められていなかった", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "notaccepted", .45)); } }
+    else { const k = k_(t, "acid", .5, 1.6); callout("ストレス？", 330, 560, 400, 800, k); callout("胃酸？", 760, 640, 690, 880, k_(t, "acid", .5, 1.9)); if (t >= CUE.notaccepted) uiCard([["細菌が原因？", T(34), 800], ["広く認められていなかった", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "notaccepted", .45)); } }
   if (name === "find") { if (t < CUE.spiral) uiCard([["1979年ごろ", T(34), 800], ["病理医 ロビン・ウォレン", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "find", .45, .2));
     else if (t < CUE.join) uiCard([["らせん形の細菌", T(34), 800], ["顕微鏡の視野（模式図）", T(24), 500, "#B8C7D6"]], 540, 250, k_(t, "spiral", .45));
     else uiCard([["若い医師 バリー・マーシャル", T(32), 800], [t >= CUE.nogrow ? "菌が育たない" : "菌を育てる", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "join", .45)); }
   if (name === "grow" && t >= CUE.colony && t < CUE.reject) { uiCard([["菌が育っていた", T(34), 800], ["（とされる）", T(24), 500, "#B8C7D6"]], 540, 250, k_(t, "colony", .45, .4)); uiNote("※培養皿は再現", 540, 1250, k_(t, "colony", .4, .4)); }
   if (name === "grow" && t >= CUE.reject) uiNote("※採用されなかったとされる（再現）", 540, 1300, k_(t, "reject", .4, .3));
   if (name === "self" && t >= CUE.decide && t < CUE.days) { const d = t - CUE.decide;
-    if (d < CUT[0]) HUD.title(ui, [["自分の体で", T(110), "#FFD58A"], ["確かめる", T(110), "#EAF2F8"]], 540, 820, easeOut(clamp(d / .12)), t);
-    else uiCard([["自分の胃で確かめる", T(34), 800]], 540, 250, 1); }
+    if (d >= CUT[0]) uiCard([["自分の胃で確かめる", T(34), 800]], 540, 250, 1); }
   if (name === "self" && t >= CUE.inflam) { uiCard([["胃の炎症と菌を確認", T(32), 800], ["模式図", T(24), 500, "#B8C7D6"]], 540, 250, k_(t, "inflam", .45, .3)); }
   if (name === "proof") { if (t >= CUE.nih && t < CUE.nobel) uiCard([["1994年", T(34), 800], ["アメリカ国立衛生研究所の会議", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "nih", .45, .2));
     if (t >= CUE.nobel) { uiCard([["2005年", T(34), 800], ["ノーベル生理学・医学賞", T(28), 600, "#FFE2A8"]], 540, 250, k_(t, "nobel", .45, .2)); uiNote("※メダルは再現", 540, 1250, k_(t, "medal", .4)); } }
@@ -392,7 +402,7 @@ function renderFrame(t) {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
   const es = TL.ending_start, name = S.sceneAt(Math.min(t, es - .001));
   const kind = drawScene(t, name); if (kind === "2d") draw2D(t, name);
-  if (name === "open") { bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); const box_ = [140, 720, 940, 1258]; plate(bg, IMG.gray, k_(t, "t0", .5, .1), clamp(t / 3), box_); photoGlow(t, "t0", box_); }   // オープニング：本物の図（グレイ解剖学の胃）を中央に
+  if (name === "open") { bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); const box_ = [300, 600, 780, 1290]; photo(bg, IMG.jar, k_(t, "t0", .5, .1), 1.0, 1.06, clamp(t / 3), { box: box_, cy: .42, gray: 0, bright: 1.0 }); photoGlow(t, "t0", box_); }   // オープニング：本物の図（グレイ解剖学の胃）を中央に
   S.moodGrade(bg, t, MOOD); Cine.bloom(bg, name === "proof" && t >= CUE.medal ? .42 : .28); addGrain(t);
   if (t < es) { drawUI(t, name); if (name !== "open") S.docSub(ui, t, { endAt: es }); }
   else { const e = TL.lines.filter(x => x.ending); HUD.endingOverlay(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits }); }
@@ -402,7 +412,7 @@ function renderFrame(t) {
 }
 function renderThumb() {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); CUE = CUE || {}; CUE.t0 = 0;
-  driftShot(1); bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); plate(bg, IMG.gray, 1, .5, [140, 720, 940, 1258]);
+  driftShot(1); bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); photo(bg, IMG.jar, 1, 1.0, 1.06, .5, { box: [300, 600, 780, 1290], cy: .42, gray: 0, bright: 1.0 });
   S.moodGrade(bg, 0, [[0, { cool: .25, sat: 1.05, vig: .55 }]]); Cine.bloom(bg, .3); addGrain(0);
   HUD.title(ui, [["胃潰瘍の大きな原因は", 84, "#EAF2F8"], ["細菌だった", 120, "#FFD58A"]], 540, 420, 1, 9);
   text(ui, "自分で飲んで確かめた医師", 540, 1420, 64, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 });

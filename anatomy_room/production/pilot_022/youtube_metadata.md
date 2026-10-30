@@ -21,7 +21,7 @@
 ・NIH Consensus Development Conference "Helicobacter pylori in peptic ulcer disease"（1994）
 
 ▼ 写真
-・胃の図：Henry Vandyke Carter, Gray's Anatomy (1918) Fig. 1046（Wikimedia Commons、パブリックドメイン、注記を外す）
+・マーシャルが飲んだ培養液の瓶（ノーベル博物館）："Barry Marshall - Sample Jar - Nobel Musem, Stockholm" by Gaius Cornelius, Wikimedia Commons, CC BY 4.0（切り抜き）https://commons.wikimedia.org/wiki/File:Barry_Marshall_-_Sample_Jar_-_Nobel_Musem,_Stockholm.jpg
 ・3D の素材：Poly Haven（CC0）、MakeHuman / MPFB（CC0）
 ※人物・研究室・胃・メダルは再現CG（胃は模式図）です。
 

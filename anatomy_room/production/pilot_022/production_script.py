@@ -4,7 +4,8 @@
 知的設計（templates/DESIGN_MODES.md、参考 pilot_017）：落ち着いた科学ドキュメンタリー。字幕は S.docSub、見出しは uiCard、効果音はやわらかく、ゆっくりした寄り。
 冒頭のオープニング（約 3 秒、ユーザーの指示）：結論の文字を大きく、W の声（冥鳴ひまり）が読み、本物の図（グレイ解剖学の胃の図、1918、パブリックドメイン）を中央、
 背景は動く CG、ゆっくりで少し不気味な、気を引く音（ext/opening_bgm.py のモード open_eerie。2026-10-30 の直し：電子顕微鏡写真はグロテスク、やさしい音は物足りない）。
-話が大きく変わるところ（L08 自分の体で試す）は、カットを切り替えて大きく演出する（ユーザーの指示）。
+起承転結のそれぞれの頭（起 L02 当時の常識・承 L03 発見・転 L08 自分の体で・結 L10 除菌）に、暗転の大きな文字 → 2 つのカット → 本来の画のカットインを入れる（ユーザーの指示、2026-10-30 の 2 回目の直し）。
+冒頭の写真はマーシャルが飲んだ培養液の瓶（ノーベル博物館、Gaius Cornelius、CC BY 4.0）。話速はオモテ 1.5（聞き取れる限界近く）。
 共通エンディングは短い版（ending_ext）。BGM は lab_melodic（落ち着いた曲調。直前の知的設計は lab_dub）。
 処理の本体は production/common/pipeline.py、標準の既定値は production/common/standard.py。素材は assets/（scripts/pilot_022/assets.md）。
 """
@@ -38,19 +39,19 @@ EP = standard.config({
     },
     "sfx": [("shimmer", "t0", 0.4, 0.05), ("glow", "t0", 0.4, 0.3),
             ("title", "hook", 0.8, 0.02), ("deep", "hook", 0.5, 0.05), ("zoom", "drink", 0.4), ("glow", "drink", 0.4, 0.3),
-            ("whoosh", "acid", 0.5), ("scanline", "acid", 0.4, 0.4), ("tagpop", "acid", 0.4, 1.2), ("tagpop", "acid", 0.4, 1.6), ("deep", "notaccepted", 0.45),
-            ("room", "find", 0.4), ("scan", "spiral", 0.5), ("lock", "spiral", 0.5, 0.6), ("paper", "join", 0.35), ("tick", "nogrow", 0.35), ("tick", "nogrow", 0.35, 0.6),
+            ("impact", "acid", 1.0), ("deep", "acid", 0.8, 0.02), ("hit", "acid", 0.7, 0.45), ("whoosh", "acid", 0.6, 0.42), ("impact", "acid", 0.8, 0.95), ("hit", "acid", 0.6, 1.5), ("tagpop", "acid", 0.4, 1.6), ("tagpop", "acid", 0.4, 1.9), ("deep", "notaccepted", 0.45),
+            ("impact", "find", 1.0), ("deep", "find", 0.8, 0.02), ("hit", "find", 0.7, 0.45), ("whoosh", "find", 0.6, 0.42), ("impact", "find", 0.8, 0.95), ("hit", "find", 0.6, 1.5), ("scan", "spiral", 0.5), ("lock", "spiral", 0.5, 0.6), ("paper", "join", 0.35), ("tick", "nogrow", 0.35), ("tick", "nogrow", 0.35, 0.6),
             ("flip", "easter", 0.4), ("flip", "easter", 0.35, 0.25), ("reveal", "colony", 0.6), ("bloom", "colony", 0.5, 0.2), ("paper", "reject", 0.35), ("stamp", "stampc", 0.55),
             ("deep", "self", 0.45), ("scanline", "self", 0.35, 0.4), ("riser", "self", 0.5, 1.0),
-            ("impact", "decide", 1.0), ("deep", "decide", 0.8, 0.02), ("hit", "decide", 0.7, 0.55), ("whoosh", "decide", 0.6, 0.5), ("impact", "decide", 0.8, 1.15), ("hit", "decide", 0.6, 1.8), ("zoom", "decide", 0.6, 1.8),
+            ("impact", "decide", 1.0), ("deep", "decide", 0.8, 0.02), ("hit", "decide", 0.7, 0.45), ("whoosh", "decide", 0.6, 0.42), ("impact", "decide", 0.8, 0.95), ("hit", "decide", 0.6, 1.5), ("zoom", "decide", 0.6, 1.5),
             ("tick", "days", 0.35), ("tick", "days", 0.35, 0.5), ("tick", "days", 0.35, 1.0), ("deep", "sick", 0.5), ("scan", "inflam", 0.45), ("data", "inflam", 0.4, 0.4),
-            ("whoosh", "proof", 0.45), ("data", "bars", 0.45), ("ring", "bars", 0.35, 0.8), ("room", "nih", 0.35), ("paper", "nih", 0.3, 0.6),
+            ("impact", "proof", 1.0), ("deep", "proof", 0.8, 0.02), ("hit", "proof", 0.7, 0.45), ("whoosh", "proof", 0.6, 0.42), ("impact", "proof", 0.8, 0.95), ("hit", "proof", 0.6, 1.5), ("data", "bars", 0.45), ("ring", "bars", 0.35, 0.8), ("room", "nih", 0.35), ("paper", "nih", 0.3, 0.6),
             ("bloom", "medal", 0.6), ("discover", "medal", 0.5, 0.1), ("shimmer", "medal", 0.4, 0.5),
             ("glow", "today", 0.45), ("prism", "today", 0.35, 0.6), ("zoom", "back", 0.4, 0.4), ("shimmer", "card", 0.5), ("discover", "card", 0.4, 0.1)],
     # BGM：オープニングはゆっくりで少し不気味な音（open_eerie）→ 冒頭（謎）→ 常識（陰り）→ 発見（物語）→ 培養（集中）→ 不採用（陰り）→ 自己実験（集中・間）→ 証明（高まり）→ ノーベル（発見）→ 現代（温かく）→ 冒頭へ
     "music": {"style": "lab_melodic", "sections": [
-        ("t0", 0.0, "open_eerie"), ("hook", -0.05, "w_hook"), ("notaccepted", -0.1, "w_shade"), ("find", -0.1, "w_story"), ("grow", -0.1, "w_focus"), ("colony", -0.1, "w_discover"),
-        ("reject", -0.1, "w_shade"), ("self", -0.1, "w_focus"), ("decide", -0.5, "w_hold"), ("decide", 0.0, "w_discover"), ("days", -0.1, "w_focus"), ("sick", -0.15, "w_hold"), ("proof", -0.1, "w_rise"), ("medal", -0.1, "w_discover"),
+        ("t0", 0.0, "open_eerie"), ("hook", -0.05, "w_hook"), ("acid", -0.5, "w_hold"), ("acid", 0.0, "w_hook"), ("notaccepted", -0.1, "w_shade"), ("find", -0.5, "w_hold"), ("find", 0.0, "w_story"), ("grow", -0.1, "w_focus"), ("colony", -0.1, "w_discover"),
+        ("reject", -0.1, "w_shade"), ("self", -0.1, "w_focus"), ("decide", -0.5, "w_hold"), ("decide", 0.0, "w_discover"), ("days", -0.1, "w_focus"), ("sick", -0.15, "w_hold"), ("proof", -0.5, "w_hold"), ("proof", 0.0, "w_rise"), ("medal", -0.1, "w_discover"),
         ("today", -0.1, "w_warm"), ("back", -0.1, "w_hook"), ("end1", -0.6, "ending")]},
     "segments": ["open", "hook", "find", "grow", "self", "proof", "today"],
     "extra_files": ["../ext/hud_ext.js", "../common/cine.js", "assets/assets.js", "assets/scene_assets.js"] + V3,
