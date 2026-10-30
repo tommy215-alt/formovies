@@ -41,7 +41,7 @@ def main():
     kana = "".join(chr(c) for c in range(0x3041, 0x3097)) + "".join(chr(c) for c in range(0x30A1, 0x30FB)) + "ー・「」『』（）！？。、…〜"
     chars |= set(string.printable) | set(kana) | set("０１２３４５６７８９£")
     text = "".join(sorted(c for c in chars if not c.isspace() or c == " "))
-    for k, f in [("dela", "delagothicone_DelaGothicOne-Regular.ttf"), ("mochiy", "mochiypopone_MochiyPopOne-Regular.ttf")]:
+    for k, f in [("dela", "delagothicone_DelaGothicOne-Regular.ttf"), ("mochiy", "mochiypopone_MochiyPopOne-Regular.ttf"), ("mincho", "shipporimincho_ShipporiMincho-SemiBold.ttf")]:
         out["font_" + k] = b64(font_subset(HERE / "fonts" / f, text))
     (HERE / "assets.js").write_text("window.ASSETS = " + json.dumps(out) + ";\n", encoding="utf-8")
     s3 = {"glb": {p.stem: b64(p.read_bytes()) for p in sorted((HERE / "human").glob("*.glb"))},

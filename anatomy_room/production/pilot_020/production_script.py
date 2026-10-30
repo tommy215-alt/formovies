@@ -22,8 +22,9 @@ import ending_ext  # noqa: E402
 import noend_ext  # noqa: E402
 
 ending_ext.apply(pipeline)   # 共通エンディングの短い版（この回の処理の中だけ）
-noend_ext.apply(pipeline)    # 設計「悲劇」：その共通エンディングも外す（余韻なし）
-bgm_file.register("file_black_vortex", HERE / "assets" / "bgm" / "Black Vortex.mp3", bpm=163, gains={"ending": 0.0})
+noend_ext.apply(pipeline, black=2.6)   # 設計「悲劇」：共通エンディングを外し、最後は 2.6 秒かけて暗転
+# 曲は後半で少しずつ無音へ（モードの切り替えを 3 秒かけてなめらかに）、吹雪の環境音（合成）だけを強く残す。暗転のあいだは吹雪だけ
+bgm_file.register("file_black_vortex", HERE / "assets" / "bgm" / "Black Vortex.mp3", bpm=163, gains={"ending": "m0w70"}, smooth=3.0)
 
 V3 = ["../ext/vendor/three147/" + f for f in ["GLTFLoader.js", "RGBELoader.js", "Pass.js", "EffectComposer.js", "RenderPass.js", "ShaderPass.js",
                                                "CopyShader.js", "SimplexNoise.js", "SSAOShader.js", "SSAOPass.js", "BokehShader.js", "BokehPass.js"]]
@@ -56,11 +57,11 @@ EP = standard.config({
             ("deep", "last", 0.5), ("paper", "lastw", 0.4),
             ("wind", "found", 0.5), ("discover", "rocks", 0.5), ("stamp", "rocks", 0.6, 0.1), ("deep", "carried", 0.5),
             ("rewind", "back", 0.6), ("wind", "back", 0.6, 0.1), ("brake", "cut", 0.8), ("deep", "cut", 0.8, 0.05)],
-    # BGM（短調）：冒頭から勝負のテンション（全開）→ 南極点の写真で無音 → 振り向いて戻る（85%）→ 後半は段階的に下げる（70 → 55 → 45 → 35 → 25 → 15%）
-    #      → 最後の日記から無音のまま終わる（設計「悲劇」）
+    # BGM（短調）と吹雪の環境音（mXXwYY＝曲 XX%・吹雪 YY%、3 秒かけてなめらかに）：冒頭は曲だけ（全開）→ 南極点の写真で曲を消し、かすかな風
+    #      → 振り向いて曲が戻る → 後半は曲が少しずつ無音へ、吹雪が少しずつ強く → 最後の日記からは吹雪だけ（設計「悲劇」）
     "music": {"style": "file_black_vortex", "sections": [
-        ("t0", 0.0, "f_full"), ("diary", -0.1, "f_mute"), ("turn", -0.05, "f_85"), ("ret", -0.1, "f_70"), ("oates", -0.1, "f_55"), ("cold", -0.1, "f_45"),
-        ("fuel", -0.1, "f_35"), ("tent", -0.05, "f_35"), ("blizz", 0.0, "f_25"), ("ready", 0.0, "f_15"), ("last", -0.3, "f_mute")]},
+        ("t0", 0.0, "m100w0"), ("diary", -0.1, "m0w15"), ("turn", -0.05, "m85w10"), ("ret", -0.1, "m65w35"), ("oates", -0.1, "m50w55"), ("cold", -0.1, "m40w45"),
+        ("fuel", -0.1, "m30w45"), ("tent", -0.05, "m25w50"), ("blizz", 0.0, "m12w80"), ("ready", 0.0, "m5w90"), ("last", -0.3, "m0w85"), ("found", -0.1, "m0w60"), ("back", -0.1, "m0w80")]},
     "segments": ["hook", "race", "pole", "ret", "tent", "found"],
     "extra_files": ["../ext/hud_ext.js", "../common/cine.js", "assets/assets.js", "assets/scene_assets.js"] + V3,
     "workers": 1,   # 3D が重い（pilot_017 で 2 本同時だとブラウザが落ちた）
@@ -77,7 +78,7 @@ EP = standard.config({
         ("4 帰り道", "ret", "tent", "5 人が 4 人に → テントを出て吹雪へ消える後ろ姿 → 落ちる温度計 → 空になる燃料と食料", "f_mid → f_low → f_mid"),
         ("5 最後のテント", "tent", "found", "地図の「あと18km」（叫ぶ声）→ 吹雪に叩かれるテント、21 日 → 29 日 → ろうそくの光と最後の日記（無音）", "f_full → f_mid → f_mute"),
         ("6 発見と冒頭へ", "found", "endcard", "雪に埋もれたテント → 岩石標本と化石の葉 → 冒頭の旗、途切れた 18km の線", "f_low"),
-        ("7 暗転（共通エンディングなし）", "endcard", None, "最後の一文のすぐあとに暗転（余韻なし、設計「悲劇」）", "無音"),
+        ("7 暗転（共通エンディングなし）", "endcard", None, "最後の一文のあと 2.6 秒かけて暗転（設計「悲劇」）", "吹雪だけ"),
     ],
     "plan_notes": [
         "## 演出の方針（設計「悲劇」＋ガイドライン v2.4）",
