@@ -32,7 +32,7 @@
 - 事実・説明・冗談・比喩演出・不確実な情報を分けて記録する（`FACT_CHECK_POLICY.md`）。
 - キャラクター設定（`CHARACTER_GUIDE.md` v3：**オモテ（M）＝破天荒な実験台**、好奇心と自信でブレーキが壊れているが頭は切れる／**ウラ（W）＝毒舌の解説者**、オモテを面白がり、短く鋭い一言で返す。人格否定はしない）を全動画で一貫させる。
 - 標準の構成は `REVERSE_STANDARD_RULES.md` の 5 段（フック → 対象 → 背景・仕組み → 核心 → 余韻）で、ナレーション主体。**オモテとウラの会話形式の回**（ユーザーが指定したとき、または題材に合うとき）は：疑問 → オモテが巻き込まれる → とんでもない事態 → ウラが毒舌を交えて解説 → オモテが理解する／さらにひどい目に遭う（`CHANNEL_POLICY.md`）。ギャグ・非現実の演出・再現 CG は画面に明記し、事実と区別する。
-- **全動画の最後に共通エンディング**（W の声で「リバース。世界の仕組みを、はじめから。」）を付ける。pilot_015 までは専用の明るい画面、**pilot_016 以降は短い版**（明るい画面をやめ、最後の画の上にロゴと決めゼリフを重ねる。2026-10-29 にユーザーが承認。docs/ENDING_SPEC.md の「短い版」）。仕様は `anatomy_room/docs/ENDING_SPEC.md`、映像は `anatomy_room/production/common/ending.js`、声の設定は `production/common/voices.json` の `ending`。
+- **全動画の最後に共通エンディング**（例外：設計「悲劇」の回はユーザーの指示でカット、`production/ext/noend_ext.py`。`templates/DESIGN_MODES.md`）（W の声で「リバース。世界の仕組みを、はじめから。」）を付ける。pilot_015 までは専用の明るい画面、**pilot_016 以降は短い版**（明るい画面をやめ、最後の画の上にロゴと決めゼリフを重ねる。2026-10-29 にユーザーが承認。docs/ENDING_SPEC.md の「短い版」）。仕様は `anatomy_room/docs/ENDING_SPEC.md`、映像は `anatomy_room/production/common/ending.js`、声の設定は `production/common/voices.json` の `ending`。
 - 画面は暗めでテクノロジー感のある色調を標準とする（`REVERSE_STANDARD_RULES.md`）。暗さが目的ではなく、被写体と文字がはっきり見えること。第 7 弾までの明るい画面（`CHANNEL_POLICY.md` の「映像」）は旧標準。
 - 台本を直したら `python3 anatomy_room/tools/check_scripts.py`、
   `python3 anatomy_room/tools/build_chatgpt_review.py`、`python3 anatomy_room/tools/build_copy_page.py` を順に実行し、

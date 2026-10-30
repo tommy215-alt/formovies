@@ -30,8 +30,9 @@ html,body{margin:0;background:#000}
 <script src="assets/assets.js"></script>
 <script src="assets/scene_assets.js"></script>
 <script>
-// pilot_020「あと18キロ——スコットの南極点」のレンダラー（悲劇用＋ガイドライン v2.4）。
-// 悲劇用（templates/DESIGN_MODES.md）：勝負のテンション（叩きつける文字・跳ねる字幕・画面の一打・派手な人とものの動き）。ギャンブルの器具は出さない。閃光は使わない。
+// pilot_020「あと18キロ——スコットの南極点」のレンダラー（設計「悲劇」＋ガイドライン v2.4）。
+// 設計「悲劇」（templates/DESIGN_MODES.md、2026-10-30）：前半は勝負のテンション（叩きつける文字・跳ねる字幕・画面の一打・派手な人とものの動き。器具は出さない、閃光なし）。
+//   色は全体に冷たく（暖色を使わない）。後半 2/3（tentp〜）は darkK(t) で少しずつ暗く、一打も弱める。共通エンディングはなし（TL.no_ending：最後の一文のすぐあとに暗転）。
 //   人の死（エヴァンス・オーツ・最後のテント）は直接見せず、音と動きを落とす。あざける演出はしない。
 // CG：Poly Haven の質感、SSAO・ボケ、MPFB の人体（assets/make_human.py、そりを引く姿勢。顔は映さない、手のアップなし）。雪原・旗・テント・そり・帆船は再現。
 // 本物の写真：アムンセンのテントの前のスコット隊（A2）、南極点の 5 人（A1）。どちらも Henry Bowers 撮影、パブリックドメイン。※注記は冒頭に 1 回だけ。地図は模式図。
@@ -54,7 +55,7 @@ function logBox(ctx, s, x0, y0, x1, y1, size) {   // 文字の検査用（stage.
   S.TEXTLOG.push({ s, box: [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))], size: size * Math.hypot(m.a, m.b), group: ++GSEQ, container: null, ignore: false });
 }
 // 叩きつける文字：大きく出て一瞬で縮み（行き過ぎて戻る）、色ずれ・揺れ・光。cols＝[上の色, 下の色]
-function slam(ctx, s, x, y, size, t0, t, { cols = ["#FFF36A", "#FF9A1F"], stroke = "#120606", rot = -.05, font = DG, dur = 99, out = .25, glow = "rgba(255,170,60,.9)", sub = null } = {}) {
+function slam(ctx, s, x, y, size, t0, t, { cols = ["#FFF36A", "#FF9A1F"], stroke = "#120606", rot = -.05, font = DG, dur = 99, out = .25, glow = "rgba(120,190,255,.9)", sub = null } = {}) {
   const u = t - t0; if (u < 0 || u > dur + out) return;
   { ctx.save(); ctx.font = `400 ${size}px ${font}`; const w0 = ctx.measureText(s).width; ctx.restore(); if (w0 > 860) size = Math.floor(size * 860 / w0); }   // 安全な範囲に収める：幅 860 まで、上端は 200＋文字の高さ
   y = Math.max(y, 210 + size * .7); if (y > 860 && y < 1660) x = Math.min(x, 950 - Math.min(430, (size * s.length) / 2));
@@ -85,10 +86,10 @@ function popSub(ctx, t, endAt) {
   const lh = size * 1.3, bw = wmax + 80, bh = rows.length * lh + 34;
   ctx.save(); ctx.translate(cx, cy); ctx.scale(pop, pop); ctx.rotate(-.025);
   ctx.save(); ctx.transform(1, 0, -.12, 1, 0, 0); ctx.fillStyle = "rgba(8,4,14,.82)"; ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
-  const g = ctx.createLinearGradient(-bw / 2, 0, bw / 2, 0); g.addColorStop(0, "#2ad8ff"); g.addColorStop(1, "#ffd23d"); ctx.fillStyle = g; ctx.fillRect(-bw / 2, bh / 2 - 7, bw, 7); ctx.fillRect(-bw / 2, -bh / 2, 10, bh); ctx.restore();
+  const g = ctx.createLinearGradient(-bw / 2, 0, bw / 2, 0); g.addColorStop(0, "#2ad8ff"); g.addColorStop(1, "#e8f4ff"); ctx.fillStyle = g; ctx.fillRect(-bw / 2, bh / 2 - 7, bw, 7); ctx.fillRect(-bw / 2, -bh / 2, 10, bh); ctx.restore();
   rows.forEach((r, i) => { const parts = r.split("**"), ws = parts.map(p => ctx.measureText(p).width), tw = ws.reduce((a, b) => a + b, 0); let x = -tw / 2; const y = -(rows.length - 1) * lh / 2 + i * lh + 3;
     parts.forEach((p, j) => { if (!p) return; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.lineJoin = "round"; ctx.lineWidth = size * .22; ctx.strokeStyle = "#0a0408"; ctx.strokeText(p, x, y);
-      ctx.fillStyle = j % 2 ? "#FFE14A" : "#FFFFFF"; ctx.fillText(p, x, y); x += ws[j]; });
+      ctx.fillStyle = j % 2 ? "#9FE8FF" : "#FFFFFF"; ctx.fillText(p, x, y); x += ws[j]; });
     logBox(ctx, r.replace(/\*\*/g, ""), -tw / 2, y - size * .58, tw / 2, y + size * .58, size); });
   ctx.restore();
 }
@@ -97,7 +98,7 @@ const tmpC = document.createElement("canvas"); tmpC.width = W; tmpC.height = H; 
 function punch(ctx, z, sx = 0, sy = 0) { if (z <= 1.001 && !sx && !sy) return; tmpX.clearRect(0, 0, W, H); tmpX.drawImage(ctx.canvas, 0, 0); ctx.clearRect(0, 0, W, H);
   ctx.save(); ctx.translate(W / 2 + sx, H / 2 + sy); ctx.scale(z, z); ctx.drawImage(tmpC, -W / 2, -H / 2); ctx.restore(); }
 const HITS = [];   // [きっかけ, 強さ]：ここで画面がズームして揺れる
-function hitAmt(t) { let z = 0, s = 0; for (const [c, k] of HITS) { const u = t - CUE[c]; if (u >= 0 && u < .45) { const e = Math.exp(-u * 9); z += .09 * k * e; s += 26 * k * e; } } return [1 + z, s]; }
+function hitAmt(t) { let z = 0, s = 0; const fade = 1 - .6 * darkK(t); for (const [c, k] of HITS) { const u = t - CUE[c]; if (u >= 0 && u < .45) { const e = Math.exp(-u * 9); z += .09 * k * e * fade; s += 26 * k * e * fade; } } return [1 + z, s]; }
 function label(ctx, s, x, y, size, col = "#fff", { font = MP, align = "center", stroke = "#06080e", sw = .2 } = {}) {   // 図の中の文字（縁取りつき、検査に記録）
   ctx.save(); ctx.font = `400 ${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.lineJoin = "round"; ctx.lineWidth = size * sw; ctx.strokeStyle = stroke; ctx.strokeText(s, x, y); ctx.fillStyle = col; ctx.fillText(s, x, y);
   const w = ctx.measureText(s).width, x0 = align === "center" ? x - w / 2 : align === "right" ? x - w : x; logBox(ctx, s, x0, y - size * .58, x0 + w, y + size * .58, size); ctx.restore();
@@ -388,14 +389,14 @@ function thermo(ctx, t) { ctx.fillStyle = "#06080e"; ctx.fillRect(0, 0, W, H); c
   const yy = lerp(y1, y0 - 30, (-v) / 45), g = ctx.createLinearGradient(0, yy, 0, 1240); g.addColorStop(0, "#7ad8ff"); g.addColorStop(1, "#2a6aff"); ctx.fillStyle = g; ctx.shadowColor = "#7ad8ff"; ctx.shadowBlur = 30; rrect(ctx, -26, yy, 52, 1240 - yy, 26); ctx.fill(); ctx.shadowBlur = 0;
   ctx.restore(); }
 function gauges(ctx, t) { ctx.fillStyle = "#06080e"; ctx.fillRect(0, 0, W, H); const u = easeInOut(clamp((t - CUE.fuel) / 1.6));
-  [["燃料", "#ff9a3a", 1 - .88 * u, 560], ["食料", "#ffd24a", 1 - .82 * u, 900]].forEach(([s, col, k, y]) => { label(ctx, s, 540, y - 110, 64, "#fff", { font: DG });
+  [["燃料", "#7fc8ff", 1 - .88 * u, 560], ["食料", "#c8e8ff", 1 - .82 * u, 900]].forEach(([s, col, k, y]) => { label(ctx, s, 540, y - 110, 64, "#fff", { font: DG });
     ctx.fillStyle = "rgba(20,20,30,.95)"; rrect(ctx, 140, y - 50, 800, 100, 50); ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.4)"; ctx.lineWidth = 4; ctx.stroke(); const lowc = k < .25 ? "#ff3a5a" : col; ctx.fillStyle = lowc; ctx.shadowColor = lowc; ctx.shadowBlur = 24; rrect(ctx, 150, y - 40, 780 * k, 80, 40); ctx.fill(); ctx.shadowBlur = 0; }); }
 function routeMap(ctx, t) {   // 模式図：南極点 → 最後のテント → 補給所（ワントン・デポ）→ 基地。最後の 18 km に寄る
   panel(ctx, "rgba(4,12,24,.9)"); const z = easeInOut(clamp((t - CUE.tent) / .6)), py = lerp(400, -1400, z), ty = lerp(1000, 760, z), dy = lerp(1060, 1060, z);
   ctx.save(); ctx.beginPath(); rrect(ctx, 100, 340, 880, 930, 16); ctx.clip();
   const P = { pole: [540, py], tent: [520, ty], depot: [560, dy], base: [600, 1400] };
   ctx.setLineDash([18, 12]); glowLine(ctx, "rgba(160,220,255,.9)", 6, 14, () => { ctx.moveTo(...P.pole); ctx.lineTo(...P.tent); }); ctx.setLineDash([]);
-  glowLine(ctx, "#ff4a6a", 10, 26, () => { ctx.moveTo(...P.tent); ctx.lineTo(P.tent[0] + (P.depot[0] - P.tent[0]) * .97, P.tent[1] + (P.depot[1] - P.tent[1]) * .97); });
+  glowLine(ctx, "#9FD8FF", 10, 26, () => { ctx.moveTo(...P.tent); ctx.lineTo(P.tent[0] + (P.depot[0] - P.tent[0]) * .97, P.tent[1] + (P.depot[1] - P.tent[1]) * .97); });
   ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(P.tent[0], P.tent[1] - 34); ctx.lineTo(P.tent[0] - 30, P.tent[1] + 16); ctx.lineTo(P.tent[0] + 30, P.tent[1] + 16); ctx.fill();
   ctx.fillStyle = "#7CFFB2"; ctx.shadowColor = "#7CFFB2"; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(P.depot[0], P.depot[1] + 40 * z, 22, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
   label(ctx, "最後のテント", P.tent[0] - 220, P.tent[1], 40, "#fff"); label(ctx, "補給所", P.depot[0] + 170, P.depot[1] + 40 * z, 44, "#7CFFB2", { font: DG }); label(ctx, "模式図", 900, 1240, 30, "#9EB4CC");
@@ -442,12 +443,12 @@ function draw2D(t, name) {
     if (t < CUE.diary) { S.rays(bg, 540, 800, t, "rgba(200,220,255,.07)", 20); photo(bg, IMG.polheim, k_(t, "tentp", .22), 1.0, 1.12, easeInOut(clamp((t - CUE.tentp) / (CUE.diary - CUE.tentp))), { box: [70, 440, 1010, 1100], cy: .5, rot: lerp(-.18, -.02, easeOut(clamp((t - CUE.tentp) / .22))) }); return; }
     photo(bg, IMG.pole5, k_(t, "diary", .5), 1.0, 1.08, easeInOut(clamp((t - CUE.diary) / (CUE.turn - CUE.diary))), { box: [70, 440, 1010, 1060], cy: .45 }); return; }   // 無音：静かに
   if (name === "ret") { if (t < CUE.fuel) thermo(bg, t); else gauges(bg, t); return; }
-  if (name === "tent") { routeMap(X, t); holoDraw(t, { edge: 0xff4a6a, shake: t >= CUE.tent + .25 ? Math.max(0, 1 - (t - CUE.tent - .25) / .6) : 0 }); return; }
+  if (name === "tent") { routeMap(X, t); holoDraw(t, { edge: 0x6ab8ff, shake: t >= CUE.tent + .25 ? Math.max(0, 1 - (t - CUE.tent - .25) / .6) : 0 }); return; }
   bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H);
 }
 
 // ---------------------------------------------------------------- 画面の派手な文字と演出
-const RED = ["#FF7A8A", "#E8102E"], GOLD = ["#FFF36A", "#FF9A1F"], CYAN = ["#C8FFFF", "#2AC8FF"], WHITE = ["#FFFFFF", "#C8C8D8"];
+const RED = ["#FF9AB0", "#B8143E"], GOLD = ["#FFFFFF", "#8FD0FF"], CYAN = ["#C8FFFF", "#2AC8FF"], WHITE = ["#FFFFFF", "#C8C8D8"];   // GOLD も冷たい色（氷）にする
 function quote(s, k, y = 1250) { if (k <= 0) return; ui.save(); ui.globalAlpha = clamp(k); label(ui, s, 540, y, 38, "#E6EEF8", { font: '"Noto Serif", "Noto Sans CJK JP", serif', sw: .25 }); ui.restore(); }
 function drawUI(t, name) {
   if (name === "hook") { if (t < CUE.reveal) slam(ui, "あと少し", 540, 400, 170, .05, t, { cols: GOLD, rot: -.06 }); else slam(ui, "先を越された", 540, 400, 130, CUE.reveal + .05, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: .04 });
@@ -456,17 +457,17 @@ function drawUI(t, name) {
     else if (t < CUE.haul) slam(ui, "アムンセン", 540, 330, 140, CUE.rival + .05, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.05, sub: "ノルウェー・犬ぞり" });
     else if (t < CUE.pony) slam(ui, "動力そり", 540, 330, 130, CUE.haul + .05, t, { cols: WHITE, rot: -.04 });
     else if (t < CUE.manhaul) slam(ui, "ポニー", 540, 330, 150, CUE.pony + .05, t, { cols: WHITE, rot: .04 });
-    else slam(ui, "人がそりを引く", 540, 330, 120, CUE.manhaul + .05, t, { cols: GOLD, glow: "rgba(255,200,60,1)", rot: -.06 }); }
+    else slam(ui, "人がそりを引く", 540, 330, 120, CUE.manhaul + .05, t, { cols: GOLD, glow: "rgba(120,200,255,1)", rot: -.06 }); }
   if (name === "pole") { if (t < CUE.blackflag) slam(ui, "1912年1月", 540, 330, 120, CUE.pole + .05, t, { cols: WHITE, rot: -.04, sub: "南極点の手前" });
     else if (t < CUE.tentp) slam(ui, "黒い旗", 540, 360, 190, CUE.blackflag, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: -.06 });
     else if (t < CUE.diary) { if (t >= CUE.month) slam(ui, "1か月以上", 540, 300, 150, CUE.month, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: -.06, sub: "先に着いていた" }); credit("写真：Henry Bowers（1912）／パブリックドメイン", k_(t, "tentp", .4, .3), 1180); }
     else if (t < CUE.turn) { quote("“Great God! this is an awful place”", k_(t, "awful", .6), 1150); credit("写真：Henry Bowers（1912）／パブリックドメイン", k_(t, "diary", .6, .3), 1230); }
-    else if (t >= CUE.turn2) slam(ui, "生きて帰れ", 540, 360, 150, CUE.turn2, t, { cols: GOLD, glow: "rgba(255,200,60,1)", rot: -.06 }); }
+    else if (t >= CUE.turn2) slam(ui, "生きて帰れ", 540, 360, 150, CUE.turn2, t, { cols: GOLD, glow: "rgba(120,200,255,1)", rot: -.06 }); }
   if (name === "ret") { if (t < CUE.oates) { if (t >= CUE.evans) slam(ui, "5人 → 4人", 540, 360, 120, CUE.evans + .3, t, { cols: WHITE, rot: -.03 }); }
     else if (t < CUE.cold) { quote("“I am just going outside and may be some time.”", k_(t, "outside", .5), 1230); if (t >= CUE.gone) slam(ui, "4人 → 3人", 540, 360, 120, CUE.gone, t, { cols: WHITE, rot: -.03 }); }
     else if (t < CUE.fuel) { slam(ui, "−40℃", 720, 560, 160, CUE.cold + .45, t, { cols: CYAN, glow: "rgba(40,200,255,1)", rot: -.06 }); if (t >= CUE.study) { ui.save(); ui.globalAlpha = k_(t, "study", .4); label(ui, "1912年3月の最低気温は", 700, 930, 36, "#cfe4ff"); label(ui, "平年より約6〜11℃低かった", 700, 985, 36, "#fff"); label(ui, "（研究による推定）", 700, 1040, 30, "#9EB4CC"); ui.restore(); } }
     else slam(ui, "足りない", 540, 1230, 140, CUE.fuel + .7, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: .04 }); }
-  if (name === "tent") { if (t < CUE.blizz) slam(ui, "あと18km", 540, 420, 200, CUE.tent + .25, t, { cols: GOLD, glow: "rgba(255,200,60,1)", rot: -.07 });
+  if (name === "tent") { if (t < CUE.blizz) slam(ui, "あと18km", 540, 420, 200, CUE.tent + .25, t, { cols: GOLD, glow: "rgba(120,200,255,1)", rot: -.07 });
     else if (t < CUE.last) { const d = Math.min(29, 21 + Math.floor(clamp((t - CUE.blizz) / (CUE.last - CUE.blizz - .3)) * 8.999)); slam(ui, `3月${d}日`, 540, 360, 130, CUE.blizz + .1, t, { cols: WHITE, rot: -.03 }); if (t >= CUE.noexit) slam(ui, "出られない", 540, 1240, 120, CUE.noexit + .1, t, { cols: RED, glow: "rgba(255,30,60,1)", rot: .04 }); }
     else quote("“For God's sake look after our people.”", k_(t, "lastw", .6), 1180); }
   if (name === "found") { if (t < CUE.rocks) slam(ui, "1912年11月", 540, 330, 120, CUE.found + .1, t, { cols: WHITE, rot: -.03, sub: "捜索隊がテントを見つけた" });
@@ -475,14 +476,14 @@ function drawUI(t, name) {
 }
 function brokenLine(ctx, t) {   // 冒頭とつなぐ：18 km の線が途中で途切れる
   const k = clamp((t - CUE.cut) / 1.2), x0 = 160, x1 = 920, y = 760, xe = lerp(x0, x0 + (x1 - x0) * .62, easeOut(k));
-  ctx.save(); glowLine(ctx, "#ff4a6a", 10, 24, () => { ctx.moveTo(x0, y); ctx.lineTo(xe, y); }); ctx.setLineDash([16, 14]); glowLine(ctx, "rgba(255,255,255,.35)", 4, 0, () => { ctx.moveTo(xe + 30, y); ctx.lineTo(x1, y); }); ctx.setLineDash([]);
+  ctx.save(); glowLine(ctx, "#9FD8FF", 10, 24, () => { ctx.moveTo(x0, y); ctx.lineTo(xe, y); }); ctx.setLineDash([16, 14]); glowLine(ctx, "rgba(255,255,255,.35)", 4, 0, () => { ctx.moveTo(xe + 30, y); ctx.lineTo(x1, y); }); ctx.setLineDash([]);
   ctx.fillStyle = "#7CFFB2"; ctx.beginPath(); ctx.arc(x1, y, 18, 0, 6.283); ctx.fill(); label(ctx, "補給所", x1 - 40, y + 70, 40, "#7CFFB2", { font: DG }); label(ctx, "18km", 540, y - 60, 52, "#fff", { font: DG }); ctx.restore(); }
 function fx(t, name) {   // 画面全体の一打（ズーム・揺れ）、グリッチ、スピード線。閃光は使わない
   const [z, s] = hitAmt(t), r = S.rng(Math.floor(t * 30) + 11); punch(bg, z, (r() - .5) * s, (r() - .5) * s);
   for (const [c, d, a] of [["reveal", .25, 10], ["haul", .3, 10], ["blackflag", .3, 12], ["month", .25, 10], ["study", .25, 8], ["tent", .3, 12], ["noexit", .25, 8]]) if (CUE[c] !== undefined && t >= CUE[c] && t < CUE[c] + d) S.glitch(bg, t, a * (1 - (t - CUE[c]) / d), 3);
   if (name === "race" && (t < CUE.rival || (t >= CUE.rival && t < CUE.haul) || t >= CUE.manhaul)) S.speedLines(bg, 540, 820, t, "rgba(255,255,255,.22)", 50, 380, 9);
-  if (name === "pole" && t >= CUE.turn2 && t < CUE.turn2 + .8) S.speedLines(bg, 540, 820, t, "rgba(255,230,180,.3)", 56, 360, 7);
-  if (name === "tent" && t < CUE.blizz) S.speedLines(bg, 540, 760, t, "rgba(255,120,140,.25)", 50, 300, 5);
+  if (name === "pole" && t >= CUE.turn2 && t < CUE.turn2 + .8) S.speedLines(bg, 540, 820, t, "rgba(200,230,255,.3)", 56, 360, 7);
+  if (name === "tent" && t < CUE.blizz) S.speedLines(bg, 540, 760, t, "rgba(160,200,255,.25)", 50, 300, 5);
 }
 
 const grain = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = S.rng(99);
@@ -490,23 +491,23 @@ const grain = (() => { const c = document.createElement("canvas"); c.width = c.h
 function addGrain(t) { const ox = Math.floor(S.rng(Math.floor(t * 30) + 7)() * 256), oy = Math.floor(S.rng(Math.floor(t * 30) + 91)() * 256);
   bg.save(); bg.globalCompositeOperation = "overlay"; bg.globalAlpha = .5; bg.fillStyle = bg.createPattern(grain, "repeat"); bg.translate(-ox, -oy); bg.fillRect(ox, oy, W, H); bg.restore(); }
 
-function buildMood() {
+function buildMood() {   // 色調：暖色を使わない。後半 2/3 は少しずつ彩度を落とし、周辺を暗く
   const c = CUE;
-  MOOD = [[0, { cool: .35, sat: 1.05, vig: .6 }], [c.race, { cool: .2, sat: 1.15, vig: .55 }], [c.rival, { cool: .15, sat: 1.15, vig: .55 }], [c.haul, { cool: .25, sat: 1.0, vig: .6 }],
-    [c.pole, { warm: .1, sat: 1.1, vig: .55 }], [c.blackflag, { cool: .3, sat: 1.1, vig: .65 }], [c.tentp, { cool: .2, sat: .9, vig: .6 }], [c.diary, { cool: .3, sat: .7, vig: .7 }], [c.turn, { warm: .2, sat: 1.15, vig: .55 }],
-    [c.ret, { cool: .4, sat: .85, vig: .7 }], [c.oates, { cool: .5, sat: .8, vig: .72 }], [c.cold, { cool: .45, sat: 1.0, vig: .65 }], [c.tent, { warm: .2, sat: 1.15, vig: .55 }], [c.blizz, { cool: .5, sat: .8, vig: .72 }],
-    [c.last, { warm: .35, sat: .9, vig: .75 }], [c.found, { cool: .35, sat: .75, vig: .68 }], [c.back, { cool: .4, sat: .85, vig: .7 }]];
+  MOOD = [[0, { cool: .4, sat: 1.0, vig: .6 }], [c.race, { cool: .35, sat: 1.05, vig: .55 }], [c.haul, { cool: .4, sat: .95, vig: .6 }], [c.pole, { cool: .35, sat: 1.0, vig: .58 }],
+    [c.blackflag, { cool: .45, sat: .95, vig: .65 }], [c.tentp, { cool: .45, sat: .85, vig: .66 }], [c.diary, { cool: .5, sat: .7, vig: .7 }], [c.turn, { cool: .45, sat: .85, vig: .66 }],
+    [c.ret, { cool: .55, sat: .75, vig: .72 }], [c.oates, { cool: .6, sat: .68, vig: .75 }], [c.cold, { cool: .6, sat: .7, vig: .75 }], [c.tent, { cool: .6, sat: .7, vig: .76 }],
+    [c.blizz, { cool: .65, sat: .6, vig: .8 }], [c.last, { cool: .65, sat: .52, vig: .84 }], [c.found, { cool: .7, sat: .45, vig: .86 }], [c.back, { cool: .7, sat: .4, vig: .9 }]];
 }
+// 後半 2/3 の暗さ（0 → 1）：南極点の写真（tentp）から最後の一文の終わりまで、少しずつ
+function darkK(t) { if (!TL || CUE.tentp === undefined) return 0; return clamp((t - CUE.tentp) / (TL.ending_start - CUE.tentp)); }
 function renderFrame(t) {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
   const es = TL.ending_start, name = S.sceneAt(Math.min(t, es - .001));
-  const kind = drawScene(t, name); if (kind === "2d") draw2D(t, name);
-  S.moodGrade(bg, t, MOOD); Cine.bloom(bg, .32); fx(t, name); addGrain(t);
+  const kind = drawScene(Math.min(t, es - .001), name); if (kind === "2d") draw2D(Math.min(t, es - .001), name);
+  S.moodGrade(bg, t, MOOD); Cine.bloom(bg, .32 * (1 - .5 * darkK(t))); fx(t, name); addGrain(t);
+  { const dk = darkK(t); if (dk > 0) { bg.fillStyle = `rgba(0,6,14,${.48 * Math.pow(dk, 1.3)})`; bg.fillRect(0, 0, W, H); } }   // 後半ほど暗く
   if (t < es) { drawUI(t, name); popSub(ui, t, es); }
-  else { const e = TL.lines.filter(x => x.ending); HUD.endingOverlay(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: [] });   // クレジットは 2 行に分けてここで描く（声 3 人と BGM）
-    const k = clamp((t - es) / .4); ui.save(); ui.globalAlpha = k * .9; const cr = TL.credits.join("／").split("／");
-    S.group(() => { text(ui, "音声：" + cr.slice(0, 2).join("／"), 540, 1150, 28, "#B8C7D6", { weight: 500 }); text(ui, cr.slice(2).join("／"), 540, 1192, 28, "#B8C7D6", { weight: 500 });
-      text(ui, "BGM：“Blown Away” Kevin MacLeod（CC BY 4.0）", 540, 1234, 26, "#B8C7D6", { weight: 500 }); }); ui.restore(); }
+  else { bg.fillStyle = `rgba(0,0,0,${clamp((t - es) / .1)})`; bg.fillRect(0, 0, W, H); }   // 共通エンディングなし：すぐに暗転（余韻なし）
   const [a] = S.sceneRange(name), i = SCN.indexOf(name);
   if (i > 0 && t < es) { const k = 1 - prog(t, a, .14); if (k > 0) { bg.fillStyle = `rgba(0,0,0,${.75 * k})`; bg.fillRect(0, 0, W, H); } }   // 場面の切り替えは短い暗転（閃光は使わない）
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
@@ -514,8 +515,8 @@ function renderFrame(t) {
 function renderThumb() {
   bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); CUE = CUE || {};
   teamPose(2.0, {}); snowShot(2.0, { mode: "blizz", cp: V3(2.2, 1.9, 4.2), look: V3(0, 1.4, -8), fov: 44, wind: 1.3, flag: [-.6, 0, -9], teamAt: [0, 0, -1] });
-  S.moodGrade(bg, 0, [[0, { cool: .35, sat: 1.05, vig: .6 }]]); Cine.bloom(bg, .4); addGrain(0);
-  slam(ui, "あと18km", 540, 420, 210, 0, 5, { cols: GOLD, glow: "rgba(255,200,60,1)", rot: -.06 }); slam(ui, "届かなかった5人", 540, 1330, 110, 0, 5, { cols: RED, glow: "rgba(255,30,60,1)", rot: .03 });
+  S.moodGrade(bg, 0, [[0, { cool: .45, sat: .9, vig: .65 }]]); Cine.bloom(bg, .3); addGrain(0);
+  slam(ui, "あと18km", 540, 420, 210, 0, 5, { cols: GOLD, glow: "rgba(120,200,255,1)", rot: -.06 }); slam(ui, "届かなかった5人", 540, 1330, 110, 0, 5, { cols: RED, glow: "rgba(255,30,60,1)", rot: .03 });
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
 }
 function setTimeline(tl) { TL = tl; S.setup(tl, SCN); CUE = S.CUE; buildMood();

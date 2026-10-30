@@ -23,7 +23,8 @@ Kevin MacLeod（incompetech.com）の曲。**CC BY 4.0**（クレジットを書
 
 - クレジットの書き方：「"曲名" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License」
 - 決めた曲は `production/pilot_020/assets/bgm/` に置き、ここに記録する。
-- **使った曲：Blown Away**（Kevin MacLeod、170 BPM、ISRC USUAN1200100）。2026-10-30 に https://incompetech.com/music/royalty-free/mp3-royaltyfree/Blown%20Away.mp3 から取得。ユーザーが曲を指定しなかったので Claude が選んだ（話速を上げた台本の勢いに合う、ギター抜きのエレクトロ）。クレジットは動画のエンディングと説明文に書く。BGM の部品は `production/ext/bgm_file.py`。
+- **v2（設計「悲劇」、2026-10-30）で使った曲：Black Vortex**（Kevin MacLeod、163 BPM、incompetech の一覧の feel：Action, Aggressive, Dark, Driving, Epic, Intense, Suspenseful）。ユーザーの指示「曲調をマイナーコードに」で選び直した。`production/voice_tests/keycheck.py` の推定でホ短調（短調の相関 0.78、長調 0.62）。https://incompetech.com/music/royalty-free/mp3-royaltyfree/Black%20Vortex.mp3 から取得。
+- v1（悲劇用）で使った曲：Blown Away（Kevin MacLeod、170 BPM、ISRC USUAN1200100）。2026-10-30 に https://incompetech.com/music/royalty-free/mp3-royaltyfree/Blown%20Away.mp3 から取得。ユーザーが曲を指定しなかったので Claude が選んだ（話速を上げた台本の勢いに合う、ギター抜きのエレクトロ）。クレジットは動画のエンディングと説明文に書く。BGM の部品は `production/ext/bgm_file.py`。
 
 ## 使わないもの
 

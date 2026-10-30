@@ -17,11 +17,13 @@ from music import SR
 
 FILES = {}
 GAIN = {"f_full": 1.0, "f_mid": .65, "f_low": .3, "f_mute": 0.0, "ending": .35}
+GAIN.update({f"f_{p}": p / 100 for p in range(5, 100, 5)})   # 段階的に下げる用（f_85・f_70 など。設計「悲劇」で後半を少しずつ暗くする）
 RMS = 0.11   # 曲全体の音の大きさ（合成の BGM とだいたい同じ）
 
 
-def register(name, path, start=0.0, bpm=170):
-    FILES[name] = {"path": str(path), "start": start}
+def register(name, path, start=0.0, bpm=170, gains=None):
+    """gains：この曲だけのモードの音量（例 {"ending": 0.0}：エンディングで無音のまま）"""
+    FILES[name] = {"path": str(path), "start": start, "gains": gains or {}}
     music.TECH_STYLES[name] = {"bpm": bpm, "chords": [], "seed": 0}
 
 
@@ -42,7 +44,7 @@ def bgm_file(total, sections, style):
     g = np.ones(n)
     sec = sorted(sections) + [(total + 1, None)]
     for (a, m), (b, _) in zip(sec, sec[1:]):
-        g[max(0, int(a * SR)):min(n, int(b * SR))] = GAIN[m]
+        g[max(0, int(a * SR)):min(n, int(b * SR))] = f["gains"].get(m, GAIN[m])
     g = music._smooth(g, np.ones(int(.25 * SR)) / int(.25 * SR))
     t = np.arange(n) / SR
     return x * g * np.clip(t / .01, 0, 1) * np.clip((total - t) / 1.5, 0, 1), {}

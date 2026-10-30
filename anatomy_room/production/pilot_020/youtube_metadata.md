@@ -22,11 +22,11 @@
 
 ▼ 写真・音楽
 ・写真：Henry Bowers（1912）／パブリックドメイン（Wikimedia Commons）
-・BGM："Blown Away" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License
+・BGM："Black Vortex" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License
 ・フォント：Dela Gothic One、Mochiy Pop One（SIL Open Font License）
 ・3D の素材：Poly Haven（CC0）、MakeHuman / MPFB（CC0）
 ※人物・雪原・テント・帆船は再現CGです。地図は模式図です。
 
-音声：VOICEVOX:玄野武宏／VOICEVOX:青山龍星／VOICEVOX:冥鳴ひまり
+音声：VOICEVOX:玄野武宏／VOICEVOX:青山龍星
 
 #南極 #スコット #アムンセン #探検 #リバース

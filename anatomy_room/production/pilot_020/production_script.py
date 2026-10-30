@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""pilot_020「あと18キロ——スコットの南極点」（チャンネル「リバース」悲劇用＋ガイドライン v2.4）の制作スクリプト。
+"""pilot_020「あと18キロ——スコットの南極点」（チャンネル「リバース」設計「悲劇」＋ガイドライン v2.4）の制作スクリプト。
 
-悲劇用（templates/DESIGN_MODES.md）：演出はハイテンションな勝負のテンション（器具は出さない、閃光なし）、中身は救いのない実話。
-声は話速 1.5（聞き取れる限界近く、ユーザーの指示）。叫ぶ声は L08・L13 だけ（青山龍星「熱血」）。
-BGM は外の曲（Kevin MacLeod「Blown Away」、CC BY 4.0）を production/ext/bgm_file.py で使う。場面のモードで音量を変え、人の死の場面は絞る。
+設計「悲劇」（templates/DESIGN_MODES.md、2026-10-30）：前半は勝負のテンション（器具は出さない、閃光なし）、後半 2/3 から少しずつ
+話のトーン・色・BGM を暗くし、最後は BGM 無音。曲は短調、色は全体に冷たく。共通エンディングはなし（余韻なし、ext/noend_ext.py）。
+声は話速 1.5（聞き取れる限界近く）から後半で少しずつ落とす。叫ぶ声は L08 だけ（青山龍星「熱血」）。
+BGM は外の曲（Kevin MacLeod「Black Vortex」、ホ短調、CC BY 4.0）を production/ext/bgm_file.py で使い、後半で段階的に下げる。
+（1 本目の版「悲劇用」：Blown Away・エンディングあり。git の 2e938ad）
 処理の本体は production/common/pipeline.py、標準の既定値は production/common/standard.py。素材は assets/（scripts/pilot_020/assets.md）。
 """
 import sys
@@ -17,9 +19,11 @@ import standard  # noqa: E402
 import music_ext  # noqa: E402,F401
 import bgm_file  # noqa: E402
 import ending_ext  # noqa: E402
+import noend_ext  # noqa: E402
 
 ending_ext.apply(pipeline)   # 共通エンディングの短い版（この回の処理の中だけ）
-bgm_file.register("file_blown_away", HERE / "assets" / "bgm" / "Blown Away.mp3", bpm=170)
+noend_ext.apply(pipeline)    # 設計「悲劇」：その共通エンディングも外す（余韻なし）
+bgm_file.register("file_black_vortex", HERE / "assets" / "bgm" / "Black Vortex.mp3", bpm=163, gains={"ending": 0.0})
 
 V3 = ["../ext/vendor/three147/" + f for f in ["GLTFLoader.js", "RGBELoader.js", "Pass.js", "EffectComposer.js", "RenderPass.js", "ShaderPass.js",
                                                "CopyShader.js", "SimplexNoise.js", "SSAOShader.js", "SSAOPass.js", "BokehShader.js", "BokehPass.js"]]
@@ -52,11 +56,11 @@ EP = standard.config({
             ("deep", "last", 0.5), ("paper", "lastw", 0.4),
             ("wind", "found", 0.5), ("discover", "rocks", 0.5), ("stamp", "rocks", 0.6, 0.1), ("deep", "carried", 0.5),
             ("rewind", "back", 0.6), ("wind", "back", 0.6, 0.1), ("brake", "cut", 0.8), ("deep", "cut", 0.8, 0.05)],
-    # BGM：冒頭から勝負のテンション（全開）→ 南極点の写真で無音 → 振り向いて再び全開 → 帰り道（中）→ オーツ（小）→ 寒さと燃料（中）→「あと18キロ」（全開）
-    #      → 吹雪（中）→ 最後の日記（無音）→ 発見と最後の一文（小）
-    "music": {"style": "file_blown_away", "sections": [
-        ("t0", 0.0, "f_full"), ("diary", -0.1, "f_mute"), ("turn", -0.05, "f_full"), ("ret", -0.1, "f_mid"), ("oates", -0.1, "f_low"), ("cold", -0.1, "f_mid"),
-        ("tent", -0.05, "f_full"), ("blizz", 0.2, "f_mid"), ("last", -0.1, "f_mute"), ("found", -0.1, "f_low"), ("end1", -0.6, "ending")]},
+    # BGM（短調）：冒頭から勝負のテンション（全開）→ 南極点の写真で無音 → 振り向いて戻る（85%）→ 後半は段階的に下げる（70 → 55 → 45 → 35 → 25 → 15%）
+    #      → 最後の日記から無音のまま終わる（設計「悲劇」）
+    "music": {"style": "file_black_vortex", "sections": [
+        ("t0", 0.0, "f_full"), ("diary", -0.1, "f_mute"), ("turn", -0.05, "f_85"), ("ret", -0.1, "f_70"), ("oates", -0.1, "f_55"), ("cold", -0.1, "f_45"),
+        ("fuel", -0.1, "f_35"), ("tent", -0.05, "f_35"), ("blizz", 0.0, "f_25"), ("ready", 0.0, "f_15"), ("last", -0.3, "f_mute")]},
     "segments": ["hook", "race", "pole", "ret", "tent", "found"],
     "extra_files": ["../ext/hud_ext.js", "../common/cine.js", "assets/assets.js", "assets/scene_assets.js"] + V3,
     "workers": 1,   # 3D が重い（pilot_017 で 2 本同時だとブラウザが落ちた）
@@ -65,6 +69,7 @@ EP = standard.config({
                   ("ret", 0.5), ("evans", 0.6), ("oates", 0.6), ("outside", 0.8), ("gone", 0.4), ("cold", 0.5), ("study", 0.8), ("fuel", 0.8),
                   ("tent", 0.6), ("blizz", 0.6), ("ready", 0.8), ("noexit", 0.6), ("last", 0.5), ("lastw", 0.8), ("found", 0.6), ("rocks", 0.6), ("carried", 0.5),
                   ("back", 0.6), ("cut", 0.8)],
+    "final_hold": 0.0,
     "scenes": [
         ("1 冒頭（フック）", None, "race", "最初の 1 秒：吹雪の中ではためく黒い旗 → 一打で引くと、そりを引く 5 人の影", "f_full、一打"),
         ("2 競争", "race", "pole", "氷山の間を進む帆船 → 犬ぞりの疾走 → 止まる動力そり・消えるポニー → 人がそりを引く", "f_full"),
@@ -72,19 +77,20 @@ EP = standard.config({
         ("4 帰り道", "ret", "tent", "5 人が 4 人に → テントを出て吹雪へ消える後ろ姿 → 落ちる温度計 → 空になる燃料と食料", "f_mid → f_low → f_mid"),
         ("5 最後のテント", "tent", "found", "地図の「あと18km」（叫ぶ声）→ 吹雪に叩かれるテント、21 日 → 29 日 → ろうそくの光と最後の日記（無音）", "f_full → f_mid → f_mute"),
         ("6 発見と冒頭へ", "found", "endcard", "雪に埋もれたテント → 岩石標本と化石の葉 → 冒頭の旗、途切れた 18km の線", "f_low"),
-        ("7 共通エンディング（短い版）", "endcard", None, "最後の画の上にロゴと決めゼリフ", "BGM ending"),
+        ("7 暗転（共通エンディングなし）", "endcard", None, "最後の一文のすぐあとに暗転（余韻なし、設計「悲劇」）", "無音"),
     ],
     "plan_notes": [
-        "## 演出の方針（悲劇用＋ガイドライン v2.4）",
+        "## 演出の方針（設計「悲劇」＋ガイドライン v2.4）",
         "",
         "- 冒頭の最初の 1 秒：決定的な映像（吹雪の中ではためく黒い旗）。答えは言わない。",
-        "- 悲劇用：ハイテンションなのは「勝負」の部分（冒頭〜L08、L13）。速い話速（1.5）・外の BGM（Blown Away、170 BPM）・叩きつける文字・ズームの一打と揺れ・派手な人とものの動き。ギャンブルの器具は出さない。閃光は使わない。",
-        "- 人の死（L09・L10・L15）は BGM を絞り、効果音は低い音と風だけ。あざける演出はしない。最後の 2 行も絞ったまま、後味を残す。",
+        "- 設計「悲劇」：前半 1/3（冒頭〜L08）は勝負のテンション。速い話速（1.5）・短調の外の BGM（Black Vortex、163 BPM）・叩きつける文字・ズームの一打と揺れ・派手な人とものの動き。ギャンブルの器具は出さない。閃光は使わない。",
+        "- 後半 2/3（L07〜）は少しずつ暗く：声の抑揚・高さ・速さを下げ、画面を暗く冷たくし、一打を弱め、BGM を段階的に下げ、最後の日記（L15）から無音。色は全体に冷たく（暖色を使わない）。",
+        "- 人の死（L09・L10・L15）は直接見せない。あざける演出はしない。共通エンディング（リバース）はなし、最後の一文のすぐあとに暗転。",
         "- 最後の一文（L17）と画を冒頭につなげる：吹雪の中の旗と、途中で途切れた 18km の線。",
         "- 本物の写真：アムンセンのテントの前のスコット隊（A2）と南極点の 5 人（A1）。どちらも Henry Bowers 撮影、パブリックドメイン。",
         "- ※注記は冒頭に 1 回だけ（ユーザーの設定）。地図は模式図。",
         "- 人物は MPFB の人体の後ろ姿・遠景・吹雪の中の影（顔なし、手のアップなし）。死の瞬間は見せない。",
-        "- 声：VOICEVOX:玄野武宏（v7）、話速 1.5、抑揚 1.7、行間 0.03 秒。L08・L13 だけ VOICEVOX:青山龍星「熱血」。BGM：Kevin MacLeod「Blown Away」（CC BY 4.0）。",
+        "- 声：VOICEVOX:玄野武宏（v7）、話速 1.5 → 1.32、抑揚 1.7 → 0.9、高さ +0.03 → −0.05（後半で少しずつ）、行間 0.03 秒。L08 だけ VOICEVOX:青山龍星「熱血」。BGM：Kevin MacLeod「Black Vortex」（CC BY 4.0）。",
     ],
 })
 
