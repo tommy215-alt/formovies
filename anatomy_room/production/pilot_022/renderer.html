@@ -42,9 +42,9 @@ const ui = document.getElementById("ui").getContext("2d");
 const SCN = ["open", "hook", "find", "grow", "self", "proof", "today"];
 let TL, CUE, MOOD = [];
 const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
-const CUT = [.45, .95, 1.5];   // 起承転結のカットインの切れ目（秒、効果音の打点と同じ）：暗転に大きな文字 → カット A → カット B → 本来の画
+const CUT = [.45, .95, 1.5];   // カットインの切れ目（秒、効果音の打点と同じ）。起・承・結は暗転に大きな文字の 1 回だけ → 本来の画。転は 3 回：暗転 → カット A → カット B → 本来の画
 const CI = { acid: ["当時の", "常識"], find: ["胃の中に", "らせん形の菌"], decide: ["自分の体で", "確かめる"], proof: ["菌を除くと", "再発しにくく"] };   // 起・承・転・結
-function ciPhase(t) { for (const c in CI) { const d = t - CUE[c]; if (d >= 0 && d < CUT[2]) return { c, d, p: d < CUT[0] ? 0 : d < CUT[1] ? 1 : 2 }; } return null; }
+function ciPhase(t) { for (const c in CI) { const d = t - CUE[c]; if (d >= 0 && d < (c === "decide" ? CUT[2] : CUT[0])) return { c, d, p: d < CUT[0] ? 0 : d < CUT[1] ? 1 : 2 }; } return null; }
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const b64buf = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; };
 
@@ -359,7 +359,7 @@ function drawUI(t, name) {
   if (t >= CUE.hook && t < CUE.proof) uiNote("※細菌を飲むなどの自己実験は危険です。まねしないでください", 540, 1320, (name === "hook" && t < CUE.acid) || name === "self" ? .95 : 0, T(22));
   { const P = ciPhase(t); if (P && P.p === 0) { HUD.title(ui, [[CI[P.c][0], T(110), "#FFD58A"], [CI[P.c][1], T(110), "#EAF2F8"]], 540, 820, easeOut(clamp(P.d / .1)), t); return; } }   // カットインの大きな文字
   if (name === "hook") { if (t < CUE.acid) uiCard([["1984年", T(34), 800], ["オーストラリア・パース", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "hook", .45, .3));
-    else { const k = k_(t, "acid", .5, 1.6); callout("ストレス？", 330, 560, 400, 800, k); callout("胃酸？", 760, 640, 690, 880, k_(t, "acid", .5, 1.9)); if (t >= CUE.notaccepted) uiCard([["細菌が原因？", T(34), 800], ["広く認められていなかった", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "notaccepted", .45)); } }
+    else { const k = k_(t, "acid", .5, 1.0); callout("ストレス？", 330, 560, 400, 800, k); callout("胃酸？", 760, 640, 690, 880, k_(t, "acid", .5, 1.3)); if (t >= CUE.notaccepted) uiCard([["細菌が原因？", T(34), 800], ["広く認められていなかった", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "notaccepted", .45)); } }
   if (name === "find") { if (t < CUE.spiral) uiCard([["1979年ごろ", T(34), 800], ["病理医 ロビン・ウォレン", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "find", .45, .2));
     else if (t < CUE.join) uiCard([["らせん形の細菌", T(34), 800], ["顕微鏡の視野（模式図）", T(24), 500, "#B8C7D6"]], 540, 250, k_(t, "spiral", .45));
     else uiCard([["若い医師 バリー・マーシャル", T(32), 800], [t >= CUE.nogrow ? "菌が育たない" : "菌を育てる", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "join", .45)); }

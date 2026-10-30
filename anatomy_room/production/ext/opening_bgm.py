@@ -57,7 +57,38 @@ def _eerie(n, seed=7):
     return y * .1 / (np.sqrt(np.mean(y ** 2)) + 1e-9)
 
 
-SOUNDS = {"open_soft": _soft, "open_eerie": _eerie}
+def _chime(n, seed=5):
+    """謎が解ける瞬間のようなチャイム（2026-10-30、ユーザー「チャララララーンみたいな、ゼルダのチャイムみたいな感じ」）：
+    ベルの音色で駆け上がるアルペジオ（自作の音の並び。既存の曲の旋律はなぞらない）→ 最後の音と和音をのばす＋きらめき＋やわらかい和音の帯"""
+    t = np.arange(n) / SR
+    r = np.random.default_rng(seed)
+    def bell(f0, dur, dec):
+        d = np.arange(int(dur * SR)) / SR
+        return (np.sin(2 * np.pi * f0 * d) + .35 * np.sin(2 * np.pi * 2.0 * f0 * d) * np.exp(-d / (dec * .4)) + .12 * np.sin(2 * np.pi * 3.01 * f0 * d) * np.exp(-d / (dec * .2))) * np.exp(-d / dec) * np.minimum(1, d / .003)
+    arp = np.zeros(n)
+    notes = (293.7, 370.0, 440.0, 554.4, 659.3, 740.0, 880.0, 1108.7, 1318.5)   # レ・ファ♯・ラ・ド♯・ミ…（D の長九の和音を 2 オクターブ駆け上がる）
+    for i, f0 in enumerate(notes):
+        s = int((.12 + i * .075) * SR)
+        last = i == len(notes) - 1
+        b = bell(f0, 2.6 if last else 1.2, 1.1 if last else .45) * (1.3 if last else 1.0)
+        arp[s:s + len(b)] += b[:max(0, n - s)]
+    hold = np.zeros(n)
+    s = int((.12 + (len(notes) - 1) * .075) * SR)
+    for f0 in (587.3, 740.0, 880.0, 1108.7):   # 最後に和音をそっと重ねる
+        b = bell(f0, 2.4, 1.0) * .45
+        hold[s:s + len(b)] += b[:max(0, n - s)]
+    pad = sum(np.sin(2 * np.pi * f * t + .3 * np.sin(2 * np.pi * .25 * t + k)) for k, f in enumerate((146.8, 220.0, 277.2, 329.6)))
+    pad *= np.clip((t - .6) / .8, 0, 1)
+    spark = np.zeros(n)
+    for _ in range(14):   # きらめき（高い小さな粒）
+        s = int((.8 + r.random() * 1.6) * SR); b = bell(2200 + r.random() * 1800, .4, .12) * .3
+        spark[s:s + len(b)] += b[:max(0, n - s)]
+    nm = lambda x: x / (np.sqrt(np.mean(x ** 2)) + 1e-9)
+    y = nm(arp) * .7 + nm(hold) * .35 + nm(pad) * .3 + nm(spark) * .12
+    return y * .1 / (np.sqrt(np.mean(y ** 2)) + 1e-9)
+
+
+SOUNDS = {"open_soft": _soft, "open_eerie": _eerie, "open_chime": _chime}
 
 
 if not getattr(music, "_OPEN_LOADED", False):
