@@ -88,7 +88,36 @@ def _chime(n, seed=5):
     return y * .1 / (np.sqrt(np.mean(y ** 2)) + 1e-9)
 
 
-SOUNDS = {"open_soft": _soft, "open_eerie": _eerie, "open_chime": _chime}
+def _impact(n, seed=9):
+    """衝撃波の一発「ズァッ」（2026-10-31、ユーザー「シンプルに、ズァッみたいな衝撃波、迫力の音」）：
+    ごく短い吸い込み → 低い一撃（音程が落ちるサブの低音）＋ざらついた噴き出し（高い音から低い音へ一気に下がるノイズ）→ 低いうなりが 2 秒かけて消える。曲はなし"""
+    t = np.arange(n) / SR
+    r = np.random.default_rng(seed)
+    t0 = .08   # 一撃の時刻（L00 の声より少し前）
+    d = np.clip(t - t0, 0, None)
+    hit = (t >= t0).astype(float)
+    ph = 2 * np.pi * np.cumsum(38 + 70 * np.exp(-d / .06)) / SR   # 108 Hz → 38 Hz に落ちる
+    boom = np.sin(ph) * np.exp(-d / .55) * hit * np.minimum(1, d / .002)
+    m = int((t0 + .7) * SR)
+    nz = r.standard_normal(m)
+    y_ = np.zeros(m); a = 0.0
+    for i in range(m):   # 噴き出しのノイズ：切れ目の周波数を 9 kHz → 300 Hz へ一気に下げる（一次のローパス）
+        tt = max(0.0, i / SR - t0)
+        fc = 300 + 8700 * np.exp(-tt / .09)
+        k = 1 - np.exp(-2 * np.pi * fc / SR)
+        a += k * (nz[i] - a); y_[i] = a
+    burst = np.zeros(n); burst[:m] = y_
+    burst *= hit * np.exp(-d / .22) * np.minimum(1, d / .004)
+    suck = r.standard_normal(n) * np.clip(t / t0, 0, 1) ** 3 * (t < t0)   # 一撃の直前の短い吸い込み
+    suck = music._lp(suck, 4000) - music._lp(suck, 900)
+    rumble = music._lp(r.standard_normal(n), 120) * hit * np.exp(-d / 1.1)
+    nm = lambda x: x / (np.max(np.abs(x)) + 1e-9)
+    y = nm(boom) * 1.0 + nm(burst) * .55 + nm(suck) * .2 + nm(rumble) * .35
+    y = np.tanh(y * 1.6) / np.tanh(1.6)   # 少し歪ませて迫力を出す
+    return y * .7 / (np.max(np.abs(y)) + 1e-9)
+
+
+SOUNDS = {"open_soft": _soft, "open_eerie": _eerie, "open_chime": _chime, "open_impact": _impact}
 
 
 if not getattr(music, "_OPEN_LOADED", False):
