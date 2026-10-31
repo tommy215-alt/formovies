@@ -24,6 +24,7 @@
   - **3 回目の直し（v4）**：カットインは起・承・結が暗転の文字 1 回だけ、転だけ 3 回に。オープニングの音を駆け上がるベルのチャイム（`open_chime`）に（open_eerie は「あるチャンネルの音に酷似」）。ユーザー「あとはバッチリ」→ 設計として保存済み。
 
 - **pilot_023 インスリンの発見（バンティング、1922 年のレナード・トンプソン）、知的設計**（2026-10-31、ユーザーが選択。希望は「なるべく感動するようなやつ」、タイトル〔オープニング〕あり）。ChatGPT への依頼文 `scripts/pilot_023/gpt_fact_check_prompt.md` → ユーザーが結果を貼る → Claude が出典で確かめて `fact_check.md`・`assets.md`・`script_draft.md` → ユーザーの「OK」で制作。冒頭の一文（案）「死を待つだけの病に、薬が生まれた」。
+  - 事実確認で ChatGPT の「血糖 約520 → 約120」は出典（J Clin Invest 2021）に無い → 使わず「1 日で正常まで」（トロント大学の展示）。写真はトロント大学の図書館が Flickr に CC BY 2.0 で公開したもの（犬と写った 2 人、テディの手紙）。ユーザーの「OK」（2026-10-31）→ 制作：`production/pilot_023/`（約 67 秒、BGM lab_dub、オープニングの音 open_impact）。renderer は pilot_022 の renderer.html の行を土台にスクラッチの組み立てスクリプトで作った（直すときは renderer.html を直接直す）。`production_script.py` の `cues` には `segments` の場面名（fail・turn・legacy）も書く（抜けて場面が切り替わらなかった）。
 
 ## 次の動画でやること（ガイドライン v2.4）
 
