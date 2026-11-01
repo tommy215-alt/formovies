@@ -41,7 +41,7 @@
 - `node anatomy_room/tools/yt_upload.js next`：一覧の次の回を上げて予約まで入れる（YouTube Studio の画面を Chrome で操作。窓は画面の外。`--show` で表示）。途中で止まった下書きがあれば続きから入れる（同じ動画を 2 本上げない）。各段階の画面は `publish/log/`（git に入れない）。
 - ログインはユーザーが一度だけ画面で行った（`yt_upload.js login`、プロフィールは `%LOCALAPPDATA%
 everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認証情報は扱わない。
-- **自動で動く（2026-11-01、ユーザーの承認）**：Windows のタスク スケジューラ「Reverse-YouTube-Upload」が、ログオン時と 3 時間ごとに `yt_upload.js next` を動かす（PC が切れていた分は起動時に実行）。queue.json の queued の回を順に全部上げ、時刻を過ぎた回や `publish_at` が空の回は次の空いた 8:00・19:00 に振り直す。記録は `publish/log/run.log`・`task.log`。登録・削除は `tools/yt_task.ps1`（`-Remove`）。**新しい回を予約するには、queue.json に `{"id", "video", "meta", "publish_at": null, "status": "queued"}` を足して push・pull するだけ**（PC が拾う）。
+- **自動で動く（2026-11-01、ユーザーの承認）**：Windows のタスク スケジューラ「Reverse-YouTube-Upload」が、ログオン時と 3 時間ごとに `yt_upload.js next` を動かす（PC が切れていた分は起動時に実行）。queue.json の queued の回を順に全部上げ、時刻を過ぎた回や `publish_at` が空の回は次の空いた 8:00・19:00 に振り直す。記録は `publish/log/run.log`・`task.log`。登録・削除は `tools/yt_task.ps1`（`-Remove`）。**新しい回を予約するには、queue.json に `{"id", "video", "meta", "publish_at": null, "status": "queued"}` を **PC の作業フォルダで** 足すだけ**（タスクは git pull しないので、クラウドのセッションで足したときは PC で `git pull` してから）。
 - 予約済み：pilot_024（2026-11-02 8:00）、pilot_026（2026-11-02 19:00）。pilot_023・025 などはユーザーが自分で上げ済み。
 
 ## 次の動画でやること（ガイドライン v2.4）
