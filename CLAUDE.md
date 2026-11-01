@@ -64,7 +64,7 @@
 - **標準ルール v4（2026-10-28）映像品質**：新しい回は `production/common/cine.js`（周りの光の映り込み・素材の凹凸とつや・水とガラスの透過・光の筋と埃・超解像度 1.5 倍・動きのぶれ・光のにじみ）を使い、各動画に決定的な映像を 1 つ設計する。GPU の調査結果と使い方は `docs/CINE_QUALITY.md`、見本は `production/pilot_012/renderer_cine.html`（pilot_012 の完成版 mp4 は従来の renderer.html のまま）。比較は `render_frames.js --renderer … --stills／--clip`。
 - **自分の PC（GPU）で書き出す手順**は `anatomy_room/docs/PC_SETUP.md`。準備の確認は `node anatomy_room/tools/check_pc.js`。`render_frames.js` は GPU で WebGL が動けば GPU、動かなければソフトウェア描画（`REVERSE_GPU=off` で常にソフトウェア）。
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
-- YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。
+- YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。**例外（2026-11-01 ユーザーの承認）：`anatomy_room/publish/queue.json` に載せた回は、`node anatomy_room/tools/yt_upload.js next` で予約公開まで上げてよい**（毎日 8:00・19:00〔日本時間〕、公開前の確認は不要、改変または合成されたコンテンツは「いいえ」）。queue.json に載せるのはユーザーが選んだ回だけ。ブラウザは PC の Chrome、プロフィールはリポジトリの外（`%LOCALAPPDATA%\reverse_yt_profile`）で、ログインはユーザーが画面で行う。パスワードなどの認証情報は扱わない・保存しない。
 
 ## 書き出しの時短と、トークンの節約（rv、2026-10-28〜。ユーザーの指示「制作パイプラインの時間とトークン消費の最適化」）
 

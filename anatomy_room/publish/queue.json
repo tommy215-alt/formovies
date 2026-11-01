@@ -1,0 +1,26 @@
+{
+ "note": "YouTube の予約投稿の一覧（2026-11-01〜、ユーザーの承認：完成して video_qa を通った回を、この順に 8:00・19:00〔日本時間〕の予約公開で上げてよい。公開前の確認は不要。改変または合成されたコンテンツは「いいえ」）。tools/yt_upload.js が上から順に上げ、status を scheduled にする。",
+ "slots": [
+  "08:00",
+  "19:00"
+ ],
+ "items": [
+  {
+   "id": "pilot_024",
+   "video": "anatomy_room/production/pilot_024/reverse_024_blanchard.mp4",
+   "meta": "anatomy_room/production/pilot_024/youtube_metadata.md",
+   "publish_at": "2026-11-02 08:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T13:13:22.116Z",
+   "url": "https://youtube.com/shorts/0w14v7E3JVM?feature=share"
+  },
+  {
+   "id": "pilot_026",
+   "video": "anatomy_room/production/pilot_026/reverse_026_patterson.mp4",
+   "meta": "anatomy_room/production/pilot_026/youtube_metadata.md",
+   "publish_at": "2026-11-02 19:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T13:15:13.486Z"
+  }
+ ]
+}
