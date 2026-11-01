@@ -2,7 +2,9 @@
 // YouTube Studio の画面を Playwright で操作する（API は使わない）。ブラウザは PC の Google Chrome、プロフィールはリポジトリの外
 // （%LOCALAPPDATA%\reverse_yt_profile）。ログイン状態はそこにだけ残る。パスワードはこのスクリプトでは扱わない（ユーザーが画面で一度ログインする）。
 //   node anatomy_room/tools/yt_upload.js login          ログイン用に Chrome を開く（YouTube Studio のチャンネル画面に入ったら自動で閉じる）
-//   node anatomy_room/tools/yt_upload.js next           queue.json の status が queued の最初の回を上げて、予約公開まで入れる
+//   node anatomy_room/tools/yt_upload.js next           queue.json の status が queued の回を順に全部上げて、予約公開まで入れる。
+//       公開の時刻を過ぎていた回（PC が切れていたなど）や publish_at が空の回は、次に空いている 8:00・19:00 に振り直す。
+//       Windows のタスク スケジューラ「Reverse-YouTube-Upload」が、ログオン時と 3 時間ごとにこれを動かす（tools/yt_task.ps1）
 //   node anatomy_room/tools/yt_upload.js upload pilot_024   指定した回を上げる
 //   --show を付けると画面を表示したまま操作する（最初の数回の確認用）
 // 入れる項目：動画・タイトル・説明文（youtube_metadata.md の「## タイトル」と「## 説明文」のコードブロック）・子ども向けではない・
@@ -56,7 +58,7 @@ async function upload(item) {
   const { title, desc } = meta(item.meta), video = path.join(ROOT, item.video);
   if (!fs.existsSync(video)) throw new Error("動画がない：" + item.video);
   const [d, hm] = item.publish_at.split(" "), [Y, Mo, D] = d.split("-").map(Number);
-  if (new Date(`${d}T${hm}:00+09:00`) < new Date(Date.now() + 20 * 60000)) throw new Error("公開日時が近すぎるか過ぎている：" + item.publish_at);
+  if (new Date(`${d}T${hm}:00+09:00`) < new Date(Date.now() + 20 * 60000)) throw new Error("公開日時が近すぎるか過ぎている：" + item.publish_at);   // 振り直しは呼ぶ側（next）で済ませてある
   const ctx = await open(!SHOW); page = ctx.pages()[0] || await ctx.newPage();
   try {
     await page.goto("https://studio.youtube.com/"); await page.waitForTimeout(4000);
@@ -120,15 +122,40 @@ async function upload(item) {
   } catch (e) { const f = await shot("error"); e.message += `（画面：${f}）`; throw e; } finally { await ctx.close(); }
 }
 
+// 公開の枠（日本時間の 8:00・19:00）：PC が切れていて予定の時刻を過ぎた回、または publish_at が空の回は、次に空いている枠に振り直す
+const jst = (d, hm) => new Date(`${d}T${hm}:00+09:00`);
+function nextSlot(q, after) {
+  const taken = new Set(q.items.filter(x => x.status === "scheduled" && x.publish_at).map(x => x.publish_at));
+  const t0 = new Date(Date.now() + 9 * 3600000);   // 日本時間の日付
+  for (let day = 0; day < 60; day++) { const d = new Date(Date.UTC(t0.getUTCFullYear(), t0.getUTCMonth(), t0.getUTCDate() + day)).toISOString().slice(0, 10);
+    for (const hm of q.slots) { const at = `${d} ${hm}`; if (jst(d, hm) > after && !taken.has(at)) return at; } }
+  throw new Error("空いている枠が見つからない");
+}
+function lockOn() {   // タスク スケジューラと手で動かしたのが重ならないように（2 時間たった鍵は古いとみなす）
+  const f = path.join(PUB, ".lock"); if (fs.existsSync(f) && Date.now() - fs.statSync(f).mtimeMs < 2 * 3600000) return false;
+  fs.writeFileSync(f, String(process.pid)); process.on("exit", () => { try { fs.unlinkSync(f); } catch {} }); return true;
+}
+function logRun(s) { fs.appendFileSync(path.join(LOG, "run.log"), `${new Date().toISOString()} ${s}\n`, "utf-8"); }
+
 (async () => {
   const cmd = args[0];
   if (cmd === "login") return login();
-  const q = JSON.parse(fs.readFileSync(QUEUE, "utf-8"));
-  const item = cmd === "upload" ? q.items.find(x => x.id === args[1]) : q.items.find(x => x.status === "queued");
-  if (!item) { say("上げる回がありません"); return; }
-  if (item.status === "scheduled") throw new Error("すでに予約済み：" + item.id);
-  const link = await upload(item);
-  item.status = "scheduled"; item.uploaded = new Date().toISOString(); if (link) item.url = link;
-  fs.writeFileSync(QUEUE, JSON.stringify(q, null, 1) + "\n", "utf-8");
-  say(`✅ 予約しました：${item.id}（公開 ${item.publish_at}）${link ? " " + link : ""}`);
+  if (!lockOn()) { say("別の投稿が動いているので、今回はやめます"); return; }
+  const q = JSON.parse(fs.readFileSync(QUEUE, "utf-8")), save = () => fs.writeFileSync(QUEUE, JSON.stringify(q, null, 1) + "\n", "utf-8");
+  // next：queued の回を上から順に、全部上げる（PC が切れていた間の分も、起動したときにまとめて）
+  const items = cmd === "upload" ? q.items.filter(x => x.id === args[1]) : q.items.filter(x => x.status === "queued");
+  if (!items.length) { say("上げる回がありません"); return; }
+  let last = new Date(Date.now() + 30 * 60000);   // 公開は今から 30 分以上あと
+  for (const item of items) {
+    if (item.status === "scheduled") throw new Error("すでに予約済み：" + item.id);
+    const [d, hm] = (item.publish_at || "").split(" ");
+    if (!item.publish_at || jst(d, hm) <= last || q.items.some(x => x !== item && x.status === "scheduled" && x.publish_at === item.publish_at)) {
+      const at = nextSlot(q, last); say(`公開の枠を振り直し：${item.id} ${item.publish_at || "（未定）"} → ${at}`); logRun(`reslot ${item.id} ${item.publish_at || "-"} -> ${at}`); item.publish_at = at; save(); }
+    try {
+      const link = await upload(item);
+      item.status = "scheduled"; item.uploaded = new Date().toISOString(); if (link) item.url = link; save();
+      say(`✅ 予約しました：${item.id}（公開 ${item.publish_at}）${link ? " " + link : ""}`); logRun(`scheduled ${item.id} ${item.publish_at}`);
+      const [d2, hm2] = item.publish_at.split(" "); last = jst(d2, hm2);
+    } catch (e) { logRun(`error ${item.id} ${e.message}`); throw e; }
+  }
 })().catch(e => { console.error("❌ " + e.message); process.exit(1); });
