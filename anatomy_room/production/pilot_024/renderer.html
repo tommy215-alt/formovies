@@ -32,12 +32,12 @@ html,body{margin:0;background:#000}
 <script src="../ext/kit/kit.js"></script>
 <script>
 // pilot_024「花火の夜空——ソフィー・ブランシャール」のレンダラー（設計「悲劇」＋ガイドライン v2.4＋オープニング）。制作の土台は ext/kit/kit.js。
-// 設計「悲劇」：序盤はコテコテ（紙吹雪・派手な色・跳ねる文字・一打）。L06（alps）から darkK で少しずつ暗く冷たく、一打も弱める。結（fall〜）は明朝体の静かな文字。共通エンディングなし。閃光は使わない。
+// 設計「悲劇」5 回目の更新（2026-11-01）：文字は最初から明朝体、編集も最初から暗く張り詰めた色調（kit が暗い幕をかけ、darkK で終盤ほどさらに暗く）。紙吹雪・光の筋・一打は使わない。
+// オープニングは知的設計と同じ（結論の文字・本物の写真・衝撃波の一発）。共通エンディングなし。閃光は使わない。
 // CG：夜の公園と群衆の影・気球（水素の袋・網・小さなかご、人物は遠景の小さな影で顔なし）・花火・海・アルプス・水の野原・パリの屋根（すべて再現）。死の瞬間は見せない。
 Object.assign(KIT, {
   design: "tragedy", scenes: ["open", "hook", "rise", "night", "fall"], images: ["fall", "portrait"], ci: {},
-  hits: [["hook", 1.0], ["balloon", 1.2], ["sophie", .9], ["first", 1.6], ["husband", .8], ["debt", 1.2], ["alone", 1.0, .4], ["napoleon", 1.6], ["wedding", 1.0], ["milan", .8], ["alps", .5], ["crowd", .5], ["fire", .4], ["spark", .3]],
-  darkFrom: "alps", serifFrom: "fall",
+  hits: [], darkFrom: "hook",
 });
 loadImages(KIT.images);
 
@@ -70,7 +70,7 @@ function buildPark() {
 }
 function fireworks(t, k, seed = 3) {   // 花火の玉（決まった種、時刻 t だけで決まる）
   const p = fw.geometry.attributes.position, c = fw.geometry.attributes.color, cols = [[1, .4, .6], [1, .85, .3], [.4, .8, 1], [.6, 1, .5], [.9, .5, 1]]; fw.visible = k > 0;
-  for (let i = 0; i < p.count; i++) { const b = Math.floor(i / 300), r = S.rng(seed * 100 + b), cx = (r() - .5) * 40, cy = 14 + r() * 12, cz = -14 - r() * 18, per = 2.2 + r(), ph = ((t + r() * per) % per) / per;
+  for (let i = 0; i < p.count; i++) { const b = Math.floor(i / 300), r = S.rng(seed * 100 + b), cx = (r() - .5) * 16, cy = 12 + r() * 12, cz = -14 - r() * 14, per = 2.2 + r(), ph = ((t + r() * per) % per) / per;
     const rr = S.rng(i), a = rr() * Math.PI * 2, e = Math.acos(2 * rr() - 1), sp = (4 + rr() * 3) * easeOut(ph); p.setXYZ(i, cx + sp * Math.sin(e) * Math.cos(a), cy + sp * Math.cos(e) - 3 * ph * ph, cz + sp * Math.sin(e) * Math.sin(a));
     const col = cols[b % cols.length], f = k * Math.max(0, 1 - ph) * (ph > .02 ? 1 : 0); c.setXYZ(i, col[0] * f, col[1] * f, col[2] * f); }
   p.needsUpdate = c.needsUpdate = true;
@@ -153,22 +153,18 @@ function draw2D(t, name) {
   if (name === "hook") { const box_ = [240, 330, 840, 1250]; photo(bg, IMG.portrait, k_(t, "sophie", .3), 1.35, 1.45, clamp((t - CUE.sophie) / 4), { box: box_, cx: .42, cy: .28, gray: 1, sepia: .35, rot: -.02, frame: "#f4ead8", bright: 1.0 }); }   // 肖像（上半身に寄せる）
   if (name === "rise") { const box_ = [210, 300, 870, 1280]; photo(bg, IMG.portrait, k_(t, "milan", .3), 1.0, 1.06, clamp((t - CUE.milan) / 4), { box: box_, cy: .5, gray: 1, sepia: .35, rot: .015, frame: "#f4ead8", bright: 1.0 }); }   // ミラノ 1811（全体）
 }
-function openingBG(t) { bg.fillStyle = "rgba(0,0,0,.4)"; bg.fillRect(0, 0, W, H); photo(bg, IMG.fall, clamp(t / .3), 1.0, 1.06, clamp(t / 4), { box: [240, 700, 840, 1370], cy: .45, gray: 1, rot: -.015, frame: "#e8e4dc", bright: .95 }); }
-function fxEp(t, name) {   // 序盤の派手な飾り（紙吹雪・光の筋・スピード線）、終盤は何も足さない
-  if (name === "hook" && t < CUE.sophie) S.rays(bg, 540, 700, t, "rgba(255,180,90,.08)", 22);
-  if (name === "rise" && t >= CUE.alone && t < CUE.napoleon) S.speedLines(bg, 540, 800, t, "rgba(255,255,255,.22)", 50, 380, 8);
-  if (name === "rise" && t >= CUE.napoleon && t < CUE.milan) S.rays(bg, 540, 820, t, "rgba(255,120,200,.10)", 24);
-}
+function openingBG(t) { bg.fillStyle = "rgba(2,4,12,.45)"; bg.fillRect(0, 0, W, H); const box_ = [270, 640, 810, 1400]; photo(bg, IMG.fall, k_(t, "t0", .5, .1), 1.0, 1.06, clamp(t / 3), { box: box_, cy: .45, gray: 1, bright: .95 }); photoGlow(t, .1, box_); }   // 知的設計と同じ形（青い細い縁）
+function fxEp(t, name) { }   // 悲劇：紙吹雪・光の筋・スピード線は使わない（2026-11-01〜）
 
-// ---------------------------------------------------------------- 画面の文字（序盤はコテコテ、結は明朝体の静かな文字）
-function openingUI(t) {
-  const k = k_(t, "t0", .25, .05); if (k <= 0) return;
-  for (const [s, y, size] of [["祭りの夜空で", 330, 104], ["花火が気球に燃え移った", 490, 86]]) label(ui, s, 540, y, size, "#F4F7FA", { font: MIN, stroke: "#05080c", sw: .14 });
-  credit("「Death of Madame Blanchard」1869年の版画", k, 1430); credit("パブリックドメイン", k, 1470);
+// ---------------------------------------------------------------- 画面の文字（悲劇は最初から明朝体の静かな文字：slam は kit が calmText に切り替える）
+function openingUI(t) {   // 知的設計と同じ形：結論の文字を上〜中ほどに大きく（明朝体）
+  const k = k_(t, "t0", .4, .05); if (k <= 0) return; ui.save(); ui.globalAlpha = k;
+  label(ui, "祭りの夜空で", 540, 360, 76, "#EAF2F8", { font: MIN, stroke: "#05080c", sw: .14 }); label(ui, "花火が気球に燃え移った", 540, 490, 84, "#FFD58A", { font: MIN, stroke: "#05080c", sw: .14 }); ui.restore();
+  credit("「Death of Madame Blanchard」1869年の版画", k, 1450); credit("パブリックドメイン", k, 1490);
 }
 function drawUI(t, name) {
   if (name === "open") { openingUI(t); return; }
-  if (name === "hook") { confetti(ui, t, CUE.balloon, 2.4); S.note(ui, "※再現CGを含みます", 540, 1290, win(t, CUE.hook + .3, CUE.sophie, .3, .3), 26, true);
+  if (name === "hook") { S.note(ui, "※再現CGを含みます", 540, 1290, win(t, CUE.hook + .3, CUE.sophie, .3, .3), 26, true);
     if (t < CUE.sophie) slam(ui, "1819年7月6日", 540, 320, 120, CUE.hook + .05, t, { cols: GOLD, rot: -.05, sub: "パリ・ティヴォリ公園" });
     else { slam(ui, "ソフィー・ブランシャール", 540, 280, 80, CUE.sophie + .05, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: -.03 }); if (t >= CUE.first) slam(ui, "空を仕事にした最初の女性", 540, 1350, 66, CUE.first, t, { cols: GOLD, rot: .03 });
       credit("Luigi Rados（1811）", k_(t, "sophie", .4), 1230); credit("米国議会図書館／パブリックドメイン", k_(t, "sophie", .4), 1270); } }
@@ -176,7 +172,7 @@ function drawUI(t, name) {
     if (t < CUE.debt) { if (t < CUE.collapse) slam(ui, "海峡を越えた夫", 540, 330, 110, CUE.husband + .05, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.04 }); else slam(ui, "1808年 倒れる", 540, 330, 110, CUE.collapse, t, { cols: WHITE, rot: -.03 }); }
     else if (t < CUE.alone) slam(ui, "破産の寸前", 540, 380, 130, CUE.debt, t, { cols: RED, glow: "rgba(255,40,60,1)", rot: -.05 });
     else if (t < CUE.napoleon) slam(ui, "一人で空へ", 540, 330, 140, CUE.alone + .1, t, { cols: GOLD, rot: -.05 });
-    else if (t < CUE.milan) { confetti(ui, t, CUE.napoleon, 2.6, 81); slam(ui, "ナポレオン", 540, 320, 130, CUE.napoleon + .05, t, { cols: GOLD, rot: -.05, sub: "祝典で飛ぶ役目" }); if (t >= CUE.wedding) slam(ui, "皇帝の結婚の祝い", 540, 1300, 76, CUE.wedding, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: .03 }); }
+    else if (t < CUE.milan) { slam(ui, "ナポレオン", 540, 320, 130, CUE.napoleon + .05, t, { cols: GOLD, rot: -.05, sub: "祝典で飛ぶ役目" }); if (t >= CUE.wedding) slam(ui, "皇帝の結婚の祝い", 540, 1300, 76, CUE.wedding, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: .03 }); }
     else if (t < CUE.alps) { slam(ui, "1811年 ミラノ", 540, 230, 90, CUE.milan + .1, t, { cols: GOLD, rot: -.03 }); credit("Luigi Rados「ミラノでの夜の上昇」1811年", k_(t, "milan", .4), 1330); credit("米国議会図書館／パブリックドメイン", k_(t, "milan", .4), 1370); }
     else if (t < CUE.flood) slam(ui, "アルプスの上空", 540, 320, 100, CUE.alps + .1, t, { cols: ICE, glow: "rgba(120,190,255,.9)", rot: -.02, sub: "凍えかけた" });
     else if (t < CUE.crowd) slam(ui, "溺れかけた", 540, 320, 110, CUE.flood + .05, t, { cols: ICE, rot: -.02 });
@@ -189,16 +185,15 @@ function drawUI(t, name) {
     else if (t < CUE.last) slam(ui, "航空の事故で亡くなった最初の女性", 540, 360, 84, CUE.lastw + .2, t, { cols: WHITE, rot: 0, sub: "とされる" }); }
 }
 
-function buildMood() {   // 色調：序盤は派手 → L06 から少しずつ冷たく、彩度を落とし、暗く
+function buildMood() {   // 色調：最初から冷たく暗く（彩度低め・周辺を暗く）、終盤ほどさらに静かに（2026-11-01〜）
   const c = CUE;
-  MOOD = [[0, { cool: .3, sat: .9, vig: .75 }], [c.hook, { warm: .3, sat: 1.4, vig: .45 }], [c.sophie, { warm: .2, sat: 1.1, vig: .55 }], [c.husband, { warm: .1, sat: 1.25, vig: .5 }], [c.collapse, { cool: .15, sat: .9, vig: .6 }],
-    [c.alone, { warm: .25, sat: 1.35, vig: .45 }], [c.napoleon, { warm: .3, sat: 1.45, vig: .42 }], [c.milan, { warm: .2, sat: 1.1, vig: .55 }],
-    [c.alps, { cool: .25, sat: 1.0, vig: .58 }], [c.flood, { cool: .35, sat: .85, vig: .62 }], [c.crowd, { warm: .1, sat: 1.0, vig: .6 }], [c.night, { cool: .25, sat: .85, vig: .66 }],
-    [c.fire, { warm: .2, sat: .8, vig: .7 }], [c.wait, { cool: .45, sat: .65, vig: .74 }], [c.fall, { cool: .55, sat: .55, vig: .78 }], [c.net, { cool: .65, sat: .4, vig: .84 }], [c.last, { cool: .7, sat: .35, vig: .9 }]];
+  MOOD = [[0, { cool: .45, sat: .6, vig: .8 }], [c.hook, { cool: .45, sat: .62, vig: .8 }], [c.husband, { cool: .5, sat: .55, vig: .82 }], [c.napoleon, { cool: .4, sat: .6, vig: .8 }],
+    [c.milan, { cool: .45, sat: .5, vig: .82 }], [c.alps, { cool: .55, sat: .5, vig: .84 }], [c.night, { cool: .5, sat: .5, vig: .85 }], [c.fire, { cool: .3, warm: .1, sat: .55, vig: .86 }],
+    [c.wait, { cool: .55, sat: .45, vig: .87 }], [c.fall, { cool: .6, sat: .42, vig: .88 }], [c.net, { cool: .68, sat: .36, vig: .9 }], [c.last, { cool: .72, sat: .32, vig: .92 }]];
 }
 function thumb() {
-  CUE = CUE || {}; CUE.t0 = 0; parkShot(2, { by: 6, crown: 1, fwK: 1, cp: V3(0, 2, 14), fov: 44 }); S.moodGrade(bg, 0, [[0, { warm: .2, sat: 1.2, vig: .5 }]]); Cine.bloom(bg, .34); addGrain(0);
-  openingBG(4); for (const [s, y, size] of [["祭りの夜空で", 360, 110], ["花火が気球に燃え移った", 520, 88]]) label(ui, s, 540, y, size, "#F4F7FA", { font: MIN, stroke: "#05080c", sw: .14 });
+  CUE = CUE || {}; CUE.t0 = 0; parkShot(2, { by: 6, crown: 1, fwK: .6, cp: V3(0, 2, 14), fov: 44, exp: .8 }); S.moodGrade(bg, 0, [[0, { cool: .45, sat: .6, vig: .8 }]]); Cine.bloom(bg, .3); addGrain(0);
+  openingBG(4); label(ui, "祭りの夜空で", 540, 360, 96, "#EAF2F8", { font: MIN, stroke: "#05080c", sw: .14 }); label(ui, "花火が気球に燃え移った", 540, 500, 90, "#FFD58A", { font: MIN, stroke: "#05080c", sw: .14 });
 }
 kitStart(() => { buildPark(); buildDay(); buildCity(); });
 </script>

@@ -1,12 +1,12 @@
 {
  "title": "花火の夜空——ソフィー・ブランシャール",
  "theme": "1819 年 7 月 6 日、パリのティヴォリ公園。空を飛ぶことを仕事にした最初の女性ソフィー・ブランシャールは、67 回目の飛行で、花火の火が気球の水素に移り、プロヴァンス通りの屋根に落ちて亡くなった。夫の死と破産の寸前から、一人で飛び続け、ナポレオンの祝典でも飛んだ",
- "note": "チャンネル「リバース」設計「悲劇」（templates/DESIGN_MODES.md）＋ガイドライン v2.4。制作の土台は production/ext/kit（2026-11-01〜）。本編のナレーターは最初から最後まで M（v7：VOICEVOX:玄野武宏）。L06 から行ごとの speed・inton・pitch で少しずつ静かにゆっくり、最後の L13 は話速 1.0。オープニング（L00）だけ W（VOICEVOX:冥鳴ひまり）。fact は scripts/pilot_024/fact_check.md の ID。台本は 2026-11-01 にユーザーが「OK」。",
+ "note": "チャンネル「リバース」設計「悲劇」5 回目の更新（templates/DESIGN_MODES.md、2026-11-01：明朝体・最初から暗く張り詰めた編集・悲しい BGM・知的設計と同じオープニング）＋ガイドライン v2.4。制作の土台は production/ext/kit（2026-11-01〜）。本編のナレーターは最初から最後まで M（v7：VOICEVOX:玄野武宏）。抑揚は最初から 1.25 と抑えめ、L06 から行ごとの speed・inton・pitch で少しずつ静かにゆっくり、最後の L13 は話速 1.0。オープニング（L00）だけ W（VOICEVOX:冥鳴ひまり）。fact は scripts/pilot_024/fact_check.md の ID。台本は 2026-11-01 にユーザーが「OK」。",
  "voices": "v7",
  "voice_override": {
   "M": {
    "speed": 1.5,
-   "inton": 1.7,
+   "inton": 1.25,
    "pitch": 0.03
   },
   "W": {
@@ -103,7 +103,7 @@
    ],
    "fact": "FACT-06",
    "speed": 1.45,
-   "inton": 1.5,
+   "inton": 1.15,
    "pitch": 0.02
   },
   {
@@ -116,7 +116,7 @@
    ],
    "fact": "FACT-07",
    "speed": 1.42,
-   "inton": 1.4,
+   "inton": 1.1,
    "pitch": 0.01
   },
   {
@@ -130,7 +130,7 @@
    ],
    "fact": "FACT-01",
    "speed": 1.38,
-   "inton": 1.25,
+   "inton": 1.05,
    "pitch": 0.0
   },
   {
@@ -144,7 +144,7 @@
    ],
    "fact": "FACT-08",
    "speed": 1.33,
-   "inton": 1.1,
+   "inton": 1.0,
    "pitch": -0.01
   },
   {
@@ -158,7 +158,7 @@
    ],
    "fact": "FACT-09",
    "speed": 1.3,
-   "inton": 1.0,
+   "inton": 0.95,
    "pitch": -0.02
   },
   {
@@ -172,7 +172,7 @@
    ],
    "fact": "FACT-10",
    "speed": 1.27,
-   "inton": 0.95,
+   "inton": 0.9,
    "pitch": -0.03
   },
   {
@@ -186,7 +186,7 @@
    ],
    "fact": "FACT-11",
    "speed": 1.23,
-   "inton": 0.9,
+   "inton": 0.88,
    "pitch": -0.04
   },
   {

@@ -8,7 +8,7 @@
 
 設計ごとの違い（templates/DESIGN_MODES.md）：
 - intel（知的）・dopa（ドパ）：共通エンディングの短い版（ending_ext）、オープニングの音は衝撃波の一発（opening_bgm の open_impact）。
-- tragedy（悲劇）：共通エンディングなし（noend_ext、最後は black 秒かけて暗転）、オープニングはホラー調の音（bgm_file のモード h）。
+- tragedy（悲劇）：共通エンディングなし（noend_ext、最後は black 秒かけて暗転）。オープニングの音も知的設計と同じ open_impact（2026-11-01〜）。
 - BGM は外のフリー音源（assets/bgm/ の mp3、bgm_file）。スタイル名は "file_<回の番号>"。
 """
 import sys
@@ -36,8 +36,7 @@ def setup(here, design, bgm, black=2.6, ending_gain=None):
     if design == "tragedy":
         import noend_ext
         noend_ext.apply(pipeline, black=black)
-    else:
-        import opening_bgm  # noqa: F401
+    import opening_bgm  # noqa: F401  オープニングの音は全設計で衝撃波の一発 open_impact（悲劇も 2026-11-01〜）
     name = "file_" + Path(here).name.split("_")[-1]
     gains = {"ending": ending_gain if ending_gain is not None else ("m0w70" if design == "tragedy" else .35)}
     bgm_file.register(name, Path(here) / "assets" / "bgm" / bgm[0], bpm=bgm[1], gains=gains, smooth=2.0 if design == "tragedy" else .4)

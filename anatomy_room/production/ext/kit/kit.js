@@ -15,8 +15,8 @@ const KIT = {
   images: [],           // window.ASSETS の本物の写真のキー
   ci: {},               // { きっかけ: [[傾き, 画角の倍率], …] }。1 つなら 1 回、3 つなら転の 3 回
   hits: [],             // [[きっかけ, 強さ, 遅れ], …]：画面の一打（ズームと揺れ）
-  darkFrom: null,       // 悲劇：このきっかけから少しずつ暗く冷たく
-  serifFrom: null,      // 悲劇：このきっかけから明朝体の静かな文字・字幕
+  darkFrom: null,       // 悲劇：このきっかけから、さらに少しずつ暗く（悲劇は最初から暗い幕がかかる、2026-11-01〜）
+  serifFrom: null,      // 明朝体の静かな文字・字幕に切り替えるきっかけ（悲劇は指定しなくても最初から明朝体）
 };
 let TL, CUE, MOOD = [], NOW = 0, SCN = [];
 const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
@@ -42,7 +42,7 @@ function label(ctx, s, x, y, size, col = "#fff", { font = MP, align = "center", 
   ctx.save(); ctx.font = `400 ${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.lineJoin = "round"; ctx.lineWidth = size * sw; ctx.strokeStyle = stroke; ctx.strokeText(s, x, y); ctx.fillStyle = col; ctx.fillText(s, x, y);
   const w = ctx.measureText(s).width, x0 = align === "center" ? x - w / 2 : align === "right" ? x - w : x; logBox(ctx, s, x0, y - size * .58, x0 + w, y + size * .58, size); ctx.restore();
 }
-const SERIF = () => KIT.serifFrom && CUE && CUE[KIT.serifFrom] !== undefined ? CUE[KIT.serifFrom] : Infinity;
+const SERIF = () => KIT.design === "tragedy" ? -Infinity : KIT.serifFrom && CUE && CUE[KIT.serifFrom] !== undefined ? CUE[KIT.serifFrom] : Infinity;   // 悲劇は最初から明朝体（2026-11-01〜）
 function calmText(ctx, s, x, y, size, t0, t, sub, dur = 99) {   // 静かな文字：ゆっくり現れる。揺れ・色ずれ・光なし（悲劇の終盤）
   const u = t - t0, a = Math.min(clamp(u / .6), 1 - clamp((u - dur) / .4)); if (u < 0 || a <= 0) return; size = Math.round(size * .62); y = Math.max(y, 230 + size * .7);
   ctx.save(); ctx.globalAlpha *= a; ctx.font = `600 ${size}px ${MIN}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; let w = ctx.measureText(s).width; if (w > 860) { size = Math.floor(size * 860 / w); ctx.font = `600 ${size}px ${MIN}`; w = ctx.measureText(s).width; }
@@ -264,7 +264,7 @@ function renderFrame(t) {
   if (D === "dopa") { const P = ciPhase(t); if (P) { const a = P.p ? CUT[P.p - 1] : 0; if (P.d - a < .1) S.glitch(bg, t, 8 * (1 - (P.d - a) / .1), 3); } }   // ドパ：カットインの切れ目で一瞬乱れる
   if (typeof fxEp === "function") fxEp(t, name);
   addGrain(t);
-  if (D === "tragedy") { const dk = darkK(t); if (dk > 0) { bg.fillStyle = `rgba(0,6,14,${.5 * Math.pow(dk, 1.2)})`; bg.fillRect(0, 0, W, H); } }   // 後半ほど暗く
+  if (D === "tragedy" && name !== "open") { const dk = darkK(t); bg.fillStyle = `rgba(0,6,14,${.32 + .22 * Math.pow(dk, 1.2)})`; bg.fillRect(0, 0, W, H); }   // 悲劇：最初から暗く張り詰めた画面、終盤ほどさらに暗く（2026-11-01〜）
   if (t < es) { drawUI(t, name); if (name !== "open") { if (D === "intel") S.docSub(ui, t, { endAt: es }); else popSub(ui, t, es); } }
   else if (D === "tragedy") { const k = easeInOut(clamp((t - es) / Math.max(.1, (TL.blackout || .25) - .3))); bg.fillStyle = `rgba(0,0,0,${k})`; bg.fillRect(0, 0, W, H); }   // 共通エンディングなし：時間をかけて暗転
   else { const e = TL.lines.filter(x => x.ending), cr = TL.credits.join("／").split("／"), two = cr.length > 2;   // 声が 3 人以上なら、クレジットを 2 行に分けて描く（pilot_019 と同じ）

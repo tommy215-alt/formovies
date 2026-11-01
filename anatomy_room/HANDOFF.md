@@ -32,6 +32,7 @@
   - **2026-11-01**：ChatGPT の結果を出典で確かめ直し、各回の `scripts/pilot_02N/fact_check.md`・`assets.md`・`script_draft.md`（VOICEVOX で実測、本編 52〜57 秒）を作成。画像は Commons の API で権利を確認（PD・CC0 だけ。パターソン本人の写真は権利不明で使わない）。BGM は incompetech の一覧で確認（024 Danse Macabre、025 Raving Energy (faster)、026 Clean Soul が第一候補）。ユーザーの「OK」（2026-11-01、ドパ設計のカットインは「文字なし、効果音たっぷり」）。
   - **3 本とも完成（2026-11-01）**：`production/pilot_024/reverse_024_blanchard.mp4`（63.0 秒、悲劇、Danse Macabre）、`pilot_025/reverse_025_stapp.mp4`（58.8 秒、ドパ、Raving Energy (faster)）、`pilot_026/reverse_026_patterson.mp4`（63.4 秒、知的、Clean Soul）。video_qa の残りは想定どおり（最初のコマが暗い → thumbnail.png、オープニング L00 の字幕なし、悲劇はエンディングなし）。タイトル・説明文は各回の `youtube_metadata.md`。ユーザーの感想待ち。YouTube へのアップロードはユーザーの指示まで行わない。
   - 書き出しで 3D が重い場面はブラウザが落ちることがある（1 回やり直すと通った）。
+  - **設計「悲劇」を 5 回目の更新**（2026-11-01、ユーザーの指示、`DESIGN_MODES.md`）：明朝体・最初から暗く張り詰めた編集・悲しい BGM（終盤は無音）・知的設計と同じオープニング。**pilot_024 を作り直した**（BGM は Sad Trio、63.0 秒）。kit は `KIT.design = "tragedy"` で自動。
   - **制作の土台 `production/ext/kit/` を作成**（`DESIGN_MODES.md` の「制作の土台」）。3 本とも renderer.html は場面だけ。書き出しは `rv.py 02N render all`。
 
 ## 次の動画でやること（ガイドライン v2.4）

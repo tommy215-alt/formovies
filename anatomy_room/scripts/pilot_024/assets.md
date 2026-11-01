@@ -15,7 +15,12 @@
 - A2 と A3 は同じ 1811 年のミラノの版画（A3 は小さい複製）だった。制作では高画質の A2 を、L02 では上半身に寄せて、L05b では全体で使う（A3 は使わない）。
 - Smithsonian NASM の所蔵ページの版画は再利用に条件があるので使わない（ChatGPT の注意どおり）。議会図書館の同じ時期の版画（A2・A3）を使う。
 
-## BGM（設計「悲劇」：短調でリズミカル）
+## BGM（設計「悲劇」5 回目の更新：悲しい曲。2026-11-01 に Danse Macabre から差し替え）
+
+- **使用：Sad Trio**（Kevin MacLeod、ピアノ・チェロ・イングリッシュホルン、4:12、Somber・Dark・Calming、CC BY 4.0）。クレジット：「Sad Trio」Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/
+- 次点：Wounded（ピアノと弦、Dark・Somber）
+
+### 以前の候補（4 回目までの設定）
 
 incompetech の曲の一覧（pieces.json）で、存在・曲調・テンポを確認。ライセンスは CC BY 4.0（Kevin MacLeod）。
 
