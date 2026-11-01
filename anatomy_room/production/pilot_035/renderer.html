@@ -69,7 +69,7 @@ function skyShot(t, u, { mode = "gond", cam, chute = false, exp = 1.0 } = {}) {
 // ---------------------------------------------------------------- 2D の図
 function gloveDiag(X, t, a) { panel(X); lab2(X, "右手の手袋の加圧が壊れた", 540, 410, T(30), "#B8DFF2", 800); const k = easeOut(clamp((t - a - .3) / 1.2)), s = 1 + .5 * k;
   X.save(); X.translate(540, 800); X.scale(s, s); X.fillStyle = "#8a8f80"; X.beginPath(); X.ellipse(0, 40, 110, 130, 0, 0, Math.PI * 2); X.fill(); for (let i = 0; i < 4; i++) { X.beginPath(); X.ellipse(-75 + i * 50, -110, 22, 60, 0, 0, Math.PI * 2); X.fill(); } X.restore();
-  if (k > .6) lab2(X, "腫れ上がる", 540, 1160, T(40), "#FF9A8A", 900); }
+  if (k > .6) lab2(X, "腫れ上がる", 540, 520, T(40), "#FF9A8A", 900); }
 function speedDiag(X, t, a) { panel(X); lab2(X, "自由落下", 540, 410, T(32), "#B8DFF2", 800); const k = easeOut(clamp((t - a - .2) / 1.5)); bigNum(X, `時速 ${Math.round(988 * k)}km`, 700, 90, "#FFE2A8"); lab2(X, "（614 mph、米空軍博物館）", 540, 820, T(24), "#8FB0C8", 600); bigNum(X, "4分半以上", 1020, 80, "#EAF2F8"); }
 
 // ---------------------------------------------------------------- ショットの一覧
