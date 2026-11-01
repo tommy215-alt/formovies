@@ -26,56 +26,63 @@
    "id": "pilot_027",
    "video": "anatomy_room/production/pilot_027/reverse_027_hans.mp4",
    "meta": "anatomy_room/production/pilot_027/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued"
+   "publish_at": "2026-11-03 08:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T19:26:27.120Z"
   },
   {
    "id": "pilot_028",
    "video": "anatomy_room/production/pilot_028/reverse_028_forssmann.mp4",
    "meta": "anatomy_room/production/pilot_028/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued"
+   "publish_at": "2026-11-03 19:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T19:27:45.871Z"
   },
   {
    "id": "pilot_029",
    "video": "anatomy_room/production/pilot_029/reverse_029_moseley.mp4",
    "meta": "anatomy_room/production/pilot_029/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued"
+   "publish_at": "2026-11-04 08:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T19:29:08.044Z"
   },
   {
    "id": "pilot_030",
    "video": "anatomy_room/production/pilot_030/reverse_030_brand.mp4",
    "meta": "anatomy_room/production/pilot_030/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued"
+   "publish_at": "2026-11-04 19:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T19:30:27.714Z"
   },
   {
    "id": "pilot_031",
    "video": "anatomy_room/production/pilot_031/reverse_031_dally.mp4",
    "meta": "anatomy_room/production/pilot_031/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued"
+   "publish_at": "2026-11-05 08:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T19:31:45.957Z"
   },
   {
    "id": "pilot_032",
    "video": "anatomy_room/production/pilot_032/reverse_032_frisch.mp4",
    "meta": "anatomy_room/production/pilot_032/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued"
+   "publish_at": "2026-11-05 19:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T19:33:04.312Z"
   },
   {
    "id": "pilot_033",
    "video": "anatomy_room/production/pilot_033/reverse_033_shrimp.mp4",
    "meta": "anatomy_room/production/pilot_033/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued"
+   "publish_at": "2026-11-06 08:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-01T19:34:23.347Z"
   },
   {
    "id": "pilot_034",
    "video": "anatomy_room/production/pilot_034/reverse_034_bentley.mp4",
    "meta": "anatomy_room/production/pilot_034/youtube_metadata.md",
-   "publish_at": null,
+   "publish_at": "2026-11-06 19:00",
    "status": "queued"
   },
   {

@@ -69,7 +69,9 @@ async function upload(item) {
     let resumed = false;
     for (const tab of ["short", "upload"]) {
       await page.goto(`https://studio.youtube.com/channel/${ch}/videos/${tab}`); await page.waitForTimeout(5000); await dismiss();
-      const row = page.locator("ytcp-video-row", { hasText: title.replace(/\s*#shorts\s*$/, "") }).first();
+      // タイトルで探し、なければファイル名のままの下書き（上限で止まったときなど。例：reverse 034 bentley）を探す
+      let row = page.locator("ytcp-video-row", { hasText: title.replace(/\s*#shorts\s*$/, "") }).first();
+      if (!(await row.count())) row = page.locator("ytcp-video-row", { hasText: path.basename(video, ".mp4").replace(/_/g, " ") }).first();
       if (!(await row.count())) continue;
       await row.hover().catch(() => {}); const btn = row.locator("ytcp-button:has-text('ドラフトを編集'), ytcp-button:has-text('下書きを編集'), ytcp-button:has-text('Edit draft'), #edit-draft-button").first();
       if (await btn.count()) { await btn.click(); resumed = true; say("下書きの続きから入れる：" + item.id); break; }
@@ -79,6 +81,8 @@ async function upload(item) {
       await page.goto(`https://studio.youtube.com/channel/${ch}/videos/upload?d=ud`); await page.waitForTimeout(3000); await shot("upload_dialog");
       const fi = page.locator("input[type=file]").first(); await fi.waitFor({ state: "attached", timeout: 30000 }); await fi.setInputFiles(video);
       say("アップロード中：" + item.id);
+      await page.waitForTimeout(4000);
+      if (await page.locator("text=アップロード数の上限").first().isVisible().catch(() => false)) { await shot("limit"); const e = new Error("1 日のアップロード数の上限（24 時間後に自動で続きを上げる）"); e.limit = true; throw e; }
     }
     await page.locator("#title-textarea #textbox").first().waitFor({ timeout: 120000 }); await page.waitForTimeout(2500);
     await typeInto("#title-textarea #textbox", title); await typeInto("#description-textarea #textbox", desc); await shot("details");
@@ -156,6 +160,6 @@ function logRun(s) { fs.appendFileSync(path.join(LOG, "run.log"), `${new Date().
       item.status = "scheduled"; item.uploaded = new Date().toISOString(); if (link) item.url = link; save();
       say(`✅ 予約しました：${item.id}（公開 ${item.publish_at}）${link ? " " + link : ""}`); logRun(`scheduled ${item.id} ${item.publish_at}`);
       const [d2, hm2] = item.publish_at.split(" "); last = jst(d2, hm2);
-    } catch (e) { logRun(`error ${item.id} ${e.message}`); throw e; }
+    } catch (e) { logRun(`error ${item.id} ${e.message}`); if (e.limit) { say("⏸ " + e.message); return; } throw e; }
   }
 })().catch(e => { console.error("❌ " + e.message); process.exit(1); });
