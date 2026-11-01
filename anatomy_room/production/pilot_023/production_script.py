@@ -3,7 +3,7 @@
 
 知的設計の編集設定（templates/DESIGN_MODES.md、参考 pilot_022）：
 - 話速はオモテ 1.5・W 1.3・行間 0.03。
-- 起承転結の頭にカットイン：起 L02・承 L03・結 L11 は暗転の大きな文字 1 回だけ、転 L09（1 月 23 日）は暗転 → 2 カットの 3 回。
+- 起承転結の頭にカットイン：カメラの動きだけ（文字・効果音なし）。起 L02＝傾いた寄りから引く、承 L03＝引きから急に寄る、結 L11＝大きく引く、転 L09（1 月 23 日）＝低い角度 → 2 カットの 3 回。
 - 冒頭のオープニング（約 3 秒）：結論の文字を大きく、W の声（冥鳴ひまり）が読み、本物の写真（バンティングとベストと犬、1921、CC BY 2.0）を中央。
   音は衝撃波の一発（ext/opening_bgm.py のモード open_impact）。
 - 共通エンディングは短い版（ending_ext）。BGM は lab_dub（直前の pilot_022 は lab_melodic）。
@@ -26,8 +26,6 @@ ending_ext.apply(pipeline)   # 共通エンディングの短い版（この回�
 
 V3 = ["../ext/vendor/three147/" + f for f in ["GLTFLoader.js", "RGBELoader.js", "Pass.js", "EffectComposer.js", "RenderPass.js", "ShaderPass.js",
                                                "CopyShader.js", "SimplexNoise.js", "SSAOShader.js", "SSAOPass.js", "BokehShader.js", "BokehPass.js"]]
-CI1 = lambda c: [("impact", c, 0.9), ("deep", c, 0.7, 0.02), ("whoosh", c, 0.5, 0.42)]   # カットイン 1 回
-CI3 = lambda c: [("impact", c, 1.0), ("deep", c, 0.8, 0.02), ("hit", c, 0.7, 0.45), ("whoosh", c, 0.6, 0.42), ("impact", c, 0.8, 0.95), ("hit", c, 0.6, 1.5)]   # カットイン 3 回
 
 EP = standard.config({
     "id": "pilot_023",
@@ -41,13 +39,13 @@ EP = standard.config({
         "back": ("L14", 0.0), "card": ("L14", 1.0),
     },
     "sfx": [("title", "hook", 0.6, 0.02), ("room", "hook", 0.4, 0.1), ("tick", "boy", 0.3), ("tick", "boy", 0.3, 0.6),
-            *CI1("nodrug"), ("tick", "diet", 0.35), ("tick", "diet", 0.35, 0.5), ("tick", "diet", 0.35, 1.0),
-            *CI1("idea"), ("paper", "note", 0.4), ("scanline", "plan", 0.4), ("paper", "plan", 0.35, 0.3),
+            ("tick", "diet", 0.35), ("tick", "diet", 0.35, 0.5), ("tick", "diet", 0.35, 1.0),
+            ("paper", "note", 0.4), ("scanline", "plan", 0.4), ("paper", "plan", 0.35, 0.3),
             ("room", "lab", 0.35), ("glow", "dogs", 0.35), ("data", "dogfall", 0.45), ("lock", "dogfall", 0.4, 1.4),
             ("deep", "first", 0.45), ("tick", "first", 0.3, 0.3), ("deep", "abscess", 0.4), ("scan", "collip", 0.4), ("shimmer", "collip", 0.35, 1.2),
-            *CI3("jan23"), ("zoom", "jan23", 0.5, 1.5), ("reveal", "normal", 0.55), ("data", "normal", 0.4, 0.3), ("lock", "normal", 0.45, 1.3),
+            ("reveal", "normal", 0.55), ("data", "normal", 0.4, 0.3), ("lock", "normal", 0.45, 1.3),
             ("bloom", "live", 0.45), ("paper", "letter", 0.4), ("shimmer", "letter", 0.4, 0.5),
-            *CI1("patent"), ("ring", "mass", 0.35), ("tick", "mass", 0.3, 0.3), ("tick", "mass", 0.3, 0.6), ("tick", "mass", 0.3, 0.9),
+            ("ring", "mass", 0.35), ("tick", "mass", 0.3, 0.3), ("tick", "mass", 0.3, 0.6), ("tick", "mass", 0.3, 0.9),
             ("bloom", "nobel", 0.55), ("discover", "nobel", 0.45, 0.1), ("shimmer", "share", 0.35),
             ("glow", "cure", 0.45), ("prism", "cure", 0.35, 0.6), ("glow", "back", 0.4, 0.2), ("shimmer", "card", 0.45), ("discover", "card", 0.4, 0.1)],
     # BGM：オープニングは衝撃波の一発（open_impact）→ 冬の病室（謎）→ 薬はない（陰り）→ 計画（物語）→ 実験（集中）→ 最初の失敗（陰り）→ 精製（集中）
@@ -66,11 +64,11 @@ EP = standard.config({
                   ("share", 0.8), ("cure", 1.0), ("back", 1.0), ("card", 0.3)],
     "scenes": [
         ("0 オープニング（約 3 秒）", None, "hook", "結論の文字を大きく、本物の写真（A1：バンティングとベストと犬、1921）を中央、背景は漂う光の粒。衝撃波の一発", "open_impact"),
-        ("1 冒頭（フック）・起", "hook", "idea", "最初の 1 秒：冬の病室のベッド（再現、顔なし）→【起】カットイン「薬は なかった」→ 小さな食事と時計", "w_hook → w_shade"),
-        ("2 計画と実験・承", "idea", "fail", "【承】カットイン「ノートに 書いた計画」→ 夜の机の後ろ姿 → ノートのメモ（原文）→ 夏の研究室の 2 人 → 下がる血糖（模式図）", "w_story → w_focus"),
+        ("1 冒頭（フック）・起", "hook", "idea", "最初の 1 秒：冬の病室のベッド（再現、顔なし）→【起】カットイン（傾いた寄りから引く）→ 小さな食事と時計", "w_hook → w_shade"),
+        ("2 計画と実験・承", "idea", "fail", "【承】カットイン（引きから急に寄る）→ 夜の机の後ろ姿 → ノートのメモ（原文）→ 夏の研究室の 2 人 → 下がる血糖（模式図）", "w_story → w_focus"),
         ("3 最初の失敗と精製", "fail", "turn", "病室、濁った液の注射器（手のアップなし）→ 澄んでいくフラスコ", "w_shade → w_focus"),
-        ("4 1 月 23 日・転", "turn", "legacy", "【転】カットイン 3 回「1月23日 もう一度」→ 澄んだ液の小瓶の極端な寄り → 窓の光の病室 → 朝の光（光の転換）→ 正常の帯に入る血糖 → テディの本物の手紙", "w_hold → w_discover → w_warm"),
-        ("5 特許・ノーベル・いま・結", "legacy", "back", "【結】カットイン「特許は 1ドルで」→ 増えていく薬瓶 → メダルの光 → ペン型の注射器", "w_rise → w_discover → w_warm"),
+        ("4 1 月 23 日・転", "turn", "legacy", "【転】カットイン 3 回：低い角度の病室 → 澄んだ液の小瓶の極端な寄り → 窓の光の病室 → 朝の光（光の転換）→ 正常の帯に入る血糖 → テディの本物の手紙", "w_hold → w_discover → w_warm"),
+        ("5 特許・ノーベル・いま・結", "legacy", "back", "【結】カットイン（寄りから大きく引く）→ 増えていく薬瓶 → メダルの光 → ペン型の注射器", "w_rise → w_discover → w_warm"),
         ("6 冒頭へ", "back", "endcard", "冒頭の病室に朝の光", "w_warm"),
         ("7 共通エンディング（短い版）", "endcard", None, "最後の画の上にロゴと決めゼリフ", "BGM ending"),
     ],
@@ -79,7 +77,7 @@ EP = standard.config({
         "",
         "- オープニング：結論の文字を画面の上〜中ほどに大きく、W の声ではっきり読む。本物の写真（バンティングとベストと犬、1921、CC BY 2.0）を中央に。背景は動く CG。衝撃波の一発。",
         "- 冒頭（本編）の最初の 1 秒：冬の病室のベッド（決定的な映像）。",
-        "- 起承転結のカットイン：起 L02・承 L03・結 L11 は暗転の文字 1 回、転 L09 は 3 回。",
+        "- 起承転結のカットイン：カメラの角度・急な寄り・引きで（文字・効果音なし）。起 L02・承 L03・結 L11 は 1 回、転 L09 は 3 回。",
         "- 決定的な瞬間：1 月 23 日、病室に朝の光が差し込む（光の転換）。思いが伝わる場面：テディの本物の手紙。",
         "- 最後の一文と画を冒頭につなげる：冒頭の病室に戻り、朝の光。",
         "- 人物は MPFB の人体の後ろ姿（顔なし、手のアップなし）。少年は布団のふくらみだけで、体は描かない。動物実験は犬も手術も描かず、図で見せる。",

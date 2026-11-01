@@ -42,8 +42,12 @@ const ui = document.getElementById("ui").getContext("2d");
 const SCN = ["open", "hook", "idea", "fail", "turn", "legacy", "back"];
 let TL, CUE, MOOD = [];
 const k_ = (t, cue, d = .4, off = 0) => easeOut(prog(t, CUE[cue] + off, d));
-const CUT = [.45, .95, 1.5];   // カットインの切れ目（秒、効果音の打点と同じ）。起・承・結は暗転に大きな文字の 1 回だけ → 本来の画。転は 3 回：暗転 → カット A → カット B → 本来の画
-const CI = { nodrug: ["薬は", "なかった"], idea: ["ノートに", "書いた計画"], jan23: ["1月23日", "もう一度"], patent: ["特許は", "1ドルで"] };   // 起・承・転・結
+const CUT = [.45, .95, 1.5];   // カットインの切れ目（秒）。起・承・結は 1 回 → 本来の画。転は 3 回：低い角度 → カット A → カット B → 本来の画
+// 起承転結のカットイン（文字・効果音なし）：[カメラの傾き（rad）, 画角の倍率]。1 より大きいと引きから急に寄り、小さいと寄りから引く。どちらも傾き 0・倍率 1 に戻って本来の画へ
+const CI = { nodrug: [[.26, .7]], idea: [[-.18, 1.8]], jan23: [[.22, 1.7], [0, 1.5], [-.14, .65]], patent: [[0, .4]] };   // 起・承・転・結
+let NOW = 0;
+function camFX(t) { const P = ciPhase(t); if (!P) return; const [roll, z] = CI[P.c][P.p], a = P.p ? CUT[P.p - 1] : 0, k = easeOut(clamp((P.d - a) / ((CUT[P.p] - a) * .85)));
+  cam.fov *= z + (1 - z) * k; cam.rotateZ(roll * (1 - k)); cam.updateProjectionMatrix(); cam.updateMatrixWorld(); }
 function ciPhase(t) { for (const c in CI) { const d = t - CUE[c]; if (d >= 0 && d < (c === "jan23" ? CUT[2] : CUT[0])) return { c, d, p: d < CUT[0] ? 0 : d < CUT[1] ? 1 : 2 }; } return null; }
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -112,7 +116,7 @@ const ssao = new THREE.SSAOPass(scene, cam, GW, GH); ssao.kernelRadius = .22; ss
 const bokeh = new THREE.BokehPass(scene, cam, { focus: 1, aperture: .002, maxblur: .008, width: GW, height: GH });
 composer.addPass(rpass); composer.addPass(ssao); composer.addPass(bokeh); composer.addPass(OUT);
 function draw3D({ ao = true, dof = null } = {}) {   // dof＝{ focus：焦点までの距離（m）, aperture, maxblur }
-  R.shadowMap.needsUpdate = true; R.setClearColor(FOGC, 1);
+  camFX(NOW); R.shadowMap.needsUpdate = true; R.setClearColor(FOGC, 1);
   rpass.enabled = !ao; ssao.enabled = ao; bokeh.enabled = !!dof;
   if (dof) { bokeh.uniforms.focus.value = dof.focus; bokeh.uniforms.aperture.value = dof.aperture ?? .002; bokeh.uniforms.maxblur.value = dof.maxblur ?? .008; bokeh.uniforms.nearClip.value = cam.near; bokeh.uniforms.farClip.value = cam.far; bokeh.uniforms.aspect.value = cam.aspect; }
   composer.render(); bg.imageSmoothingQuality = "high"; bg.drawImage(glc, 0, 0, W, H);
@@ -154,7 +158,7 @@ function human(kindKey, { coat = 0x2a2a30, hair = 0x3a2a20 } = {}) {
 }
 
 // ---------------------------------------------------------------- 病室（1922 年のトロント総合病院、再現）：窓・鉄のベッド・布団のふくらみ（体は描かない）・小机・時計
-const ward = set("ward"); const BX = -.6; let wardWinM, wardCool, wardWarm, wardDust, snowPts, snowY0, plateG, syrG, syrLiqM, clockMin, clockHr, medBottle;
+const ward = set("ward"); const BX = -.6; let wardWinM, wardDust, snowPts, snowY0, plateG, syrG, syrLiqM, clockMin, clockHr, medBottle;
 function buildWard() {
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), pbr("old_wood_floor", [5, 5], { tint: 0x6a6258 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; ward.add(floor);
   const wallM = M(0x7a8680, { roughness: .95 }); Cine.surface(wallM, "plaster", { repeat: [4, 2], normal: .4 });
@@ -194,12 +198,10 @@ function buildWard() {
     for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283; box(.008, .025, .005, M(0x222222), Math.sin(a) * .13, Math.cos(a) * .13, .018, clk).rotation.z = -a; }
     clockMin = new THREE.Group(); box(.008, .12, .004, M(0x111111), 0, .05, .022, clockMin); clk.add(clockMin); clockHr = new THREE.Group(); box(.012, .08, .004, M(0x111111), 0, .03, .026, clockHr); clk.add(clockHr); }
   clk.position.set(BX + .85, 1.3, -2.97); ward.add(clk);
-  wardCool = Cine.shaft({ from: [-2.6, 2.3, -1.0], to: [BX, .6, -1.1], r0: .5, r1: 1.1, color: 0xd8e6ff, opacity: .05 }); ward.add(wardCool);
-  wardWarm = Cine.shaft({ from: [-2.6, 2.3, -1.0], to: [BX + .2, .6, -1.0], r0: .55, r1: 1.3, color: 0xffd8a0, opacity: .16 }); ward.add(wardWarm);
   wardDust = Cine.dust({ min: [-2.4, .3, -2.8], max: [1.5, 2.6, .5], count: 600, size: .009, seed: 23 }); ward.add(wardDust.points);
 }
 function wardShot(t, { dawn = 0, syr = false, plate = false, exp = 1.0 } = {}) {
-  show("ward"); envOn(.25 + .2 * dawn); syrG.visible = syr; plateG.visible = plate; wardDust.update(t, 1); wardCool.userData.set(t, 1 - dawn); wardWarm.userData.set(t, dawn);
+  show("ward"); envOn(.25 + .2 * dawn); syrG.visible = syr; plateG.visible = plate; wardDust.update(t, 1);
   const p = snowPts.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, .8 + ((snowY0[i] - .8 - t * .22) % 1.9 + 1.9) % 1.9); p.needsUpdate = true; snowPts.visible = dawn < .5;
   wardWinM.color = C(0xb8cce6).lerp(C(0xffe2b8), dawn); clockMin.rotation.z = -t * .4; clockHr.rotation.z = -1.2 - t * .033;
   lights({ keyPos: [-3.4, 2.6, -1.0], keyAt: [BX, .6, -1.2], keyI: 6 + 26 * dawn, angle: .5, keyCol: dawn > 0 ? lerpHex(0xcfdcf0, 0xffd29a, dawn) : 0xcfdcf0, rimPos: [3, 3, 3], rimI: .35, rimCol: 0x9fc8ff,
@@ -238,14 +240,13 @@ function buildLab() {
   deskLamp.position.set(.98, .93, -.72); lab.add(deskLamp);
   labLamp = new THREE.PointLight(C(0xffd8a0), 0, 4, 2); labLamp.position.set(.92, 1.2, -.6); labLamp.castShadow = false; lab.add(labLamp);
   labDust = Cine.dust({ min: [-2, .5, -2.5], max: [2, 2.4, 1.5], count: 700, size: .01, seed: 81 }); lab.add(labDust.points);
-  const sh = Cine.shaft({ from: [-3.4, 2.6, -.8], to: [-.4, .5, -.5], r0: .5, r1: 1.3, color: 0xfff0d8, opacity: .08 }); lab.add(sh); lab.userData.shaft = sh;
   doc1 = human("man_sit", { coat: 0xe6e6e0, hair: 0x3a2a20 }); doc1.position.set(.62, 0, .02); doc1.rotation.y = Math.PI; lab.add(doc1);   // バンティング（昼、白衣、後ろ姿）
   doc1n = human("man_sit", { coat: 0x23262c, hair: 0x3a2a20 }); doc1n.position.set(.62, 0, .02); doc1n.rotation.y = Math.PI; lab.add(doc1n);   // バンティング（夜、暗い色の上着）
   doc2 = human("man_stand", { coat: 0xe6e6e0, hair: 0x5a4030 }); doc2.position.set(-.25, 0, .12); doc2.rotation.y = Math.PI; lab.add(doc2);   // ベスト（後ろ姿）
 }
 function labShot(t, { w1 = false, w2 = false, night = false, exp = 1.0 } = {}) {
   show("lab"); doc1.visible = w1 && !night; doc1n.visible = w1 && night; doc2.visible = w2; nbook.visible = deskLamp.visible = night; scope.visible = !night; flasks.visible = !night; hero.visible = !night;
-  labDust.update(t, night ? .4 : 1); lab.userData.shaft.userData.set(t, night ? 0 : .8); labLamp.intensity = night ? 3.2 : 0; labWinM.color = C(night ? 0x101a2c : 0xf4ecd8);
+  labDust.update(t, night ? .4 : 1);labLamp.intensity = night ? 3.2 : 0; labWinM.color = C(night ? 0x101a2c : 0xf4ecd8);
   if (night) lights({ keyPos: [.95, 1.25, -.62], keyAt: [.62, .93, -.5], keyI: 14, angle: .9, keyCol: 0xffc888, rimPos: [-3, 2.5, -.8], rimI: .35, rimCol: 0x6a8ab8, hemiI: .06, hemiSky: 0x2a3448, hemiGround: 0x0a0806, fog: .05, fogC: 0x05070c, exp });
   else lights({ keyPos: [-3.3, 3, -.8], keyAt: [0, .9, -.6], keyI: 18, angle: .6, keyCol: 0xfff0d8, rimPos: [2, 3, 3], rimI: .5, rimCol: 0x9fc8ff, hemiI: .38, hemiSky: 0xc8c4b8, hemiGround: 0x2a2620, fog: .035, fogC: 0x0e0e10, exp });
   envOn(night ? .25 : .7);
@@ -342,12 +343,13 @@ function letterView(t) {   // テディ・ライダーの手紙（本物、CC BY
 }
 
 // ---------------------------------------------------------------- 場面
-function ciShot(t, P) {   // 転（1 月 23 日）のカット A・B：澄んだ液の極端な寄り → 窓の光の病室
+function ciShot(t, P) {   // 転（1 月 23 日）の 3 カット：病室を低い角度から → 澄んだ液の極端な寄り → 窓の光の病室
+  if (P.p === 0) { wardShot(t, { dawn: .25 }); setCam(V3(.8, .42, .7), V3(BX, .85, -1.2), 40, .02, 40); draw3D({ ao: true }); return; }
   const u = easeOut(clamp((P.d - CUT[P.p - 1]) / (CUT[P.p] - CUT[P.p - 1])));
   if (P.p === 1) { heroShot(t, u, 1, { near: .3 }); return; }
   wardShot(t, { dawn: .35 + .25 * u }); setCam(V3(.7 - .15 * u, 1.2, 1.5 - .25 * u), V3(-1.9, 1.35, -1.2), 40 - 4 * u, .02, 40); draw3D({ ao: true }); }
 function drawScene(t, name) {
-  const P = ciPhase(t); if (P && P.p === 0) return "2d"; if (P && P.c === "jan23") { ciShot(t, P); return "3d"; }
+  const P = ciPhase(t); if (P && P.c === "jan23") { ciShot(t, P); return "3d"; }
   if (name === "open") { driftShot(t); return "3d"; }
   if (name === "hook") { if (t < CUE.nodrug) { wardWide(t, easeInOut(clamp((t - CUE.hook) / (CUE.nodrug - CUE.hook)))); return "3d"; }   // 冬の病室（最初の 1 秒の決定的な映像）
     wardShot(t, { plate: true }); const u = easeInOut(clamp((t - CUE.nodrug - CUT[0]) / (CUE.idea - CUE.nodrug))), at = V3(BX + .9, .85, -1.95);   // 小さな食事と時計
@@ -374,7 +376,6 @@ function drawScene(t, name) {
 }
 function draw2D(t, name) {
   const X = holoX; X.setTransform(1, 0, 0, 1, 0, 0); X.clearRect(0, 0, W, H);
-  { const P = ciPhase(t); if (P && P.p === 0) { bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H); return; } }   // カットインの暗転
   if (name === "idea") { if (t < CUE.lab) { planNote(X, t); holoDraw(t, {}); return; } sugarGraph(X, t, "dogfall", false); holoDraw(t, {}); return; }
   if (name === "turn") { if (t < CUE.live) { sugarGraph(X, t, "normal", true); holoDraw(t, {}); return; } letterView(t); return; }
   bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H);
@@ -388,7 +389,6 @@ function openingUI(t) {   // 結論の文字を大きく（上〜中ほど）
 function drawUI(t, name) {
   if (name === "open") { openingUI(t); return; }
   if (t >= CUE.hook && t < CUE.idea) uiNote("※再現CGを含みます", 540, 1250, win(t, CUE.hook + .3, CUE.nodrug, .3, .3));
-  { const P = ciPhase(t); if (P && P.p === 0) { HUD.title(ui, [[CI[P.c][0], T(110), "#FFD58A"], [CI[P.c][1], T(110), "#EAF2F8"]], 540, 820, easeOut(clamp(P.d / .1)), t); return; } }   // カットインの大きな文字
   if (name === "hook") { if (t < CUE.nodrug) uiCard([["1922年1月", T(34), 800], ["カナダ・トロントの病院", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "hook", .45, .3));
     else uiCard([["インスリンができる前", T(32), 800], ["食事を減らすしかなかった", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "nodrug", .45, CUT[0])); }
   if (name === "idea") { if (t < CUE.plan) uiCard([["1920年10月", T(34), 800], ["外科医 フレデリック・バンティング", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "idea", .45, CUT[0]));
@@ -434,7 +434,7 @@ function buildMood() {
     [c.back, { warm: .3, sat: 1.05, glow: .25, glowX: .25, glowY: .4, vig: .5 }]];
 }
 function renderFrame(t) {
-  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
+  bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H); NOW = t;
   const es = TL.ending_start, name = S.sceneAt(Math.min(t, es - .001));
   const kind = drawScene(t, name); if (kind === "2d") draw2D(t, name);
   if (name === "open") { bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); const box_ = [280, 590, 800, 1290]; photo(bg, IMG.dog, k_(t, "t0", .5, .1), 1.0, 1.06, clamp(t / 3), { box: box_, cy: .45, gray: 0, bright: 1.0 }); photoGlow(t, "t0", box_); }   // オープニング：本物の写真を中央に

@@ -26,6 +26,7 @@
 - **pilot_023 インスリンの発見（バンティング、1922 年のレナード・トンプソン）、知的設計**（2026-10-31、ユーザーが選択。希望は「なるべく感動するようなやつ」、タイトル〔オープニング〕あり）。ChatGPT への依頼文 `scripts/pilot_023/gpt_fact_check_prompt.md` → ユーザーが結果を貼る → Claude が出典で確かめて `fact_check.md`・`assets.md`・`script_draft.md` → ユーザーの「OK」で制作。冒頭の一文（案）「死を待つだけの病に、薬が生まれた」。
   - 事実確認で ChatGPT の「血糖 約520 → 約120」は出典（J Clin Invest 2021）に無い → 使わず「1 日で正常まで」（トロント大学の展示）。写真はトロント大学の図書館が Flickr に CC BY 2.0 で公開したもの（犬と写った 2 人、テディの手紙）。ユーザーの「OK」（2026-10-31）→ 制作：`production/pilot_023/`（約 67 秒、BGM lab_dub、オープニングの音 open_impact）。renderer は pilot_022 の renderer.html の行を土台にスクラッチの組み立てスクリプトで作った（直すときは renderer.html を直接直す）。`production_script.py` の `cues` には `segments` の場面名（fail・turn・legacy）も書く（抜けて場面が切り替わらなかった）。
   - **書き出し完了（2026-11-01）**：`production/pilot_023/reverse_023_insulin.mp4`（67.4 秒）。video_qa は「最初のコマが暗い」だけ → `thumbnail.png` を使う。ユーザーの感想待ち。自己レビュー（`reviews/internal_review/pilot_023_review.md`）は未作成。
+  - **直し（2026-11-01）**：斜めの光の筋（`Cine.shaft`、幕のように見えた）を削除。起承転結のカットインを文字なし・効果音なしのカメラの動き（傾き・急な寄り・引き、`camFX()`）に。どちらも知的設計の設定として `DESIGN_MODES.md` に保存。
 
 ## 次の動画でやること（ガイドライン v2.4）
 
