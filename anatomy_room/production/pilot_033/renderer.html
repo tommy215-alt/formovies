@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_033 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_033「はさみの一撃で数千度——テッポウエビ」のレンダラー（ドパ設計、閃光なし）。土台は ext/kit（kit.js・shots.js）。画面の構成は SHOTS。
+// 本物の写真：shrimp（FWC Fish and Wildlife Research Institute、CC BY 2.0）。3D：海の底・エビ・泡・小魚・ハゼ（再現・模式）。泡の光はやわらかい光で表す（閃光は使わない）。
+Object.assign(KIT, { design: "dopa", scenes: ["open", "hook", "ki", "sho", "ten", "ketsu"], images: ["shrimp"],
+  ci: { l03: [[.28, .65]], l05: [[-.22, 1.9]], l08: [[.25, 1.8], [-.1, 1.6], [.16, .6]], l11: [[0, .38]] },
+  hits: [["hook", 1.4], ["l01m", 1.0], ["l02", .8], ["l04", 1.4], ["l06", 1.2], ["l07", .8], ["l09", 1.6], ["l10", .6], ["l12", 1.0], ["l12b", .8], ["l13", .8]],
+  opening: { img: "shrimp", box: [100, 760, 980, 1190], cy: .5, gray: 0, title: ["はさみの一撃で", "泡の中が数千度"], credit: ["写真：FWC Fish and Wildlife Research Institute", "CC BY 2.0"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：海の底・エビ・泡・小魚・ハゼ
+const sea = set("sea"); let shrimp, claw, jaw, jet, bubble, bubbleL, fish, goby, rings = [], seaDust, extraShrimp = [];
+function makeShrimp(s = 1) { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: C(0xe8b890), roughness: .35, transparent: true, opacity: .95 }); Cine.surface(m, "skin", { repeat: [2, 2], normal: .5 });
+  for (let i = 0; i < 6; i++) { const seg = sph(.12 - i * .012, m, 0, 0, -i * .14, g, 24); seg.scale.set(1, .85, 1.1); }
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(.08, .2, 16), m); tail.rotation.x = -Math.PI / 2; tail.position.z = -.92; g.add(tail);
+  const cl = new THREE.Group(), cm = M(0xd8885a, { roughness: .4 }); const arm = box(.08, .08, .3, cm, 0, 0, .15, cl); const pal = box(.16, .14, .3, cm, 0, 0, .42, cl); const dac = box(.05, .1, .26, cm, .07, .02, .66, cl); cl.position.set(.14, -.02, .12); g.add(cl);
+  const small = box(.04, .04, .25, cm, -.12, -.03, .25, g); for (const sd of [-1, 1]) for (let k = 0; k < 2; k++) { const an = new THREE.Mesh(new THREE.CylinderGeometry(.005, .003, .7, 6), cm); an.position.set(sd * .04, .05, .45); an.rotation.x = Math.PI / 2 - .3 - k * .2; an.rotation.z = sd * .3; g.add(an); }
+  g.userData = { claw: cl, dac }; g.scale.setScalar(s); return g; }
+function makeFish(col = 0x9ab8d8, s = 1) { const g = new THREE.Group(), m = M(col, { roughness: .35, metalness: .3 }); const b = sph(.12, m, 0, 0, 0, g, 24); b.scale.set(.6, 1, 1.8); const tl = new THREE.Mesh(new THREE.ConeGeometry(.1, .18, 3), m); tl.rotation.x = Math.PI / 2; tl.position.z = -.28; g.add(tl); g.scale.setScalar(s); return g; }
+function buildSea() {
+  const sand = M(0xc8b890, { roughness: 1 }); Cine.surface(sand, "stone", { repeat: [20, 20], normal: .8 }); const fl = new THREE.Mesh(new THREE.PlaneGeometry(60, 60, 60, 60), sand); const p = fl.geometry.attributes.position, r = S.rng(4);
+  for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin(p.getX(i) * .9) * .06 + (r() - .5) * .04); fl.geometry.computeVertexNormals(); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; sea.add(fl);
+  for (let i = 0; i < 18; i++) { const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(.3 + r() * .7, 1), M(0x5a5a50, { roughness: 1 })); rk.position.set((r() - .5) * 12, 0, -2 - r() * 10); rk.scale.y = .6; rk.castShadow = true; sea.add(rk); }
+  shrimp = makeShrimp(1); shrimp.position.set(0, .12, 0); sea.add(shrimp);
+  jet = new THREE.Mesh(new THREE.ConeGeometry(.08, 1.2, 24, 1, true), new THREE.MeshBasicMaterial({ color: C(0xbfe8ff), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); jet.rotation.x = -Math.PI / 2; jet.position.set(.14, .1, 1.3); jet.userData.noAO = true; sea.add(jet);
+  bubble = new THREE.Mesh(new THREE.SphereGeometry(.12, 48, 32), new THREE.MeshPhysicalMaterial({ color: C(0xdff4ff), roughness: .05, transmission: .8, thickness: .1, transparent: true, opacity: .6, emissive: C(0xffd8a0), emissiveIntensity: 0 })); bubble.position.set(.14, .1, 1.2); bubble.userData.noAO = true; sea.add(bubble);
+  bubbleL = new THREE.PointLight(C(0xffc890), 0, 2.5, 2); bubbleL.position.copy(bubble.position); sea.add(bubbleL);
+  fish = makeFish(0x9ab8d8, .8); fish.position.set(.2, .25, 2.2); sea.add(fish);
+  goby = makeFish(0xf0e070, 1.4); goby.position.set(-.9, .15, .4); goby.rotation.y = .6; sea.add(goby); const hole = new THREE.Mesh(new THREE.CircleGeometry(.3, 32), M(0x1a1408)); hole.rotation.x = -Math.PI / 2; hole.position.set(-.6, .02, -.2); sea.add(hole);
+  for (let i = 0; i < 8; i++) { const s2 = makeShrimp(.7), q = S.rng(i + 40); s2.position.set((q() - .5) * 6, .08, -1 - q() * 6); s2.rotation.y = q() * 6; sea.add(s2); extraShrimp.push(s2); }
+  for (let i = 0; i < 6; i++) { const rg = new THREE.Mesh(new THREE.TorusGeometry(1, .01, 6, 64), new THREE.MeshBasicMaterial({ color: C(0x8fdcff), transparent: true, opacity: 0 })); rg.rotation.x = Math.PI / 2; rg.userData.noAO = true; sea.add(rg); rings.push(rg); }
+  seaDust = Cine.dust({ min: [-6, 0, -8], max: [6, 4, 4], count: 1500, size: .02, seed: 61 }); sea.add(seaDust.points);
+}
+// snap：0→1（はさみが閉じる→噴流→泡がふくらみ→つぶれる）、glow：泡の光（やわらかく）
+function seaShot(t, u, { cam = [V3(1.2, .6, 2.4), V3(0, .15, .3), 40], snap = -1, glow = 0, fishK = 0, gobyOn = false, crowd = false, ringK = 0, exp = 1.0 } = {}) {
+  show("sea"); scene.environment = ENV_ROOM; seaDust.update(t, 1); goby.visible = gobyOn; extraShrimp.forEach(s => s.visible = crowd);
+  const cl = shrimp.userData.dac; cl.rotation.y = snap >= 0 && snap < .15 ? -.5 * (1 - snap / .15) : (snap < 0 ? -.5 : 0);
+  jet.material.opacity = snap > .1 && snap < .5 ? .5 * (1 - (snap - .1) / .4) : 0; const bs = snap < .2 ? 0 : snap < .6 ? (snap - .2) / .4 : Math.max(0, 1 - (snap - .6) / .15); bubble.scale.setScalar(.2 + 2.2 * bs); bubble.visible = snap > .2 && snap < .8 || glow > 0;
+  bubble.material.emissiveIntensity = glow * 1.5; bubbleL.intensity = glow * 4;
+  fish.visible = fishK > 0; fish.rotation.z = fishK > .5 ? Math.PI / 2 * clamp((fishK - .5) * 3) : 0; fish.position.y = .25 - .1 * clamp((fishK - .5) * 2);
+  rings.forEach((rg, i) => { const ph = (ringK * 2 + i / 6) % 1; rg.scale.setScalar(.2 + ph * 4); rg.material.opacity = ringK > 0 ? .5 * (1 - ph) : 0; rg.position.y = .1; });
+  lights({ keyPos: [0, 8, 2], keyAt: [0, 0, 0], keyI: 16, angle: .6, keyCol: 0xc8f0ff, rimPos: [-3, 2, -3], rimI: .8, rimCol: 0x5ab8ff, hemiI: .45, hemiSky: 0x3a8ac8, hemiGround: 0x1a3a40, fog: .09, fogC: 0x0a3a5a, exp });
+  setCam(cam[0], cam[1], cam[2], .02, 80); draw3D({ ao: true, dof: { focus: cam[0].distanceTo(cam[1]), aperture: .006, maxblur: .01 } });
+}
+
+// ---------------------------------------------------------------- 2D の図
+function mechDiag(X, t, a) { panel(X); lab2(X, "音のしくみ（模式）", 540, 410, T(30), "#B8DFF2", 800);
+  [["はさみが閉じる", "#EAF2F8"], ["水が噴き出す", "#8FDCFF"], ["泡ができる", "#BFE8FF"], ["泡がつぶれる → 音", "#FFE2A8"]].forEach(([s, c], i) => { const k = clamp((t - a - .1 - i * .4) / .3); X.globalAlpha = k; lab2(X, s, 540, 560 + i * 170, T(38), c, 900); if (i < 3) lab2(X, "↓", 540, 645 + i * 170, T(30), "#8FB0C8", 700); X.globalAlpha = 1; }); }
+function camDiag(X, t, a) { panel(X); lab2(X, "2000年 オランダの研究チーム", 540, 410, T(30), "#B8DFF2", 800);
+  for (let i = 0; i < 4; i++) { const x = 200 + i * 200, s = [0, 50, 90, 20][i], k = clamp((t - a - .2 - i * .3) / .2); X.globalAlpha = k; X.fillStyle = "#0a2a40"; X.fillRect(x - 85, 600, 170, 300); X.fillStyle = "#BFE8FF"; X.beginPath(); X.arc(x, 750, Math.max(3, s * .7), 0, Math.PI * 2); X.fill(); X.globalAlpha = 1; }
+  lab2(X, "高速カメラで泡を撮る（模式）", 540, 1000, T(30), "#EAF2F8", 800); }
+function hotDiag(X, t, a) { panel(X); bigNum(X, "約5000K", 640, 130, "#FFD27A"); lab2(X, "少なくとも（推定）", 540, 800, T(30), "#B8C7D6", 700); X.fillStyle = "#FFB050"; X.beginPath(); X.arc(540, 1000, 90, 0, Math.PI * 2); X.fill(); lab2(X, "太陽の表面 約5800K", 540, 1160, T(28), "#FFE2A8", 800); }
+function onlyDiag(X, t, a) { panel(X); lab2(X, "泡の中だけ ほんの一瞬", 540, 410, T(32), "#B8DFF2", 800); X.fillStyle = "#0a3a5a"; X.fillRect(140, 500, 800, 640); X.fillStyle = "#FFD27A"; X.beginPath(); X.arc(540, 820, 8, 0, Math.PI * 2); X.fill(); lab2(X, "まわりの海は冷たいまま", 540, 1080, T(28), "#EAF2F8", 700); }
+
+// ---------------------------------------------------------------- ショットの一覧
+const snapAt = (t, a, d = 1.2) => clamp((t - a) / d);
+function ciShot(t, P) { const s = snapAt(t, CUE.l08 + 1.0, .8); seaShot(t, 0, { snap: s, glow: s > .6 && s < .9 ? .6 : 0, cam: [[V3(.8, .25, 1.6), V3(.14, .1, 1.2), 34], [V3(.35, .2, 1.4), V3(.14, .1, 1.2), 26], [V3(-.5, .3, 2.0), V3(.14, .1, 1.2), 34]][P.p] }); }
+SHOTS = [
+  { at: "l01", kind: "3d", draw: (t, u) => seaShot(t, u, { crowd: true, ringK: u, cam: [V3(0, 1.4, 4.5 - u), V3(0, .2, -1), 44] }), slam: { s: "パチン！パチン！", cols: CYAN, glow: "rgba(40,200,255,.9)", size: 120 } },
+  { at: "l02", kind: "photo", img: "shrimp", box: [80, 560, 1000, 1080], cy: .5, gray: 0, slam: { s: "テッポウエビ", size: 130, y: 330 }, slam2: { s: "体長 数センチ", cols: WHITE, off: 1.0, y: 1250, size: 80 }, credit: ["写真：FWC Fish and Wildlife Research Institute／CC BY 2.0"], creditY: 1140 },
+  { at: "l03", kind: "3d", draw: (t, u) => seaShot(t, u, { cam: [V3(.9, .4, 1.5 - .3 * u), V3(.14, .1, .4), 38] }), slam: { s: "片方だけ巨大なはさみ", size: 86, cols: GOLD, off: .5 } },
+  { at: "l04", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: snapAt(t, CUE.l04 + .2) * .5, cam: [V3(1.0, .35, 1.9), V3(.14, .1, .9), 36] }), slam: { s: "水の噴流！", cols: CYAN, glow: "rgba(40,200,255,.9)" } },
+  { at: "l05", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: .2 + snapAt(t, CUE.l05 + .6, 1.6) * .6, cam: [V3(.6, .3, 1.8), V3(.14, .1, 1.2), 30] }), slam: { s: "泡が つぶれる！", size: 110, off: .6 } },
+  { at: "l06", kind: "holo", draw: (X, t) => mechDiag(X, t, CUE.l06), slam: { s: "泡の音だった", cols: GOLD, off: 1.6 } },
+  { at: "l07", kind: "holo", draw: (X, t) => camDiag(X, t, CUE.l07), slam: { s: "高速カメラ", cols: WHITE, size: 110 } },
+  { at: "l08", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: .6, glow: .5 + .3 * Math.sin(t * 8), cam: [V3(.4, .2, 1.6), V3(.14, .1, 1.2), 26] }), slam: { s: "光った！", cols: GOLD, size: 150, off: .3 } },
+  { at: "l09", kind: "holo", draw: (X, t) => hotDiag(X, t, CUE.l09), slam: { s: "太陽の表面に近い", size: 90, off: .9, y: 300 } },
+  { at: "l10", kind: "holo", draw: (X, t) => onlyDiag(X, t, CUE.l10) },
+  { at: "l11", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: snapAt(t, CUE.l11 + .6) , fishK: u, cam: [V3(1.4, .5, 2.6), V3(.1, .15, 1.4), 38] }), slam: { s: "気絶させて 捕まえる", size: 90, cols: RED, glow: "rgba(255,40,60,1)", off: .8 } },
+  { at: "l12", kind: "3d", draw: (t, u) => seaShot(t, u, { crowd: true, ringK: u, cam: [V3(0, 2.2, 5.5 - u), V3(0, 0, -1.5), 44] }), slam: { s: "通信をじゃま", cols: CYAN, glow: "rgba(40,200,255,.9)" } },
+  { at: "l12b", kind: "3d", draw: (t, u) => seaShot(t, u, { gobyOn: true, cam: [V3(-.2, .5, 2.0 - .3 * u), V3(-.6, .15, .1), 38] }), slam: { s: "ハゼと共生", cols: LIME, glow: "rgba(90,224,74,.9)" } },
+  { at: "l13", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: .6, glow: .4, cam: [V3(.6, .4, 1.8 + 1.5 * u), V3(.14, .1, 1.0), 38] }), slam: { s: "小さな太陽", cols: GOLD, off: 1.2 } },
+];
+const _ds = drawScene; drawScene = function (t, name) { const P = ciPhase(t); if (P && P.c === "l08") { ciShot(t, P); return "3d"; } return _ds(t, name); };
+function fxEp(t, name) { if (name === "ki" && t >= CUE.l04 && t < CUE.l05) S.speedLines(bg, 540, 900, t, "rgba(200,240,255,.25)", 50, 360, 8); }
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .3, sat: 1.1, vig: .6 }], [c.hook, { cool: .35, sat: 1.3, vig: .48 }], [c.ki, { cool: .3, sat: 1.35, vig: .45 }], [c.sho, { cool: .2, sat: 1.3, vig: .45 }],
+  [c.ten, { warm: .3, sat: 1.35, glow: .3, glowX: .5, glowY: .5, vig: .45 }], [c.ketsu, { cool: .25, sat: 1.25, vig: .5 }], [c.l13, { warm: .3, sat: 1.3, glow: .3, glowX: .5, glowY: .55, vig: .45 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; seaShot(1, 0, { snap: .6, glow: .6, cam: [V3(.5, .25, 1.7), V3(.14, .1, 1.0), 30] }); S.moodGrade(bg, 0, [[0, { warm: .2, sat: 1.3, vig: .45 }]]); Cine.bloom(bg, .4); addGrain(0);
+  slam(ui, "はさみの一撃で", 540, 330, 110, 0, 9, { cols: WHITE, glow: "rgba(40,200,255,.9)", rot: -.03 }); slam(ui, "泡の中が数千度", 540, 520, 120, 0, 9, { cols: GOLD, glow: "rgba(255,120,60,.9)", rot: .02 }); slam(ui, "テッポウエビ", 540, 1420, 110, 0, 9, { cols: CYAN }); }
+kitStart(() => { buildSea(); });
+</script>
+</body></html>

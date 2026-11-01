@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_031 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_031「見えない光——クラレンス・ダリー」のレンダラー（設計「悲劇」5 回目の更新：明朝体・最初から暗く張り詰めた編集・共通エンディングなし）。土台は ext/kit。
+// 本物の写真：edison（透視装置をのぞくエジソン、1896、米国立公園局 NPGallery、パブリックドメイン）。ダリー本人の写真は権利の確かなものがないので使わない。
+// 3D：研究室・X 線管と透視装置（再現）。人物は後ろ姿・遠景（顔なし、手のアップなし）。けがは描かない。
+Object.assign(KIT, { design: "tragedy", scenes: ["open", "hook", "a", "b", "c"], images: ["edison"], ci: {}, hits: [], darkFrom: "hook",
+  opening: { img: "edison", box: [260, 640, 820, 1400], cy: .4, title: ["X線の危険を", "まだ誰も知らなかった"], credit: ["透視装置をのぞくエジソン（1896年）", "米国立公園局／パブリックドメイン"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：X 線管と透視装置（再現）
+let xtube, xglow, xlight, scope;
+function buildHero() {
+  const g = new THREE.Group(); const glass = Cine.glass({ thickness: .004, roughness: .03 });
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(.16, 32, 24), glass); bulb.scale.set(1.5, 1, 1); bulb.userData.noAO = true; g.add(bulb);
+  xglow = new THREE.Mesh(new THREE.SphereGeometry(.1, 24, 16), new THREE.MeshBasicMaterial({ color: C(0x9fd8ff), transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false })); xglow.userData.noAO = true; g.add(xglow);
+  xlight = new THREE.PointLight(C(0x9fd8ff), 0, 3, 2); g.add(xlight); const stand = cyl(.02, .02, .4, M(0x3a3a3a, { metalness: .8, roughness: .4 }), 0, -.3, 0, g);
+  g.position.set(-.6, 1.35, -1.6); ROOM_PROPS.add(g); xtube = g;
+  scope = new THREE.Group(); const wood = M(0x3a2a1c, { roughness: .6 }); Cine.surface(wood, "wood", { repeat: [1, 1], normal: .6 });
+  const s1 = new THREE.Mesh(new THREE.CylinderGeometry(.08, .2, .45, 4, 1, true), wood); s1.rotation.set(Math.PI / 2, Math.PI / 4, 0); scope.add(s1); box(.3, .3, .02, M(0x6a8a6a, { emissive: C(0x1a3a2a), roughness: .5 }), 0, 0, -.23, scope);
+  scope.position.set(.25, 1.25, -1.55); ROOM_PROPS.add(scope);
+}
+function devShot(t, u, { cam, glow = 1, who = { white: [.6, -.95] }, night = .6, exp = .95 } = {}) {
+  const g = glow * (.7 + .3 * Math.abs(Math.sin(t * 11))); xglow.material.opacity = .5 * g; xlight.intensity = 3 * g;
+  roomShot(t, { cam: cam || [V3(2.2 - .3 * u, 1.6, 2.4 - .3 * u), V3(-.1, 1.2, -1.5), 40], who, night, exp });
+}
+
+// ---------------------------------------------------------------- 2D の図
+function newsDiag(X, t, a) { panel(X); lab2(X, "1895年の終わり レントゲン", 540, 430, T(32), "#B8DFF2", 700); bigNum(X, "X線", 700, 160, "#DDE8F0"); lab2(X, "体の中が透けて見える光", 540, 940, T(36), "#EAF2F8", 800); }
+function bodyDiag(X, t, a) { panel(X); lab2(X, "透けて見える（模式）", 540, 410, T(30), "#B8DFF2", 700); X.strokeStyle = "rgba(220,235,255,.55)"; X.lineWidth = 9;
+  for (let i = 0; i < 6; i++) { X.beginPath(); X.ellipse(540, 560 + i * 90, 260 - i * 8, 60, 0, Math.PI * 1.05, Math.PI * 1.95); X.stroke(); } X.fillStyle = "rgba(220,235,255,.5)"; X.fillRect(525, 500, 30, 640); }
+function stepsDiag(X, t, a) { panel(X); lab2(X, "治らない傷（伝えられる経過）", 540, 410, T(30), "#B8DFF2", 700);
+  ["皮膚の移植", "手術を重ねる", "腕を失う"].forEach((s, i) => { const k = clamp((t - a - .3 - i * .7) / .5); X.globalAlpha = k; lab2(X, s, 540, 620 + i * 210, T(44), i === 2 ? "#E8C8C0" : "#EAF2F8", 800); if (i < 2) lab2(X, "↓", 540, 720 + i * 210, T(36), "#8FB0C8", 700); X.globalAlpha = 1; }); }
+
+// ---------------------------------------------------------------- ショットの一覧（文字は kit が明朝体の静かな文字にする）
+SHOTS = [
+  { at: "l01", kind: "holo", draw: (X, t) => newsDiag(X, t, CUE.l01), slam: { s: "1896年", size: 130, y: 260 } },
+  { at: "l01b", kind: "holo", draw: (X, t) => bodyDiag(X, t, CUE.l01b) },
+  { at: "l02", kind: "photo", img: "edison", box: [240, 380, 840, 1240], cy: .4, credit: ["透視装置をのぞくエジソン（1896年）", "米国立公園局／パブリックドメイン"], creditY: 1290 },
+  { at: "l03", kind: "3d", draw: (t, u) => devShot(t, u), slam: { s: "クラレンス・ダリー", size: 110, y: 300, sub: "エジソンの研究所の助手" } },
+  { at: "l04", kind: "3d", draw: (t, u) => devShot(t, u, { cam: [V3(.6, 1.5, -.2), V3(-.3, 1.3, -1.6), 34], glow: 1.4 }), slam: { s: "何度も", size: 130, y: 300, off: 1.2 } },
+  { at: "l05", kind: "3d", draw: (t, u) => devShot(t, u, { night: .85, exp: .85 }), slam: { s: "治らない傷", size: 120, y: 300 } },
+  { at: "l06", kind: "holo", draw: (X, t) => stepsDiag(X, t, CUE.l06) },
+  { at: "l07", kind: "photo", img: "edison", box: [240, 380, 840, 1240], cy: .35, z0: 1.15, z1: 1.3, bright: .8, slam: { s: "研究をやめた", size: 110, y: 290, sub: "とされる" } },
+  { at: "l08", kind: "3d", draw: (t, u) => devShot(t, u, { who: {}, night: 1, glow: .3, exp: .8, cam: [V3(2.6 - .5 * u, 1.7, 2.8), V3(-.1, 1.1, -1.5), 42] }), slam: { s: "1904年10月", size: 120, y: 300 } },
+  { at: "l09", kind: "holo", draw: (X, t) => { panel(X); bigNum(X, "39歳", 720, 150, "#E8DDD0"); lab2(X, "とされる", 540, 920, T(34), "#B8C7D6", 700); } },
+  { at: "l10", kind: "3d", draw: (t, u) => devShot(t, u, { who: {}, night: 1, glow: .6, exp: .8, cam: [V3(.4, 1.5, .4 - .3 * u), V3(-.6, 1.35, -1.6), 36] }) },
+  { at: "l11", kind: "holo", draw: (X, t) => { panel(X); lab2(X, "防護なしで浴び続けた人たち", 540, 620, T(36), "#EAF2F8", 800); lab2(X, "↓", 540, 760, T(40), "#8FB0C8", 700); lab2(X, "放射線の安全の考えへ", 540, 900, T(40), "#E8DDD0", 800); } },
+  { at: "l12", kind: "3d", draw: (t, u) => devShot(t, u, { who: {}, night: 1, glow: .5 * (1 - u), exp: .75 - .2 * u, cam: [V3(1.4, 1.5, 1.4 + 1.0 * u), V3(-.6, 1.3, -1.6), 40] }) },
+];
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .45, sat: .6, vig: .8 }], [c.hook, { cool: .45, sat: .6, vig: .8 }], [c.a, { cool: .5, sat: .55, vig: .82 }], [c.b, { cool: .55, sat: .48, vig: .85 }], [c.c, { cool: .62, sat: .4, vig: .88 }], [c.l12, { cool: .7, sat: .32, vig: .92 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; devShot(1, .5, { who: { white: [.6, -.95] }, night: .7 }); S.moodGrade(bg, 0, [[0, { cool: .45, sat: .6, vig: .8 }]]); Cine.bloom(bg, .3); addGrain(0); openingBG(4);
+  label(ui, "X線の危険を", 540, 360, 96, "#EAF2F8", { font: MIN, stroke: "#05080c", sw: .14 }); label(ui, "まだ誰も知らなかった", 540, 500, 84, "#FFD58A", { font: MIN, stroke: "#05080c", sw: .14 }); }
+kitStart(() => { buildRoom({ wall: 0x8a8e8a }); buildHero(); });
+</script>
+</body></html>

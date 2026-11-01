@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_036 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_036「回り続ける機械——ウィリアム・ブロック」のレンダラー（設計「悲劇」5 回目の更新：明朝体・最初から暗く張り詰めた編集・共通エンディングなし）。土台は ext/kit。
+// 権利の確かな画像が見つからなかったので、本物の画像は使わない（scripts/pilot_036/assets.md）。3D：印刷工場と輪転印刷機（ロール紙・ローラー・ベルト）は再現・模式。人物・事故の瞬間は描かない。
+Object.assign(KIT, { design: "tragedy", scenes: ["open", "hook", "a", "b", "c"], images: [], ci: {}, hits: [], darkFrom: "hook",
+  opening: { img: null, bg: t => pressShot(t, 0, { speed: 1, cam: [V3(2.6, 1.6, 2.4), V3(0, 1.0, -1.2), 42] }), title: ["自分の作った機械に", "命を奪われた発明家"], credit: ["※再現CG"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：輪転印刷機（ロール紙・ローラー・ベルトと車輪）
+let rolls = [], web, belt, wheel, speedNow = 1;
+function buildPress() {
+  const press = new THREE.Group(), iron = M(0x2a2c30, { roughness: .45, metalness: .7 }); Cine.surface(iron, "metal", { repeat: [2, 2], normal: .6 });
+  for (const x of [-.9, .9]) box(.12, 1.6, 1.4, iron, x, .8, -1.2, press);
+  const paperRoll = cyl(.38, .38, 1.6, M(0xe8e0cc, { roughness: .9 }), 0, 1.1, -.4, press, 48); paperRoll.rotation.z = Math.PI / 2; rolls.push(paperRoll);
+  for (const [y, z, r] of [[1.4, -1.0, .22], [1.0, -1.25, .22], [.6, -1.0, .2], [1.2, -1.7, .18]]) { const c = cyl(r, r, 1.7, M(0x4a4c52, { roughness: .3, metalness: .9 }), 0, y, z, press, 48); c.rotation.z = Math.PI / 2; rolls.push(c); }
+  const ptex = document.createElement("canvas"); ptex.width = 256; ptex.height = 1024; const px = ptex.getContext("2d"); px.fillStyle = "#e8e0cc"; px.fillRect(0, 0, 256, 1024); px.fillStyle = "#3a3a3a"; for (let i = 0; i < 80; i++) px.fillRect(20 + (i % 3) * 75, 10 + Math.floor(i / 3) * 38, 60, 6);
+  const tx = new THREE.CanvasTexture(ptex); tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(1, 3);
+  web = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 3.0), new THREE.MeshStandardMaterial({ map: tx, roughness: .9, side: THREE.DoubleSide })); web.rotation.x = -Math.PI / 2 + .35; web.position.set(0, 1.2, -1.2); press.add(web);
+  wheel = new THREE.Group(); const wm = M(0x3a3a3e, { roughness: .4, metalness: .8 }); const rim = new THREE.Mesh(new THREE.TorusGeometry(.45, .04, 12, 64), wm); wheel.add(rim); for (let k = 0; k < 6; k++) { const sp = box(.9, .04, .04, wm, 0, 0, 0, wheel); sp.rotation.z = k * Math.PI / 6; }
+  wheel.rotation.y = Math.PI / 2; wheel.position.set(1.15, .6, -.6); press.add(wheel);
+  const pts = []; for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2; pts.push(V3(1.18, .6 + .47 * Math.cos(a) * (Math.cos(a) > 0 ? 1 : .5) + (Math.cos(a) > 0 ? 0 : .55 * (1 + Math.cos(a))), -.6 + .47 * Math.sin(a))); }
+  belt = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 128, .02, 6, true), M(0x4a2a18, { roughness: .8 })); press.add(belt);
+  ROOM_PROPS.add(press);
+}
+function pressShot(t, u, { speed = 1, cam = [V3(2.6, 1.6, 2.4), V3(0, 1.0, -1.2), 42], night = .6, exp = .95 } = {}) {
+  rolls.forEach((r, i) => r.rotation.x = -t * 4 * speed * (i ? 1.6 : .6)); wheel.rotation.x = t * 3 * speed; web.material.map.offset.y = -t * .8 * speed;
+  roomShot(t, { cam, who: {}, night, exp, warm: .3 });
+}
+
+// ---------------------------------------------------------------- 2D の図
+function sheetDiag(X, t, a) { panel(X); lab2(X, "1枚ずつ差し込んで刷る（模式）", 540, 410, T(30), "#B8DFF2", 700);
+  for (let i = 0; i < 4; i++) { const k = clamp((t - a - i * .6) / .5); X.fillStyle = `rgba(232,224,204,${.85 * k})`; X.fillRect(260 + i * 30, 560 + i * 120, 500, 300 * .35); } }
+function webDiag(X, t, a) { panel(X); lab2(X, "巻いた長い紙に 止めずに刷る（模式）", 540, 410, T(30), "#B8DFF2", 700); X.fillStyle = "#E8E0CC"; X.beginPath(); X.arc(300, 760, 120, 0, Math.PI * 2); X.fill();
+  const off = ((t - a) * 120) % 60; X.fillRect(300, 640, 600, 60); X.fillStyle = "#3a3a3a"; for (let x = 320 - off; x < 900; x += 60) if (x > 310) X.fillRect(x, 655, 30, 30); }
+
+// ---------------------------------------------------------------- ショットの一覧（文字は kit が明朝体の静かな文字にする）
+SHOTS = [
+  { at: "l01", kind: "holo", draw: (X, t) => sheetDiag(X, t, CUE.l01), slam: { s: "19世紀のアメリカ", size: 110, y: 290 } },
+  { at: "l02", kind: "holo", draw: (X, t) => webDiag(X, t, CUE.l02), slam: { s: "ウィリアム・ブロック", size: 110, y: 290 } },
+  { at: "l03", kind: "3d", draw: (t, u) => pressShot(t, u, { cam: [V3(1.4 - .3 * u, 1.7, 1.2), V3(0, 1.1, -1.1), 38] }), slam: { s: "輪転印刷機", size: 120, y: 290, sub: "1860年代" } },
+  { at: "l04", kind: "3d", draw: (t, u) => pressShot(t, u, { cam: [V3(3.0 - .5 * u, 1.8, 3.0), V3(0, 1.0, -1.2), 44] }), slam: { s: "1867年4月", size: 120, y: 290, sub: "フィラデルフィアの新聞社" } },
+  { at: "l05", kind: "3d", draw: (t, u) => pressShot(t, u, { cam: [V3(2.2, .8, .4), V3(1.15, .7, -.6), 34], night: .8 }), slam: { s: "と伝えられる", size: 90, y: 300, off: 2.2 } },
+  { at: "l06", kind: "3d", draw: (t, u) => pressShot(t, u, { speed: 0, night: .95, exp: .8, cam: [V3(2.6, 1.6, 2.6), V3(0, 1.0, -1.2), 42] }), slam: { s: "壊疽", size: 140, y: 300 } },
+  { at: "l07", kind: "holo", draw: (X, t) => { panel(X); bigNum(X, "1867年4月12日", 720, 80, "#E8DDD0"); lab2(X, "手術の際に 亡くなったとされる", 540, 900, T(32), "#B8C7D6", 700); } },
+  { at: "l08", kind: "holo", draw: (X, t) => { panel(X); lab2(X, "事故の日付・経緯・場所は", 540, 700, T(36), "#EAF2F8", 800); lab2(X, "資料によって食い違う", 540, 820, T(40), "#E8DDD0", 900); } },
+  { at: "l09", kind: "3d", draw: (t, u) => pressShot(t, u, { speed: 1.2, night: .5, cam: [V3(.8, 2.4, 1.4), V3(0, 1.1, -1.2), 40] }) },
+  { at: "l10", kind: "holo", draw: (X, t) => webDiag(X, t, CUE.l10), slam: { s: "毎朝届く新聞", size: 100, y: 290 } },
+  { at: "l11", kind: "3d", draw: (t, u) => pressShot(t, u, { speed: 1 - u, night: .9, exp: .9 - .2 * u, cam: [V3(2.6, 1.6, 2.4 + 1.2 * u), V3(0, 1.0, -1.2), 42] }) },
+];
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .45, sat: .6, vig: .8 }], [c.hook, { cool: .45, sat: .6, vig: .8 }], [c.a, { cool: .5, sat: .55, vig: .82 }], [c.b, { cool: .55, sat: .48, vig: .85 }], [c.c, { cool: .62, sat: .42, vig: .88 }], [c.l11, { cool: .7, sat: .32, vig: .92 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; pressShot(1, 0, { cam: [V3(2.4, 1.6, 2.2), V3(0, 1.0, -1.2), 42] }); S.moodGrade(bg, 0, [[0, { cool: .45, sat: .6, vig: .8 }]]); Cine.bloom(bg, .3); addGrain(0);
+  label(ui, "自分の作った機械に", 540, 360, 88, "#EAF2F8", { font: MIN, stroke: "#05080c", sw: .14 }); label(ui, "命を奪われた発明家", 540, 500, 88, "#FFD58A", { font: MIN, stroke: "#05080c", sw: .14 }); }
+kitStart(() => { buildRoom({ wall: 0x7a7a76, table: false }); buildPress(); });
+</script>
+</body></html>

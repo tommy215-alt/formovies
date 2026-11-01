@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_034 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_034「雪の結晶を写した農夫——ウィルソン・ベントレー」のレンダラー（知的設計）。土台は ext/kit（kit.js・shots.js）。画面の構成は SHOTS。
+// 本物の写真：flakes（雪の結晶の図版、1902、パブリックドメイン）、bentley（1931 年 Snow Crystals の口絵、パブリックドメイン）。3D：雪の結晶・降る雪・撮影の部屋（再現）。
+Object.assign(KIT, { design: "intel", scenes: ["open", "hook", "ki", "sho", "ten", "ketsu"], images: ["flakes", "bentley"],
+  ci: { l03: [[.26, .7]], l05: [[-.18, 1.8]], l09: [[.22, 1.7], [0, 1.5], [-.14, .65]], l11: [[0, .4]] },
+  opening: { img: "flakes", box: [250, 640, 830, 1380], cy: .4, title: ["雪の結晶を", "写真に残した農夫"], credit: ["ウィルソン・ベントレーの写真（1902年）", "パブリックドメイン"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：雪の結晶（6 回対称の枝）・降る雪・カメラ
+let flake, flakeM, snow, snowY0, camDev;
+function buildHero() {
+  flakeM = new THREE.MeshPhysicalMaterial({ color: C(0xe8f4ff), roughness: .08, transmission: .4, thickness: .05, transparent: true, opacity: .95, emissive: C(0x2a5a8a), emissiveIntensity: .35 });
+  flake = new THREE.Group(); cyl(.09, .09, .015, flakeM, 0, 0, 0, flake, 6).rotation.x = Math.PI / 2;
+  for (let k = 0; k < 6; k++) { const arm = new THREE.Group(); box(.5, .03, .012, flakeM, .25, 0, 0, arm); for (let j = 1; j <= 3; j++) { const L = .16 - j * .03; for (const sd of [-1, 1]) { const b = box(L, .022, .01, flakeM, .1 + j * .1 + L / 2 * Math.cos(.9), sd * L / 2 * Math.sin(.9), 0, arm); b.rotation.z = sd * .9; } }
+    arm.rotation.z = k * Math.PI / 3; flake.add(arm); }
+  flake.position.y = 1.0; flake.traverse(o => { if (o.isMesh) o.userData.noAO = true; }); STAGE_HERO.add(flake);
+  const n = 1800, p = new Float32Array(n * 3), r = S.rng(34); snowY0 = new Float32Array(n); for (let i = 0; i < n; i++) { p.set([(r() - .5) * 10, r() * 6, (r() - .5) * 8], i * 3); snowY0[i] = p[i * 3 + 1]; }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3)); snow = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xf0f6ff, size: .03, transparent: true, opacity: .9, depthWrite: false })); stage.add(snow);
+  camDev = new THREE.Group(); const wood = M(0x5a3a22, { roughness: .6 }); Cine.surface(wood, "wood", { repeat: [1, 1], normal: .6 }); box(.25, .25, .25, wood, 0, 1.25, -1.5, camDev);
+  const bel = new THREE.Mesh(new THREE.CylinderGeometry(.08, .12, .45, 4, 6, true), M(0x1a1a1a, { roughness: .8, side: THREE.DoubleSide })); bel.rotation.x = Math.PI / 2; bel.position.set(0, 1.25, -1.15); camDev.add(bel);
+  cyl(.04, .05, .4, M(0xb8a060, { metalness: 1, roughness: .3 }), 0, 1.0, -.9, camDev); box(.3, .02, .3, M(0x111111), 0, .95, -.9, camDev); camDev.position.x = -.3; ROOM_PROPS.add(camDev);
+}
+function flakeShot(t, u, { cam = [V3(0, 1.0, 1.4 - .3 * u), V3(0, 1.0, 0), 38], melt = 0, storm = 1, glow = .5, exp = 1.0 } = {}) {
+  flake.visible = true; flake.rotation.z = t * .15; flake.rotation.y = Math.sin(t * .3) * .3; flake.scale.setScalar(1 - .85 * melt); flakeM.opacity = .95 * (1 - melt);
+  const p = snow.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, ((snowY0[i] - t * .5 * storm) % 6 + 6) % 6); p.needsUpdate = true; snow.visible = true;
+  STAGE_HERO.rotation.y = 0; stageShot(t, { cam, spin: 0, ring: 0x9fd8ff, keyCol: 0xe8f4ff, glow, exp });
+}
+
+// ---------------------------------------------------------------- ショットの一覧
+const ROOMB = who => ({ who, night: .2, cam: [V3(2.0, 1.5, 2.0), V3(-.3, 1.2, -1.4), 40] });
+function ciShot(t, P) { const v = [[V3(1.8, .5, 1.4), V3(.4, 1.5, -1.4), 40], [V3(.6, 1.4, -.4), V3(-.3, 1.25, -1.2), 30], [V3(2.8, 2.0, 2.6), V3(0, 1.0, -1.4), 44]][P.p];
+  roomShot(t, { cam: v, who: { stand: [.6, -.9] }, night: .9 }); }
+SHOTS = [
+  { at: "l01", kind: "3d", draw: (t, u) => flakeShot(t, u, { cam: [V3(0, 1.6, 3.4 - .6 * u), V3(0, 1.0, 0), 44] }), card: [["アメリカ バーモント州ジェリコ", T(30), 800], ["雪の深い農村", T(26), 500, "#B8C7D6"]] },
+  { at: "l02", kind: "photo", img: "bentley", box: [130, 520, 950, 1220], cy: .5, card: [["ウィルソン・ベントレー", T(34), 800]], credit: ["写真集 Snow Crystals（1931）の口絵／パブリックドメイン"], creditY: 1280 },
+  { at: "l03", kind: "3d", draw: (t, u) => flakeShot(t, u, { melt: clamp((u - .3) / .7) }), card: [["結晶は すぐに溶ける", T(32), 800]] },
+  { at: "l04", kind: "3d", draw: (t, u) => roomShot(t, { ...ROOMB({ stand: [.5, -.8] }), cam: [V3(1.4 - .3 * u, 1.5, 1.6), V3(-.3, 1.15, -1.3), 38] }), card: [["顕微鏡に カメラをつなぐ", T(32), 800], ["（再現）", T(22), 500, "#B8C7D6"]] },
+  { at: "l05", kind: "3d", draw: (t, u) => flakeShot(t, u, { glow: 1.2, cam: [V3(.1, 1.0, 1.0 - .2 * u), V3(0, 1.0, 0), 36] }), card: [["1885年 19歳", T(34), 800], ["雪の結晶の写真に成功", T(26), 500, "#B8C7D6"]] },
+  { at: "l06", kind: "3d", draw: (t, u) => roomShot(t, { who: { stand: [.5, -.8] }, night: .35, cam: [V3(-1.2, 1.6, 1.6), V3(-3.0, 1.8, -.8), 42] }), card: [["羽根で運び", T(30), 800], ["寒い外で撮る", T(26), 500, "#B8C7D6"]] },
+  { at: "l06b", kind: "holo", draw: (X, t) => { panel(X); lab2(X, "1枚の撮影に", 540, 520, T(34), "#B8DFF2", 800); bigNum(X, "約1分半", 760, 120, "#DDEEFF"); const k = clamp((t - CUE.l06b) / 3); X.strokeStyle = "#9fd8ff"; X.lineWidth = 10; X.beginPath(); X.arc(540, 1020, 90, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); X.stroke(); } },
+  { at: "l07", kind: "photo", img: "flakes", box: [230, 380, 850, 1180], cy: .4, card: [["1903年", T(34), 800], ["500枚をスミソニアンへ", T(26), 500, "#B8C7D6"]], credit: ["Wilson Bentley（1902）／パブリックドメイン"], creditY: 1240 },
+  { at: "l08", kind: "holo", draw: (X, t) => { panel(X); const k = clamp((t - CUE.l08) / 2); for (let i = 0; i < Math.floor(160 * k); i++) { const x = 180 + (i % 16) * 46, y = 480 + Math.floor(i / 16) * 52; X.strokeStyle = "rgba(220,240,255,.8)"; X.lineWidth = 2; X.beginPath(); for (let j = 0; j < 6; j++) { const a = j * Math.PI / 3; X.moveTo(x, y); X.lineTo(x + 14 * Math.cos(a), y + 14 * Math.sin(a)); } X.stroke(); } bigNum(X, "5000枚超", 1080, 90, "#FFE2A8"); } },
+  { at: "l09", kind: "3d", draw: (t, u) => roomShot(t, { cam: [V3(2.2, 1.6, 2.4), V3(-.2, 1.2, -1.4), 40], who: { sit: [.6, -1.0] }, night: .7 }), card: [["1931年", T(34), 800], ["写真集 Snow Crystals", T(28), 600, "#B8C7D6"]] },
+  { at: "l10", kind: "3d", draw: (t, u) => flakeShot(t, u, { storm: 4, glow: .1, exp: .8, cam: [V3(0, 1.8, 4.5), V3(0, 1.2, 0), 46] }), card: [["1931年12月", T(34), 800], ["吹雪のあと 肺炎で亡くなる", T(26), 500, "#B8C7D6"]] },
+  { at: "l11", kind: "3d", draw: (t, u) => flakeShot(t, u, { glow: .8, cam: [V3(0, 1.0, .9 + .8 * u), V3(0, 1.0, 0), 38] }) },
+  { at: "l11b", kind: "photo", img: "flakes", box: [230, 380, 850, 1180], cy: .5, z0: 1.15, z1: 1.35, card: [["スミソニアンの写真の一部は", T(28), 800], ["CC0（誰でも自由に使える）", T(26), 600, "#9AF0D0"]] },
+  { at: "l12", kind: "3d", draw: (t, u) => flakeShot(t, u, { melt: clamp((u - .5) / .5) * .6, glow: .6, cam: [V3(0, 1.1, 1.2 + 1.5 * u), V3(0, 1.0, 0), 40] }) },
+];
+const _ds = drawScene; drawScene = function (t, name) { const P = ciPhase(t); if (P && P.c === "l09") { ciShot(t, P); return "3d"; } return _ds(t, name); };
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .35, sat: .9, vig: .6 }], [c.hook, { cool: .4, sat: .9, vig: .58 }], [c.ki, { cool: .35, sat: .95, vig: .58 }], [c.sho, { cool: .3, sat: 1.0, glow: .2, glowX: .5, glowY: .45, vig: .55 }],
+  [c.ten, { cool: .5, sat: .7, vig: .7 }], [c.ketsu, { cool: .3, warm: .05, sat: .95, vig: .58 }], [c.l12, { cool: .35, sat: .9, glow: .25, glowX: .5, glowY: .45, vig: .58 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; flakeShot(2, .5, { glow: 1.0, cam: [V3(0, 1.0, 1.1), V3(0, 1.0, 0), 38] }); S.moodGrade(bg, 0, [[0, { cool: .35, sat: 1.0, vig: .55 }]]); Cine.bloom(bg, .35); addGrain(0);
+  HUD.title(ui, [["雪の結晶を", 90, "#EAF2F8"], ["写真に残した農夫", 108, "#FFD58A"]], 540, 420, 1, 9); }
+kitStart(() => { buildRoom({}); buildStage({ floor: 0x0a0e16 }); buildHero(); });
+</script>
+</body></html>

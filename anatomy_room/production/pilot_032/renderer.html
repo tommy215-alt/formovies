@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_032 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_032「踊りで地図を伝える——カール・フォン・フリッシュ」のレンダラー（知的設計）。土台は ext/kit（kit.js・shots.js）。画面の構成は SHOTS。
+// 本物の画像：frisch（Atelier Veritas 1926 年ごろ、パブリックドメイン）、dance（8 の字ダンスの図、DBCLS TogoTV 2022、CC BY 4.0）。3D：巣板とミツバチ・えさ場（再現・模式）。
+Object.assign(KIT, { design: "intel", scenes: ["open", "hook", "ki", "sho", "ten", "ketsu"], images: ["frisch", "dance"],
+  ci: { l03: [[.26, .7]], l07: [[-.18, 1.8]], l09: [[.22, 1.7], [0, 1.5], [-.14, .65]], l11: [[0, .4]] },
+  opening: { img: "frisch", box: [300, 640, 780, 1400], cy: .35, title: ["ミツバチは", "踊りで地図を伝えている"], credit: ["カール・フォン・フリッシュ（1926年ごろ）", "パブリックドメイン"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：巣板（六角形）とミツバチ、えさ場
+const comb = set("comb"); let bees = [], dancer, feeder;
+function makeBee(s = 1) { const g = new THREE.Group(), y = M(0xd8a020, { roughness: .5 }), k = M(0x1a1410, { roughness: .6 });
+  const ab = sph(.06, y, 0, 0, -.07, g, 20); ab.scale.set(1, .85, 1.5); for (let i = 0; i < 3; i++) { const st = new THREE.Mesh(new THREE.TorusGeometry(.055 - i * .006, .012, 8, 24), k); st.position.z = -.05 - i * .035; g.add(st); }
+  const th = sph(.045, M(0x6a4a20, { roughness: .9 }), 0, 0, .03, g, 16); sph(.035, k, 0, 0, .09, g, 16);
+  const wm = new THREE.MeshStandardMaterial({ color: C(0xe8f0ff), transparent: true, opacity: .45, roughness: .2, side: THREE.DoubleSide }); for (const sd of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(.1, .05), wm); w.position.set(sd * .06, .04, .01); w.rotation.x = -Math.PI / 2; w.userData.noAO = true; g.add(w); g.userData["w" + sd] = w; }
+  g.scale.setScalar(s); return g; }
+function buildComb() {
+  const wax = new THREE.MeshStandardMaterial({ color: C(0xc89a40), roughness: .45, emissive: C(0x2a1a04), emissiveIntensity: .3 }); Cine.surface(wax, "porcelain", { repeat: [2, 2], normal: .3 });
+  const hex = new THREE.CylinderGeometry(.09, .09, .12, 6, 1, true), cap = new THREE.CylinderGeometry(.088, .088, .01, 6), n = 26 * 30, I = new THREE.InstancedMesh(hex, wax, n), B = new THREE.InstancedMesh(cap, M(0x8a6420, { roughness: .6 }), n), m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, Math.PI / 6));
+  let k = 0; for (let i = 0; i < 26; i++) for (let j = 0; j < 30; j++) { const x = (i - 13) * .156, y = (j - 15) * .18 + (i % 2) * .09; m4.compose(V3(x, y + 1.4, 0), q, V3(1, 1, 1)); I.setMatrixAt(k, m4); m4.compose(V3(x, y + 1.4, -.05), q, V3(1, 1, 1)); B.setMatrixAt(k, m4); k++; }
+  I.receiveShadow = true; comb.add(I, B);
+  for (let i = 0; i < 26; i++) { const b = makeBee(1.2), r = S.rng(i + 3); b.position.set((r() - .5) * 2.4, 1.4 + (r() - .5) * 3, .12); b.rotation.set(Math.PI / 2, 0, r() * 6.28); b.rotation.order = "ZXY"; comb.add(b); bees.push(b); }
+  dancer = makeBee(1.6); dancer.position.set(0, 1.4, .14); comb.add(dancer);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), M(0x1a2a14, { roughness: 1 })); fl.rotation.x = -Math.PI / 2; fl.position.y = -1.5; comb.add(fl);
+  feeder = new THREE.Group(); cyl(.3, .25, .05, M(0x2a5ab8, { roughness: .4 }), 0, 0, 0, feeder, 32); cyl(.03, .03, 1.2, M(0x5a4a3a), 0, -.6, 0, feeder); feeder.position.set(0, -.3, 1.6); feeder.visible = false; comb.add(feeder);
+}
+function danceAt(t) { const p = (t * .45) % 1, a = p * Math.PI * 2; if (p < .25) return { x: 0, y: -.3 + p / .25 * .6, ang: 0, waggle: 1 }; const s = p < .625 ? 1 : -1, q = (p < .625 ? (p - .25) / .375 : (p - .625) / .375) * Math.PI;
+  return { x: s * .2 * Math.sin(q), y: .3 - .6 * (q / Math.PI), ang: s * (Math.PI / 2 + q), waggle: 0 }; }
+function combShot(t, u, { cam = [V3(.2, 1.4, 2.2 - .3 * u), V3(0, 1.4, 0), 40], warm = 0, feed = false, glow = 0, exp = 1.0 } = {}) {
+  show("comb"); scene.environment = ENV_ROOM; feeder.visible = feed;
+  bees.forEach((b, i) => { b.rotation.z += 0; const r = S.rng(i + 3); b.position.x += Math.sin(t * 1.3 + i) * .0015; b.rotation.z = r() * 6.28 + Math.sin(t * .8 + i) * .4; b.userData["w1"].rotation.z = Math.sin(t * 60 + i) * .5; });
+  const d = danceAt(t); dancer.position.set(d.x, 1.4 + d.y, .16); dancer.rotation.set(Math.PI / 2, 0, d.ang + (d.waggle ? Math.sin(t * 40) * .35 : 0)); dancer.rotation.order = "ZXY";
+  lights({ keyPos: [1.2, 3, 3], keyAt: [0, 1.4, 0], keyI: 18 + 8 * warm, angle: .6, keyCol: lerpHex(0xffe8c0, 0xffc870, warm), rimPos: [-2, 2, 2], rimI: .6 + glow, rimCol: 0xffd27a, hemiI: .15, fog: .04, fogC: 0x0a0804, exp });
+  setCam(cam[0], cam[1], cam[2], .02, 60); draw3D({ ao: true, dof: { focus: cam[0].distanceTo(cam[1]), aperture: .006, maxblur: .01 } });
+}
+
+// ---------------------------------------------------------------- 2D の図
+function sunDiag(X, t, a) {   // 巣の真上＝太陽の方向。踊りの角度＝太陽から見たえさ場の角度（模式）
+  panel(X); lab2(X, "向きの伝え方（模式）", 540, 410, T(30), "#B8DFF2", 800); const th = .6, k = clamp((t - a - .3) / .6);
+  X.fillStyle = "rgba(200,150,60,.25)"; X.fillRect(170, 520, 330, 520); lab2(X, "巣の中", 335, 1080, T(24), "#B8C7D6", 700);
+  arrow(X, 335, 900, 335, 600, "#FFE2A8", 5); lab2(X, "真上", 335, 570, T(22), "#FFE2A8", 700); arrow(X, 335, 900, 335 + 260 * Math.sin(th) * k, 900 - 260 * Math.cos(th) * k, "#9AF0D0", 7);
+  X.fillStyle = "#FFD27A"; X.beginPath(); X.arc(745, 560, 34, 0, Math.PI * 2); X.fill(); lab2(X, "太陽", 745, 630, T(22), "#FFE2A8", 700);
+  arrow(X, 745, 900, 745, 620, "rgba(255,226,168,.6)", 4); arrow(X, 745, 900, 745 + 260 * Math.sin(th) * k, 900 - 260 * Math.cos(th) * k, "#9AF0D0", 7); X.fillStyle = "#FF8AC8"; if (k > .9) { X.beginPath(); X.arc(745 + 270 * Math.sin(th), 900 - 270 * Math.cos(th), 20, 0, Math.PI * 2); X.fill(); }
+  lab2(X, "外", 745, 1080, T(24), "#B8C7D6", 700); lab2(X, "同じ角度", 540, 1180, T(32), "#9AF0D0", 900);
+}
+function distDiag(X, t, a) { panel(X); lab2(X, "距離の伝え方（模式）", 540, 410, T(30), "#B8DFF2", 800);
+  [["近い", .3], ["遠い", .9]].forEach(([s, v], i) => { const y = 650 + i * 300, k = easeOut(clamp((t - a - .2 - i * .5) / .7)); lab2(X, s, 230, y, T(34), "#EAF2F8", 800); X.fillStyle = i ? "#FFE2A8" : "#9AF0D0"; X.fillRect(330, y - 30, 560 * v * k, 60); });
+  lab2(X, "体を振って進む時間", 540, 1180, T(30), "#B8C7D6", 700); }
+function roundDiag(X, t, a) { panel(X); lab2(X, "近いときは 円を描く踊り（模式）", 540, 410, T(30), "#B8DFF2", 800); const k = clamp((t - a) / 1.5);
+  X.strokeStyle = "#9AF0D0"; X.lineWidth = 8; X.beginPath(); X.arc(540, 800, 220, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); X.stroke(); }
+function colorDiag(X, t, a) { panel(X); lab2(X, "ミツバチに見える色（模式）", 540, 410, T(30), "#B8DFF2", 800);
+  const cols = ["#8a4aff", "#3a6aff", "#3ac8a0", "#e8d83a", "#ff8a3a", "#e8303a"]; cols.forEach((c, i) => { X.fillStyle = c; X.fillRect(170 + i * 125, 640, 115, 220); });
+  X.fillStyle = "rgba(200,170,255,.5)"; X.fillRect(60, 640, 100, 220); lab2(X, "紫外線", 110, 920, T(22), "#D8C8FF", 800);
+  const k = clamp((t - a - .4) / .4); X.globalAlpha = k; X.fillStyle = "rgba(0,0,0,.7)"; X.fillRect(795, 640, 115, 220); lab2(X, "赤は同じには見えない", 760, 980, T(24), "#FF9A8A", 800); lab2(X, "紫外線は見える", 300, 980, T(24), "#D8C8FF", 800); X.globalAlpha = 1; }
+function radarDiag(X, t, a) { panel(X); lab2(X, "レーダーで追った飛び方（模式）", 540, 410, T(30), "#B8DFF2", 800); const k = clamp((t - a - .2) / 1.6);
+  X.fillStyle = "#c89a40"; X.fillRect(220, 1040, 80, 80); lab2(X, "巣", 260, 1160, T(24), "#B8C7D6", 700); X.fillStyle = "#FF8AC8"; X.beginPath(); X.arc(820, 600, 30, 0, Math.PI * 2); X.fill(); lab2(X, "えさ場", 820, 540, T(24), "#B8C7D6", 700);
+  X.setLineDash([12, 12]); X.strokeStyle = "#9AF0D0"; X.lineWidth = 5; X.beginPath(); X.moveTo(260, 1040); X.lineTo(lerp(260, 820, k), lerp(1040, 600, k)); X.stroke(); X.setLineDash([]); }
+
+// ---------------------------------------------------------------- ショットの一覧
+function ciShot(t, P) { const v = [[V3(1.8, .5, 1.4), V3(.4, 1.5, -1.4), 40], [V3(.9, 1.6, -.2), V3(.6, 1.4, -.9), 30], [V3(2.8, 2.0, 2.6), V3(0, 1.0, -1.4), 44]][P.p];
+  roomShot(t, { cam: v, who: { sit: [.6, -1.0] }, night: .8 }); }
+SHOTS = [
+  { at: "l01", kind: "3d", draw: (t, u) => combShot(t, u, { cam: [V3(.5, 1.6, 2.8 - .5 * u), V3(0, 1.4, 0), 42] }), card: [["巣の中の踊り", T(34), 800], ["（再現）", T(22), 500, "#B8C7D6"]] },
+  { at: "l02", kind: "photo", img: "frisch", box: [300, 380, 780, 1180], cy: .35, card: [["カール・フォン・フリッシュ", T(32), 800], ["オーストリアの動物学者", T(26), 500, "#B8C7D6"]], credit: ["Atelier Veritas（1926年ごろ）／パブリックドメイン"], creditY: 1240 },
+  { at: "l03", kind: "3d", draw: (t, u) => combShot(t, u, { cam: [V3(.1, 1.45, .9 - .1 * u), V3(0, 1.4, 0), 40] }), card: [["8の字ダンス", T(36), 800]] },
+  { at: "l04", kind: "holo", draw: (X, t) => sunDiag(X, t, CUE.l04), note: "※模式図" },
+  { at: "l05", kind: "holo", draw: (X, t) => distDiag(X, t, CUE.l05) },
+  { at: "l06", kind: "holo", draw: (X, t) => roundDiag(X, t, CUE.l06) },
+  { at: "l07", kind: "3d", draw: (t, u) => combShot(t, u, { feed: true, cam: [V3(1.4, .3, 3.6 - .4 * u), V3(0, .2, 1.2), 42] }), card: [["えさ場を動かして", T(32), 800], ["どこへ飛ぶかを確かめる（再現）", T(24), 500, "#B8C7D6"]] },
+  { at: "l08", kind: "holo", draw: (X, t) => colorDiag(X, t, CUE.l08), card: [["1910年代", T(32), 800], ["色を見分けることを示す", T(26), 500, "#B8C7D6"]] },
+  { at: "l09", kind: "3d", draw: (t, u) => roomShot(t, { cam: [V3(2.0, 1.5, 2.2), V3(.2, 1.1, -1.4), 40], who: { sit: [.6, -1.0] }, night: .8 }), card: [["第二次世界大戦中", T(32), 800], ["職を失いかける", T(26), 500, "#B8C7D6"]] },
+  { at: "l10", kind: "3d", draw: (t, u) => combShot(t, u, { cam: [V3(-.6, 1.2, 1.8), V3(0, 1.3, 0), 40], exp: .85 }), card: [["ミツバチの病気（ノゼマ病）", T(30), 800], ["その研究が必要とされた", T(26), 500, "#B8C7D6"]] },
+  { at: "l11", kind: "3d", draw: (t, u) => combShot(t, u, { warm: 1, glow: 1, cam: [V3(0, 1.4, 1.2 + 1.6 * u), V3(0, 1.4, 0), 42] }), card: [["1973年", T(34), 800], ["ノーベル生理学・医学賞", T(28), 600, "#FFE2A8"]] },
+  { at: "l12", kind: "holo", draw: (X, t) => radarDiag(X, t, CUE.l12), card: [["2005年", T(34), 800], ["レーダーでハチを追う", T(26), 500, "#B8C7D6"]], note: "※模式図" },
+  { at: "l13", kind: "photo", img: "dance", box: [160, 400, 920, 1160], cy: .5, gray: 0, bright: 1.0, credit: ["図：DBCLS TogoTV（2022）／CC BY 4.0"], creditY: 1220 },
+];
+const _ds = drawScene; drawScene = function (t, name) { const P = ciPhase(t); if (P && P.c === "l09") { ciShot(t, P); return "3d"; } return _ds(t, name); };
+function buildMood() { const c = CUE; MOOD = [[0, { warm: .1, sat: .95, vig: .6 }], [c.hook, { warm: .3, sat: 1.05, vig: .55 }], [c.ki, { warm: .25, sat: 1.0, vig: .55 }], [c.sho, { warm: .15, sat: 1.0, vig: .55 }],
+  [c.ten, { cool: .35, sat: .75, vig: .68 }], [c.ketsu, { warm: .35, sat: 1.1, glow: .3, glowX: .5, glowY: .45, vig: .5 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; combShot(2, .5, { cam: [V3(.1, 1.45, 1.0), V3(0, 1.4, 0), 40], warm: .6 }); S.moodGrade(bg, 0, [[0, { warm: .3, sat: 1.1, vig: .5 }]]); Cine.bloom(bg, .3); addGrain(0);
+  HUD.title(ui, [["ミツバチは", 90, "#EAF2F8"], ["踊りで地図を伝える", 104, "#FFD58A"]], 540, 420, 1, 9); }
+kitStart(() => { buildRoom({}); buildComb(); });
+</script>
+</body></html>

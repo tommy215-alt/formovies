@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_035 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_035「高度31キロから飛び降りた男——ジョー・キッティンジャー」のレンダラー（ドパ設計、閃光なし）。土台は ext/kit（kit.js・shots.js）。画面の構成は SHOTS。
+// 本物の写真：gondola（ゴンドラのキッティンジャー、米空軍）、after（降下のあと、NASA／米空軍）。どちらもパブリックドメイン。降下の瞬間の有名な写真は撮影者の権利が不明なので使わない。
+// 3D：高い空・地球の丸み・気球と開いたゴンドラ・与圧服の人体（後ろ姿・遠景、顔なし）（再現）。
+Object.assign(KIT, { design: "dopa", scenes: ["open", "hook", "ki", "sho", "ten", "ketsu"], images: ["gondola", "after"],
+  ci: { l04: [[.28, .65]], l06: [[-.22, 1.9]], l09: [[.25, 1.8], [-.1, 1.6], [.16, .6]], l11: [[0, .38]] },
+  hits: [["hook", 1.2], ["l02", .8], ["l03", .8], ["l03b", .8], ["l05", 1.0], ["l07", 1.4], ["l08", .8], ["l08b", .8], ["l10", .8], ["l12", 1.0], ["l13", .8]],
+  opening: { img: "gondola", box: [250, 640, 830, 1380], cy: .4, gray: 0, title: ["高度31キロから", "飛び降りた男"], credit: ["写真：米空軍／パブリックドメイン"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：高い空（地球の丸み）・気球・ゴンドラ・降下する人
+const sky = set("sky"); let earthB, haze, envB, gond, diver, drogue, diverY = 0;
+function buildSky() {
+  earthB = new THREE.Mesh(new THREE.SphereGeometry(400, 96, 64), new THREE.MeshStandardMaterial({ color: C(0x3a6a9a), roughness: .9, emissive: C(0x0a1a2a) })); earthB.position.y = -431; sky.add(earthB);
+  haze = new THREE.Mesh(new THREE.SphereGeometry(406, 96, 64), new THREE.MeshBasicMaterial({ color: C(0x9ad0ff), transparent: true, opacity: .25, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false })); haze.position.y = -431; haze.userData.noAO = true; sky.add(haze);
+  const r = S.rng(5), n = 1500, sp = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const a = r() * Math.PI * 2, b = r() * 1.2, d = 300; sp.set([d * Math.sin(b) * Math.cos(a), d * Math.cos(b), d * Math.sin(b) * Math.sin(a)], i * 3); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(sp, 3)); sky.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xdfe8ff, size: .8 })));
+  envB = new THREE.Mesh(new THREE.SphereGeometry(3, 48, 32), M(0xe8e8e0, { roughness: .5 })); envB.scale.set(1, 1.5, 1); envB.position.y = 9; sky.add(envB);
+  gond = new THREE.Group(); const gm = M(0xc8ccd2, { metalness: .6, roughness: .4 }); box(1.2, .08, 1.2, gm, 0, 0, 0, gond); for (const [x, z] of [[-.6, -.6], [.6, -.6], [-.6, .6], [.6, .6]]) cyl(.02, .02, 1.3, gm, x, .65, z, gond); box(1.2, .05, 1.2, gm, 0, 1.3, 0, gond);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; sky.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(Math.cos(a) * .6, 1.3, Math.sin(a) * .6), V3(Math.cos(a) * 2.2, 5, Math.sin(a) * 2.2)]), new THREE.LineBasicMaterial({ color: 0x8a8a8a }))); }
+  sky.add(gond);
+  diver = new THREE.Group(); const suit = human("man_stand", { coat: 0x8a8f80, hair: 0x2a2a2a }); suit.scale.setScalar(.95); diver.add(suit); sph(.17, M(0xd8d8d0, { roughness: .3, metalness: .3 }), 0, 1.62, 0, diver, 24);
+  drogue = new THREE.Mesh(new THREE.ConeGeometry(.35, .5, 24, 1, true), M(0xe86a2a, { roughness: .7, side: THREE.DoubleSide })); drogue.position.y = 3.2; drogue.rotation.x = Math.PI; diver.add(drogue);
+  diver.position.set(.2, .08, .1); diver.rotation.y = Math.PI; sky.add(diver);
+}
+// mode："gond"（ゴンドラに立つ）・"fall"（落ちる）・"spin"（きりもみ）
+function skyShot(t, u, { mode = "gond", cam, chute = false, exp = 1.0 } = {}) {
+  show("sky"); scene.environment = null; drogue.visible = chute;
+  if (mode === "gond") { diver.position.set(.2, .08, .1); diver.rotation.set(0, Math.PI, 0); gond.visible = true; }
+  else { gond.visible = mode === "fall" && u < .3; const y = mode === "fall" ? -6 * u * u : -2; diver.position.set(.2, y, .1); diver.rotation.set(mode === "spin" ? 1.2 : .3 + .3 * Math.sin(t), mode === "spin" ? t * 9 : Math.PI, mode === "spin" ? .4 : 0); }
+  lights({ keyPos: [20, 15, 10], keyAt: [0, 0, 0], keyI: 40, angle: .3, keyCol: 0xfff8f0, rimPos: [-10, -5, -10], rimI: .8, rimCol: 0x9ad0ff, hemiI: .25, hemiSky: 0x0a0a20, hemiGround: 0x3a6a9a, fog: 0, fogC: 0x000005, exp });
+  const c = cam || [V3(3.5 - u, 1.5, 4.5), V3(0, .8, 0), 40]; if (mode !== "gond") { c[1] = V3(diver.position.x, diver.position.y + .8, diver.position.z); }
+  setCam(c[0], c[1], c[2], .05, 1200); draw3D({ ao: false });
+}
+
+// ---------------------------------------------------------------- 2D の図
+function gloveDiag(X, t, a) { panel(X); lab2(X, "右手の手袋の加圧が壊れた", 540, 410, T(30), "#B8DFF2", 800); const k = easeOut(clamp((t - a - .3) / 1.2)), s = 1 + .5 * k;
+  X.save(); X.translate(540, 800); X.scale(s, s); X.fillStyle = "#8a8f80"; X.beginPath(); X.ellipse(0, 40, 110, 130, 0, 0, Math.PI * 2); X.fill(); for (let i = 0; i < 4; i++) { X.beginPath(); X.ellipse(-75 + i * 50, -110, 22, 60, 0, 0, Math.PI * 2); X.fill(); } X.restore();
+  if (k > .6) lab2(X, "腫れ上がる", 540, 1160, T(40), "#FF9A8A", 900); }
+function speedDiag(X, t, a) { panel(X); lab2(X, "自由落下", 540, 410, T(32), "#B8DFF2", 800); const k = easeOut(clamp((t - a - .2) / 1.5)); bigNum(X, `時速 ${Math.round(988 * k)}km`, 700, 90, "#FFE2A8"); lab2(X, "（614 mph、米空軍博物館）", 540, 820, T(24), "#8FB0C8", 600); bigNum(X, "4分半以上", 1020, 80, "#EAF2F8"); }
+
+// ---------------------------------------------------------------- ショットの一覧
+function ciShot(t, P) { const u = clamp((t - CUE.l09) / 1.5); skyShot(t, u, { mode: "spin", cam: [[V3(1.5, -1.0, 2.5), V3(0, -1.2, 0), 40], [V3(.6, -1.3, 1.2), V3(0, -1.2, 0), 30], [V3(-3, 0, 5), V3(0, -1.6, 0), 44]][P.p] }); }
+SHOTS = [
+  { at: "l01", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(6 - 2 * u, 3, 10 - 3 * u), V3(0, 3, 0), 44] }), slam: { s: "1960.8.16", size: 140 }, slam2: { s: "10万2800フィート", off: 1.0, cols: CYAN, glow: "rgba(40,200,255,.9)", size: 96 } },
+  { at: "l02", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(.5, 1.8, .3), V3(6, -30, -40), 60] }), slam: { s: "約31km", size: 150 } },
+  { at: "l03", kind: "photo", img: "gondola", box: [180, 380, 900, 1260], cy: .4, gray: 0, slam: { s: "ジョー・キッティンジャー", size: 80, y: 300 }, credit: ["写真：米空軍／パブリックドメイン"], creditY: 1300 },
+  { at: "l03b", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(2.2 - .4 * u, 1.2, 2.6), V3(0, .9, 0), 40] }), slam: { s: "屋根も壁もない", cols: WHITE, size: 100 } },
+  { at: "l04", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(-1.4, 1.4, 1.6), V3(.2, 1.2, 0), 36] }), slam: { s: "手袋が壊れた！", cols: RED, glow: "rgba(255,40,60,1)", off: .5 } },
+  { at: "l05", kind: "holo", draw: (X, t) => gloveDiag(X, t, CUE.l05), slam: { s: "それでも続けた", cols: GOLD, off: 1.6 } },
+  { at: "l06", kind: "3d", draw: (t, u) => skyShot(t, clamp(u * 1.2), { mode: "fall", cam: [V3(3, 2, 4), V3(0, 0, 0), 44] }), slam: { s: "飛び降りる！", size: 140, cols: RED, glow: "rgba(255,40,60,1)", off: .3 } },
+  { at: "l07", kind: "holo", draw: (X, t) => speedDiag(X, t, CUE.l07) },
+  { at: "l08", kind: "3d", draw: (t, u) => skyShot(t, .6, { mode: "fall", chute: true, cam: [V3(2.5, 1, 3), V3(0, -2, 0), 40] }), slam: { s: "小さなパラシュート", size: 90, cols: GOLD } },
+  { at: "l08b", kind: "holo", draw: (X, t) => { panel(X); lab2(X, "地上に降りるまで", 540, 560, T(34), "#B8DFF2", 800); bigNum(X, "約14分", 800, 140, "#FFE2A8"); } },
+  { at: "l09", kind: "3d", draw: (t, u) => skyShot(t, u, { mode: "spin", cam: [V3(-3, 0, 5), V3(0, -1.6, 0), 44] }), slam: { s: "前年：きりもみで気絶", size: 84, cols: RED, glow: "rgba(255,40,60,1)" } },
+  { at: "l10", kind: "holo", draw: (X, t) => { panel(X); lab2(X, "命がけの試験", 540, 560, T(40), "#EAF2F8", 900); lab2(X, "↓", 540, 700, T(40), "#8FB0C8", 700); lab2(X, "高い空から脱出する装備を確かめる", 540, 840, T(32), "#9AF0D0", 800); } },
+  { at: "l11", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(4, 2, 7 + 6 * u), V3(0, 3, 0), 44] }), slam: { s: "52年間 破られず", size: 110 } },
+  { at: "l12", kind: "photo", img: "after", box: [160, 380, 920, 1200], cy: .45, slam: { s: "2012年", size: 120, y: 290 }, slam2: { s: "84歳で 地上から声を", off: 1.2, cols: CYAN, glow: "rgba(40,200,255,.9)", size: 84, y: 1330 }, credit: ["写真：NASA／米空軍（1960）／パブリックドメイン"], creditY: 1250 },
+  { at: "l13", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(.5, -6, 6), V3(0, 6, 0), 50] }), slam: { s: "地上から見守った", cols: GOLD, off: 1.0, size: 96 } },
+];
+const _ds = drawScene; drawScene = function (t, name) { const P = ciPhase(t); if (P && P.c === "l09") { ciShot(t, P); return "3d"; } return _ds(t, name); };
+function fxEp(t, name) { if (name === "sho" && t < CUE.l07) S.speedLines(bg, 540, 900, t, "rgba(220,240,255,.3)", 60, 320, 10); }
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .3, sat: 1.1, vig: .6 }], [c.hook, { cool: .35, sat: 1.25, vig: .5 }], [c.ki, { cool: .25, sat: 1.2, vig: .52 }], [c.sho, { cool: .2, sat: 1.35, vig: .45 }],
+  [c.ten, { cool: .4, sat: 1.0, vig: .6 }], [c.ketsu, { warm: .2, sat: 1.25, glow: .25, glowX: .5, glowY: .4, vig: .48 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; skyShot(1, 0, { cam: [V3(4, 2.5, 8), V3(0, 2.5, 0), 44] }); S.moodGrade(bg, 0, [[0, { cool: .3, sat: 1.3, vig: .48 }]]); Cine.bloom(bg, .34); addGrain(0);
+  slam(ui, "高度31キロから", 540, 330, 110, 0, 9, { cols: WHITE, glow: "rgba(40,200,255,.9)", rot: -.03 }); slam(ui, "飛び降りた男", 540, 520, 130, 0, 9, { cols: GOLD, glow: "rgba(255,120,60,.9)", rot: .02 }); slam(ui, "1960年", 540, 1420, 110, 0, 9, { cols: CYAN }); }
+kitStart(() => { buildSky(); });
+</script>
+</body></html>

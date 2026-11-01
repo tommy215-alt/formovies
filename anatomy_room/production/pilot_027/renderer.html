@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_027 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_027「計算できる馬の正体——賢馬ハンス」のレンダラー（知的設計）。制作の土台は ext/kit（kit.js・shots.js）。画面の構成は SHOTS。
+// 本物の写真：hans・test1907（Karl Krall『Denkende Tiere』1912）、osten（1908 年ごろ）。すべてパブリックドメイン。3D：黒板とひづめ・研究室・AI のネットワーク（再現・模式）。
+Object.assign(KIT, { design: "intel", scenes: ["open", "hook", "ki", "sho", "ten", "ketsu"], images: ["hans", "osten", "test1907"],
+  ci: { l03: [[.26, .7]], l05: [[-.18, 1.8]], l08: [[.22, 1.7], [0, 1.5], [-.14, .65]], l11: [[0, .4]] },
+  opening: { img: "osten", box: [130, 700, 950, 1190], cy: .5, title: ["計算できる馬の正体は", "人間の方にあった"], credit: ["フォン・オステンとハンス（1908年ごろ）", "パブリックドメイン"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：黒板とひづめ（数を打つ）・AI のネットワーク
+const boardC = document.createElement("canvas"); boardC.width = 1024; boardC.height = 640; const boardX = boardC.getContext("2d"); const boardTex = new THREE.CanvasTexture(boardC); boardTex.encoding = THREE.sRGBEncoding;
+let hoof, board, net;
+function buildHero() {
+  board = new THREE.Group(); const fr = M(0x5a3a22, { roughness: .6 }); Cine.surface(fr, "wood", { repeat: [2, 1], normal: .6 });
+  box(2.2, 1.4, .06, fr, 0, 1.25, -.4, board); const face = new THREE.Mesh(new THREE.PlaneGeometry(2.05, 1.28), new THREE.MeshStandardMaterial({ map: boardTex, roughness: .9 })); face.position.set(0, 1.25, -.365); board.add(face);
+  hoof = new THREE.Group(); const leg = cyl(.07, .09, .9, M(0x3a2a20, { roughness: .8 }), 0, .55, 0, hoof); const h = cyl(.11, .13, .14, M(0x1a1410, { roughness: .5 }), 0, .07, 0, hoof); hoof.position.set(.5, 0, .4); board.add(hoof);
+  STAGE_HERO.add(board);
+  net = new THREE.Group(); const nm = new THREE.MeshStandardMaterial({ color: C(0x5aa8d8), emissive: C(0x1a5a80), emissiveIntensity: .6, roughness: .3 }), lm = new THREE.LineBasicMaterial({ color: C(0x5aa8d8), transparent: true, opacity: .5 });
+  const layers = [4, 6, 6, 3], pts = []; layers.forEach((n, li) => { pts.push([]); for (let k = 0; k < n; k++) { const p = V3((li - 1.5) * .42, 1.0 + (k - (n - 1) / 2) * .18, 0); sph(.035, nm, p.x, p.y, p.z, net, 16).userData.noAO = true; pts[li].push(p); } });
+  for (let li = 0; li < 3; li++) for (const a of pts[li]) for (const b of pts[li + 1]) net.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), lm));
+  STAGE_HERO.add(net);
+}
+function drawBoard(t, taps) { const X = boardX; X.fillStyle = "#1e3328"; X.fillRect(0, 0, 1024, 640); X.fillStyle = "rgba(240,240,230,.9)"; X.font = "700 150px serif"; X.textAlign = "center"; X.fillText("3 + 4 = ?", 512, 300);
+  X.font = "700 90px serif"; X.fillText("|".repeat(taps), 512, 500); boardTex.needsUpdate = true; }
+function heroShot(t, mode, u) { board.visible = mode === "board"; net.visible = mode === "net";
+  if (mode === "board") { const taps = Math.min(7, Math.floor(u * 9)); drawBoard(t, taps); hoof.position.y = Math.max(0, Math.sin(u * 9 * Math.PI)) * .12; STAGE_HERO.rotation.y = 0;
+    stageShot(t, { cam: [V3(1.4 - .3 * u, 1.35, 4.2 - .5 * u), V3(.15, 1.05, -.3), 38], spin: 0, keyCol: 0xffe8c8 }); return; }
+  net.rotation.y = Math.sin(t * .4) * .4; stageShot(t, { cam: [V3(0, 1.2, 3.6 - .5 * u), V3(0, 1.0, 0), 40], spin: 0, ring: 0x8fdcff, glow: .3 }); }
+
+// ---------------------------------------------------------------- 2D の図
+function condDiag(X, t, a) {   // 1907 年の条件（質問者が答えを知る／知らない／見えない）
+  panel(X); lab2(X, "プフングストの試し（1907年）", 540, 410, T(32), "#B8DFF2", 800);
+  [["質問者が答えを知っている", "正解", "#9AF0D0"], ["質問者が答えを知らない", "答えられない", "#FF9A8A"], ["馬から質問者が見えない", "答えられない", "#FF9A8A"]].forEach(([q, r, c], i) => {
+    const k = clamp((t - a - .2 - i * .6) / .3); if (k <= 0) return; X.globalAlpha = k; const y = 560 + i * 220;
+    X.fillStyle = "rgba(143,220,255,.08)"; X.fillRect(140, y - 70, 800, 150); lab2(X, q, 540, y - 20, T(28), "#EAF2F8", 700); lab2(X, "→ " + r, 540, y + 40, T(30), c, 900); X.globalAlpha = 1; });
+}
+function cueDiag(X, t, a) {   // ひづめを打つ数と、人のわずかな動き（模式）
+  panel(X); lab2(X, "ハンスが見ていたもの（模式）", 540, 410, T(32), "#B8DFF2", 800);
+  const n = Math.min(7, Math.floor((t - a) * 2.6)), lift = n >= 7 ? clamp((t - a - 2.7) / .3) : 0;
+  X.fillStyle = "#2a3a4a"; X.beginPath(); X.arc(540, 640 - 30 * lift, 70, 0, Math.PI * 2); X.fill(); X.fillRect(470, 720 - 30 * lift, 140, 260);
+  if (lift > 0) { X.strokeStyle = "#FFE2A8"; X.lineWidth = 6; X.beginPath(); X.arc(540, 640 - 30 * lift, 100, Math.PI * 1.15, Math.PI * 1.85); X.stroke(); lab2(X, "顔がわずかに上がる", 540, 500, T(26), "#FFE2A8", 800); }
+  for (let k = 0; k < 7; k++) { X.fillStyle = k < n ? "#FFE2A8" : "rgba(255,255,255,.15)"; X.fillRect(200 + k * 100, 1080, 70, 70); }
+  lab2(X, `ひづめ ${n} 回`, 540, 1210, T(30), "#EAF2F8", 800);
+}
+function effectDiag(X, t, a) { panel(X); lab2(X, "Clever Hans effect", 540, 520, T(34), "#B8DFF2", 700); bigNum(X, "クレバー・ハンス効果", 720, 60); lab2(X, "見る人の期待が 結果を変える", 540, 940, T(30), "#EAF2F8", 800); }
+function blindDiag(X, t, a) {   // 答えを知らない人が確かめる
+  panel(X); lab2(X, "確かめ方", 540, 410, T(32), "#B8DFF2", 800);
+  const k = clamp((t - a - .3) / .5); X.fillStyle = "rgba(255,154,138,.2)"; X.fillRect(140, 520, 360, 520); X.fillStyle = `rgba(154,240,208,${.2 * k})`; X.fillRect(580, 520, 360, 520);
+  lab2(X, "答えを知る人", 320, 600, T(28), "#FF9A8A", 800); lab2(X, "合図が出てしまう", 320, 800, T(24), "#EAF2F8", 600);
+  X.globalAlpha = k; lab2(X, "答えを知らない人", 760, 600, T(28), "#9AF0D0", 800); lab2(X, "合図が出ない", 760, 800, T(24), "#EAF2F8", 600); X.globalAlpha = 1;
+}
+function aiDiag(X, t, a) {   // 正解と関係のない手がかりで当てる AI（模式）
+  panel(X); lab2(X, "AI の「クレバー・ハンス」（模式）", 540, 410, T(30), "#B8DFF2", 800);
+  X.fillStyle = "#24303c"; X.fillRect(200, 520, 680, 500); X.fillStyle = "#3a4a5a"; X.beginPath(); X.ellipse(540, 780, 200, 120, 0, 0, Math.PI * 2); X.fill(); lab2(X, "写真", 540, 780, T(30), "#B8C7D6", 700);
+  const k = clamp((t - a - .4) / .4); X.fillStyle = `rgba(255,90,80,${.7 * k})`; X.fillRect(700, 940, 160, 60); X.globalAlpha = k; lab2(X, "AI が見ていたのは 隅の小さな印", 540, 1120, T(26), "#FF9A8A", 800); X.globalAlpha = 1;
+}
+
+// ---------------------------------------------------------------- ショットの一覧
+const ROOMW = { cam: [V3(2.4, 1.6, 2.6), V3(-.2, 1.2, -1.5), 40], who: { white: [.6, -.9] } };
+function ciShot(t, P) { const v = [[V3(1.8, .5, 1.4), V3(.4, 1.5, -1.4), 40], [V3(.9, 1.6, -.2), V3(.6, 1.4, -.9), 30], [V3(2.8, 2.0, 2.6), V3(0, 1.0, -1.4), 44]][P.p];
+  roomShot(t, { cam: v, who: { white: [.6, -.9] } }); }
+SHOTS = [
+  { at: "l01", kind: "photo", img: "hans", box: [110, 560, 970, 1140], card: [["1904年 ベルリン", T(34), 800], ["計算問題に答える馬", T(26), 500, "#B8C7D6"]], credit: ["写真：Karl Krall『Denkende Tiere』（1912）", "パブリックドメイン"], creditY: 1200 },
+  { at: "l02", kind: "photo", img: "osten", box: [110, 560, 970, 1140], card: [["ヴィルヘルム・フォン・オステン", T(32), 800], ["元教師 ハンスの飼い主", T(26), 500, "#B8C7D6"]] },
+  { at: "l03", kind: "3d", draw: (t, u) => heroShot(t, "board", u), card: [["答えの数だけ ひづめを打つ", T(30), 800], ["（再現）", T(22), 500, "#B8C7D6"]] },
+  { at: "l04", kind: "holo", draw: (X, t) => { panel(X); lab2(X, "1904年 ハンス委員会", 540, 420, T(32), "#B8DFF2", 800); bigNum(X, "トリック：なし", 760, 64, "#9AF0D0"); lab2(X, "心理学者シュトゥンプら", 540, 960, T(28), "#EAF2F8", 700); } },
+  { at: "l05", kind: "3d", draw: (t, u) => roomShot(t, { ...ROOMW, cam: [V3(2.4 - .5 * u, 1.6, 2.6 - .4 * u), V3(-.2, 1.2, -1.5), 40] }), card: [["1907年 オスカー・プフングスト", T(30), 800], ["条件をひとつずつ変える", T(26), 500, "#B8C7D6"]] },
+  { at: "l05m", off: 1.2, kind: "photo", img: "test1907", box: [110, 560, 970, 1180], credit: ["1907年の調べ：Karl Krall『Denkende Tiere』（1912）", "パブリックドメイン"], creditY: 1240 },
+  { at: "l06", kind: "holo", draw: (X, t) => condDiag(X, t, CUE.l06) },
+  { at: "l07", kind: "holo", draw: (X, t) => cueDiag(X, t, CUE.l07), note: "※模式図" },
+  { at: "l08", kind: "3d", draw: (t, u) => roomShot(t, ROOMW), card: [["合図は わざとではない", T(30), 800]] },
+  { at: "l09", kind: "holo", draw: (X, t) => effectDiag(X, t, CUE.l09) },
+  { at: "l10", kind: "holo", draw: (X, t) => blindDiag(X, t, CUE.l10) },
+  { at: "l11", kind: "3d", draw: (t, u) => heroShot(t, "net", u), card: [["いまの AI の研究でも", T(30), 800]] },
+  { at: "l12", kind: "holo", draw: (X, t) => aiDiag(X, t, CUE.l12), note: "※模式図" },
+  { at: "l13", kind: "photo", img: "osten", box: [110, 560, 970, 1140], z0: 1.06, z1: 1.18 },
+];
+const _ds = drawScene; drawScene = function (t, name) { const P = ciPhase(t); if (P && P.c === "l08") { ciShot(t, P); return "3d"; } return _ds(t, name); };
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .2, warm: .05, sat: .95, vig: .6 }], [c.hook, { warm: .15, sat: .9, vig: .6 }], [c.ki, { warm: .2, sat: 1.0, vig: .55 }], [c.sho, { cool: .15, sat: .95, vig: .58 }],
+  [c.ten, { cool: .3, sat: .85, vig: .64 }], [c.ketsu, { cool: .1, warm: .1, sat: 1.0, vig: .55 }], [c.l13, { warm: .25, sat: 1.0, glow: .25, glowX: .5, glowY: .45, vig: .5 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; driftShot(1); openingBG(4); S.moodGrade(bg, 0, [[0, { warm: .1, sat: 1.0, vig: .55 }]]); Cine.bloom(bg, .3); addGrain(0);
+  HUD.title(ui, [["計算できる馬の正体は", 78, "#EAF2F8"], ["人間の方にあった", 112, "#FFD58A"]], 540, 420, 1, 9); text(ui, "賢馬ハンス", 540, 1340, 76, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 }); }
+kitStart(() => { buildRoom({}); buildStage({}); buildHero(); });
+</script>
+</body></html>

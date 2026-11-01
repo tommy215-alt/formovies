@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_029 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script>
+// pilot_029「元素の番号の意味——ヘンリー・モーズリー」のレンダラー（知的設計）。制作の土台は ext/kit（kit.js・shots.js）。画面の構成は SHOTS。
+// 本物の写真：moseley（実験室のモーズリー、Nature 誌、1915 年以前、パブリックドメイン）。3D：X 線管・元素の札の並び・ヘルメット（再現・模式）。
+Object.assign(KIT, { design: "intel", scenes: ["open", "hook", "ki", "sho", "ten", "ketsu"], images: ["moseley"],
+  ci: { l03: [[.26, .7]], l07: [[-.18, 1.8]], l09: [[.22, 1.7], [0, 1.5], [-.14, .65]], l11: [[0, .4]] },
+  opening: { img: "moseley", box: [270, 620, 810, 1390], cy: .35, title: ["元素の番号の意味を", "突き止めた男"], credit: ["ヘンリー・モーズリー（Nature誌、1915年以前）", "パブリックドメイン"] } });
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 3D：X 線管・元素の札（20〜80 番、空いた番号つき）・ヘルメット
+let xtube, beam, tiles, tileMs = [], helmet;
+const GAP = [43, 61, 75];
+function buildHero() {
+  xtube = new THREE.Group(); const glass = Cine.glass({ thickness: .004, roughness: .03 }); const bulb = new THREE.Mesh(new THREE.SphereGeometry(.38, 48, 32), glass); bulb.scale.set(1.4, 1, 1); bulb.position.y = 1.05; bulb.userData.noAO = true; xtube.add(bulb);
+  const metal = M(0xb8bcc4, { metalness: 1, roughness: .25 }); cyl(.05, .05, .5, metal, -.75, 1.05, 0, xtube).rotation.z = Math.PI / 2; cyl(.08, .08, .3, metal, .6, 1.05, 0, xtube).rotation.z = Math.PI / 2; box(.12, .12, .02, M(0xd8a848, { metalness: 1, roughness: .3 }), .2, 1.05, 0, xtube).rotation.y = .7;
+  beam = new THREE.Mesh(new THREE.ConeGeometry(.12, 1.4, 24, 1, true), new THREE.MeshBasicMaterial({ color: C(0x8fdcff), transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); beam.position.set(.2, .45, .2); beam.rotation.x = .2; beam.userData.noAO = true; xtube.add(beam);
+  STAGE_HERO.add(xtube);
+  tiles = new THREE.Group(); for (let z = 20; z <= 80; z++) { const m = new THREE.MeshStandardMaterial({ color: C(GAP.includes(z) ? 0x101418 : 0x2a5a7a), emissive: C(GAP.includes(z) ? 0x000000 : 0x0a3a5a), emissiveIntensity: .8, roughness: .4 });
+    const k = z - 20, b = box(.12, .12, .03, m, ((k % 12) - 5.5) * .15, 1.55 - Math.floor(k / 12) * .16, 0, tiles); tileMs[z] = m; }
+  STAGE_HERO.add(tiles);
+  helmet = new THREE.Group(); const hm = M(0x4a5038, { roughness: .6, metalness: .3 }); const dome = new THREE.Mesh(new THREE.SphereGeometry(.32, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), hm); dome.position.y = .3; dome.castShadow = true; helmet.add(dome);
+  const brim = cyl(.5, .5, .02, hm, 0, .3, 0, helmet, 48); helmet.position.y = 0; STAGE_HERO.add(helmet);
+}
+function heroShot(t, mode, u, o = {}) { xtube.visible = mode === "tube"; tiles.visible = mode === "tiles"; helmet.visible = mode === "helmet";
+  if (mode === "tube") { beam.material.opacity = .25 + .15 * Math.sin(t * 20); stageShot(t, { cam: [V3(1.4 - .4 * u, 1.3, 2.6 - .3 * u), V3(0, .95, 0), 38], spin: .15, ring: 0x8fdcff, glow: .5 }); return; }
+  if (mode === "tiles") { const fill = o.fill || 0; GAP.forEach((z, i) => { const on = fill > i / 3 + .1; tileMs[z].color = C(on ? 0xffd27a : 0x101418); tileMs[z].emissive = C(on ? 0x8a5a10 : (Math.sin(t * 4) > 0 ? 0x3a0a0a : 0x000000)); });
+    STAGE_HERO.rotation.y = 0; stageShot(t, { cam: [V3(.3, 1.35, 2.2 - .4 * u), V3(0, 1.3, 0), 40], spin: 0, glow: .4 }); return; }
+  stageShot(t, { cam: [V3(1.0, .7, 1.6 - .2 * u), V3(0, .45, 0), 36], spin: .1, ring: 0x6a5a40, keyCol: 0xc8b898, exp: .85 }); }
+
+// ---------------------------------------------------------------- 2D の図
+const EL = [["Fe", 26, 55.85], ["Co", 27, 58.93], ["Ni", 28, 58.69], ["Cu", 29, 63.55]];
+function weightDiag(X, t, a, byZ) {   // 重さの順 → 番号の順（コバルトとニッケル）
+  panel(X); lab2(X, byZ ? "原子番号の順" : "重さ（原子量）の順", 540, 410, T(32), "#B8DFF2", 800);
+  const list = byZ ? EL : [...EL].sort((p, q) => p[2] - q[2]), k = easeInOut(clamp((t - a - .3) / .8));
+  list.forEach((e, i) => { const x = 220 + i * 210, y = 760; const bad = !byZ && (e[0] === "Co" || e[0] === "Ni");
+    X.fillStyle = bad ? "rgba(255,120,100,.25)" : "rgba(143,220,255,.12)"; X.fillRect(x - 90, y - 120, 180, 240); lab2(X, e[0], x, y - 20, T(54), bad ? "#FF9A8A" : "#EAF2F8", 900);
+    lab2(X, byZ ? String(e[1]) : e[2].toFixed(1), x, y + 70, T(30), "#B8C7D6", 700); });
+  if (!byZ) lab2(X, "性質の順と合わない", 540, 1060, T(30), "#FF9A8A", 800); else { X.globalAlpha = k; lab2(X, "性質の順と一致", 540, 1060, T(30), "#9AF0D0", 800); X.globalAlpha = 1; }
+}
+function lawDiag(X, t, a) {   // 振動数の平方根と原子番号（模式）
+  panel(X); lab2(X, "モーズリーの法則（模式）", 540, 410, T(32), "#B8DFF2", 800);
+  const x0 = 200, x1 = 900, y0 = 520, y1 = 1150; X.strokeStyle = "rgba(143,220,255,.5)"; X.lineWidth = 3; X.beginPath(); X.moveTo(x0, y0); X.lineTo(x0, y1); X.lineTo(x1, y1); X.stroke();
+  lab2(X, "√振動数", x0 + 60, y0 - 30, T(24), "#8FB0C8", 700); lab2(X, "原子番号 →", x1 - 80, y1 + 44, T(24), "#8FB0C8", 700);
+  const k = clamp((t - a - .2) / 2); for (let i = 0; i < 12; i++) { if (i / 12 > k) break; const x = x0 + 40 + i * 55, y = y1 - 40 - i * 48; X.fillStyle = "#FFE2A8"; X.beginPath(); X.arc(x, y, 12, 0, Math.PI * 2); X.fill(); }
+  if (k > .8) { X.strokeStyle = "#FF9A8A"; X.lineWidth = 4; X.beginPath(); X.moveTo(x0 + 20, y1 - 22); X.lineTo(x1 - 40, y0 + 40); X.stroke(); lab2(X, "まっすぐ並ぶ", 700, 600, T(32), "#FF9A8A", 900); }
+}
+
+// ---------------------------------------------------------------- ショットの一覧
+function ciShot(t, P) { const v = [[V3(1.8, .5, 1.4), V3(.4, 1.5, -1.4), 40], [V3(.9, 1.6, -.2), V3(.6, 1.4, -.9), 30], [V3(2.8, 2.0, 2.6), V3(0, 1.0, -1.4), 44]][P.p];
+  roomShot(t, { cam: v, who: { stand: [.6, -.9] }, night: .5 }); }
+SHOTS = [
+  { at: "l01", kind: "photo", img: "moseley", box: [250, 380, 830, 1240], cy: .3, card: [["1913年 イギリス", T(34), 800], ["物理学者 ヘンリー・モーズリー", T(26), 500, "#B8C7D6"]] },
+  { at: "l02", kind: "holo", draw: (X, t) => weightDiag(X, t, CUE.l02, false) },
+  { at: "l03", kind: "3d", draw: (t, u) => heroShot(t, "tube", u), card: [["元素ごとの X 線", T(32), 800], ["振動数を測る（再現）", T(26), 500, "#B8C7D6"]] },
+  { at: "l04", kind: "holo", draw: (X, t) => lawDiag(X, t, CUE.l04), note: "※模式図" },
+  { at: "l05", kind: "holo", draw: (X, t) => { panel(X); bigNum(X, "原子番号", 700, 90); lab2(X, "原子核の電荷の大きさ", 540, 900, T(34), "#EAF2F8", 800); } },
+  { at: "l06", kind: "holo", draw: (X, t) => weightDiag(X, t, CUE.l06, true) },
+  { at: "l07", kind: "3d", draw: (t, u) => heroShot(t, "tiles", u), card: [["空いている番号", T(34), 800], ["43・61・75", T(30), 700, "#FF9A8A"]] },
+  { at: "l08", kind: "holo", draw: (X, t) => { panel(X); bigNum(X, "43", 640, 160, "#FFE2A8"); lab2(X, "テクネチウム", 540, 860, T(44), "#EAF2F8", 900); lab2(X, "1937年に見つかる", 540, 980, T(32), "#B8C7D6", 700); } },
+  { at: "l09", kind: "3d", draw: (t, u) => roomShot(t, { cam: [V3(2.4, 1.6, 2.6), V3(-.2, 1.2, -1.5), 40], who: { stand: [.6, -.9] }, night: .5 }), card: [["第一次世界大戦", T(34), 800], ["志願して 通信の将校に", T(26), 500, "#B8C7D6"]] },
+  { at: "l10", kind: "3d", draw: (t, u) => heroShot(t, "helmet", u), card: [["1915年8月10日 ガリポリ", T(32), 800], ["27歳", T(30), 700, "#FFE2A8"]] },
+  { at: "l11", kind: "3d", draw: (t, u) => heroShot(t, "tiles", u), card: [["科学者を前線に送ること", T(30), 800], ["議論が強まったとされる", T(26), 500, "#B8C7D6"]] },
+  { at: "l12", kind: "3d", draw: (t, u) => heroShot(t, "tiles", u, { fill: u * 1.2 }), card: [["43 テクネチウム 1937", T(26), 700], ["61 プロメチウム 1945 ／ 75 レニウム 1925", T(24), 600, "#B8C7D6"]] },
+  { at: "l13", kind: "photo", img: "moseley", box: [250, 380, 830, 1240], cy: .3, z0: 1.05, z1: 1.18 },
+];
+const _ds = drawScene; drawScene = function (t, name) { const P = ciPhase(t); if (P && P.c === "l09") { ciShot(t, P); return "3d"; } return _ds(t, name); };
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .2, sat: .95, vig: .6 }], [c.hook, { warm: .1, sat: .9, vig: .6 }], [c.ki, { cool: .2, sat: 1.0, vig: .55 }], [c.sho, { cool: .1, sat: 1.0, glow: .2, glowX: .5, glowY: .45, vig: .55 }],
+  [c.ten, { cool: .45, sat: .7, vig: .7 }], [c.l10, { cool: .5, sat: .55, vig: .76 }], [c.ketsu, { cool: .2, warm: .05, sat: .9, vig: .62 }], [c.l12, { warm: .2, sat: 1.0, glow: .25, glowX: .5, glowY: .45, vig: .55 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; driftShot(1); openingBG(4); S.moodGrade(bg, 0, [[0, { cool: .15, sat: 1.0, vig: .55 }]]); Cine.bloom(bg, .3); addGrain(0);
+  HUD.title(ui, [["元素の番号の意味を", 80, "#EAF2F8"], ["突き止めた男", 116, "#FFD58A"]], 540, 420, 1, 9); text(ui, "27歳で戦場に消えた", 540, 1500, 64, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 12 }); }
+kitStart(() => { buildRoom({}); buildStage({}); buildHero(); });
+</script>
+</body></html>
