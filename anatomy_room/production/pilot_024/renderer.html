@@ -66,7 +66,7 @@ function buildPark() {
   for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, l = sph(.18, new THREE.MeshBasicMaterial({ color: C(i % 3 ? 0xffb050 : 0xff6a8a) }), Math.cos(a) * 14, 3.2, Math.sin(a) * 9 + 2, park, 10); l.userData.noAO = true; lanterns.push(l); }
   pb = makeBalloon(); park.add(pb);
   const n = 3000, p = new Float32Array(n * 3), c = new Float32Array(n * 3); const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3)); g.setAttribute("color", new THREE.BufferAttribute(c, 3));
-  fw = new THREE.Points(g, new THREE.PointsMaterial({ size: .18, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); fw.userData.noAO = true; park.add(fw);
+  fw = new THREE.Points(g, new THREE.PointsMaterial({ size: .5, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); fw.userData.noAO = true; park.add(fw);
 }
 function fireworks(t, k, seed = 3) {   // 花火の玉（決まった種、時刻 t だけで決まる）
   const p = fw.geometry.attributes.position, c = fw.geometry.attributes.color, cols = [[1, .4, .6], [1, .85, .3], [.4, .8, 1], [.6, 1, .5], [.9, .5, 1]]; fw.visible = k > 0;
@@ -97,9 +97,9 @@ function buildDay() {
 function dayShot(t, { mode = "sea", by = 0, gray = 0, frost = 0, flood = 0, cp, look, fov = 44 } = {}) {
   show("day"); scene.environment = null; sea.visible = mode === "sea" || mode === "flood"; alps.visible = mode === "alps"; flags.visible = mode === "fest"; roofsD.visible = mode === "fest";
   sea.position.y = mode === "flood" ? -3.5 : -40; sea.material.color = C(mode === "flood" ? 0x4a5a5a : 0x2a5a7a); db.position.set(0, by, 0); db.userData.crown.visible = false; db.userData.flame.material.opacity = 0;
-  db.userData.silk.color = C(0xe8d8b0).lerp(C(0xffffff), frost); db.userData.silk.emissive = C(0x000000);
-  const skyC = mode === "alps" ? 0xa8c0d8 : mode === "fest" ? 0x8ab8f0 : 0x9ac0e0;
-  lights({ keyPos: [30, 50, 30], keyAt: [0, by, 0], keyI: 40 - 20 * gray, angle: .6, keyCol: 0xfff0d8, rimPos: [-20, 10, -40], rimI: .8, rimCol: 0x9fc8ff, hemiI: .7 - .4 * gray, hemiSky: lerpHex(skyC, 0x5a6068, gray), hemiGround: 0x3a4048, fog: .006, fogC: lerpHex(skyC, 0x3a4048, gray), exp: 1.0 - .2 * gray });
+  db.userData.silk.color = C(0xe8d8b0).lerp(C(0xc8dcf0), frost); db.userData.silk.emissive = C(0x000000);
+  const skyC = mode === "alps" ? 0x5a7aa8 : mode === "fest" ? 0x8ab8f0 : 0x9ac0e0;
+  lights({ keyPos: [30, 50, 30], keyAt: [0, by, 0], keyI: 40 - 20 * gray, angle: .6, keyCol: 0xfff0d8, rimPos: [-20, 10, -40], rimI: .8, rimCol: 0x9fc8ff, hemiI: .7 - .4 * gray, hemiSky: lerpHex(skyC, 0x5a6068, gray), hemiGround: 0x3a4048, fog: mode === "alps" ? .0018 : .006, fogC: lerpHex(skyC, 0x3a4048, gray), exp: 1.0 - .2 * gray });
   setCam(cp || V3(6, by + 3, 10), look || V3(0, by + 2.5, 0), fov, .05, 900); draw3D({ ao: false });
 }
 function lerpHex(a, b, k) { return new THREE.Color(a).lerp(new THREE.Color(b), clamp(k)).getHex(); }
@@ -110,17 +110,17 @@ function buildCity() {
   const r = S.rng(21), wm = M(0x5a5048, { roughness: .9 }), rm = M(0x2a3038, { roughness: .7, metalness: .3 });
   for (let i = 0; i < 40; i++) { const side = i % 2 ? 1 : -1, w = 5 + r() * 3, h = 10 + r() * 8, x = side * (5 + w / 2), z = -i * 4; box(w, h, 4, wm, x, h / 2, z, city); const ro = box(w + .4, 2.2, 4.2, rm, x, h + 1.1, z, city); ro.rotation.x = .02;
     for (let j = 0; j < 6; j++) box(.8, 1.2, .05, new THREE.MeshBasicMaterial({ color: C(r() > .5 ? 0xffc880 : 0x1a1e24) }), x - side * (w / 2 + .03), 2 + j * 1.6, z + (r() - .5) * 2, city).rotation.y = Math.PI / 2; }
-  cb = makeBalloon(); city.add(cb);
+  cb = makeBalloon(); city.add(cb); const fireL = new THREE.PointLight(C(0xff7a30), 0, 60, 1.6); fireL.position.y = 2; cb.add(fireL); cb.userData.light = fireL;
   smoke = Cine.dust({ min: [-6, 0, -40], max: [6, 30, -10], count: 1600, size: .35, seed: 33 }); city.add(smoke.points);
-  netOnGround = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), new THREE.MeshBasicMaterial({ color: C(0x2a1a10), wireframe: true, transparent: true, opacity: .7 })); netOnGround.rotation.x = -Math.PI / 2; netOnGround.position.set(.5, .02, -20); netOnGround.userData.noAO = true; city.add(netOnGround);
+  netOnGround = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), new THREE.MeshBasicMaterial({ color: C(0xb8a088), wireframe: true, transparent: true, opacity: .8 })); netOnGround.rotation.x = -Math.PI / 2; netOnGround.position.set(.5, .02, -20); netOnGround.userData.noAO = true; city.add(netOnGround);
   procession = new THREE.Group(); const cap = new THREE.CylinderGeometry(.22, .25, 1.6, 8); cap.translate(0, .8, 0); for (let i = 0; i < 60; i++) { const m = new THREE.Mesh(cap, M(0x0a0a0e, { roughness: 1 })); m.position.set((i % 4 - 1.5) * .9 + (r() - .5) * .3, 0, -Math.floor(i / 4) * 1.4); procession.add(m); } city.add(procession);
 }
 function cityShot(t, { mode = "roof", u = 0, cp, look, fov = 40 } = {}) {
-  show("city"); scene.environment = null; cb.visible = mode === "roof"; smoke.points.visible = mode === "roof"; netOnGround.visible = mode === "street"; procession.visible = mode === "funeral";
+  show("city"); scene.environment = null; cb.visible = mode === "roof"; cb.userData.light.intensity = mode === "roof" ? 30 : 0; smoke.points.visible = mode === "roof"; netOnGround.visible = mode === "street"; procession.visible = mode === "funeral";
   if (mode === "roof") { cb.position.set(1, lerp(28, 15, easeIn(u)), -26); cb.rotation.z = .2 * u; const U = cb.userData; U.crown.visible = false; U.flame.material.opacity = .5 * (.8 + .2 * Math.sin(t * 18)); U.silk.color = C(0x2a1408); U.silk.emissive = C(0xff4a10).multiplyScalar(.4); smoke.update(t, 1); }
   if (mode === "funeral") procession.position.set(0, 0, -16 + 6 * u);
-  lights({ keyPos: [0, 30, -26], keyAt: [0, 0, -20], keyI: mode === "roof" ? 26 : 8, angle: .6, keyCol: mode === "roof" ? 0xff7a30 : 0x9ab0d0, rimPos: [0, 10, 10], rimI: .4, rimCol: 0x6a8aff, hemiI: .12, hemiSky: 0x1a2040, hemiGround: 0x06080c, fog: .02, fogC: 0x05070e, exp: .95 });
-  setCam(cp || V3(0, 1.7, 6), look || V3(0, 6, -26), fov, .05, 300); draw3D({ ao: mode !== "roof" });
+  lights({ keyPos: [0, 30, -10], keyAt: [0, 0, -20], keyI: mode === "roof" ? 30 : 22, angle: .8, keyCol: mode === "roof" ? 0xff9a50 : 0x9ab0d0, rimPos: [0, 10, 10], rimI: .8, rimCol: 0x6a8aff, hemiI: .45, hemiSky: 0x3a4a78, hemiGround: 0x101420, fog: .008, fogC: 0x0a0e1c, exp: 1.0 });
+  setCam(cp || V3(0, 1.7, 6), look || V3(0, lerp(19, 12, u), -26), fov, .05, 300); draw3D({ ao: mode !== "roof" });
 }
 
 // ---------------------------------------------------------------- 場面
@@ -142,7 +142,7 @@ function drawScene(t, name) {
     if (t < CUE.wait) { const f = easeInOut(clamp((t - CUE.spark) / 2.5)); parkShot(t, { by: 9.5, crown: 1 - f, fire: f, fwK: .3, cp: V3(4, 4, 10), look: V3(0, 11, -6), fov: 42 }); return "3d"; }   // 火が水素へ（ゆっくり、閃光なし）
     parkShot(t, { by: 10, fire: .6, fwK: 0, cp: V3(0, 1.4, 20), look: V3(0, 8, -6), fov: 46, exp: .85 }); return "3d"; }   // 着陸を待つ群衆の後ろ姿
   if (name === "fall") {
-    if (t < CUE.net) { cityShot(t, { mode: "roof", u: clamp((t - CUE.fall) / (CUE.net - CUE.fall)) }); return "3d"; }   // 燃える気球が屋根へ（遠景）
+    if (t < CUE.net) { cityShot(t, { mode: "roof", u: clamp((t - CUE.fall) / (CUE.net - CUE.fall)), fov: 48 }); return "3d"; }   // 燃える気球が屋根へ（遠景）
     if (t < CUE.funeral) { cityShot(t, { mode: "street", cp: V3(2.5, 1.2, -15), look: V3(.5, 0, -20), fov: 38 }); return "3d"; }   // 暗い通りに網だけ
     if (t < CUE.last) { cityShot(t, { mode: "funeral", u: clamp((t - CUE.funeral) / 3), cp: V3(4, 2.2, 2), look: V3(0, 1, -14), fov: 40 }); return "3d"; }
     const u = clamp((t - CUE.last) / 3); parkShot(t, { by: 6, inflate: 0, crown: 0, fwK: .25 * (1 - u), cp: V3(0, 2, 16), look: V3(0, 12, -10), fov: 46, exp: .7, ball: false }); return "3d"; }   // 冒頭の夜空、残り火が消える
@@ -164,20 +164,20 @@ function fxEp(t, name) {   // 序盤の派手な飾り（紙吹雪・光の筋�
 function openingUI(t) {
   const k = k_(t, "t0", .25, .05); if (k <= 0) return;
   for (const [s, y, size] of [["祭りの夜空で", 330, 104], ["花火が気球に燃え移った", 490, 86]]) label(ui, s, 540, y, size, "#F4F7FA", { font: MIN, stroke: "#05080c", sw: .14 });
-  credit("「Death of Madame Blanchard」1869年の版画／パブリックドメイン", k, 1440);
+  credit("「Death of Madame Blanchard」1869年の版画", k, 1430); credit("パブリックドメイン", k, 1470);
 }
 function drawUI(t, name) {
   if (name === "open") { openingUI(t); return; }
   if (name === "hook") { confetti(ui, t, CUE.balloon, 2.4); S.note(ui, "※再現CGを含みます", 540, 1290, win(t, CUE.hook + .3, CUE.sophie, .3, .3), 26, true);
     if (t < CUE.sophie) slam(ui, "1819年7月6日", 540, 320, 120, CUE.hook + .05, t, { cols: GOLD, rot: -.05, sub: "パリ・ティヴォリ公園" });
     else { slam(ui, "ソフィー・ブランシャール", 540, 280, 80, CUE.sophie + .05, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: -.03 }); if (t >= CUE.first) slam(ui, "空を仕事にした最初の女性", 540, 1350, 66, CUE.first, t, { cols: GOLD, rot: .03 });
-      credit("Luigi Rados（1811）／米国議会図書館（パブリックドメイン）", k_(t, "sophie", .4), 1240); } }
+      credit("Luigi Rados（1811）", k_(t, "sophie", .4), 1230); credit("米国議会図書館／パブリックドメイン", k_(t, "sophie", .4), 1270); } }
   if (name === "rise") {
     if (t < CUE.debt) { if (t < CUE.collapse) slam(ui, "海峡を越えた夫", 540, 330, 110, CUE.husband + .05, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.04 }); else slam(ui, "1808年 倒れる", 540, 330, 110, CUE.collapse, t, { cols: WHITE, rot: -.03 }); }
     else if (t < CUE.alone) slam(ui, "破産の寸前", 540, 380, 130, CUE.debt, t, { cols: RED, glow: "rgba(255,40,60,1)", rot: -.05 });
     else if (t < CUE.napoleon) slam(ui, "一人で空へ", 540, 330, 140, CUE.alone + .1, t, { cols: GOLD, rot: -.05 });
     else if (t < CUE.milan) { confetti(ui, t, CUE.napoleon, 2.6, 81); slam(ui, "ナポレオン", 540, 320, 130, CUE.napoleon + .05, t, { cols: GOLD, rot: -.05, sub: "祝典で飛ぶ役目" }); if (t >= CUE.wedding) slam(ui, "皇帝の結婚の祝い", 540, 1300, 76, CUE.wedding, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: .03 }); }
-    else if (t < CUE.alps) { slam(ui, "1811年 ミラノ", 540, 230, 90, CUE.milan + .1, t, { cols: GOLD, rot: -.03 }); credit("Luigi Rados「ミラノでの夜の上昇」1811年／米国議会図書館（パブリックドメイン）", k_(t, "milan", .4), 1340); }
+    else if (t < CUE.alps) { slam(ui, "1811年 ミラノ", 540, 230, 90, CUE.milan + .1, t, { cols: GOLD, rot: -.03 }); credit("Luigi Rados「ミラノでの夜の上昇」1811年", k_(t, "milan", .4), 1330); credit("米国議会図書館／パブリックドメイン", k_(t, "milan", .4), 1370); }
     else if (t < CUE.flood) slam(ui, "アルプスの上空", 540, 320, 100, CUE.alps + .1, t, { cols: ICE, glow: "rgba(120,190,255,.9)", rot: -.02, sub: "凍えかけた" });
     else if (t < CUE.crowd) slam(ui, "溺れかけた", 540, 320, 110, CUE.flood + .05, t, { cols: ICE, rot: -.02 });
     else slam(ui, "夜空の花火", 540, 320, 120, CUE.crowd + .1, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: -.02 }); }
