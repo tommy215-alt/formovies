@@ -261,13 +261,15 @@ function renderFrame(t) {
   if (name === "open" && typeof openingBG === "function") openingBG(t);
   S.moodGrade(bg, t, MOOD); Cine.bloom(bg, (D === "intel" ? .28 : .34) * (1 - .5 * darkK(t)));
   { const [z, s] = hitAmt(t), r = S.rng(Math.floor(t * 30) + 11); punch(bg, z, (r() - .5) * s, (r() - .5) * s); }
-  if (D === "dopa") { const P = ciPhase(t); if (P) { const a = P.p ? CUT[P.p - 1] : 0; if (P.d - a < .2) S.glitch(bg, t, 12 * (1 - (P.d - a) / .2), 3); } }   // ドパ：カットインの切れ目で一瞬乱れる
+  if (D === "dopa") { const P = ciPhase(t); if (P) { const a = P.p ? CUT[P.p - 1] : 0; if (P.d - a < .1) S.glitch(bg, t, 8 * (1 - (P.d - a) / .1), 3); } }   // ドパ：カットインの切れ目で一瞬乱れる
   if (typeof fxEp === "function") fxEp(t, name);
   addGrain(t);
   if (D === "tragedy") { const dk = darkK(t); if (dk > 0) { bg.fillStyle = `rgba(0,6,14,${.5 * Math.pow(dk, 1.2)})`; bg.fillRect(0, 0, W, H); } }   // 後半ほど暗く
   if (t < es) { drawUI(t, name); if (name !== "open") { if (D === "intel") S.docSub(ui, t, { endAt: es }); else popSub(ui, t, es); } }
   else if (D === "tragedy") { const k = easeInOut(clamp((t - es) / Math.max(.1, (TL.blackout || .25) - .3))); bg.fillStyle = `rgba(0,0,0,${k})`; bg.fillRect(0, 0, W, H); }   // 共通エンディングなし：時間をかけて暗転
-  else { const e = TL.lines.filter(x => x.ending); HUD.endingOverlay(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: TL.credits }); }
+  else { const e = TL.lines.filter(x => x.ending), cr = TL.credits.join("／").split("／"), two = cr.length > 2;   // 声が 3 人以上なら、クレジットを 2 行に分けて描く（pilot_019 と同じ）
+    HUD.endingOverlay(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: two ? [] : TL.credits });
+    if (two) { const k = clamp((t - es) / .4); ui.save(); ui.globalAlpha = k * .9; S.group(() => { text(ui, "音声：" + cr.slice(0, 2).join("／").replace(/^音声：/, ""), 540, 1150, 28, "#B8C7D6", { weight: 500 }); text(ui, cr.slice(2).join("／"), 540, 1192, 28, "#B8C7D6", { weight: 500 }); }); ui.restore(); } }
   const [a] = S.sceneRange(name), i = SCN.indexOf(name);
   if (i > 0 && t < es && !ciPhase(t)) { const d = D === "intel" ? .25 : .14, k = 1 - prog(t, a, d); if (k > 0) { bg.fillStyle = `rgba(4,8,14,${(D === "intel" ? .85 : .75) * k})`; bg.fillRect(0, 0, W, H); } }   // 場面の切り替え（閃光なし）
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
