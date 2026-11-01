@@ -29,7 +29,8 @@
   - **直し（2026-11-01）**：斜めの光の筋（`Cine.shaft`、幕のように見えた）を削除。起承転結のカットインを文字なし・効果音なしのカメラの動き（傾き・急な寄り・引き、`camFX()`）に。どちらも知的設計の設定として `DESIGN_MODES.md` に保存。
 
 - **1 日 2 本に向けた 3 本同時の制作（2026-11-01〜）**：pilot_024＝悲劇（ソフィー・ブランチャール、1819 年の花火の気球）、pilot_025＝ドパ設計（ジョン・ポール・スタップ、1954 年に 46G）、pilot_026＝知的設計（クレア・パターソン、地球の年齢とガソリンの鉛）。題材は「世間・SNS で知られていない、高学歴の人も引き込まれるもの」（ユーザーの指示）。ChatGPT への依頼文（3 本まとめて、BGM・画像の候補も）は `scripts/batch_024_026/gpt_fact_check_prompt.md` → ユーザーが結果を貼る → 確かめ直して 3 本の台本 → まとめて「OK」→ 3 本を続けて制作。**この 3 本で設計ごとの土台（部品化した renderer）を `production/ext/` に作る**（ユーザーが承認。4 本目から速くする）。BGM・画像はフリー素材だけ（`DESIGN_MODES.md`）。
-  - **2026-11-01**：ChatGPT の結果を出典で確かめ直し、各回の `scripts/pilot_02N/fact_check.md`・`assets.md`・`script_draft.md`（VOICEVOX で実測、本編 52〜57 秒）を作成。画像は Commons の API で権利を確認（PD・CC0 だけ。パターソン本人の写真は権利不明で使わない）。BGM は incompetech の一覧で確認（024 Danse Macabre、025 Raving Energy (faster)、026 Clean Soul が第一候補）。**ユーザーの「OK」待ち。**
+  - **2026-11-01**：ChatGPT の結果を出典で確かめ直し、各回の `scripts/pilot_02N/fact_check.md`・`assets.md`・`script_draft.md`（VOICEVOX で実測、本編 52〜57 秒）を作成。画像は Commons の API で権利を確認（PD・CC0 だけ。パターソン本人の写真は権利不明で使わない）。BGM は incompetech の一覧で確認（024 Danse Macabre、025 Raving Energy (faster)、026 Clean Soul が第一候補）。ユーザーの「OK」（2026-11-01、ドパ設計のカットインは「文字なし、効果音たっぷり」）。
+  - **制作の土台 `production/ext/kit/` を作成**（`DESIGN_MODES.md` の「制作の土台」）。3 本とも renderer.html は場面だけ。書き出しは `rv.py 02N render all`。
 
 ## 次の動画でやること（ガイドライン v2.4）
 

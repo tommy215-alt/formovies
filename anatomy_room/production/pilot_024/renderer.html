@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_024 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script>
+// pilot_024「花火の夜空——ソフィー・ブランシャール」のレンダラー（設計「悲劇」＋ガイドライン v2.4＋オープニング）。制作の土台は ext/kit/kit.js。
+// 設計「悲劇」：序盤はコテコテ（紙吹雪・派手な色・跳ねる文字・一打）。L06（alps）から darkK で少しずつ暗く冷たく、一打も弱める。結（fall〜）は明朝体の静かな文字。共通エンディングなし。閃光は使わない。
+// CG：夜の公園と群衆の影・気球（水素の袋・網・小さなかご、人物は遠景の小さな影で顔なし）・花火・海・アルプス・水の野原・パリの屋根（すべて再現）。死の瞬間は見せない。
+Object.assign(KIT, {
+  design: "tragedy", scenes: ["open", "hook", "rise", "night", "fall"], images: ["fall", "portrait"], ci: {},
+  hits: [["hook", 1.0], ["balloon", 1.2], ["sophie", .9], ["first", 1.6], ["husband", .8], ["debt", 1.2], ["alone", 1.0, .4], ["napoleon", 1.6], ["wedding", 1.0], ["milan", .8], ["alps", .5], ["crowd", .5], ["fire", .4], ["spark", .3]],
+  darkFrom: "alps", serifFrom: "fall",
+});
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 気球（水素の袋・網・かご・小さな人影）
+function makeBalloon() {
+  const g = new THREE.Group(), silk = M(0xe8d8b0, { roughness: .6 }); Cine.surface(silk, "fabric", { repeat: [6, 6], normal: .5 });
+  const env = new THREE.Mesh(new THREE.SphereGeometry(1.6, 48, 32), silk); env.position.y = 3.2; env.castShadow = true; g.add(env);
+  const net = new THREE.Mesh(new THREE.SphereGeometry(1.63, 20, 14), new THREE.MeshBasicMaterial({ color: C(0x3a2a1a), wireframe: true, transparent: true, opacity: .55 })); net.position.y = 3.2; net.userData.noAO = true; g.add(net);
+  const rope = new THREE.LineBasicMaterial({ color: C(0x3a2a1a) }); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(Math.cos(a) * 1.2, 2.1, Math.sin(a) * 1.2), V3(Math.cos(a) * .35, .5, Math.sin(a) * .25)]), rope)); }
+  const gon = new THREE.Group(), gm = M(0x8a1a2a, { roughness: .5 }), gold = M(0xc8a048, { metalness: 1, roughness: .3 });   // 小さな飾りのかご
+  box(.8, .25, .45, gm, 0, .35, 0, gon); box(.84, .04, .49, gold, 0, .48, 0, gon); g.add(gon);
+  const fig = new THREE.Group(), dress = M(0xf0ece4, { roughness: .7 }); const sk = new THREE.Mesh(new THREE.ConeGeometry(.16, .5, 16), dress); sk.position.y = .55; fig.add(sk);
+  cyl(.06, .08, .22, dress, 0, .88, 0, fig, 12); sph(.07, M(0x3a2a20, { roughness: .6 }), 0, 1.06, 0, fig, 16); fig.position.set(0, .2, 0); g.add(fig);   // 遠景の小さな人影（顔は描かない）
+  const crown = new THREE.Group(); for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, s = sph(.05, new THREE.MeshBasicMaterial({ color: C(0xfff0c8) }), Math.cos(a) * 1.1, 1.3, Math.sin(a) * 1.1, crown, 8); s.userData.noAO = true; } g.add(crown);   // 花火の冠
+  const fl = new THREE.Mesh(new THREE.SphereGeometry(1.7, 32, 24), new THREE.MeshBasicMaterial({ color: C(0xff6a20), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); fl.position.y = 3.2; fl.userData.noAO = true; g.add(fl);
+  g.userData = { env, net, crown, fig, flame: fl, silk }; return g;
+}
+// ---------------------------------------------------------------- 夜の公園（ティヴォリ）：芝・木・ランタン・群衆の影・花火
+const park = set("park"); let pb, crowdI, lanterns = [], fw;
+function buildPark() {
+  const gr = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), M(0x1a2a1a, { roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.receiveShadow = true; park.add(gr);
+  const r = S.rng(19); for (let i = 0; i < 40; i++) { const tr = new THREE.Mesh(new THREE.ConeGeometry(1.5 + r() * 1.5, 5 + r() * 4, 8), M(0x10201a, { roughness: 1 })); const a = r() * Math.PI * 2, d = 18 + r() * 30; tr.position.set(Math.cos(a) * d, 3, Math.sin(a) * d - 10); park.add(tr); }
+  const cap = new THREE.CapsuleGeometry ? new THREE.CapsuleGeometry(.22, .9, 4, 8) : new THREE.CylinderGeometry(.22, .22, 1.3, 8); cap.translate(0, .75, 0);
+  crowdI = new THREE.InstancedMesh(cap, M(0x08080c, { roughness: 1 }), 600); const m4 = new THREE.Matrix4();
+  for (let i = 0; i < 600; i++) { const a = r() * Math.PI * 2, d = 4 + r() * 16; m4.makeScale(1, .8 + r() * .35, 1); m4.setPosition(Math.cos(a) * d, 0, Math.sin(a) * d * .6 + 6); crowdI.setMatrixAt(i, m4); } park.add(crowdI);
+  for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, l = sph(.18, new THREE.MeshBasicMaterial({ color: C(i % 3 ? 0xffb050 : 0xff6a8a) }), Math.cos(a) * 14, 3.2, Math.sin(a) * 9 + 2, park, 10); l.userData.noAO = true; lanterns.push(l); }
+  pb = makeBalloon(); park.add(pb);
+  const n = 3000, p = new Float32Array(n * 3), c = new Float32Array(n * 3); const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3)); g.setAttribute("color", new THREE.BufferAttribute(c, 3));
+  fw = new THREE.Points(g, new THREE.PointsMaterial({ size: .18, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); fw.userData.noAO = true; park.add(fw);
+}
+function fireworks(t, k, seed = 3) {   // 花火の玉（決まった種、時刻 t だけで決まる）
+  const p = fw.geometry.attributes.position, c = fw.geometry.attributes.color, cols = [[1, .4, .6], [1, .85, .3], [.4, .8, 1], [.6, 1, .5], [.9, .5, 1]]; fw.visible = k > 0;
+  for (let i = 0; i < p.count; i++) { const b = Math.floor(i / 300), r = S.rng(seed * 100 + b), cx = (r() - .5) * 40, cy = 14 + r() * 12, cz = -14 - r() * 18, per = 2.2 + r(), ph = ((t + r() * per) % per) / per;
+    const rr = S.rng(i), a = rr() * Math.PI * 2, e = Math.acos(2 * rr() - 1), sp = (4 + rr() * 3) * easeOut(ph); p.setXYZ(i, cx + sp * Math.sin(e) * Math.cos(a), cy + sp * Math.cos(e) - 3 * ph * ph, cz + sp * Math.sin(e) * Math.sin(a));
+    const col = cols[b % cols.length], f = k * Math.max(0, 1 - ph) * (ph > .02 ? 1 : 0); c.setXYZ(i, col[0] * f, col[1] * f, col[2] * f); }
+  p.needsUpdate = c.needsUpdate = true;
+}
+// fire：0→1 で気球の下が赤く燃える（閃光なし、ゆっくり）
+function parkShot(t, { by = 6, inflate = 1, crown = 0, fire = 0, fwK = 0, cp, look, fov = 42, exp = 1.0, ball = true } = {}) {
+  show("park"); scene.environment = null; pb.visible = ball; pb.position.set(0, by, -6); pb.scale.setScalar(.6 + .4 * inflate); const U = pb.userData;
+  U.crown.visible = crown > 0; U.crown.children.forEach((s, i) => s.scale.setScalar(crown * (.7 + .6 * Math.abs(Math.sin(t * 12 + i)))));
+  U.flame.material.opacity = .55 * fire * (.8 + .2 * Math.sin(t * 20)); U.silk.color = C(0xe8d8b0).lerp(C(0x3a1a10), clamp(fire * 1.2 - .3)); U.silk.emissive = C(0xff4a10).multiplyScalar(fire * .5);
+  lanterns.forEach((l, i) => l.scale.setScalar(.8 + .3 * Math.sin(t * 3 + i))); fireworks(t, fwK);
+  lights({ keyPos: [6, 14, 10], keyAt: [0, by, -6], keyI: 10 + 30 * fire, angle: .5, keyCol: fire > 0 ? 0xff8a40 : 0xffd8a0, rimPos: [-8, 10, -30], rimI: .8, rimCol: 0x6a8aff, hemiI: .18, hemiSky: 0x2a3060, hemiGround: 0x0a0c10, fog: .012, fogC: 0x070a1a, exp });
+  setCam(cp || V3(0, 2, 14), look || V3(0, by + 1.6, -6), fov, .05, 300); draw3D({ ao: false });
+}
+// ---------------------------------------------------------------- 昼の空・海・祝典の旗・アルプス・水の野原
+const day = set("day"); let db, sea, alps, flags, roofsD;
+function buildDay() {
+  db = makeBalloon(); day.add(db);
+  sea = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({ color: C(0x2a5a7a), roughness: .2, metalness: .6 })); sea.rotation.x = -Math.PI / 2; sea.position.y = -40; day.add(sea);
+  alps = new THREE.Group(); const snow = M(0xf4f6fa, { roughness: .8 }), rock = M(0x5a5a62, { roughness: 1 }); const r = S.rng(8);
+  for (let i = 0; i < 22; i++) { const h = 30 + r() * 50, x = (r() - .5) * 300, z = -60 - r() * 200, m = new THREE.Mesh(new THREE.ConeGeometry(18 + r() * 25, h, 7), r() > .3 ? snow : rock); m.position.set(x, -40 + h / 2, z); alps.add(m); } day.add(alps);
+  flags = new THREE.Group(); const fc = [0x1a3ab8, 0xf0f0f0, 0xd81a2a]; for (let i = 0; i < 30; i++) { const f = box(1.2, .8, .02, M(fc[i % 3], { roughness: .7 }), (i - 15) * 2.4, -8 + Math.sin(i) * .6, -18, flags); f.rotation.z = Math.sin(i * 2) * .2; } day.add(flags);
+  roofsD = new THREE.Group(); const rm = M(0x4a5a6a, { roughness: .8 }), wm = M(0xc8b898, { roughness: .9 }); for (let i = 0; i < 60; i++) { const w = 4 + r() * 4, h = 6 + r() * 8, x = (r() - .5) * 160, z = -30 - r() * 120; box(w, h, w, wm, x, -40 + h / 2, z, roofsD); const ro = new THREE.Mesh(new THREE.ConeGeometry(w * .75, 3, 4), rm); ro.position.set(x, -40 + h + 1.5, z); ro.rotation.y = Math.PI / 4; roofsD.add(ro); } day.add(roofsD);
+}
+function dayShot(t, { mode = "sea", by = 0, gray = 0, frost = 0, flood = 0, cp, look, fov = 44 } = {}) {
+  show("day"); scene.environment = null; sea.visible = mode === "sea" || mode === "flood"; alps.visible = mode === "alps"; flags.visible = mode === "fest"; roofsD.visible = mode === "fest";
+  sea.position.y = mode === "flood" ? -3.5 : -40; sea.material.color = C(mode === "flood" ? 0x4a5a5a : 0x2a5a7a); db.position.set(0, by, 0); db.userData.crown.visible = false; db.userData.flame.material.opacity = 0;
+  db.userData.silk.color = C(0xe8d8b0).lerp(C(0xffffff), frost); db.userData.silk.emissive = C(0x000000);
+  const skyC = mode === "alps" ? 0xa8c0d8 : mode === "fest" ? 0x8ab8f0 : 0x9ac0e0;
+  lights({ keyPos: [30, 50, 30], keyAt: [0, by, 0], keyI: 40 - 20 * gray, angle: .6, keyCol: 0xfff0d8, rimPos: [-20, 10, -40], rimI: .8, rimCol: 0x9fc8ff, hemiI: .7 - .4 * gray, hemiSky: lerpHex(skyC, 0x5a6068, gray), hemiGround: 0x3a4048, fog: .006, fogC: lerpHex(skyC, 0x3a4048, gray), exp: 1.0 - .2 * gray });
+  setCam(cp || V3(6, by + 3, 10), look || V3(0, by + 2.5, 0), fov, .05, 900); draw3D({ ao: false });
+}
+function lerpHex(a, b, k) { return new THREE.Color(a).lerp(new THREE.Color(b), clamp(k)).getHex(); }
+// ---------------------------------------------------------------- 夜のパリの屋根と通り（結）
+const city = set("city"); let cb, smoke, netOnGround, procession;
+function buildCity() {
+  const st = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), pbr("old_wood_floor", [30, 30], { tint: 0x3a3a40 })); st.rotation.x = -Math.PI / 2; st.receiveShadow = true; city.add(st);
+  const r = S.rng(21), wm = M(0x5a5048, { roughness: .9 }), rm = M(0x2a3038, { roughness: .7, metalness: .3 });
+  for (let i = 0; i < 40; i++) { const side = i % 2 ? 1 : -1, w = 5 + r() * 3, h = 10 + r() * 8, x = side * (5 + w / 2), z = -i * 4; box(w, h, 4, wm, x, h / 2, z, city); const ro = box(w + .4, 2.2, 4.2, rm, x, h + 1.1, z, city); ro.rotation.x = .02;
+    for (let j = 0; j < 6; j++) box(.8, 1.2, .05, new THREE.MeshBasicMaterial({ color: C(r() > .5 ? 0xffc880 : 0x1a1e24) }), x - side * (w / 2 + .03), 2 + j * 1.6, z + (r() - .5) * 2, city).rotation.y = Math.PI / 2; }
+  cb = makeBalloon(); city.add(cb);
+  smoke = Cine.dust({ min: [-6, 0, -40], max: [6, 30, -10], count: 1600, size: .35, seed: 33 }); city.add(smoke.points);
+  netOnGround = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), new THREE.MeshBasicMaterial({ color: C(0x2a1a10), wireframe: true, transparent: true, opacity: .7 })); netOnGround.rotation.x = -Math.PI / 2; netOnGround.position.set(.5, .02, -20); netOnGround.userData.noAO = true; city.add(netOnGround);
+  procession = new THREE.Group(); const cap = new THREE.CylinderGeometry(.22, .25, 1.6, 8); cap.translate(0, .8, 0); for (let i = 0; i < 60; i++) { const m = new THREE.Mesh(cap, M(0x0a0a0e, { roughness: 1 })); m.position.set((i % 4 - 1.5) * .9 + (r() - .5) * .3, 0, -Math.floor(i / 4) * 1.4); procession.add(m); } city.add(procession);
+}
+function cityShot(t, { mode = "roof", u = 0, cp, look, fov = 40 } = {}) {
+  show("city"); scene.environment = null; cb.visible = mode === "roof"; smoke.points.visible = mode === "roof"; netOnGround.visible = mode === "street"; procession.visible = mode === "funeral";
+  if (mode === "roof") { cb.position.set(1, lerp(28, 15, easeIn(u)), -26); cb.rotation.z = .2 * u; const U = cb.userData; U.crown.visible = false; U.flame.material.opacity = .5 * (.8 + .2 * Math.sin(t * 18)); U.silk.color = C(0x2a1408); U.silk.emissive = C(0xff4a10).multiplyScalar(.4); smoke.update(t, 1); }
+  if (mode === "funeral") procession.position.set(0, 0, -16 + 6 * u);
+  lights({ keyPos: [0, 30, -26], keyAt: [0, 0, -20], keyI: mode === "roof" ? 26 : 8, angle: .6, keyCol: mode === "roof" ? 0xff7a30 : 0x9ab0d0, rimPos: [0, 10, 10], rimI: .4, rimCol: 0x6a8aff, hemiI: .12, hemiSky: 0x1a2040, hemiGround: 0x06080c, fog: .02, fogC: 0x05070e, exp: .95 });
+  setCam(cp || V3(0, 1.7, 6), look || V3(0, 6, -26), fov, .05, 300); draw3D({ ao: mode !== "roof" });
+}
+
+// ---------------------------------------------------------------- 場面
+function drawScene(t, name) {
+  if (name === "open") { parkShot(t, { by: 6, fwK: .6, cp: V3(0, 2, 16), fov: 46, exp: .8 }); return "3d"; }
+  if (name === "hook") { if (t < CUE.sophie) { const u = easeOut(clamp((t - CUE.hook) / 1.2)); parkShot(t, { by: 3 + 4 * easeInOut(clamp((t - CUE.balloon) / 3)), inflate: u, crown: k_(t, "balloon", .4), fwK: k_(t, "balloon", .6), cp: V3(4 - 2 * u, 1.8, 15 - 3 * u), fov: 44 }); return "3d"; }   // 夜の公園の上の気球（最初の 1 秒）
+    return "2d"; }
+  if (name === "rise") {
+    if (t < CUE.debt) { const u = clamp((t - CUE.husband) / (CUE.debt - CUE.husband)), g = clamp((t - CUE.collapse) / .4); dayShot(t, { mode: "sea", by: 2 * u, gray: g, cp: V3(8 - 3 * u, 3, 12 - 2 * u), look: V3(0, 2.5, 0) }); return "3d"; }   // 海峡の上 → 灰色に
+    if (t < CUE.alone) { dayShot(t, { mode: "sea", by: 2, gray: 1, cp: V3(4, 5, 7), look: V3(0, 3.5, 0), fov: 36 }); return "3d"; }
+    if (t < CUE.napoleon) { const u = easeIn(clamp((t - CUE.alone) / (CUE.napoleon - CUE.alone))); dayShot(t, { mode: "sea", by: 2 + 12 * u, cp: V3(3, -2, 14), look: V3(0, 4 + 10 * u, 0), fov: 48 }); return "3d"; }   // 一人で上がる（見上げ）
+    if (t < CUE.milan) { const u = clamp((t - CUE.napoleon) / (CUE.milan - CUE.napoleon)); dayShot(t, { mode: "fest", by: 0, cp: V3(10 - 4 * u, -4, 16), look: V3(0, 1, -6), fov: 50 }); return "3d"; }   // 祝典の旗とパリの屋根
+    if (t < CUE.alps) return "2d";
+    if (t < CUE.flood) { dayShot(t, { mode: "alps", by: 0, frost: clamp((t - CUE.alps) / 1.5), cp: V3(6, 2, 9), look: V3(0, 1, -20), fov: 46 }); return "3d"; }
+    if (t < CUE.crowd) { dayShot(t, { mode: "flood", by: -2.6, gray: .5, cp: V3(5, -2, 9), look: V3(0, -2, 0), fov: 44 }); return "3d"; }
+    parkShot(t, { by: 8, fwK: 1, cp: V3(0, 1.2, 18), look: V3(0, 12, -10), fov: 50 }); return "3d"; }   // 夜空の花火（明るい最後の場面）
+  if (name === "night") {
+    if (t < CUE.fire) { const u = clamp((t - CUE.night) / (CUE.fire - CUE.night)); parkShot(t, { by: 9, crown: k_(t, "crown", .4), fwK: .5, cp: V3(2.5, 8.6 + .8 * u, 4.5 - 1.5 * u), look: V3(0, 10, -6), fov: 40 }); return "3d"; }   // 花火の冠の寄り
+    if (t < CUE.wait) { const f = easeInOut(clamp((t - CUE.spark) / 2.5)); parkShot(t, { by: 9.5, crown: 1 - f, fire: f, fwK: .3, cp: V3(4, 4, 10), look: V3(0, 11, -6), fov: 42 }); return "3d"; }   // 火が水素へ（ゆっくり、閃光なし）
+    parkShot(t, { by: 10, fire: .6, fwK: 0, cp: V3(0, 1.4, 20), look: V3(0, 8, -6), fov: 46, exp: .85 }); return "3d"; }   // 着陸を待つ群衆の後ろ姿
+  if (name === "fall") {
+    if (t < CUE.net) { cityShot(t, { mode: "roof", u: clamp((t - CUE.fall) / (CUE.net - CUE.fall)) }); return "3d"; }   // 燃える気球が屋根へ（遠景）
+    if (t < CUE.funeral) { cityShot(t, { mode: "street", cp: V3(2.5, 1.2, -15), look: V3(.5, 0, -20), fov: 38 }); return "3d"; }   // 暗い通りに網だけ
+    if (t < CUE.last) { cityShot(t, { mode: "funeral", u: clamp((t - CUE.funeral) / 3), cp: V3(4, 2.2, 2), look: V3(0, 1, -14), fov: 40 }); return "3d"; }
+    const u = clamp((t - CUE.last) / 3); parkShot(t, { by: 6, inflate: 0, crown: 0, fwK: .25 * (1 - u), cp: V3(0, 2, 16), look: V3(0, 12, -10), fov: 46, exp: .7, ball: false }); return "3d"; }   // 冒頭の夜空、残り火が消える
+  return "2d";
+}
+function draw2D(t, name) {
+  bg.fillStyle = "#06070c"; bg.fillRect(0, 0, W, H);
+  if (name === "hook") { const box_ = [240, 330, 840, 1250]; photo(bg, IMG.portrait, k_(t, "sophie", .3), 1.35, 1.45, clamp((t - CUE.sophie) / 4), { box: box_, cx: .42, cy: .28, gray: 1, sepia: .35, rot: -.02, frame: "#f4ead8", bright: 1.0 }); }   // 肖像（上半身に寄せる）
+  if (name === "rise") { const box_ = [210, 300, 870, 1280]; photo(bg, IMG.portrait, k_(t, "milan", .3), 1.0, 1.06, clamp((t - CUE.milan) / 4), { box: box_, cy: .5, gray: 1, sepia: .35, rot: .015, frame: "#f4ead8", bright: 1.0 }); }   // ミラノ 1811（全体）
+}
+function openingBG(t) { bg.fillStyle = "rgba(0,0,0,.4)"; bg.fillRect(0, 0, W, H); photo(bg, IMG.fall, clamp(t / .3), 1.0, 1.06, clamp(t / 4), { box: [240, 700, 840, 1370], cy: .45, gray: 1, rot: -.015, frame: "#e8e4dc", bright: .95 }); }
+function fxEp(t, name) {   // 序盤の派手な飾り（紙吹雪・光の筋・スピード線）、終盤は何も足さない
+  if (name === "hook" && t < CUE.sophie) S.rays(bg, 540, 700, t, "rgba(255,180,90,.08)", 22);
+  if (name === "rise" && t >= CUE.alone && t < CUE.napoleon) S.speedLines(bg, 540, 800, t, "rgba(255,255,255,.22)", 50, 380, 8);
+  if (name === "rise" && t >= CUE.napoleon && t < CUE.milan) S.rays(bg, 540, 820, t, "rgba(255,120,200,.10)", 24);
+}
+
+// ---------------------------------------------------------------- 画面の文字（序盤はコテコテ、結は明朝体の静かな文字）
+function openingUI(t) {
+  const k = k_(t, "t0", .25, .05); if (k <= 0) return;
+  for (const [s, y, size] of [["祭りの夜空で", 330, 104], ["花火が気球に燃え移った", 490, 86]]) label(ui, s, 540, y, size, "#F4F7FA", { font: MIN, stroke: "#05080c", sw: .14 });
+  credit("「Death of Madame Blanchard」1869年の版画／パブリックドメイン", k, 1440);
+}
+function drawUI(t, name) {
+  if (name === "open") { openingUI(t); return; }
+  if (name === "hook") { confetti(ui, t, CUE.balloon, 2.4); S.note(ui, "※再現CGを含みます", 540, 1290, win(t, CUE.hook + .3, CUE.sophie, .3, .3), 26, true);
+    if (t < CUE.sophie) slam(ui, "1819年7月6日", 540, 320, 120, CUE.hook + .05, t, { cols: GOLD, rot: -.05, sub: "パリ・ティヴォリ公園" });
+    else { slam(ui, "ソフィー・ブランシャール", 540, 280, 80, CUE.sophie + .05, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: -.03 }); if (t >= CUE.first) slam(ui, "空を仕事にした最初の女性", 540, 1350, 66, CUE.first, t, { cols: GOLD, rot: .03 });
+      credit("Luigi Rados（1811）／米国議会図書館（パブリックドメイン）", k_(t, "sophie", .4), 1240); } }
+  if (name === "rise") {
+    if (t < CUE.debt) { if (t < CUE.collapse) slam(ui, "海峡を越えた夫", 540, 330, 110, CUE.husband + .05, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.04 }); else slam(ui, "1808年 倒れる", 540, 330, 110, CUE.collapse, t, { cols: WHITE, rot: -.03 }); }
+    else if (t < CUE.alone) slam(ui, "破産の寸前", 540, 380, 130, CUE.debt, t, { cols: RED, glow: "rgba(255,40,60,1)", rot: -.05 });
+    else if (t < CUE.napoleon) slam(ui, "一人で空へ", 540, 330, 140, CUE.alone + .1, t, { cols: GOLD, rot: -.05 });
+    else if (t < CUE.milan) { confetti(ui, t, CUE.napoleon, 2.6, 81); slam(ui, "ナポレオン", 540, 320, 130, CUE.napoleon + .05, t, { cols: GOLD, rot: -.05, sub: "祝典で飛ぶ役目" }); if (t >= CUE.wedding) slam(ui, "皇帝の結婚の祝い", 540, 1300, 76, CUE.wedding, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: .03 }); }
+    else if (t < CUE.alps) { slam(ui, "1811年 ミラノ", 540, 230, 90, CUE.milan + .1, t, { cols: GOLD, rot: -.03 }); credit("Luigi Rados「ミラノでの夜の上昇」1811年／米国議会図書館（パブリックドメイン）", k_(t, "milan", .4), 1340); }
+    else if (t < CUE.flood) slam(ui, "アルプスの上空", 540, 320, 100, CUE.alps + .1, t, { cols: ICE, glow: "rgba(120,190,255,.9)", rot: -.02, sub: "凍えかけた" });
+    else if (t < CUE.crowd) slam(ui, "溺れかけた", 540, 320, 110, CUE.flood + .05, t, { cols: ICE, rot: -.02 });
+    else slam(ui, "夜空の花火", 540, 320, 120, CUE.crowd + .1, t, { cols: PINK, glow: "rgba(255,80,180,1)", rot: -.02 }); }
+  if (name === "night") { if (t < CUE.fire) { slam(ui, "67回目の飛行", 540, 320, 110, CUE.night + .1, t, { cols: GOLD, rot: -.02 }); if (t >= CUE.crown) slam(ui, "光る花火の冠", 540, 1320, 80, CUE.crown, t, { cols: WHITE, rot: .02 }); }
+    else if (t < CUE.wait) slam(ui, "高さ およそ300m", 540, 320, 100, CUE.fire + .1, t, { cols: WHITE, rot: 0 });
+    else slam(ui, "着陸を待っていた", 540, 320, 96, CUE.wait + .2, t, { cols: WHITE, rot: 0 }); }
+  if (name === "fall") { if (t < CUE.net) slam(ui, "プロヴァンス通り", 540, 330, 110, CUE.fall + .3, t, { cols: WHITE, rot: 0 });
+    else if (t < CUE.lastw) { if (t >= CUE.age41) slam(ui, "41歳", 540, 600, 150, CUE.age41, t, { cols: WHITE, rot: 0 }); }
+    else if (t < CUE.last) slam(ui, "航空の事故で亡くなった最初の女性", 540, 360, 84, CUE.lastw + .2, t, { cols: WHITE, rot: 0, sub: "とされる" }); }
+}
+
+function buildMood() {   // 色調：序盤は派手 → L06 から少しずつ冷たく、彩度を落とし、暗く
+  const c = CUE;
+  MOOD = [[0, { cool: .3, sat: .9, vig: .75 }], [c.hook, { warm: .3, sat: 1.4, vig: .45 }], [c.sophie, { warm: .2, sat: 1.1, vig: .55 }], [c.husband, { warm: .1, sat: 1.25, vig: .5 }], [c.collapse, { cool: .15, sat: .9, vig: .6 }],
+    [c.alone, { warm: .25, sat: 1.35, vig: .45 }], [c.napoleon, { warm: .3, sat: 1.45, vig: .42 }], [c.milan, { warm: .2, sat: 1.1, vig: .55 }],
+    [c.alps, { cool: .25, sat: 1.0, vig: .58 }], [c.flood, { cool: .35, sat: .85, vig: .62 }], [c.crowd, { warm: .1, sat: 1.0, vig: .6 }], [c.night, { cool: .25, sat: .85, vig: .66 }],
+    [c.fire, { warm: .2, sat: .8, vig: .7 }], [c.wait, { cool: .45, sat: .65, vig: .74 }], [c.fall, { cool: .55, sat: .55, vig: .78 }], [c.net, { cool: .65, sat: .4, vig: .84 }], [c.last, { cool: .7, sat: .35, vig: .9 }]];
+}
+function thumb() {
+  CUE = CUE || {}; CUE.t0 = 0; parkShot(2, { by: 6, crown: 1, fwK: 1, cp: V3(0, 2, 14), fov: 44 }); S.moodGrade(bg, 0, [[0, { warm: .2, sat: 1.2, vig: .5 }]]); Cine.bloom(bg, .34); addGrain(0);
+  openingBG(4); for (const [s, y, size] of [["祭りの夜空で", 360, 110], ["花火が気球に燃え移った", 520, 88]]) label(ui, s, 540, y, size, "#F4F7FA", { font: MIN, stroke: "#05080c", sw: .14 });
+}
+kitStart(() => { buildPark(); buildDay(); buildCity(); });
+</script>
+</body></html>

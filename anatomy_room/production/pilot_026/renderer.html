@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_026 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="../common/vendor/earth/earth_tex.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script>
+// pilot_026「地球の年齢と、空の鉛——クレア・パターソン」のレンダラー（知的設計＋ガイドライン v2.4＋オープニング）。制作の土台は ext/kit/kit.js。
+// 起承転結のカットイン（カメラの動きだけ、文字・効果音なし）：起 dirt（傾いた寄りから引く）・承 age（引きから急に寄る）・転 warn（低い角度 → 紙の寄り → 引き）・結 end（寄りから大きく引く）。
+// CG：宇宙と隕石・研究室（Poly Haven の質感、MPFB の人体の後ろ姿、顔なし）・鉛の粒（赤）・大きな建物の影・地球（NASA Blue Marble、パブリックドメイン）。図は模式。
+Object.assign(KIT, {
+  design: "intel", scenes: ["open", "hook", "dirt", "source", "warn", "end"], images: ["crater", "pump"],
+  ci: { dirt: [[.26, .7]], age: [[-.18, 1.8]], warn: [[.22, 1.7], [0, 1.5], [-.14, .65]], end: [[0, .4]] },
+});
+loadImages(KIT.images);
+const PB = [255, 90, 80];   // 鉛の粒の色
+
+// ---------------------------------------------------------------- 宇宙と隕石
+const space = set("space"); let rock, trail, stars;
+function buildSpace() {
+  const g = new THREE.IcosahedronGeometry(1, 5), p = g.attributes.position, r = S.rng(5);
+  for (let i = 0; i < p.count; i++) { const v = V3(p.getX(i), p.getY(i), p.getZ(i)), n = .82 + .18 * Math.sin(v.x * 3.1 + 1) * Math.cos(v.y * 2.7) + .06 * Math.sin(v.z * 9 + v.x * 7); v.multiplyScalar(n); p.setXYZ(i, v.x, v.y * .85, v.z); }
+  g.computeVertexNormals(); const m = M(0x5a524a, { roughness: .95, metalness: .3 }); Cine.surface(m, "stone", { repeat: [3, 3], normal: 1.2 }); rock = new THREE.Mesh(g, m); rock.castShadow = true; space.add(rock);
+  trail = new THREE.Mesh(new THREE.ConeGeometry(.9, 9, 32, 1, true), new THREE.MeshBasicMaterial({ color: C(0xffa060), transparent: true, opacity: .45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  trail.rotation.x = -Math.PI / 2; trail.position.z = -5; trail.userData.noAO = true; space.add(trail);
+  const n = 2500, sp = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const a = r() * Math.PI * 2, b = Math.acos(2 * r() - 1), d = 60 + r() * 40; sp.set([d * Math.sin(b) * Math.cos(a), d * Math.sin(b) * Math.sin(a), d * Math.cos(b)], i * 3); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(sp, 3)); stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xdfe8ff, size: .18, sizeAttenuation: true })); space.add(stars);
+}
+function spaceShot(t, u, { earthK = 0 } = {}) {   // u：0→1 で隕石が奥から手前へ
+  show("space", ...(earthK > 0 ? ["earth"] : [])); scene.environment = null; rock.visible = trail.visible = earthK < .5;
+  rock.position.set(lerp(-7, .3, u), lerp(5, .1, u), lerp(-40, -1.5, u)); rock.rotation.set(t * .6, t * .4, 0); trail.position.copy(rock.position).add(V3(-.6, .5, -5)); trail.lookAt(rock.position); trail.rotateX(Math.PI / 2);
+  lights({ keyPos: [8, 3, 6], keyAt: [0, 0, -10], keyI: 30, angle: .9, keyCol: 0xfff2e0, rimPos: [-6, 2, -12], rimI: 1.4, rimCol: 0xff9a50, hemiI: .05, hemiSky: 0x223050, fog: .002, fogC: 0x020309, exp: 1.0 });
+  setCam(V3(0, 0, 6), V3(0, 0, -10), 42, .05, 300); draw3D({ ao: false });
+}
+
+// ---------------------------------------------------------------- 研究室（1950 年代、再現）：実験台・測定器・窓。汚れ（赤い粒）→ きれいな実験室
+const lab = set("lab"); let labWallM, labDust, leadPts, leadY0, sci, sciSit, paper, labWin, meter;
+function buildLab() {
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), pbr("old_wood_floor", [6, 6], { tint: 0x8a8a88 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; lab.add(floor);
+  labWallM = M(0x9aa0a4, { roughness: .95 }); Cine.surface(labWallM, "plaster", { repeat: [4, 2], normal: .4 });
+  for (const [x, z, ry] of [[0, -3, 0], [-3.5, 0, Math.PI / 2], [3.5, 0, -Math.PI / 2]]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(10, 4.5), labWallM); w.position.set(x, 2.25, z); w.rotation.y = ry; w.receiveShadow = true; lab.add(w); }
+  const top = M(0x2a2e32, { roughness: .35, metalness: .2 }); box(3.0, .06, 1.0, top, 0, .92, -1.6, lab); box(3.0, .9, .9, M(0x5a6068, { roughness: .6 }), 0, .45, -1.6, lab);
+  meter = new THREE.Group(); { const mm = M(0x3a4a5a, { roughness: .4, metalness: .5 }); box(.9, .55, .45, mm, 0, .28, 0, meter); box(.5, .3, .02, M(0x0a1a12, { emissive: C(0x1a6a3a), emissiveIntensity: .8 }), -.12, .32, .23, meter);
+    for (let i = 0; i < 4; i++) cyl(.035, .035, .03, M(0xb0b4b8, { metalness: 1, roughness: .3 }), .25, .15 + i * .1, .23, meter).rotation.x = Math.PI / 2; const tube = cyl(.06, .06, 1.2, M(0x9aa0a8, { metalness: .9, roughness: .3 }), -.7, .55, 0, meter); tube.rotation.z = Math.PI / 2.6; }
+  meter.position.set(-.5, .95, -1.65); lab.add(meter);
+  for (let i = 0; i < 5; i++) { const b = cyl(.04, .05, .16, Cine.glass({ thickness: .003, roughness: .05 }), .5 + i * .14, 1.03, -1.5); b.userData.noAO = true; lab.add(b); }
+  labWin = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.4), new THREE.MeshBasicMaterial({ color: C(0x5a7898) })); labWin.position.set(-3.48, 2.0, -.6); labWin.rotation.y = Math.PI / 2; labWin.userData.noAO = true; lab.add(labWin);
+  sci = human("man_stand", { coat: 0xe8e8e2, hair: 0x2a2018 }); sci.position.set(.75, 0, -.85); sci.rotation.y = Math.PI; lab.add(sci);
+  sciSit = human("man_sit", { coat: 0x3a3e46, hair: 0x2a2018 }); sciSit.position.set(.9, 0, -.85); sciSit.rotation.y = Math.PI; lab.add(sciSit);
+  paper = box(.3, .004, .4, M(0xf0ece0, { roughness: .9 }), .9, .955, -1.45, lab);
+  labDust = Cine.dust({ min: [-2.5, .4, -2.8], max: [2.5, 2.6, 1.5], count: 700, size: .01, seed: 81 }); lab.add(labDust.points);
+  const n = 900, p = new Float32Array(n * 3), r = S.rng(26); leadY0 = new Float32Array(n);   // 空気に浮かぶ鉛の粒（目に見えるように誇張した演出）
+  for (let i = 0; i < n; i++) { p.set([(r() - .5) * 5, .3 + r() * 2.4, -2.8 + r() * 4], i * 3); leadY0[i] = p[i * 3 + 1]; }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3));
+  leadPts = new THREE.Points(g, new THREE.PointsMaterial({ color: C(0xff5a4a), size: .045, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); lab.add(leadPts);
+}
+function labShot(t, { lead = 0, clean = 0, who = "stand", exp = 1.0 } = {}) {
+  show("lab"); envOn(.5 + .3 * clean); sci.visible = who === "stand"; sciSit.visible = who === "sit"; labDust.update(t, 1 - clean);
+  leadPts.material.opacity = .9 * lead; const p = leadPts.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, .3 + ((leadY0[i] - .3 + Math.sin(t * .7 + i) * .05 + t * .04) % 2.4 + 2.4) % 2.4); p.needsUpdate = true;
+  labWallM.color = C(0x9aa0a4).lerp(C(0xd8dee4), clean);
+  lights({ keyPos: [-3.2, 3, -.6], keyAt: [0, .9, -1.4], keyI: 11 + 6 * clean, angle: .7, keyCol: lerpHex(0xffe8c8, 0xf0f6ff, clean), rimPos: [2, 3, 3], rimI: .5, rimCol: 0x9fc8ff,
+    hemiI: .2 + .15 * clean, hemiSky: lerpHex(0xb8b4a8, 0xe8eef4, clean), hemiGround: 0x2a2620, fog: .03 - .015 * clean, fogC: lerpHex(0x0e0e10, 0x1a1e24, clean), exp });
+}
+function lerpHex(a, b, k) { return new THREE.Color(a).lerp(new THREE.Color(b), clamp(k)).getHex(); }
+
+// ---------------------------------------------------------------- 大きな建物の影（企業の力の比喩）
+const towers = set("towers");
+function buildTowers() {
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), M(0x0c0e12, { roughness: .3, metalness: .5 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; towers.add(fl);
+  const r = S.rng(9); for (let i = 0; i < 14; i++) { const h = 8 + r() * 14, b = box(2 + r() * 2, h, 2 + r() * 2, M(0x3a4252, { roughness: .45, metalness: .5 }), (i - 6.5) * 2.6 + (r() - .5), h / 2, -10 - r() * 8, towers);
+    for (let j = 0; j < 30; j++) box(.25, .12, .02, new THREE.MeshBasicMaterial({ color: C(r() > .6 ? 0xffd8a0 : 0x2a3448) }), b.position.x + (r() - .5) * 1.5, 1 + r() * (h - 2), b.position.z + 1.6, towers); }
+  const m = human("man_stand", { coat: 0x2a2e36, hair: 0x2a2018 }); m.position.set(0, 0, 0); m.rotation.y = Math.PI; towers.add(m);
+}
+function towersShot(t, u) { show("towers"); scene.environment = null;
+  lights({ keyPos: [0, 9, 10], keyAt: [0, 6, -12], keyI: 40, angle: .7, keyCol: 0xdfe8ff, rimPos: [0, 10, -30], rimI: 1.4, rimCol: 0xffc890, hemiI: .25, hemiSky: 0x5a6a88, fog: .012, fogC: 0x0a0e18, exp: 1.0 });
+  setCam(V3(.5, .9 + .3 * u, 4.6 - .6 * u), V3(0, 5.5, -12), 50, .05, 200); draw3D({ ao: true, dof: { focus: 4, aperture: .002, maxblur: .006 } }); }
+
+// ---------------------------------------------------------------- 地球（NASA Blue Marble）：赤い点（有鉛ガソリンの国、模式）が消えていく
+const earth = set("earth"); let globe, dots, dotT;
+function buildEarth() {
+  const tl = new THREE.TextureLoader(), land = tl.load(EARTH_TEX.land); land.encoding = THREE.sRGBEncoding; land.anisotropy = 16;
+  globe = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.MeshStandardMaterial({ map: land, roughness: .8, metalness: 0 })); globe.userData.noAO = true; earth.add(globe);
+  const atm = new THREE.Mesh(new THREE.SphereGeometry(1.03, 64, 48), new THREE.MeshBasicMaterial({ color: C(0x6ab8ff), transparent: true, opacity: .12, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false })); atm.userData.noAO = true; earth.add(atm);
+  const n = 117, r = S.rng(117), pos = new Float32Array(n * 3); dotT = new Float32Array(n);   // 2002 年に 117 か国（UNEP）。位置は模式（陸の上にばらす）
+  for (let i = 0; i < n; i++) { const last = i === n - 1, la = last ? 28 : (r() - .5) * 110, lo = last ? 3 : (r() - .5) * 340, a = la * Math.PI / 180, b = lo * Math.PI / 180;
+    pos.set([1.01 * Math.cos(a) * Math.sin(b + Math.PI / 2), 1.01 * Math.sin(a), 1.01 * Math.cos(a) * Math.cos(b + Math.PI / 2)], i * 3); dotT[i] = last ? 1 : r() * .9; }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+  dots = new THREE.Points(g, new THREE.PointsMaterial({ size: .045, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); earth.add(dots);
+}
+function earthShot(t, gone, { dist = 3.2, spin = 0, exp = 1.0 } = {}) {   // gone：0→1 で赤い点が消えていく（最後はアルジェリアのあたり）
+  show("earth"); scene.environment = null; globe.rotation.y = -1.75 + spin; dots.rotation.y = globe.rotation.y;
+  const c = dots.geometry.attributes.color; for (let i = 0; i < c.count; i++) { const k = clamp((dotT[i] - gone) / .05 + 1) * (1 - clamp((gone - dotT[i]) / .04)); c.setXYZ(i, k * 1.0, k * .25, k * .2); } c.needsUpdate = true;
+  lights({ keyPos: [4, 2, 5], keyAt: [0, 0, 0], keyI: 30, angle: .6, keyCol: 0xfff4e8, rimPos: [-4, 1, -3], rimI: .8, rimCol: 0x8fcfff, hemiI: .12, fog: 0, fogC: 0x020309, exp });
+  setCam(V3(0, .35, dist), V3(0, .1, 0), 40, .05, 300); draw3D({ ao: false });
+}
+
+// ---------------------------------------------------------------- 2D の図（ホログラムの台）：ウラン → 鉛・45.5 億年・海の断面・100 倍・氷の層・年表
+function uranDiag(X, t) {   // 模式：ウラン（緑）が時間をかけて鉛（灰）に変わる
+  panel(X); lab2(X, "ウラン → 鉛（模式）", 540, 410, T(34), "#B8DFF2", 800);
+  const k = clamp((t - CUE.uran - .2) / 1.8), r = S.rng(3);
+  for (let i = 0; i < 48; i++) { const x = 200 + (i % 8) * 97, y = 560 + Math.floor(i / 8) * 95, turned = r() < k * 1.1; X.beginPath(); X.arc(x, y, 30, 0, Math.PI * 2);
+    X.fillStyle = turned ? "#8a8f98" : "#5ae07a"; X.shadowColor = turned ? "#000" : "#5ae07a"; X.shadowBlur = turned ? 0 : 16; X.fill(); X.shadowBlur = 0; }
+  lab2(X, "長い時間", 540, 1180, T(30), "#FFE2A8", 800); X.strokeStyle = "rgba(255,226,168,.8)"; X.lineWidth = 4; X.beginPath(); X.moveTo(220, 1230); X.lineTo(220 + 640 * k, 1230); X.stroke();
+}
+function ageDiag(X, t) {   // 45.5 億年（1956 年の論文）
+  panel(X); lab2(X, "地球の年齢（1956年）", 540, 420, T(34), "#B8DFF2", 800);
+  const k = easeOut(clamp((t - CUE.age - .45) / .9)), v = Math.round(45.5 * k * 10) / 10;
+  lab2(X, `${v.toFixed(1)}億年`, 540, 760, T(110), "#FFE2A8", 900);
+  const e = k_(t, "err", .5); X.globalAlpha = e; lab2(X, "誤差 ±0.7億年", 540, 950, T(40), "#EAF2F8", 800); X.globalAlpha = 1;
+  X.strokeStyle = "rgba(143,220,255,.6)"; X.lineWidth = 3; X.beginPath(); X.moveTo(160, 1110); X.lineTo(920, 1110); X.stroke();
+  X.fillStyle = "#FFE2A8"; X.fillRect(160, 1100, 760 * k, 20); lab2(X, "地球の誕生", 200, 1170, T(24), "#8FB0C8", 600); lab2(X, "いま", 900, 1170, T(24), "#8FB0C8", 600);
+}
+function oceanDiag(X, t) {   // 海の断面（模式）：表面は鉛が多く、深くなると急に減る
+  panel(X); lab2(X, "南カリフォルニア沖の海（模式）", 540, 410, T(32), "#B8DFF2", 800);
+  const x0 = 170, x1 = 910, y0 = 500, y1 = 1200, g = X.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, "#1a4a7a"); g.addColorStop(1, "#04101e"); X.fillStyle = g; X.fillRect(x0, y0, x1 - x0, y1 - y0);
+  const k = easeInOut(clamp((t - CUE.ocean - .2) / 1.4)), r = S.rng(8);
+  for (let i = 0; i < 260; i++) { const d = Math.pow(r(), 3.2), x = x0 + 10 + r() * (x1 - x0 - 20), y = y0 + 10 + d * (y1 - y0 - 20); if (r() > k) continue; X.fillStyle = `rgba(${PB},${.85 - d * .5})`; X.fillRect(x - 3, y - 3, 6, 6); }
+  lab2(X, "表面", x1 - 70, y0 + 40, T(26), "#FFB0A0", 800); lab2(X, "深い海", x1 - 90, y1 - 40, T(26), "#8FB0C8", 700); lab2(X, "● 鉛", x0 + 80, y0 + 40, T(24), "#FF8A7A", 700);
+}
+function hundredDiag(X, t) {   // 1965 年の見積もり：現代人の体の鉛は、産業以前の最大 100 倍
+  panel(X); lab2(X, "体の鉛（1965年の見積もり）", 540, 410, T(32), "#B8DFF2", 800);
+  const k = easeOut(clamp((t - CUE.hundred - .1) / 1.2)), base = 1120, hmax = 560;
+  X.fillStyle = "#8a8f98"; X.fillRect(250, base - 6, 160, 6); lab2(X, "昔の人", 330, base + 46, T(28), "#B8C7D6", 700);
+  const h = hmax * k; X.fillStyle = `rgb(${PB})`; X.shadowColor = `rgb(${PB})`; X.shadowBlur = 20; X.fillRect(640, base - h, 160, h); X.shadowBlur = 0; lab2(X, "現代人", 720, base + 46, T(28), "#FFB0A0", 700);
+  if (k > .6) lab2(X, "最大 100倍", 720, base - h - 50, T(40), "#FFE2A8", 900);
+}
+function iceDiag(X, t) {   // グリーンランドの雪と氷の層（模式）：上（新しい）ほど鉛が多い
+  panel(X); lab2(X, "グリーンランドの氷の層（模式）", 540, 410, T(32), "#B8DFF2", 800);
+  const k = easeInOut(clamp((t - CUE.ice - .1) / 1.4)), x0 = 260, x1 = 820, y0 = 500, y1 = 1180;
+  for (let i = 0; i < 14; i++) { const y = y1 - (i + 1) * (y1 - y0) / 14, up = i / 13, lead = Math.pow(up, 3) * k; X.fillStyle = `rgb(${200 + 40 * (1 - up)},${225 - 120 * lead},${240 - 150 * lead})`; X.fillRect(x0, y, x1 - x0, (y1 - y0) / 14 - 3); }
+  lab2(X, "いま", x1 + 70, y0 + 25, T(26), "#FFB0A0", 800); lab2(X, "古代", x1 + 70, y1 - 25, T(26), "#B8C7D6", 700); if (k > .7) lab2(X, "約200倍", 540, y0 + 26, T(36), "#7a1a14", 900);
+}
+function lawDiag(X, t) {   // 規制の年表（Caltech の記事）
+  panel(X, 430, 1180); lab2(X, "アメリカの規制", 540, 510, T(34), "#B8DFF2", 800);
+  [["1970", "大気浄化法"], ["1970年代", "鉛を減らしていく"], ["1986", "ガソリンの鉛を禁止"]].forEach(([y, s], i) => { const a = clamp((t - CUE.law - .1 - i * .45) / .3); if (a <= 0) return; X.globalAlpha = a;
+    lab2(X, y, 300, 680 + i * 170, T(38), "#FFE2A8", 900); lab2(X, s, 640, 680 + i * 170, T(32), "#EAF2F8", 800); X.globalAlpha = 1; });
+}
+
+// ---------------------------------------------------------------- 場面
+function ciShot(t, P) {   // 転（警告）の 3 カット：低い角度の机 → 紙の寄り → 引き
+  labShot(t, { lead: .2, clean: .8 });
+  if (P.p === 0) setCam(V3(2.0, .5, 1.6), V3(.4, 1.5, -1.2), 40, .02, 40);
+  else if (P.p === 1) { const mp = meter.position; setCam(V3(mp.x + .35, mp.y + .45, mp.z + .9), V3(mp.x - .1, mp.y + .3, mp.z), 34, .02, 30); }
+  else setCam(V3(2.4, 1.6, 2.2), V3(.6, 1.0, -1.2), 42, .02, 40);
+  draw3D({ ao: true, dof: P.p === 1 ? { focus: 1.0, aperture: .008, maxblur: .01 } : null });
+}
+function drawScene(t, name) {
+  const P = ciPhase(t); if (P && P.c === "warn") { ciShot(t, P); return "3d"; }
+  if (name === "open") { driftShot(t); return "3d"; }
+  if (name === "hook") { if (t < CUE.bench) { spaceShot(t, easeOut(clamp((t - CUE.hook + .2) / (CUE.bench - CUE.hook + .2)))); return "3d"; }   // 宇宙から落ちてくる隕石（最初の 1 秒）
+    if (t < CUE.uran) { labShot(t, {}); const u = easeInOut(clamp((t - CUE.bench) / (CUE.uran - CUE.bench))); setCam(V3(2.6 - .4 * u, 1.7, 2.8 - .5 * u), V3(-.1, 1.1, -1.5), 40, .02, 40); draw3D({ ao: true, dof: { focus: 4.0, aperture: .003, maxblur: .008 } }); return "3d"; }
+    return "2d"; }
+  if (name === "dirt") { if (t < CUE.age) { const lead = clamp((t - CUE.contam) / .6) * (1 - clamp((t - CUE.clean - .3) / 1.6)), clean = easeInOut(clamp((t - CUE.clean) / 2)); labShot(t, { lead, clean });
+      const u = easeInOut(clamp((t - CUE.dirt - CUT[0]) / (CUE.age - CUE.dirt))); setCam(V3(2.8 - .9 * u, 1.6, 3.0 - .8 * u), V3(-.2, 1.2, -1.4), 42, .02, 40); draw3D({ ao: true, dof: { focus: 4.0 - .8 * u, aperture: .003, maxblur: .008 } }); return "3d"; }
+    if (t < CUE.age + CUT[0]) { earthShot(t, 0, { dist: 3.0, spin: t * .1 }); dots.visible = false; return "3d"; }   // 承のカットイン：地球に急に寄る
+    return "2d"; }
+  if (name === "source") { dots.visible = true;
+    if (t < CUE.ocean) { labShot(t, { lead: .7, clean: .9 }); const u = easeInOut(clamp((t - CUE.source) / (CUE.ocean - CUE.source))); setCam(V3(2.2 - 1.6 * u, 1.7, 2.4 - .6 * u), V3(-3.4, 1.9, -.6), 44, .02, 40); draw3D({ ao: true }); return "3d"; }   // 窓へ向かう
+    return "2d"; }
+  if (name === "warn") { if (t < CUE.ice) return "2d"; if (t < CUE.fight) return "2d"; if (t < CUE.law) { towersShot(t, clamp((t - CUE.fight) / (CUE.law - CUE.fight))); return "3d"; } return "2d"; }
+  if (name === "end") { dots.visible = true; if (t < CUE.back) { earthShot(t, easeInOut(clamp((t - CUE.end - .3) / (CUE.un - CUE.end))), { dist: 3.2 + .4 * clamp((t - CUE.un) / 3), spin: (t - CUE.end) * .08 }); return "3d"; }
+    const u = easeInOut(clamp((t - CUE.back) / 3.5)); if (u < .55) { earthShot(t, 1, { dist: 3.6 + 8 * u, spin: (t - CUE.end) * .08 }); return "3d"; }
+    spaceShot(t, clamp((u - .55) / .45) * .6, { earthK: 0 }); return "3d"; }   // 澄んだ地球から宇宙へ（冒頭の隕石につなげる）
+  return "2d";
+}
+function draw2D(t, name) {
+  holoClear(); const X = holoX;
+  if (name === "hook") { uranDiag(X, t); holoDraw(t); return; }
+  if (name === "dirt") { ageDiag(X, t); holoDraw(t, { tilt: -.12 }); return; }
+  if (name === "source") { if (t < CUE.sky) { oceanDiag(X, t); holoDraw(t); return; } pumpView(t); return; }
+  if (name === "warn") { if (t < CUE.ice) { hundredDiag(X, t); holoDraw(t); return; } if (t < CUE.fight) { iceDiag(X, t); holoDraw(t, { edge: 0xbfe8ff }); return; } lawDiag(X, t); holoDraw(t, { tilt: -.1 }); return; }
+  bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H);
+}
+function pumpView(t) {   // 本物の写真（ETHYL の給油機）→ 空へ上がる赤い粒
+  bg.fillStyle = "#05080c"; bg.fillRect(0, 0, W, H); const box_ = [250, 360, 830, 1250];
+  photo(bg, IMG.pump, k_(t, "sky", .4), 1.0, 1.08, clamp((t - CUE.sky) / 3), { box: box_, cy: .45, gray: 0, bright: .95 }); photoGlow(t, CUE.sky, box_);
+  const r = S.rng(31), u = t - CUE.sky; bg.save(); bg.globalCompositeOperation = "screen";
+  for (let i = 0; i < 160; i++) { const x = 300 + r() * 480, y = 1250 - ((u * (120 + r() * 220) + r() * 900) % 1100); bg.fillStyle = `rgba(${PB},${.75 * clamp(u / .5) * r()})`; bg.fillRect(x, y, 5, 5); } bg.restore();
+}
+function openingBG(t) { bg.fillStyle = "rgba(2,4,12,.35)"; bg.fillRect(0, 0, W, H); const box_ = [110, 720, 970, 1080]; photo(bg, IMG.crater, k_(t, "t0", .5, .1), 1.0, 1.06, clamp(t / 3), { box: box_, cy: .5, gray: 0, bright: 1.0 }); photoGlow(t, .1, box_); }
+
+// ---------------------------------------------------------------- 画面の文字（オープニング・見出し・注記）
+function openingUI(t) {
+  const k = k_(t, "t0", .4, .05);
+  HUD.title(ui, [["地球の年齢を測った男は", T(60), "#EAF2F8"], ["ガソリンと戦う", T(92), "#FFD58A"]], 540, 420, k, t);
+  credit("バリンジャー・クレーター（アリゾナ）", k, 1130); credit("写真：USGS／D. Roddy（パブリックドメイン）", k, 1170); }
+function drawUI(t, name) {
+  if (name === "open") { openingUI(t); return; }
+  if (t >= CUE.hook && t < CUE.dirt) uiNote("※再現CGを含みます", 540, 1250, win(t, CUE.hook + .3, CUE.uran, .3, .3));
+  if (name === "hook" && t >= CUE.bench && t < CUE.uran) uiCard([["1950年代 アメリカ", T(34), 800], ["化学者 クレア・パターソン", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "bench", .45));
+  if (name === "dirt") { if (t >= CUE.dirt + CUT[0] && t < CUE.clean) uiCard([["測るたびに 値がずれる", T(32), 800], ["原因は 実験室の鉛", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "dirt", .45, CUT[0]));
+    else if (t >= CUE.clean && t < CUE.age) uiCard([["きれいな実験室", T(34), 800], ["自分で設計して作った", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "clean", .45, .2));
+    if (t >= CUE.contam && t < CUE.clean) uiNote("※粒は見えるように表した演出", 540, 1250, k_(t, "contam", .4)); }
+  if (name === "source" && t >= CUE.pump) { credit("写真：John Margolies（1982）", k_(t, "pump", .4), 1300); credit("米国議会図書館／パブリックドメイン", k_(t, "pump", .4), 1340); }
+  if (name === "source" && t >= CUE.ocean && t < CUE.sky) uiNote("※模式図", 540, 1320, k_(t, "ocean", .4));
+  if (name === "warn") { if (t >= CUE.muro && t < CUE.fight) uiCard([["室住正世（むろずみ まさよ）", T(32), 800], ["室蘭工業大学 1969年の論文の筆頭著者", T(24), 500, "#B8C7D6"]], 540, 1290, k_(t, "muro", .45, .1));
+    if (t >= CUE.ice && t < CUE.muro) uiNote("※模式図", 540, 1320, k_(t, "ice", .4)); }
+  if (name === "end") { if (t < CUE.un && t >= CUE.end + CUT[0]) uiCard([["2021年8月", T(34), 800], ["有鉛ガソリンの時代が終わる（国連）", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "end", .45, CUT[0]));
+    else if (t >= CUE.un && t < CUE.back) uiCard([["毎年 120万人以上", T(36), 900, "#FFE2A8"], ["早すぎる死を防げる（国連の発表）", T(26), 500, "#B8C7D6"]], 540, 250, k_(t, "un", .45));
+    if (t < CUE.back) uiNote("※点の位置は模式", 540, 1330, k_(t, "end", .4, .5)); }
+}
+
+function buildMood() {
+  const c = CUE;
+  MOOD = [[0, { cool: .2, warm: .05, sat: 1.0, vig: .6 }], [c.hook, { cool: .35, sat: .95, vig: .62 }], [c.bench, { warm: .1, sat: .95, vig: .58 }], [c.uran, { cool: .2, sat: 1.0, vig: .55 }],
+    [c.dirt, { warm: .1, sat: .85, vig: .66 }], [c.contam, { warm: .15, sat: .8, vig: .68 }], [c.clean, { cool: .1, sat: .95, vig: .5 }], [c.age, { warm: .2, sat: 1.05, glow: .3, glowX: .5, glowY: .4, vig: .5 }],
+    [c.source, { cool: .2, sat: .9, vig: .6 }], [c.sky, { warm: .1, sat: .95, vig: .58 }], [c.warn, { cool: .25, sat: .85, vig: .66 }], [c.fight, { cool: .4, sat: .75, vig: .72 }],
+    [c.law, { cool: .1, sat: .95, vig: .58 }], [c.end, { cool: .1, warm: .1, sat: 1.0, vig: .55 }], [c.un, { warm: .25, sat: 1.05, glow: .25, glowX: .5, glowY: .45, vig: .5 }], [c.back, { warm: .2, sat: 1.05, vig: .52 }]];
+}
+function thumb() {
+  CUE = CUE || {}; CUE.t0 = 0; driftShot(1); openingBG(4);
+  S.moodGrade(bg, 0, [[0, { cool: .2, warm: .05, sat: 1.05, vig: .55 }]]); Cine.bloom(bg, .3); addGrain(0);
+  HUD.title(ui, [["地球の年齢を測った男は", 78, "#EAF2F8"], ["ガソリンと戦う", 116, "#FFD58A"]], 540, 420, 1, 9);
+  text(ui, "クレア・パターソン", 540, 1300, 72, "#EAF2F8", { weight: 900, stroke: "#06101c", sw: 14 });
+}
+kitStart(() => { buildSpace(); buildLab(); buildTowers(); buildEarth(); });
+</script>
+</body></html>

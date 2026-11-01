@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_025 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script>
+// pilot_025「1秒で止まる男——ジョン・ポール・スタップ」のレンダラー（ドパ設計＋ガイドライン v2.4＋オープニング）。制作の土台は ext/kit/kit.js。
+// ドパ設計：叩きつける文字（slam）・跳ねる字幕（popSub）・画面の一打（KIT.hits）・スピード線。閃光は使わない。
+// 起承転結のカットイン（文字なし、効果音と一打たっぷり）：起 why・承 train・転 final（ノズルの寄り → 水のブレーキ → 止まる瞬間）・結 legacy。
+// CG：砂漠のレール・ロケットそり（再現）・人体（MPFB、ヘルメット、後ろ姿、顔なし）・戦闘機・旅客機の影・車の座席（再現）。けがは札と本物の写真で示す。
+Object.assign(KIT, {
+  design: "dopa", scenes: ["open", "hook", "why", "train", "final", "legacy"], images: ["sled", "strap", "faces"],
+  ci: { why: [[.28, .65]], train: [[-.22, 1.9]], final: [[.25, 1.8], [-.1, 1.6], [.16, .6]], legacy: [[0, .38]] },
+  hits: [["hook", 1.2], ["ignite", 1.6], ["sled", 1.0], ["speed", 1.4], ["plane", 1.2], ["man", .8], ["g18", 1.4], ["eject", 1.0], ["self", 1.6], ["train", .6, .5], ["rib", 1.0], ["wrist", 1.2],
+    ["setk", 1.8], ["stop", 2.0, 1.05], ["g40", 1.8], ["ton", 1.2, .4], ["ok", .8], ["ban", 1.0, .3], ["back", 1.2, .7]],
+});
+loadImages(KIT.images);
+
+// ---------------------------------------------------------------- 砂漠のレールとロケットそり
+const desert = set("desert"); let sled, flames = [], smoke, spray, rider, trackLen = 400;
+function buildDesert() {
+  const sandM = M(0xb89a72, { roughness: .95 }); Cine.surface(sandM, "stone", { repeat: [60, 60], normal: .6 });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 900), sandM); ground.rotation.x = -Math.PI / 2; ground.position.z = -300; ground.receiveShadow = true; desert.add(ground);
+  const steel = M(0x8a8e94, { metalness: .9, roughness: .35 }), conc = M(0x9a948a, { roughness: .9 });
+  box(2.4, .25, trackLen + 40, conc, 0, .12, -trackLen / 2, desert); for (const x of [-.75, .75]) box(.12, .14, trackLen + 40, steel, x, .32, -trackLen / 2, desert);
+  const trough = box(.6, .2, 40, M(0x3a5a78, { roughness: .1, metalness: .3 }), 0, .27, -trackLen + 30, desert);   // 水のブレーキの溝
+  const r = S.rng(4); for (let i = 0; i < 16; i++) { const h = 20 + r() * 40, m = new THREE.Mesh(new THREE.ConeGeometry(30 + r() * 40, h, 6), M(0x8a6a58, { roughness: 1 })); m.position.set((r() - .5) * 500, h / 2 - 2, -420 - r() * 200); desert.add(m); }
+  sled = new THREE.Group(); const red = M(0xd0201c, { roughness: .45, metalness: .3 }), white = M(0xeeeeea, { roughness: .5 }), dark = M(0x2a2c30, { roughness: .5, metalness: .6 });
+  box(1.7, .18, 3.4, dark, 0, .5, 0, sled); box(1.5, .5, 1.2, red, 0, .85, -.2, sled); box(1.5, .1, 1.2, white, 0, 1.12, -.2, sled); box(.9, .9, .12, red, 0, 1.35, .45, sled);   // 車体・座席の背
+  for (const x of [-.7, .7]) for (const z of [-1.4, 1.4]) box(.2, .2, .4, steel, x, .38, z, sled);
+  const nz = []; for (let i = 0; i < 9; i++) { const x = ((i % 3) - 1) * .42, y = .75 + Math.floor(i / 3) * .3; const n = cyl(.11, .15, .5, dark, x, y, 1.75, sled); n.rotation.x = Math.PI / 2; nz.push([x, y]); }
+  for (const [x, y] of nz) { const f = new THREE.Mesh(new THREE.ConeGeometry(.17, 2.4, 20, 1, true), new THREE.MeshBasicMaterial({ color: C(0xffb050), transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    f.rotation.x = -Math.PI / 2; f.position.set(x, y, 3.2); f.userData.noAO = true; sled.add(f); flames.push(f); }
+  rider = human("man_sit", { coat: 0x5a6a4a, hair: 0x2a2018 }); rider.position.set(0, .7, .25); rider.rotation.y = Math.PI; sled.add(rider);
+  sph(.17, M(0xeeeeea, { roughness: .3, metalness: .2 }), 0, 1.9, .3, sled);   // ヘルメット（顔は見せない）
+  desert.add(sled);
+  smoke = Cine.dust({ min: [-3, 0, 0], max: [3, 3, 30], count: 1200, size: .25, seed: 12 }); desert.add(smoke.points);
+  const n = 900, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) p.set([0, 0, 0], i * 3); const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3));
+  spray = new THREE.Points(g, new THREE.PointsMaterial({ color: C(0xdff0ff), size: .12, transparent: true, opacity: .9, depthWrite: false })); desert.add(spray);
+}
+// x：そりの位置（0＝出発、trackLen＝停止）、fire：炎の強さ、spr：しぶきの強さ
+function desertShot(t, { z = 0, fire = 0, spr = 0, cp, look, fov = 40, dusk = 0, dof = null } = {}) {
+  show("desert"); scene.environment = null; sled.position.set(0, 0, -z);
+  flames.forEach((f, i) => { const s = fire * (.85 + .3 * Math.sin(t * 60 + i * 1.7)); f.visible = fire > .01; f.scale.set(1, s, 1); f.position.z = 1.75 + 1.2 * s; });
+  smoke.points.position.set(0, 0, -z); smoke.update(t, fire > 0 ? 1 : .2); smoke.points.visible = fire > 0;
+  const sp = spray.geometry.attributes.position, r = S.rng(Math.floor(t * 30)); spray.visible = spr > 0;
+  if (spr > 0) for (let i = 0; i < sp.count; i++) { const a = r() * Math.PI, v = 2 + r() * 8 * spr, u = r(); sp.setXYZ(i, Math.cos(a) * v * u * .6, .4 + Math.sin(a) * v * u, -z - 1.8 + u * 4); } sp.needsUpdate = true;
+  const sky = lerpHex(0xffc890, 0xff8a50, dusk);
+  lights({ keyPos: [30, 40 - 25 * dusk, 20], keyAt: [0, 0, -z], keyI: 38 - 12 * dusk, angle: .5, keyCol: sky, rimPos: [-20, 10, -80], rimI: 1.2, rimCol: 0x9fc8ff, hemiI: .5, hemiSky: lerpHex(0xc8d8f0, 0xf0a878, dusk), hemiGround: 0x6a5038, fog: .004, fogC: lerpHex(0xe0c8a8, 0xc07858, dusk), exp: 1.0 });
+  setCam(cp || V3(4, 1.6, -z + 6), look || V3(0, 1, -z), fov, .05, 900); draw3D({ ao: false, dof });
+}
+function lerpHex(a, b, k) { return new THREE.Color(a).lerp(new THREE.Color(b), clamp(k)).getHex(); }
+// 走行の位置（z）：点火から 5 秒で最高速度、最後は 1 秒あまりで止まる（見せ方は誇張なしの形だけ）
+const zRun = u => trackLen * .55 * u * u;   // u：0→1
+// 旅客機と戦闘機の影
+const sky = set("sky"); let liner, jet, seatPop;
+function buildSky() {
+  const g = M(0xdfe4ea, { roughness: .4, metalness: .5 }), d = M(0x5a6068, { roughness: .4, metalness: .6 });
+  liner = new THREE.Group(); cyl(1.6, 1.6, 30, g, 0, 0, 0, liner).rotation.x = Math.PI / 2; box(34, .3, 5, g, 0, -.3, 1, liner); box(10, .25, 2.5, g, 0, .2, 13, liner); box(.3, 5, 3, g, 0, 2.6, 13.5, liner); sky.add(liner);
+  jet = new THREE.Group(); cyl(.7, .4, 12, d, 0, 0, 0, jet).rotation.x = Math.PI / 2; box(8, .15, 3.5, d, 0, 0, .8, jet); box(.15, 2.2, 2, d, 0, 1.1, 5, jet); sky.add(jet);
+  seatPop = new THREE.Group(); box(.6, .1, .6, M(0x3a3e44), 0, 0, 0, seatPop); box(.6, .8, .1, M(0x3a3e44), 0, .4, -.25, seatPop); const pr = human("man_sit", { coat: 0x5a6a4a }); pr.scale.setScalar(.75); pr.rotation.y = Math.PI; seatPop.add(pr); sky.add(seatPop);
+  const n = 800, p = new Float32Array(n * 3), r = S.rng(2); for (let i = 0; i < n; i++) p.set([(r() - .5) * 300, (r() - .5) * 100, -50 - r() * 300], i * 3);
+  const cg = new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.BufferAttribute(p, 3)); const clouds = new THREE.Points(cg, new THREE.PointsMaterial({ color: 0xffffff, size: 6, transparent: true, opacity: .25, depthWrite: false })); sky.add(clouds);
+}
+function skyShot(t, { mode = "liner", u = 0 } = {}) {
+  show("sky"); scene.environment = null; liner.visible = mode === "liner"; jet.visible = seatPop.visible = mode === "jet";
+  liner.position.set(-6, 3, -40 + 30 * u); jet.position.set(0, 0, -14); jet.rotation.set(0, 0, Math.sin(t * 3) * .05); seatPop.position.set(0, .6 + 9 * easeOut(u), -14.5); seatPop.rotation.x = -.6 * u;
+  lights({ keyPos: [20, 30, 20], keyAt: [0, 0, -20], keyI: 30, angle: .8, keyCol: 0xfff0d8, rimPos: [-10, 5, -40], rimI: 1, rimCol: 0x9fc8ff, hemiI: .8, hemiSky: 0x8ab8ff, hemiGround: 0x3a4a6a, fog: .004, fogC: 0x6a98d8, exp: 1.0 });
+  if (mode === "liner") setCam(V3(2, 1, 4), V3(-3, 2, -30), 50, .05, 900); else setCam(V3(5, 3 + 3 * u, -6), V3(0, 1 + 6 * u, -14), 46, .05, 900);
+  draw3D({ ao: false });
+}
+// 医師の影（ぼやけた視界 → はっきり）・車の座席とシートベルト
+const room = set("room"); let doc, carSeat, belt, buckle;
+function buildRoom() {
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), pbr("old_wood_floor", [6, 6], { tint: 0x6a6a68 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; room.add(fl);
+  const wm = M(0xb8c0c4, { roughness: .9 }); const w = new THREE.Mesh(new THREE.PlaneGeometry(20, 6), wm); w.position.set(0, 3, -3); room.add(w);
+  doc = human("man_stand", { coat: 0xeeeeea, hair: 0x2a2018 }); doc.position.set(0, 0, -1.2); doc.rotation.y = Math.PI; room.add(doc);   // 後ろ姿（顔は描かない）。強いぼかしからはっきりへ
+  carSeat = new THREE.Group(); const sm = M(0x2a2c32, { roughness: .8 }); Cine.surface(sm, "fabric", { repeat: [4, 4], normal: .8 }); box(.6, .15, .6, sm, 0, .5, 0, carSeat); box(.6, .8, .15, sm, 0, .95, -.25, carSeat); box(.35, .25, .12, sm, 0, 1.45, -.27, carSeat);
+  belt = box(.06, 1.1, .02, M(0x1a1a1e, { roughness: .6 }), 0, .95, .0, carSeat); belt.rotation.z = .7; buckle = box(.12, .08, .04, M(0xc8ccd2, { metalness: 1, roughness: .2 }), .3, .55, .02, carSeat);
+  carSeat.position.set(4, 0, -1); room.add(carSeat);
+}
+function roomShot(t, { mode = "doc", u = 0 } = {}) {
+  show("room"); envOn(.5); doc.visible = mode === "doc"; carSeat.visible = mode === "seat";
+  lights({ keyPos: [0, 3, -4], keyAt: [0, 1, -1], keyI: 20, angle: .7, keyCol: 0xfff0e0, rimPos: [2, 3, 3], rimI: .4, rimCol: 0x9fc8ff, hemiI: .3, fog: .03, fogC: 0x10141a, exp: 1.0 });
+  if (mode === "doc") { setCam(V3(0, 1.5, 2.2), V3(0, 1.4, -1.2), 40, .02, 40); draw3D({ ao: true, dof: { focus: lerp(.4, 3.4, u), aperture: .03 * (1 - u) + .002, maxblur: .03 * (1 - u) + .004 } }); }
+  else { buckle.position.x = lerp(.6, .3, easeOut(clamp(u * 2))); setCam(V3(4 + 1.1 - .3 * u, 1.2, .6 - .2 * u), V3(4, .9, -1.1), 40, .02, 40); draw3D({ ao: true, dof: { focus: 1.6, aperture: .004, maxblur: .008 } }); }
+}
+
+// ---------------------------------------------------------------- 2D：けがの札と写真・3 トンの針・1600 キロの計画
+function facesView(t) {   // 本物の連続写真（B3、1954 年 6 月発表の走行）
+  bg.fillStyle = "#0a0608"; bg.fillRect(0, 0, W, H); const box_ = [170, 380, 910, 1320];
+  photo(bg, IMG.faces, k_(t, "injur", .25), 1.0, 1.1, clamp((t - CUE.injur) / 3), { box: box_, cy: .5, gray: 1, rot: -.02, frame: "#fff", bright: .95 });
+}
+function gaugeView(t) {   // 体重計の針が約 3 トンへ（模式）
+  bg.fillStyle = "#0a0c12"; bg.fillRect(0, 0, W, H); const cx = 540, cy = 900, R0 = 330, k = easeOut(clamp((t - CUE.ton) / .5));
+  bg.save(); bg.lineWidth = 26; bg.strokeStyle = "#2a3040"; bg.beginPath(); bg.arc(cx, cy, R0, Math.PI, 0); bg.stroke();
+  bg.strokeStyle = "#ff3a3a"; bg.beginPath(); bg.arc(cx, cy, R0, Math.PI, Math.PI + Math.PI * .92 * k); bg.stroke();
+  const a = Math.PI + Math.PI * .92 * k + Math.sin(t * 50) * .02 * k; bg.strokeStyle = "#fff"; bg.lineWidth = 12; bg.lineCap = "round"; bg.beginPath(); bg.moveTo(cx, cy); bg.lineTo(cx + Math.cos(a) * (R0 - 40), cy + Math.sin(a) * (R0 - 40)); bg.stroke();
+  bg.fillStyle = "#fff"; bg.beginPath(); bg.arc(cx, cy, 24, 0, Math.PI * 2); bg.fill(); bg.restore();
+}
+function planView(t) {   // 時速 1600 キロ（1000 マイル）の計画に ×（再現）
+  bg.fillStyle = "#0a0c12"; bg.fillRect(0, 0, W, H); const k = k_(t, "ban", .3);
+  bg.save(); bg.globalAlpha = k; bg.translate(540, 820); bg.rotate(-.04); bg.fillStyle = "#ece4d0"; bg.shadowColor = "rgba(0,0,0,.6)"; bg.shadowBlur = 30; bg.fillRect(-330, -380, 660, 760); bg.shadowBlur = 0;
+  bg.strokeStyle = "rgba(60,70,90,.3)"; bg.lineWidth = 2; for (let i = 0; i < 10; i++) { bg.beginPath(); bg.moveTo(-280, -200 + i * 55); bg.lineTo(200 - (i % 3) * 60, -200 + i * 55); bg.stroke(); }
+  bg.restore(); const x = clamp((t - CUE.ban - .9) / .2); if (x > 0) { bg.save(); bg.translate(540, 820); bg.strokeStyle = "#e8102e"; bg.lineWidth = 48; bg.lineCap = "round"; bg.globalAlpha = .92;
+    bg.beginPath(); bg.moveTo(-250, -250); bg.lineTo(-250 + 500 * Math.min(1, x * 2), -250 + 500 * Math.min(1, x * 2)); bg.stroke(); if (x > .5) { const y = (x - .5) * 2; bg.beginPath(); bg.moveTo(250, -250); bg.lineTo(250 - 500 * y, -250 + 500 * y); bg.stroke(); } bg.restore(); }
+}
+
+// ---------------------------------------------------------------- 場面
+function ciShot(t, P) {   // 転（最後の走行）の 3 カット：ノズルの寄り → 水のブレーキのしぶき → 止まる瞬間
+  if (P.p === 0) { desertShot(t, { z: 2, fire: 1.3, cp: V3(1.6, 1.1, -2 + 5.2), look: V3(0, .9, -2 + 1.6), fov: 36 }); return; }
+  if (P.p === 1) { const z = trackLen - 18; desertShot(t, { z, fire: 0, spr: 1.2, cp: V3(3.2, .6, -z + 3), look: V3(0, 1, -z - 1), fov: 44 }); return; }
+  const z = trackLen - 12; desertShot(t, { z, fire: 0, spr: .7, cp: V3(-5, 1.4, -z + 1), look: V3(0, 1.1, -z), fov: 34 });
+}
+function drawScene(t, name) {
+  const P = ciPhase(t); if (P && P.c === "final") { ciShot(t, P); return "3d"; }
+  if (name === "open") { desertShot(t, { z: 0, cp: V3(6, 2, 8), look: V3(0, 1, -2), fov: 44, dusk: .3 }); return "3d"; }
+  if (name === "hook") {
+    if (t < CUE.sled) { const f = clamp((t - CUE.ignite) / .2); desertShot(t, { z: 0, fire: f, cp: V3(2.6 - .6 * f, 1.0, 5.5 - 1.2 * f), look: V3(0, 1.0, 1.2), fov: 42 }); return "3d"; }   // 9 本のノズルの点火（最初の 1 秒）
+    if (t < CUE.plane) { const u = clamp((t - CUE.sled) / (CUE.plane - CUE.sled)), z = zRun(u); desertShot(t, { z, fire: 1, cp: V3(5 - 2 * u, 1.3, -z + 9 - 4 * u), look: V3(0, 1, -z - 2), fov: 42 + 10 * u }); return "3d"; }   // 一気に加速
+    if (t < CUE.man) { skyShot(t, { mode: "liner", u: clamp((t - CUE.plane) / (CUE.man - CUE.plane)) }); return "3d"; }   // 旅客機を追い越す
+    const u = clamp((t - CUE.man) / (CUE.why - CUE.man)); desertShot(t, { z: 1, cp: V3(.4, 2.4 + .2 * u, 1.6 - .4 * u), look: V3(0, 1.6, -.6), fov: 40, dof: { focus: 1.6, aperture: .004, maxblur: .008 } }); return "3d"; }   // 座席の後ろ姿
+  if (name === "why") { if (t < CUE.eject) { desertShot(t, { z: 1, cp: V3(-3, 1.2, 3), look: V3(0, 1.4, -1), fov: 40, dusk: .2 }); return "3d"; }
+    if (t < CUE.self) { skyShot(t, { mode: "jet", u: clamp((t - CUE.eject) / (CUE.self - CUE.eject)) }); return "3d"; }
+    desertShot(t, { z: 1, cp: V3(.3, 1.9, 2.4), look: V3(0, 1.7, -.4), fov: 30 }); return "3d"; }   // 自分の体
+  if (name === "train") { if (t < CUE.injur) { const u = clamp((t - CUE.train - CUT[0]) / 1.2), z = zRun(u) * .3; desertShot(t, { z, fire: u < .8 ? 1 : 0, cp: V3(4, 1.4, -z + 6), look: V3(0, 1, -z), fov: 44, dusk: .1 }); return "3d"; }   // 1948 年の走行（再現）
+    if (t < CUE.set) return "2d";
+    const u = clamp((t - CUE.set) / (CUE.final - CUE.set)); desertShot(t, { z: 1, cp: V3(1.5, 1.4, 7 + 2 * u), look: V3(-1, 1.2, 14), fov: 40, dusk: .9 }); return "3d"; }   // 夕方の砂漠を歩いて戻る（後ろ姿は省き、レールと夕日）
+  if (name === "final") {
+    if (t < CUE.g40) { const u = clamp((t - CUE.final - CUT[2]) / (CUE.g40 - CUE.final - CUT[2])), slow = easeOut(u), z = trackLen - 12 * (1 - slow); desertShot(t, { z, fire: 0, spr: 1 - u, cp: V3(-4.5 + 1.5 * u, 1.3, -z + 2), look: V3(0, 1.2, -z), fov: 34 - 6 * u }); return "3d"; }   // 止まる瞬間（スロー）
+    if (t < CUE.ton) { desertShot(t, { z: trackLen, cp: V3(.3, 2.1, -trackLen + 1.4), look: V3(0, 1.8, -trackLen - .5), fov: 32 }); return "3d"; }
+    if (t < CUE.finger) return "2d";
+    if (t < CUE.ban) { roomShot(t, { mode: "doc", u: easeInOut(clamp((t - CUE.finger - .2) / (CUE.ok - CUE.finger))) }); return "3d"; }
+    return "2d"; }
+  if (name === "legacy") { if (t < CUE.belt) { skyShot(t, { mode: "jet", u: .3 }); return "3d"; }
+    if (t < CUE.back) { roomShot(t, { mode: "seat", u: clamp((t - CUE.belt) / (CUE.back - CUE.belt)) }); return "3d"; }
+    const u = clamp((t - CUE.back) / 2.5); if (u < .4) { roomShot(t, { mode: "seat", u: 1 }); return "3d"; } desertShot(t, { z: 0, cp: V3(6 - 2 * u, 2, 8 - 2 * u), look: V3(0, 1, -2), fov: 44, dusk: .3 }); return "3d"; }   // 金具 → 冒頭のレール
+  return "2d";
+}
+function draw2D(t, name) {
+  if (name === "train") { facesView(t); return; }
+  if (name === "final") { if (t < CUE.finger) { gaugeView(t); return; } planView(t); return; }
+  bg.fillStyle = "#000"; bg.fillRect(0, 0, W, H);
+}
+function openingBG(t) { bg.fillStyle = "rgba(0,0,0,.4)"; bg.fillRect(0, 0, W, H); photo(bg, IMG.strap, clamp(t / .3), 1.0, 1.06, clamp(t / 4), { box: [150, 700, 930, 1360], cy: .4, rot: -.02, gray: 1, frame: "#fff", bright: .95 }); }
+function fxEp(t, name) {   // スピード線・赤い警告の縁・暗くなる視界
+  if (name === "hook" && t >= CUE.sled && t < CUE.man) S.speedLines(bg, 540, 900, t, "rgba(255,240,210,.35)", 70, 300, 10);
+  if (name === "final" && t < CUE.g40) S.speedLines(bg, 540, 900, t, "rgba(255,255,255,.3)", 60, 320, 10);
+  if (name === "why" && t >= CUE.self) S.rays(bg, 540, 800, t, "rgba(255,80,60,.12)", 24);
+  if (name === "final" && t >= CUE.blind && t < CUE.ton + .3) { const k = clamp((t - CUE.blind) / .35); const g = bg.createRadialGradient(540, 900, 80, 540, 900, 900); g.addColorStop(0, `rgba(0,0,0,${.6 * k})`); g.addColorStop(.4, `rgba(0,0,0,${.92 * k})`); g.addColorStop(1, `rgba(0,0,0,${k})`); bg.fillStyle = g; bg.fillRect(0, 0, W, H); }
+  if (name === "train" && t >= CUE.injur && t < CUE.set) { bg.save(); bg.strokeStyle = "rgba(255,40,60,.5)"; bg.lineWidth = 18; bg.strokeRect(9, 9, W - 18, H - 18); bg.restore(); }
+}
+
+// ---------------------------------------------------------------- 画面の文字（ドパ設計：叩きつける文字）
+function tag(ctx, s, x, y, t0, t, col) { const u = t - t0; if (u < 0) return; const e = 1 + .6 * Math.pow(1 - clamp(u / .16), 2); ctx.save(); ctx.translate(x, y); ctx.scale(e, e); ctx.rotate(-.05);
+  ctx.font = `400 48px ${MP}`; const w = ctx.measureText(s).width; ctx.fillStyle = col; rrect(ctx, -w / 2 - 24, -40, w + 48, 80, 40); ctx.fill(); label(ctx, s, 0, 0, 48, "#fff", { font: MP, stroke: "#14080e", sw: .16 }); ctx.restore(); }
+function openingUI(t) {
+  const k = k_(t, "t0", .25, .05); if (k <= 0) return;
+  slam(ui, "時速1000キロから", 540, 330, 96, .05, t, { cols: WHITE, glow: "rgba(255,120,60,.9)", rot: -.03 });
+  slam(ui, "1秒あまりで止まる", 540, 500, 110, .25, t, { cols: GOLD, glow: "rgba(255,120,60,.9)", rot: .02 });
+  credit("写真：米軍（国立公文書館 111-SC-1500220）／パブリックドメイン", k, 1420);
+}
+function drawUI(t, name) {
+  if (name === "open") { openingUI(t); return; }
+  if (name === "hook") { S.note(ui, "※再現CGを含みます", 540, 1290, win(t, CUE.hook + .3, CUE.speed, .3, .3), 26, true);
+    if (t < CUE.sled) slam(ui, "1954.12.10", 540, 330, 130, CUE.hook + .05, t, { cols: GOLD, rot: -.05, sub: "ニューメキシコの砂漠" });
+    else if (t < CUE.plane) { const v = Math.round(1017 * easeIn(clamp((t - CUE.sled) / (CUE.speed - CUE.sled + .4)))); slam(ui, `${v} km/h`, 540, 360, 140, CUE.sled, t, { cols: v > 1000 ? RED : GOLD, rot: -.04, glow: "rgba(255,90,40,1)" }); if (t >= CUE.speed) slam(ui, "9本のロケット", 540, 560, 80, CUE.speed, t, { cols: WHITE, rot: .03 }); }
+    else if (t < CUE.man) slam(ui, "旅客機より速い", 540, 360, 110, CUE.plane + .05, t, { cols: CYAN, glow: "rgba(40,200,255,.9)", rot: -.04 });
+    else { tag(ui, "空軍の医師", 330, 380, CUE.man + .1, t, "#3a7ad8"); tag(ui, "スタップ本人", 700, 470, CUE.man + .45, t, "#e8402e"); } }
+  if (name === "why") { if (t < CUE.eject) { if (t >= CUE.g18) slam(ui, "18G", 540, 420, 220, CUE.g18, t, { cols: WHITE, rot: -.06, glow: "rgba(120,190,255,.9)", sub: "が限界？" }); }
+    else if (t < CUE.self) slam(ui, "生きて脱出できるか", 540, 340, 92, CUE.eject + .1, t, { cols: CYAN, rot: -.03, glow: "rgba(40,200,255,.9)" });
+    else slam(ui, "自分の体で", 540, 380, 140, CUE.self, t, { cols: RED, rot: -.05, glow: "rgba(255,40,60,1)" }); }
+  if (name === "train") { if (t < CUE.injur) { if (t >= CUE.train + .5) slam(ui, "1948年 35G", 540, 360, 130, CUE.train + .5, t, { cols: GOLD, rot: -.05 }); }
+    else if (t < CUE.set) { credit("1954年6月発表の走行の写真（米軍、国立公文書館）／パブリックドメイン", 1, 1385); slam(ui, "29回", 540, 280, 110, CUE.injur + .05, t, { cols: GOLD, rot: -.05 });
+      tag(ui, "肋骨にひび", 300, 1250, CUE.rib, t, "#d83a3a"); tag(ui, "目の血管", 760, 1180, CUE.rib + .35, t, "#d8603a"); tag(ui, "手首 2度骨折", 560, 1320, CUE.wrist, t, "#b8202e"); }
+    else if (t >= CUE.setk) slam(ui, "自分で元に戻した", 540, 400, 104, CUE.setk, t, { cols: RED, rot: -.04, glow: "rgba(255,40,60,1)" }); else slam(ui, "2度目の骨折", 540, 400, 100, CUE.set + .05, t, { cols: WHITE, rot: -.03 }); }
+  if (name === "final") { if (t < CUE.g40) { if (t >= CUE.stop + .5) slam(ui, "1秒あまりで停止", 540, 340, 110, CUE.stop + .5, t, { cols: RED, rot: -.04, glow: "rgba(255,40,60,1)" }); }
+    else if (t < CUE.ton) slam(ui, "40G超", 540, 420, 230, CUE.g40 + .02, t, { cols: RED, rot: -.06, glow: "rgba(255,40,60,1)", sub: t >= CUE.blind ? "何も見えない" : null });
+    else if (t < CUE.finger) { slam(ui, "約3トン", 540, 1250, 150, CUE.ton + .4, t, { cols: GOLD, rot: -.04 }); label(ui, "体重（計算）", 540, 1420, 44, "#B8C7D6", { font: MP }); }
+    else if (t < CUE.ban) { [1, 2, 3].forEach((n, i) => tag(ui, String(n), 360 + i * 180, 420, CUE.finger + .3 + i * .3, t, "#2a9a5a")); if (t >= CUE.ok) slam(ui, "目は戻った", 540, 640, 100, CUE.ok, t, { cols: LIME, rot: -.03, glow: "rgba(90,224,74,.9)" }); }
+    else { slam(ui, "時速1600キロ", 540, 360, 110, CUE.ban + .1, t, { cols: GOLD, rot: -.04 }); if (t >= CUE.ban + 1.0) slam(ui, "上官が止めた", 540, 1300, 100, CUE.ban + 1.0, t, { cols: RED, rot: .03, glow: "rgba(255,40,60,1)" }); } }
+  if (name === "legacy") { if (t < CUE.belt) { if (t >= CUE.legacy + .45) slam(ui, "丈夫な座席", 540, 360, 110, CUE.legacy + .45, t, { cols: CYAN, rot: -.04, glow: "rgba(40,200,255,.9)" }); }
+    else if (t < CUE.back) slam(ui, "車のシートベルト", 540, 360, 100, CUE.belt + .05, t, { cols: GOLD, rot: -.04 });
+    else if (t >= CUE.back + .7) slam(ui, "あの1秒", 540, 420, 150, CUE.back + .7, t, { cols: GOLD, rot: -.05 }); }
+}
+
+function buildMood() {
+  const c = CUE;
+  MOOD = [[0, { warm: .2, sat: 1.1, vig: .6 }], [c.hook, { warm: .3, sat: 1.35, vig: .45 }], [c.sled, { warm: .35, sat: 1.4, vig: .4 }], [c.plane, { cool: .1, sat: 1.3, vig: .45 }],
+    [c.man, { warm: .2, sat: 1.25, vig: .5 }], [c.why, { cool: .2, sat: 1.2, vig: .55 }], [c.self, { warm: .3, sat: 1.35, vig: .45 }], [c.train, { warm: .25, sat: 1.3, vig: .5 }],
+    [c.injur, { warm: .1, sat: 1.0, vig: .6 }], [c.set, { warm: .45, sat: 1.3, vig: .55 }], [c.final, { warm: .3, sat: 1.4, vig: .45 }], [c.g40, { cool: .1, sat: 1.1, vig: .7 }],
+    [c.finger, { warm: .15, sat: 1.1, vig: .55 }], [c.ban, { warm: .1, sat: 1.2, vig: .55 }], [c.legacy, { cool: .1, sat: 1.25, vig: .5 }], [c.back, { warm: .3, sat: 1.3, glow: .25, glowX: .5, glowY: .5, vig: .45 }]];
+}
+function thumb() {
+  CUE = CUE || {}; CUE.t0 = 0; desertShot(1, { z: 0, fire: 1, cp: V3(2.2, 1.0, 4.6), look: V3(0, 1.0, 1.2), fov: 42 });
+  S.moodGrade(bg, 0, [[0, { warm: .3, sat: 1.35, vig: .45 }]]); Cine.bloom(bg, .34); addGrain(0);
+  slam(ui, "時速1000キロから", 540, 360, 100, 0, 9, { cols: WHITE, glow: "rgba(255,120,60,.9)", rot: -.03 });
+  slam(ui, "1秒で止まる", 540, 560, 150, 0, 9, { cols: GOLD, glow: "rgba(255,120,60,.9)", rot: .02 });
+  slam(ui, "医者本人が乗った", 540, 1420, 96, 0, 9, { cols: RED, glow: "rgba(255,40,60,1)", rot: -.03 });
+}
+kitStart(() => { buildDesert(); buildSky(); buildRoom(); });
+</script>
+</body></html>

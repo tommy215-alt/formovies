@@ -12,6 +12,7 @@
 | A4 | [File:Sophie Blanchard.jpg](https://commons.wikimedia.org/wiki/File:Sophie_Blanchard.jpg) | 肖像の版画（1053×1404） | Jules Porreau、1859（後世の版画） | パブリックドメイン | 予備 |
 | — | File:Blanchard sophie grave.jpg | ペール・ラシェーズの墓 | Gede、2010 | **CC BY-SA 3.0 → 使わない** | — |
 
+- A2 と A3 は同じ 1811 年のミラノの版画（A3 は小さい複製）だった。制作では高画質の A2 を、L02 では上半身に寄せて、L05b では全体で使う（A3 は使わない）。
 - Smithsonian NASM の所蔵ページの版画は再利用に条件があるので使わない（ChatGPT の注意どおり）。議会図書館の同じ時期の版画（A2・A3）を使う。
 
 ## BGM（設計「悲劇」：短調でリズミカル）

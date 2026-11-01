@@ -20,7 +20,8 @@ import music
 from music import SR
 
 FILES = {}
-GAIN = {"f_full": 1.0, "f_mid": .65, "f_low": .3, "f_mute": 0.0, "ending": .35}
+GAIN = {"f_full": 1.0, "f_mid": .65, "f_low": .3, "f_mute": 0.0, "ending": .35,
+        "w_hold": .15}   # w_hold：カットインの前に曲を引く（opening_bgm.py と組み合わせると、オープニングの区間もこれで渡される。2026-11-01〜）
 GAIN.update({f"f_{p}": p / 100 for p in range(5, 100, 5)})   # 段階的に下げる用（f_85・f_70 など）
 RMS = 0.11        # 曲全体の音の大きさ（合成の BGM とだいたい同じ）
 WIND_RMS = 0.11   # 吹雪の音（w100 のとき）の大きさ
