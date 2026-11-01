@@ -65,7 +65,7 @@ function stepsDiag(X, t, a) { panel(X); lab2(X, "治らない傷（伝えられ�
 
 // ---------------------------------------------------------------- ショットの一覧（文字は kit が明朝体の静かな文字にする）
 SHOTS = [
-  { at: "l01", kind: "holo", draw: (X, t) => newsDiag(X, t, CUE.l01), slam: { s: "1896年", size: 130, y: 260 } },
+  { at: "l01", kind: "holo", draw: (X, t) => newsDiag(X, t, CUE.l01), slam: { s: "1896年", size: 130, y: 1240 } },
   { at: "l01b", kind: "holo", draw: (X, t) => bodyDiag(X, t, CUE.l01b) },
   { at: "l02", kind: "photo", img: "edison", box: [240, 380, 840, 1240], cy: .4, credit: ["透視装置をのぞくエジソン（1896年）", "米国立公園局／パブリックドメイン"], creditY: 1290 },
   { at: "l03", kind: "3d", draw: (t, u) => devShot(t, u), slam: { s: "クラレンス・ダリー", size: 110, y: 300, sub: "エジソンの研究所の助手" } },

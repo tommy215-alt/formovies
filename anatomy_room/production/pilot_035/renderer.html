@@ -75,12 +75,12 @@ function speedDiag(X, t, a) { panel(X); lab2(X, "自由落下", 540, 410, T(32),
 // ---------------------------------------------------------------- ショットの一覧
 function ciShot(t, P) { const u = clamp((t - CUE.l09) / 1.5); skyShot(t, u, { mode: "spin", cam: [[V3(1.5, -1.0, 2.5), V3(0, -1.2, 0), 40], [V3(.6, -1.3, 1.2), V3(0, -1.2, 0), 30], [V3(-3, 0, 5), V3(0, -1.6, 0), 44]][P.p] }); }
 SHOTS = [
-  { at: "l01", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(6 - 2 * u, 3, 10 - 3 * u), V3(0, 3, 0), 44] }), slam: { s: "1960.8.16", size: 140 }, slam2: { s: "10万2800フィート", off: 1.0, cols: CYAN, glow: "rgba(40,200,255,.9)", size: 96 } },
+  { at: "l01", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(6 - 2 * u, 3, 10 - 3 * u), V3(0, 3, 0), 44] }), slam: { s: "1960.8.16", size: 140 }, slam2: { s: "10万2800フィート", off: 1.0, cols: CYAN, glow: "rgba(40,200,255,.9)", size: 80, y: 520 } },
   { at: "l02", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(.5, 1.8, .3), V3(6, -30, -40), 60] }), slam: { s: "約31km", size: 150 } },
   { at: "l03", kind: "photo", img: "gondola", box: [180, 380, 900, 1260], cy: .4, gray: 0, slam: { s: "ジョー・キッティンジャー", size: 80, y: 300 }, credit: ["写真：米空軍／パブリックドメイン"], creditY: 1300 },
   { at: "l03b", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(2.2 - .4 * u, 1.2, 2.6), V3(0, .9, 0), 40] }), slam: { s: "屋根も壁もない", cols: WHITE, size: 100 } },
   { at: "l04", kind: "3d", draw: (t, u) => skyShot(t, u, { cam: [V3(-1.4, 1.4, 1.6), V3(.2, 1.2, 0), 36] }), slam: { s: "手袋が壊れた！", cols: RED, glow: "rgba(255,40,60,1)", off: .5 } },
-  { at: "l05", kind: "holo", draw: (X, t) => gloveDiag(X, t, CUE.l05), slam: { s: "それでも続けた", cols: GOLD, off: 1.6 } },
+  { at: "l05", kind: "holo", draw: (X, t) => gloveDiag(X, t, CUE.l05), slam: { s: "それでも続けた", cols: GOLD, off: 1.6, y: 1240 } },
   { at: "l06", kind: "3d", draw: (t, u) => skyShot(t, clamp(u * 1.2), { mode: "fall", cam: [V3(3, 2, 4), V3(0, 0, 0), 44] }), slam: { s: "飛び降りる！", size: 140, cols: RED, glow: "rgba(255,40,60,1)", off: .3 } },
   { at: "l07", kind: "holo", draw: (X, t) => speedDiag(X, t, CUE.l07) },
   { at: "l08", kind: "3d", draw: (t, u) => skyShot(t, .6, { mode: "fall", chute: true, cam: [V3(2.5, 1, 3), V3(0, -2, 0), 40] }), slam: { s: "小さなパラシュート", size: 90, cols: GOLD } },

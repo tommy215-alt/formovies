@@ -42,17 +42,17 @@ loadImages(KIT.images);
 
 // ---------------------------------------------------------------- 3D：海の底・エビ・泡・小魚・ハゼ
 const sea = set("sea"); let shrimp, claw, jaw, jet, bubble, bubbleL, fish, goby, rings = [], seaDust, extraShrimp = [];
-function makeShrimp(s = 1) { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: C(0xe8b890), roughness: .35, transparent: true, opacity: .95 }); Cine.surface(m, "skin", { repeat: [2, 2], normal: .5 });
+function makeShrimp(s = 1) { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: C(0xe8b890), roughness: .35, transparent: true, opacity: .95, emissive: C(0x5a3020), emissiveIntensity: .6 }); Cine.surface(m, "skin", { repeat: [2, 2], normal: .5 });
   for (let i = 0; i < 6; i++) { const seg = sph(.12 - i * .012, m, 0, 0, -i * .14, g, 24); seg.scale.set(1, .85, 1.1); }
   const tail = new THREE.Mesh(new THREE.ConeGeometry(.08, .2, 16), m); tail.rotation.x = -Math.PI / 2; tail.position.z = -.92; g.add(tail);
-  const cl = new THREE.Group(), cm = M(0xd8885a, { roughness: .4 }); const arm = box(.08, .08, .3, cm, 0, 0, .15, cl); const pal = box(.16, .14, .3, cm, 0, 0, .42, cl); const dac = box(.05, .1, .26, cm, .07, .02, .66, cl); cl.position.set(.14, -.02, .12); g.add(cl);
+  const cl = new THREE.Group(), cm = M(0xd8885a, { roughness: .4, emissive: C(0x5a2a10), emissiveIntensity: .6 }); const arm = box(.08, .08, .3, cm, 0, 0, .15, cl); const pal = box(.16, .14, .3, cm, 0, 0, .42, cl); const dac = box(.05, .1, .26, cm, .07, .02, .66, cl); cl.position.set(.14, -.02, .12); g.add(cl);
   const small = box(.04, .04, .25, cm, -.12, -.03, .25, g); for (const sd of [-1, 1]) for (let k = 0; k < 2; k++) { const an = new THREE.Mesh(new THREE.CylinderGeometry(.005, .003, .7, 6), cm); an.position.set(sd * .04, .05, .45); an.rotation.x = Math.PI / 2 - .3 - k * .2; an.rotation.z = sd * .3; g.add(an); }
   g.userData = { claw: cl, dac }; g.scale.setScalar(s); return g; }
 function makeFish(col = 0x9ab8d8, s = 1) { const g = new THREE.Group(), m = M(col, { roughness: .35, metalness: .3 }); const b = sph(.12, m, 0, 0, 0, g, 24); b.scale.set(.6, 1, 1.8); const tl = new THREE.Mesh(new THREE.ConeGeometry(.1, .18, 3), m); tl.rotation.x = Math.PI / 2; tl.position.z = -.28; g.add(tl); g.scale.setScalar(s); return g; }
 function buildSea() {
-  const sand = M(0xc8b890, { roughness: 1 }); Cine.surface(sand, "stone", { repeat: [20, 20], normal: .8 }); const fl = new THREE.Mesh(new THREE.PlaneGeometry(60, 60, 60, 60), sand); const p = fl.geometry.attributes.position, r = S.rng(4);
+  const sand = M(0x6a6248, { roughness: 1 }); Cine.surface(sand, "stone", { repeat: [20, 20], normal: .8 }); const fl = new THREE.Mesh(new THREE.PlaneGeometry(60, 60, 60, 60), sand); const p = fl.geometry.attributes.position, r = S.rng(4);
   for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin(p.getX(i) * .9) * .06 + (r() - .5) * .04); fl.geometry.computeVertexNormals(); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; sea.add(fl);
-  for (let i = 0; i < 18; i++) { const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(.3 + r() * .7, 1), M(0x5a5a50, { roughness: 1 })); rk.position.set((r() - .5) * 12, 0, -2 - r() * 10); rk.scale.y = .6; rk.castShadow = true; sea.add(rk); }
+  for (let i = 0; i < 18; i++) { const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(.3 + r() * .7, 1), M(0x3a4038, { roughness: 1 })); rk.position.set((r() - .5) * 12, 0, -2 - r() * 10); rk.scale.y = .6; rk.castShadow = true; sea.add(rk); }
   shrimp = makeShrimp(1); shrimp.position.set(0, .12, 0); sea.add(shrimp);
   jet = new THREE.Mesh(new THREE.ConeGeometry(.08, 1.2, 24, 1, true), new THREE.MeshBasicMaterial({ color: C(0xbfe8ff), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); jet.rotation.x = -Math.PI / 2; jet.position.set(.14, .1, 1.3); jet.userData.noAO = true; sea.add(jet);
   bubble = new THREE.Mesh(new THREE.SphereGeometry(.12, 48, 32), new THREE.MeshPhysicalMaterial({ color: C(0xdff4ff), roughness: .05, transmission: .8, thickness: .1, transparent: true, opacity: .6, emissive: C(0xffd8a0), emissiveIntensity: 0 })); bubble.position.set(.14, .1, 1.2); bubble.userData.noAO = true; sea.add(bubble);
@@ -65,13 +65,13 @@ function buildSea() {
 }
 // snap：0→1（はさみが閉じる→噴流→泡がふくらみ→つぶれる）、glow：泡の光（やわらかく）
 function seaShot(t, u, { cam = [V3(1.2, .6, 2.4), V3(0, .15, .3), 40], snap = -1, glow = 0, fishK = 0, gobyOn = false, crowd = false, ringK = 0, exp = 1.0 } = {}) {
-  show("sea"); scene.environment = ENV_ROOM; seaDust.update(t, 1); goby.visible = gobyOn; extraShrimp.forEach(s => s.visible = crowd);
+  show("sea"); scene.environment = null; seaDust.update(t, 1); goby.visible = gobyOn; extraShrimp.forEach(s => s.visible = crowd);
   const cl = shrimp.userData.dac; cl.rotation.y = snap >= 0 && snap < .15 ? -.5 * (1 - snap / .15) : (snap < 0 ? -.5 : 0);
   jet.material.opacity = snap > .1 && snap < .5 ? .5 * (1 - (snap - .1) / .4) : 0; const bs = snap < .2 ? 0 : snap < .6 ? (snap - .2) / .4 : Math.max(0, 1 - (snap - .6) / .15); bubble.scale.setScalar(.2 + 2.2 * bs); bubble.visible = snap > .2 && snap < .8 || glow > 0;
   bubble.material.emissiveIntensity = glow * 1.5; bubbleL.intensity = glow * 4;
   fish.visible = fishK > 0; fish.rotation.z = fishK > .5 ? Math.PI / 2 * clamp((fishK - .5) * 3) : 0; fish.position.y = .25 - .1 * clamp((fishK - .5) * 2);
   rings.forEach((rg, i) => { const ph = (ringK * 2 + i / 6) % 1; rg.scale.setScalar(.2 + ph * 4); rg.material.opacity = ringK > 0 ? .5 * (1 - ph) : 0; rg.position.y = .1; });
-  lights({ keyPos: [0, 8, 2], keyAt: [0, 0, 0], keyI: 16, angle: .6, keyCol: 0xc8f0ff, rimPos: [-3, 2, -3], rimI: .8, rimCol: 0x5ab8ff, hemiI: .45, hemiSky: 0x3a8ac8, hemiGround: 0x1a3a40, fog: .09, fogC: 0x0a3a5a, exp });
+  lights({ keyPos: [0, 8, 2], keyAt: [0, 0, .5], keyI: 7, angle: .45, keyCol: 0x9fdcff, rimPos: [-3, 2, -3], rimI: .7, rimCol: 0x5ab8ff, hemiI: .22, hemiSky: 0x2a7ab8, hemiGround: 0x0a2030, fog: .16, fogC: 0x06304a, exp: exp * .9 });
   setCam(cam[0], cam[1], cam[2], .02, 80); draw3D({ ao: true, dof: { focus: cam[0].distanceTo(cam[1]), aperture: .006, maxblur: .01 } });
 }
 
@@ -93,8 +93,8 @@ SHOTS = [
   { at: "l03", kind: "3d", draw: (t, u) => seaShot(t, u, { cam: [V3(.9, .4, 1.5 - .3 * u), V3(.14, .1, .4), 38] }), slam: { s: "片方だけ巨大なはさみ", size: 86, cols: GOLD, off: .5 } },
   { at: "l04", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: snapAt(t, CUE.l04 + .2) * .5, cam: [V3(1.0, .35, 1.9), V3(.14, .1, .9), 36] }), slam: { s: "水の噴流！", cols: CYAN, glow: "rgba(40,200,255,.9)" } },
   { at: "l05", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: .2 + snapAt(t, CUE.l05 + .6, 1.6) * .6, cam: [V3(.6, .3, 1.8), V3(.14, .1, 1.2), 30] }), slam: { s: "泡が つぶれる！", size: 110, off: .6 } },
-  { at: "l06", kind: "holo", draw: (X, t) => mechDiag(X, t, CUE.l06), slam: { s: "泡の音だった", cols: GOLD, off: 1.6 } },
-  { at: "l07", kind: "holo", draw: (X, t) => camDiag(X, t, CUE.l07), slam: { s: "高速カメラ", cols: WHITE, size: 110 } },
+  { at: "l06", kind: "holo", draw: (X, t) => mechDiag(X, t, CUE.l06), slam: { s: "泡の音だった", cols: GOLD, off: 1.6, y: 1250 } },
+  { at: "l07", kind: "holo", draw: (X, t) => camDiag(X, t, CUE.l07), slam: { s: "高速カメラ", cols: WHITE, size: 110, y: 1250 } },
   { at: "l08", kind: "3d", draw: (t, u) => seaShot(t, u, { snap: .6, glow: .5 + .3 * Math.sin(t * 8), cam: [V3(.4, .2, 1.6), V3(.14, .1, 1.2), 26] }), slam: { s: "光った！", cols: GOLD, size: 150, off: .3 } },
   { at: "l09", kind: "holo", draw: (X, t) => hotDiag(X, t, CUE.l09), slam: { s: "太陽の表面に近い", size: 90, off: .9, y: 300 } },
   { at: "l10", kind: "holo", draw: (X, t) => onlyDiag(X, t, CUE.l10) },

@@ -56,11 +56,11 @@ function buildHero() {
 }
 function heroShot(t, mode, u, { glow = 1, burn = 0, cam } = {}) { pot.visible = mode === "pot"; flask.visible = mode === "flask";
   if (mode === "pot") { fire.forEach((f, i) => f.scale.y = .8 + .4 * Math.abs(Math.sin(t * 9 + i * 1.3))); steam.update(t, 1);
-    stageShot(t, { cam: cam || [V3(1.1 - .3 * u, 1.4, 2.0 - .3 * u), V3(0, 1.0, 0), 38], spin: .1, ring: 0xff8a3a, keyCol: 0xffc890, glow: .6, exp: .9 }); return; }
+    stageShot(t, { cam: cam || [V3(1.8 - .3 * u, 1.7, 3.0 - .4 * u), V3(0, .95, 0), 38], spin: .1, ring: 0xff8a3a, keyCol: 0xffc890, glow: .6, exp: .9 }); return; }
   const g = glow * (.85 + .15 * Math.sin(t * 3)); glowM.emissiveIntensity = 2.2 * g; glowL.intensity = 6 * g;
   if (burn > 0) { glowM.emissive = C(0x7affc8).lerp(C(0xff7a20), burn); glowL.color = C(0x7affc8).lerp(C(0xff7a20), burn); }
   else { glowM.emissive = C(0x7affc8); glowL.color = C(0x7affc8); }
-  stageShot(t, { cam: cam || [V3(.8 - .3 * u, .9, 1.6 - .3 * u), V3(0, .65, 0), 36], spin: .2, ring: burn > 0 ? 0xff7a20 : 0x7affc8, keyCol: 0x6a7a8a, glow: 1.2, exp: .85 }); }
+  stageShot(t, { cam: cam || [V3(1.1 - .3 * u, 1.0, 2.4 - .3 * u), V3(0, .65, 0), 36], spin: .2, ring: burn > 0 ? 0xff7a20 : 0x7affc8, keyCol: 0x6a7a8a, glow: 1.2, exp: .85 }); }
 
 // ---------------------------------------------------------------- 2D の図
 function urineDiag(X, t, a) { panel(X); lab2(X, "使った尿の量（資料で違う）", 540, 410, T(30), "#B8DFF2", 800);
@@ -71,9 +71,9 @@ function urineDiag(X, t, a) { panel(X); lab2(X, "使った尿の量（資料で�
 function ciShot(t, P) { heroShot(t, "pot", 0, { cam: [[V3(.9, .7, 1.2), V3(0, 1.0, 0), 34], [V3(.3, 1.8, .6), V3(0, 1.1, 0), 30], [V3(-1.4, 1.5, 2.2), V3(0, .9, 0), 42]][P.p] }); }
 SHOTS = [
   { at: "l01", kind: "3d", draw: (t, u) => heroShot(t, "pot", u), slam: { s: "1669年ごろ", sub: "ドイツ・ハンブルク", size: 130 } },
-  { at: "l02", kind: "photo", img: "alchemist", box: [200, 380, 880, 1260], cy: .55, gray: 0, slam: { s: "錬金術師", cols: PINK, glow: "rgba(255,80,180,1)", y: 300 }, slam2: { s: "金を作る！", off: 1.4, y: 1340 }, credit: ["Joseph Wright of Derby（1771）／パブリックドメイン"], creditY: 1290 },
+  { at: "l02", kind: "photo", img: "alchemist", box: [200, 380, 880, 1260], cy: .55, gray: 0, slam: { s: "錬金術師", cols: PINK, glow: "rgba(255,80,180,1)", y: 300 }, slam2: { s: "金を作る！", off: 1.4, y: 1340 } },
   { at: "l03", kind: "3d", draw: (t, u) => heroShot(t, "pot", u), slam: { s: "なんと 尿", size: 150, cols: GOLD, off: .5 } },
-  { at: "l04", kind: "3d", draw: (t, u) => heroShot(t, "pot", u, { cam: [V3(.6, 1.9, 1.0), V3(0, 1.1, 0), 34] }), slam: { s: "煮詰める！", cols: RED, glow: "rgba(255,80,40,1)" } },
+  { at: "l04", kind: "3d", draw: (t, u) => heroShot(t, "pot", u, { cam: [V3(.9, 2.3, 1.6), V3(0, 1.0, 0), 36] }), slam: { s: "煮詰める！", cols: RED, glow: "rgba(255,80,40,1)" } },
   { at: "l05", kind: "holo", draw: (X, t) => urineDiag(X, t, CUE.l05) },
   { at: "l05b", kind: "holo", draw: (X, t) => { panel(X); bigNum(X, "1100L", 640, 110, "#FFE2A8"); lab2(X, "↓", 540, 790, T(60), "#EAF2F8", 900); bigNum(X, "約60g", 960, 120, "#9AF0D0"); lab2(X, "ある解説での数字", 540, 1140, T(26), "#B8C7D6", 600); } },
   { at: "l06", kind: "3d", draw: (t, u) => heroShot(t, "flask", u), slam: { s: "光った！", cols: LIME, glow: "rgba(90,255,180,1)", size: 150, off: .5 } },

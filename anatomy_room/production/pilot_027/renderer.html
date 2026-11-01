@@ -92,7 +92,7 @@ const ROOMW = { cam: [V3(2.4, 1.6, 2.6), V3(-.2, 1.2, -1.5), 40], who: { white: 
 function ciShot(t, P) { const v = [[V3(1.8, .5, 1.4), V3(.4, 1.5, -1.4), 40], [V3(.9, 1.6, -.2), V3(.6, 1.4, -.9), 30], [V3(2.8, 2.0, 2.6), V3(0, 1.0, -1.4), 44]][P.p];
   roomShot(t, { cam: v, who: { white: [.6, -.9] } }); }
 SHOTS = [
-  { at: "l01", kind: "photo", img: "hans", box: [110, 560, 970, 1140], card: [["1904年 ベルリン", T(34), 800], ["計算問題に答える馬", T(26), 500, "#B8C7D6"]], credit: ["写真：Karl Krall『Denkende Tiere』（1912）", "パブリックドメイン"], creditY: 1200 },
+  { at: "l01", kind: "photo", img: "hans", box: [110, 560, 970, 1140], card: [["1904年 ベルリン", T(34), 800], ["計算問題に答える馬", T(26), 500, "#B8C7D6"]], credit: ["写真：Karl Krall『Denkende Tiere』（1912）", "パブリックドメイン"], creditY: 1165 },
   { at: "l02", kind: "photo", img: "osten", box: [110, 560, 970, 1140], card: [["ヴィルヘルム・フォン・オステン", T(32), 800], ["元教師 ハンスの飼い主", T(26), 500, "#B8C7D6"]] },
   { at: "l03", kind: "3d", draw: (t, u) => heroShot(t, "board", u), card: [["答えの数だけ ひづめを打つ", T(30), 800], ["（再現）", T(22), 500, "#B8C7D6"]] },
   { at: "l04", kind: "holo", draw: (X, t) => { panel(X); lab2(X, "1904年 ハンス委員会", 540, 420, T(32), "#B8DFF2", 800); bigNum(X, "トリック：なし", 760, 64, "#9AF0D0"); lab2(X, "心理学者シュトゥンプら", 540, 960, T(28), "#EAF2F8", 700); } },

@@ -56,7 +56,7 @@ function buildHero() {
 function heroShot(t, mode, u, o = {}) { xtube.visible = mode === "tube"; tiles.visible = mode === "tiles"; helmet.visible = mode === "helmet";
   if (mode === "tube") { beam.material.opacity = .25 + .15 * Math.sin(t * 20); stageShot(t, { cam: [V3(1.4 - .4 * u, 1.3, 2.6 - .3 * u), V3(0, .95, 0), 38], spin: .15, ring: 0x8fdcff, glow: .5 }); return; }
   if (mode === "tiles") { const fill = o.fill || 0; GAP.forEach((z, i) => { const on = fill > i / 3 + .1; tileMs[z].color = C(on ? 0xffd27a : 0x101418); tileMs[z].emissive = C(on ? 0x8a5a10 : (Math.sin(t * 4) > 0 ? 0x3a0a0a : 0x000000)); });
-    STAGE_HERO.rotation.y = 0; stageShot(t, { cam: [V3(.3, 1.35, 2.2 - .4 * u), V3(0, 1.3, 0), 40], spin: 0, glow: .4 }); return; }
+    STAGE_HERO.rotation.y = 0; stageShot(t, { cam: [V3(.3, 1.3, 3.0 - .4 * u), V3(0, 1.25, 0), 40], spin: 0, glow: .4 }); return; }
   stageShot(t, { cam: [V3(1.0, .7, 1.6 - .2 * u), V3(0, .45, 0), 36], spin: .1, ring: 0x6a5a40, keyCol: 0xc8b898, exp: .85 }); }
 
 // ---------------------------------------------------------------- 2D の図

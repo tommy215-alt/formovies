@@ -35,7 +35,7 @@ html,body{margin:0;background:#000}
 // pilot_036「回り続ける機械——ウィリアム・ブロック」のレンダラー（設計「悲劇」5 回目の更新：明朝体・最初から暗く張り詰めた編集・共通エンディングなし）。土台は ext/kit。
 // 権利の確かな画像が見つからなかったので、本物の画像は使わない（scripts/pilot_036/assets.md）。3D：印刷工場と輪転印刷機（ロール紙・ローラー・ベルト）は再現・模式。人物・事故の瞬間は描かない。
 Object.assign(KIT, { design: "tragedy", scenes: ["open", "hook", "a", "b", "c"], images: [], ci: {}, hits: [], darkFrom: "hook",
-  opening: { img: null, bg: t => pressShot(t, 0, { speed: 1, cam: [V3(2.6, 1.6, 2.4), V3(0, 1.0, -1.2), 42] }), title: ["自分の作った機械に", "命を奪われた発明家"], credit: ["※再現CG"] } });
+  opening: { img: null, bg: t => pressShot(t, 0, { speed: 2.2, night: .4, cam: [V3(2.8 - .5 * t, 1.7 - .1 * t, 2.8 - .5 * t), V3(0, 1.05, -1.2), 42] }), title: ["自分の作った機械に", "命を奪われた発明家"], credit: ["※再現CG"] } });
 loadImages(KIT.images);
 
 // ---------------------------------------------------------------- 3D：輪転印刷機（ロール紙・ローラー・ベルトと車輪）
