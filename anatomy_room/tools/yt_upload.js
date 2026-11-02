@@ -126,6 +126,27 @@ async function upload(item) {
   } catch (e) { const f = await shot("error"); e.message += `（画面：${f}）`; throw e; } finally { await ctx.close(); }
 }
 
+async function makePrivate(item) {   // 動画の編集画面で、公開設定を「非公開」にして保存する（予約が外れる）
+  const { title } = meta(item.meta), stem = title.replace(/\s*#shorts\s*$/, "");
+  const ctx = await open(!SHOW); page = ctx.pages()[0] || await ctx.newPage();
+  try {
+    await page.goto("https://studio.youtube.com/"); await page.waitForTimeout(4000); await dismiss();
+    if (!/studio\.youtube\.com\/channel\//.test(page.url())) throw new Error("ログインしていない");
+    const ch = page.url().match(/channel\/([^/?#]+)/)[1]; let href = null;
+    for (const tab of ["short", "upload"]) { await page.goto(`https://studio.youtube.com/channel/${ch}/videos/${tab}`); await page.waitForTimeout(5000); await dismiss();
+      const row = page.locator("ytcp-video-row", { hasText: stem }).first(); if (!(await row.count())) continue;
+      href = await row.locator("a[href*='/video/']").first().getAttribute("href"); if (href) break; }
+    if (!href) throw new Error("動画が見つからない：" + stem);
+    const id = href.match(/video\/([^/]+)/)[1]; await page.goto(`https://studio.youtube.com/video/${id}/edit`); await page.waitForTimeout(5000); await dismiss(); await shot("edit_" + item.id);
+    await clickFirst(["ytcp-video-metadata-visibility", "#visibility-container"]); await page.waitForTimeout(1500);
+    if (!(await page.locator("tp-yt-paper-radio-button[name=PRIVATE]").first().isVisible().catch(() => false))) { await clickFirst(["text=保存または公開", "text=Save or publish", "#first-container-expand-button"]); await page.waitForTimeout(1000); }
+    await clickFirst(["tp-yt-paper-radio-button[name=PRIVATE]"]); await page.waitForTimeout(800); await shot("private_" + item.id);
+    await clickFirst(["ytcp-video-visibility-select #save-button", "tp-yt-paper-dialog #save-button", "ytcp-button:has-text('完了')"]); await page.waitForTimeout(1500);
+    await clickFirst(["ytcp-button#save", "#save"]); await page.waitForTimeout(4000); await shot("saved_" + item.id);
+    const v = (await page.locator("ytcp-video-metadata-visibility").first().innerText().catch(() => "")).replace(/\s+/g, " ");
+    if (!/非公開|Private/.test(v) || /スケジュール|Scheduled/.test(v)) throw new Error("非公開になったか確かめられない：" + v.slice(0, 80));
+  } catch (e) { const f = await shot("error"); e.message += `（画面：${f}）`; throw e; } finally { await ctx.close(); }
+}
 // 公開の枠（日本時間の 8:00・19:00）：PC が切れていて予定の時刻を過ぎた回、または publish_at が空の回は、次に空いている枠に振り直す
 const jst = (d, hm) => new Date(`${d}T${hm}:00+09:00`);
 function nextSlot(q, after) {
@@ -146,6 +167,12 @@ function logRun(s) { fs.appendFileSync(path.join(LOG, "run.log"), `${new Date().
   if (cmd === "login") return login();
   if (!lockOn()) { say("別の投稿が動いているので、今回はやめます"); return; }
   const q = JSON.parse(fs.readFileSync(QUEUE, "utf-8")), save = () => fs.writeFileSync(QUEUE, JSON.stringify(q, null, 1) + "\n", "utf-8");
+  // private：予約を外して非公開に戻す（動画は消さない）。回を指定しなければ、まだ公開されていない予約を全部
+  if (cmd === "private") {
+    const ids = args.slice(1), targets = q.items.filter(x => x.status === "scheduled" && (!ids.length || ids.includes(x.id)) && jst(...x.publish_at.split(" ")) > new Date());
+    for (const item of targets) { await makePrivate(item); item.status = "private"; save(); say(`✅ 非公開にしました：${item.id}（予約 ${item.publish_at} を外した）`); logRun(`private ${item.id}`); }
+    if (!targets.length) say("非公開にする予約がありません"); return;
+  }
   // next：queued の回を上から順に、全部上げる（PC が切れていた間の分も、起動したときにまとめて）
   const items = cmd === "upload" ? q.items.filter(x => x.id === args[1]) : q.items.filter(x => x.status === "queued");
   if (!items.length) { say("上げる回がありません"); return; }
