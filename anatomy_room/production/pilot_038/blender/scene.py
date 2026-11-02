@@ -97,8 +97,12 @@ po = bpy.data.objects.new("panlight", pl); sc.collection.objects.link(po); po.lo
 # ---------------------------------------------------------------- ロケット（x=-500、雨雲の中を上がる）
 ROCK = group("rocket"); RX = -500
 white = K.mat("rwhite", (.88, .88, .86), .4); black = K.mat("rblack", (.05, .05, .05), .5)
+CMG = bpy.data.objects.new("cmg", None); sc.collection.objects.link(CMG); CMG.parent = ROCK   # 司令船と脱出塔（オープニングの B：打ち上げを中止 → 脱出）
 for (z0, h, r, m) in [(0, 42, 5.05, white), (42, 25, 5.05, white), (67, 18, 3.3, white), (85, 4, 3.3, black), (89, 4, 2.0, white), (93, 6, .9, white)]:
-    bpy.ops.mesh.primitive_cylinder_add(radius=r, depth=h, vertices=48, location=(RX, 0, z0 + h / 2)); o = bpy.context.object; o.data.materials.append(m); o.parent = ROCK; bpy.ops.object.shade_smooth()
+    bpy.ops.mesh.primitive_cylinder_add(radius=r, depth=h, vertices=48, location=(RX, 0, z0 + h / 2)); o = bpy.context.object; o.data.materials.append(m); o.parent = CMG if z0 >= 89 else ROCK; bpy.ops.object.shade_smooth()
+esc_m, ESC = emit("escflame", (1, .6, .3), 0)
+for a in range(4):
+    bpy.ops.mesh.primitive_cone_add(radius1=.6, radius2=2.2, depth=9, location=(RX + 1.6 * math.cos(a * 1.57), 1.6 * math.sin(a * 1.57), 92), vertices=24); fo = bpy.context.object; fo.data.materials.append(esc_m); fo.parent = CMG
 for k in range(4):
     a = k * math.pi / 2 + math.pi / 4; K.box(f"fin{k}", (.3, 3, 6), (RX + 5.5 * math.cos(a), 5.5 * math.sin(a), 4), white, (0, 0, a + math.pi / 2), parent=ROCK)
 fl_m, FLB = emit("flame", (1, .7, .35), 30)
@@ -130,6 +134,7 @@ def show(*names, aaron=False):
         for s in segs:
             s.hide_render = "rocket" not in names
     sc.world.node_tree.nodes["Background"].inputs[1].default_value = 1.0
+    CMG.location = (0, 0, 0); ESC.inputs["Emission Strength"].default_value = 0
 
     def hide(o, h):
         o.hide_render = h
@@ -238,7 +243,19 @@ def a_l13(u, t, f):   # 落ち着いた管制室（遠景）
     e = K.ease(u); cam.look(mix((7, 6, 4.5), (5, 4.5, 3.8), e), (0, -6, 1.2), 30)
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l01", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l12", "l13"]}
-ORDER = ["l00", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
-anim = [cam.o, ROCK] + NEEDLES + [SCE] + [bg_ for b, segs, bg_ in BOLTS]
+def s_l00a():
+    s_l06()
+def a_l00a(u, t, f):   # A：このまま続行（雨雲を抜けて上がり続ける）
+    rocket_at(t, 900, 110); z = ROCK.location.z; cam.look((RX - 70, -110, z - 50), (RX, 0, z + 50), 30)
+
+def s_l00b():
+    s_l06()
+def a_l00b(u, t, f):   # B：打ち上げを中止（脱出用のロケットで司令船が離れる。もしもの場合の模式）
+    rocket_at(t, 700, 40); z = ROCK.location.z; tt = max(0, t - .15)
+    CMG.location = (6 * tt * tt, 0, 18 * tt + 22 * tt * tt); ESC.inputs["Emission Strength"].default_value = 60 if t > .15 else 0; ESC.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
+    cam.look((RX - 120, -170, z + 60), (RX + 10, 0, z + 100), 32)
+
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l12", "l13"]}
+ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
+anim = [cam.o, ROCK, CMG] + NEEDLES + [SCE] + [bg_ for b, segs, bg_ in BOLTS]
 K.render_shots(HERE, SHOTS, ORDER, O, anim)

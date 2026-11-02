@@ -43,10 +43,11 @@
    "video": "anatomy_room/production/pilot_029/reverse_029_moseley.mp4",
    "meta": "anatomy_room/production/pilot_029/youtube_metadata.md",
    "publish_at": "2026-11-02 19:00",
-   "status": "queued",
+   "status": "scheduled",
    "old_private_upload": "2026-11-01T19:29:08.044Z",
    "reupload": true,
-   "note": "2026-11-02 新しい声で作り直した版。前の版（非公開）は残っている"
+   "note": "2026-11-02 新しい声で作り直した版。前の版（非公開）は残っている",
+   "uploaded": "2026-11-02T09:01:41.309Z"
   },
   {
    "id": "pilot_030",
@@ -91,9 +92,10 @@
    "id": "pilot_035",
    "video": "anatomy_room/production/pilot_035/reverse_035_kittinger.mp4",
    "meta": "anatomy_room/production/pilot_035/youtube_metadata.md",
-   "publish_at": null,
-   "status": "queued",
-   "note": "2026-11-02 3D を Blender で描き直し、新しい声で作り直した版"
+   "publish_at": "2026-11-03 08:00",
+   "status": "scheduled",
+   "note": "2026-11-02 3D を Blender で描き直し、新しい声で作り直した版",
+   "uploaded": "2026-11-02T09:03:21.785Z"
   },
   {
    "id": "pilot_036",

@@ -234,6 +234,10 @@ try:
 except Exception as e:
     print("mother_walk:", e)
 
+# オープニングの A（その場で待つ）：密林に落ちた座席の列
+BENCH = group("bench"); BENCH.parent = FOREST
+for k in range(3):
+    K.box(f"bseat{k}", (.5, .5, .14), (2.4 + k * .55, 2.3, .42), fabric, (0, .05, .04), parent=BENCH); K.box(f"bback{k}", (.5, .12, .7), (2.4 + k * .55, 2.58, .8), fabric, (-.25, .05, .04), parent=BENCH)
 ALL = {"forest": FOREST, "river": RIVER, "cabin": CAB, "wing": WING, "fall": FALL}
 
 
@@ -364,7 +368,20 @@ def a_l13(u, t, f):   # 翌朝、小屋（男たちの声）
     e = K.ease(u); cam.look(mix((HX + 9, HY + 10, 1.8), (HX + 7, HY + 7, 1.7), e), (HX, HY, 1.4), 34)
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l12", "l13"]}
-ORDER = ["l00", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13", "l14"]
+def s_l00a():
+    show("forest", mom=True); day()
+    if MOM: MOM.location = (2.95, 2.25, 0.02); MOM.rotation_euler = (0, 0, 0)
+def a_l00a(u, t, f):   # A：座席のそばで、救助を待つ（後ろ姿）
+    e = K.ease(u); cam.look(mix((3.9, 5.6, 1.6), (3.6, 4.9, 1.45), e), (2.9, 1.2, .75), 30); flow(t)
+
+def s_l00b():
+    show("forest", girl=True); day()
+def a_l00b(u, t, f):   # B：小川を歩いて進む（後ろ姿、低いカメラで水しぶきの高さ）
+    if GIRL:
+        y = 2 - 2.2 * u; GIRL.location = (creek_x(y), y, .1 + .02 * math.sin(t * 6))
+    yc = 4.2 - 2 * u; cam.look((creek_x(yc) + .5, yc, .55 + .02 * math.sin(t * 5)), (creek_x(-6), -6, 1.0), 26); flow(t)
+
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l12", "l13"]}
+ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13", "l14"]
 anim = [cam.o] + BAGS + ([GIRL] if GIRL else [])
 K.render_shots(HERE, SHOTS, ORDER, O, anim)

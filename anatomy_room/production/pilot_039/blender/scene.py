@@ -240,6 +240,17 @@ def a_l12(u, t, f):   # ヤギを連れた少女（遠景）
     e = K.ease(u); z0 = H(16, -86); cam.look(mix((14, -80, z0 + 1.9), (16, -86, z0 + 1.8), e), (31, -122, H(30, -124) + .9), 34)
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]}
-ORDER = ["l00", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
+def s_l00a():
+    show("runner", "clouds"); day(6, 200, -1.2)
+def a_l00a(u, t, f):   # A：雲の方へ歩く（後ろ姿、足もとの近く）
+    RUN.location = (0, -60 - 2.5 * t, H(0, -60 - 2.5 * t)); RUN.rotation_euler = (0, 0, 0)
+    z0 = H(0, -60); cam.look((1.2, -55.5 - 2.5 * t, z0 + .9), (-1, -100, z0 + 6), 26)
+
+def s_l00b():
+    s_l09()
+def a_l00b(u, t, f):   # B：屋根の下で救助を待つ（廟の中、座る後ろ姿）
+    a_l09(u, t, f)
+
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]}
+ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
 K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, HELI, ROT, FL, RUN])

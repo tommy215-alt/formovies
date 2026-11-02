@@ -38,9 +38,9 @@ html,body{margin:0;background:#000}
 // pilot_039「あなたならどうする？——砂漠で迷子（マウロ・プロスペリ）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。砂嵐の砂と戸口の枠は pov.js とこのファイル。本物の写真：mds（Ben Hammersley、マラソン・デ・サーブル、CC BY 2.0）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['mds'], ci: {}, hits: [],
-  opening: { img: null, bg: blShot("l00"), title: ["砂漠で迷子。水もない", "あなたは？"], size1: 70, size2: 110, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["砂漠で迷子。水もない", "あなたは？"], size1: 70, size2: 110, credit: ["※再現CGを含みます"] } });
 loadImages(KIT.images);
-const CHOICE = { a: "雲の方へ歩く", b: "屋根の下で救助を待つ", ans: "A", reveal: "l09" };
+const CHOICE = { a: "雲の方へ歩く", b: "屋根の下で救助を待つ", ans: "A", reveal: "l09b" };
 // 廟の戸口の枠（内側の暗い壁と、上が丸い入口）
 function doorFrame() { bg.save(); bg.fillStyle = "#120c07"; bg.beginPath(); bg.rect(0, 0, W, H); bg.moveTo(180, 1920); bg.lineTo(180, 760); bg.arc(540, 760, 360, Math.PI, 0); bg.lineTo(900, 1920); bg.closePath(); bg.fill("evenodd");
   bg.strokeStyle = "rgba(120,90,60,.5)"; bg.lineWidth = 14; bg.beginPath(); bg.moveTo(180, 1920); bg.lineTo(180, 760); bg.arc(540, 760, 360, Math.PI, 0); bg.lineTo(900, 1920); bg.stroke(); bg.restore(); }
@@ -86,7 +86,7 @@ function choiceCard(ctx, letter, text, x, y, w, h, k, hi = 0, dim = 0) { if (k <
   ctx.restore(); }
 function choicePair(t, y, h, k, hiA = 0, hiB = 0, dimA = 0, dimB = 0) { choiceCard(ui, "A", CHOICE.a, 70, y, 940, h, k, hiA, dimA); choiceCard(ui, "B", CHOICE.b, 70, y + h + 34, 940, h, k, hiB, dimB); }
 function choiceUI(t, name) {
-  if (name === "open") { const k = k_(t, "t0", .5, .25); choicePair(t, 1000, 150, k); return; }
+  if (name === "open") { const k = k_(t, "t0", .5, .25), a = CUE.l00a, b = CUE.l00b; choicePair(t, 1000, 150, k, t >= a && t < b ? clamp((t - a) / .15) : 0, t >= b ? clamp((t - b) / .15) : 0, t >= b ? .6 : 0, t >= a && t < b ? .6 : 0); return; }
   const { s } = shotAt(t), es = TL.ending_start;
   if (name === "pov") { const k = clamp((t - CUE.pov) / .4) * clamp((CUE.ask - t) / .3); ui.save(); ui.globalAlpha = .85 * k;   // 上に小さく：A・B のどちらか
     for (const [L, x, c] of [["A", 270, "rgba(80,170,255,.9)"], ["B", 810, "rgba(255,150,70,.9)"]]) { ui.fillStyle = "rgba(6,12,20,.6)"; rrect(ui, x - 250, 200, 500, 70, 35); ui.fill(); ui.strokeStyle = c; ui.lineWidth = 3; rrect(ui, x - 250, 200, 500, 70, 35); ui.stroke();
@@ -95,6 +95,12 @@ function choiceUI(t, name) {
   const r = CUE[CHOICE.reveal]; if (r !== undefined && t >= r && t < r + 3.2) { const k = clamp((t - r) / .25) * clamp((r + 3.2 - t) / .4), hi = clamp((t - r - .3) / .3), A = CHOICE.ans === "A";
     choicePair(t, 300, 150, k, A ? hi : 0, A ? 0 : hi, A ? 0 : hi, A ? hi : 0); }
 }
+// オープニングの背景：状況 → A の行動の CG → B の行動の CG（2026-11-02 ユーザーの指示）
+const OPEN_SHOTS = { s: blShot("l00"), a: blShot("l00a"), b: blShot("l00b") };
+function openBG(t) { (t < CUE.l00a ? OPEN_SHOTS.s : t < CUE.l00b ? OPEN_SHOTS.a : OPEN_SHOTS.b)(t); }
+// 最後の暗転の注意書き（2026-11-02 ユーザーの指示）
+function endNote(t) { const es = TL.ending_start; if (t < es + .5) return; const k = clamp((t - es - .5) / .5);
+  ui.save(); ui.globalAlpha = k; ["※これは過去の出来事の紹介です。", "必ずしも正しい選択を", "示すものではありません。"].forEach((l, i) => label(ui, l, 540, 900 + i * 66, 44, "#D8E2EA", { stroke: "#000", sw: .1 })); ui.restore(); }
 { const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (t < TL.ending_start) choiceUI(t, name); }; }
 // ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
 function fxEp(t, name) {
@@ -102,5 +108,6 @@ function fxEp(t, name) {
   const { s, a, u } = shotAt(t); const f = FX[s.at]; if (f) f(t, u, a);
 }
 kitStart(() => {}); BL.install();
+{ const rf = window.renderFrame; window.renderFrame = t => { const r = rf(t); if (r && r.then) return r.then(() => endNote(t)); endNote(t); return r; }; }
 </script>
 </body></html>

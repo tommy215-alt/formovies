@@ -32,6 +32,23 @@ def register(name, path, start=0.0, dur=None, gain=1.0, fade_in=.05, fade_out=.4
     FILES[name] = dict(path=str(path), start=start, dur=dur, gain=gain, fade_in=fade_in, fade_out=fade_out, loop=loop, norm=norm, span=span)
 
 
+SYN = {}
+
+
+def click(name, pitch=2600, gain=1.0, double=False):
+    """選択肢を示すときの無機質なクリック音（合成。2026-11-02 ユーザーの指示「もっとクリック音ぽい無機質な感じ」）"""
+    SYN[name] = dict(pitch=pitch, gain=gain, double=double)
+
+
+def _click(c):
+    n = int(.12 * SR); t = np.arange(n) / SR; r = np.random.default_rng(7)
+    noise = r.standard_normal(n); noise = noise - music._lp(noise, 2500)
+    x = noise * np.exp(-t / .0018) + .55 * np.sin(2 * np.pi * c["pitch"] * t) * np.exp(-t / .010) + .25 * np.sin(2 * np.pi * c["pitch"] * 2.01 * t) * np.exp(-t / .005)
+    if c["double"]:
+        k = int(.055 * SR); x[k:] += .7 * x[:n - k]
+    return x * .9 / (np.max(np.abs(x)) + 1e-9) * c["gain"]
+
+
 def _span(f):
     a, b, tail = (*f["span"], 0.0)[:3]
     cues = json.load(open(TL["path"], encoding="utf-8"))["cues"]
@@ -65,6 +82,7 @@ if not getattr(music, "_AMB_LOADED", False):
     def sfx_bank_soft():
         b = _prev()
         b.update({k: _load(f) for k, f in FILES.items()})
+        b.update({k: _click(c) for k, c in SYN.items()})
         return b
 
     music.sfx_bank_soft = sfx_bank_soft
