@@ -33,6 +33,8 @@ def setup(here, design, bgm, black=2.6, ending_gain=None):
     import bgm_file   # 曲のファイル（opening_bgm より先に読む：opening_bgm が bgm_file を包む）
     import ending_ext
     ending_ext.apply(pipeline)
+    import aivis_ext  # 声の設定に "engine" があるときだけ AivisSpeech へ（ない回は従来どおり）
+    aivis_ext.apply(pipeline)
     if design == "tragedy":
         import noend_ext
         noend_ext.apply(pipeline, black=black)

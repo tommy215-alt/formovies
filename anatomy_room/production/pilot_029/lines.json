@@ -1,14 +1,32 @@
 {
  "title": "元素の番号の意味——ヘンリー・モーズリー",
  "theme": "元素の番号の意味——ヘンリー・モーズリー",
- "note": "チャンネル「リバース」知的設計（templates/DESIGN_MODES.md の「知的設計の編集設定」、カットインは文字・効果音なしのカメラの動き）＋ガイドライン v2.4。制作の土台は production/ext/kit。本編は M（v7：VOICEVOX:玄野武宏）、オープニング L00 は W（VOICEVOX:冥鳴ひまり）。fact は scripts/pilot_029/fact_check.md。台本は 2026-11-01 にユーザーが「OK」。",
+ "note": "チャンネル「リバース」知的設計（templates/DESIGN_MODES.md の「知的設計の編集設定」、カットインは文字・効果音なしのカメラの動き）＋ガイドライン v2.4。制作の土台は production/ext/kit。本編は M（声の試し 2026-11-02：AivisSpeech:阿井田 茂 Calm。元は v7 の VOICEVOX:玄野武宏）、オープニング L00 は W（VOICEVOX:No.7 アナウンス。元は冥鳴ひまり）。fact は scripts/pilot_029/fact_check.md。台本は 2026-11-01 にユーザーが「OK」。",
  "voices": "v7",
  "voice_override": {
   "M": {
-   "speed": 1.5
+   "name": "阿井田 茂",
+   "credit": "AivisSpeech: 阿井田 茂",
+   "engine": "http://127.0.0.1:10101",
+   "styles": {
+    "calm": 1310138977,
+    "normal": 1310138976
+   },
+   "default_style": "calm",
+   "speed": 1.5,
+   "pitch": 0.0,
+   "inton": 1.0,
+   "merge_aux": false
   },
   "W": {
+   "name": "No.7",
+   "credit": "VOICEVOX:No.7",
+   "styles": {
+    "announce": 30
+   },
+   "default_style": "announce",
    "speed": 1.3,
+   "pitch": 0.0,
    "inton": 1.0
   }
  },

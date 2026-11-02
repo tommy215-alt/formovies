@@ -50,6 +50,13 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - **自動で動く（2026-11-01、ユーザーの承認）**：Windows のタスク スケジューラ「Reverse-YouTube-Upload」が、ログオン時と 3 時間ごとに `yt_upload.js next` を動かす（PC が切れていた分は起動時に実行）。queue.json の queued の回を順に全部上げ、時刻を過ぎた回や `publish_at` が空の回は次の空いた 8:00・19:00 に振り直す。記録は `publish/log/run.log`・`task.log`。登録・削除は `tools/yt_task.ps1`（`-Remove`）。**新しい回を予約するには、queue.json に `{"id", "video", "meta", "publish_at": null, "status": "queued"}` を **PC の作業フォルダで** 足すだけ**（タスクは git pull しないので、クラウドのセッションで足したときは PC で `git pull` してから）。
 - 予約済み：pilot_024（2026-11-02 8:00）、pilot_026（2026-11-02 19:00）。pilot_023・025 などはユーザーが自分で上げ済み。
 
+## 質の向上（2026-11-02〜、ユーザーの指示「CG とナレーションを無料でできる範囲で高クオリティに」）
+
+- 026〜033 の予約は、ユーザーの指示で非公開に戻した（`yt_upload.js private`）。034〜036 は hold。もう一度予約するかはユーザーの指示待ち。シリーズは C 案（「あなたならどうする？」の選択型）で行く（企画はこれから）。
+- **ナレーション**：AivisSpeech Engine（無料）を導入（`docs/PC_SETUP.md` の 2b）。聞き比べ（同じ一文を 14 の声で、https://claude.ai/artifact/UJaQ2vbYU6SoQFX7iNmUT1 ）でユーザーが選んだのは 1 玄野武宏・3 VOICEVOX No.7 アナウンス（女性）・8 AivisSpeech 阿井田 茂 Calm・9 阿井田 茂 ノーマル。つなぎは `production/ext/aivis_ext.py`（`voice_override` に `"engine"`、共通エンディングの決めゼリフは W を差し替えても冥鳴ひまり）。
+  - **試し**：pilot_029 を本編 阿井田 茂 Calm（話速 1.5）・冒頭 L00 No.7 アナウンス（1.3）で作り直した（59.4 秒）。元の mp4 は `_backup/voice_trial_029/`。ユーザーの感想待ち。AivisSpeech は読み（カナ）を返さないので、qc_report の「読み上げの照合」は文のまま（耳で確かめる）。No.7 の L00 は文末 +3.6 半音の上がりの警告。
+- **CG**：Blender 5.2（Cycles・GPU）で 035 の成層圏の場面の試作（高度 31 km の多重散乱の空・手続き的な地表と雲・ゴンドラ・MPFB の人）。スクリプトはスクラッチ（`%TEMP%\claude\bl\strato.py`）。1 コマ約 17 秒（RTX 3070、128 サンプル）。今の 035 の同じ場面（l03b）と比べてもらう。
+
 ## 次の動画でやること（ガイドライン v2.4）
 
 1. 題材を決める（候補：伊能忠敬、ジョン・スノウ、ジョン・ハリソン、リービット、八木秀次など。前の会話のリスト）。

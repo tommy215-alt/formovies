@@ -28,6 +28,12 @@ https://voicevox.hiroshiba.jp/ から「ダウンロード」→ Windows 版（*
 
 > 第 1 話からの声は VOICEVOX ENGINE 0.24.1 で作っている。アプリの新しい版でも同じ声で動くはずだが、声の細部が少し変わることがある。
 
+### 2b. AivisSpeech Engine（2026-11-02〜、ナレーションの声：阿井田 茂）
+
+無料（LGPL）の音声合成。VOICEVOX と同じ API。`%LOCALAPPDATA%\reverse_tools\aivis\Windows-x64\run.exe --port 10101 --use_gpu --output_log_utf8 --disable_sentry` で起動する（書き出しの間は起動したまま）。
+声のモデルは AivisHub から入れる（`curl -X POST http://127.0.0.1:10101/aivm_models/install -F "url=https://api.aivis-project.com/v1/aivm-models/<UUID>/download?model_type=AIVMX"`）。入れたもの：阿井田 茂（47e53151-…、ACML 1.0）ほか。**ACML 1.0（商用可・説明欄に「AivisSpeech: 名前」）か CC0 だけ。ACML-NC は使わない。**
+回ごとに `lines.json` の `voice_override` に `"engine": "http://127.0.0.1:10101"` を書くと、その声だけ AivisSpeech で作る（`production/ext/aivis_ext.py`、kit の回は自動で読み込む）。
+
 ## 3. リポジトリを取ってくる
 
 ```
