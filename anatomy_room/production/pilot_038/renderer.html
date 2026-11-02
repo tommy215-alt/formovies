@@ -38,7 +38,7 @@ html,body{margin:0;background:#000}
 // pilot_038「あなたならどうする？——発射直後の雷（アポロ12号）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。本物の写真：lightning（NASA、1969 年 11 月 14 日の落雷、PD）、launch（NASA、アポロ 12 号の発射、PD）、aaron（NASA、ジョン・アーロン、PD）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['lightning', 'launch', 'aaron'], ci: {}, hits: [],
-  opening: { img: "lightning", bg: openBG, box: [250, 560, 830, 960], cy: .5, gray: 0, title: ["発射直後に雷。計器が狂ったら", "あなたは？"], size1: 60, size2: 110, credit: ["写真：NASA（1969年11月14日）／PD", "※再現CGを含みます"] } });
+  opening: { img: "lightning", bg: openBG, box: [250, 560, 830, 960], cy: .5, gray: 0, title: ["発射直後、計器が狂ったら", "あなたは？"], size1: 62, size2: 110, credit: ["写真：NASA（1969年11月14日）／PD", "※再現CGを含みます"] } });
 loadImages(KIT.images);
 const CHOICE = { a: "このまま続行", b: "打ち上げを中止", ans: "A", reveal: "l08b" };
 // SCE の仕組み（模式）：センサー → SCE → 計器・地上。前半は乱れた信号、AUX に切り替えると整った信号
@@ -98,7 +98,8 @@ function choiceUI(t, name) {
 }
 // オープニングの背景：状況 → A の行動の CG → B の行動の CG（2026-11-02 ユーザーの指示）
 const OPEN_SHOTS = { s: blShot("l00"), a: blShot("l00a"), b: blShot("l00b") };
-function openBG(t) { (t < CUE.l00a ? OPEN_SHOTS.s : t < CUE.l00b ? OPEN_SHOTS.a : OPEN_SHOTS.b)(t); }
+function openBG(t) { const o = KIT.opening; if (o.img0 === undefined) { o.img0 = o.img; o.credit0 = o.credit; } o.img = t < CUE.l00a ? o.img0 : null; o.credit = o.img ? o.credit0 : o.credit0.filter(c => !c.startsWith("写真"));   // 本物の写真は状況を読むあいだだけ、A・B では CG を全面に
+  (t < CUE.l00a ? OPEN_SHOTS.s : t < CUE.l00b ? OPEN_SHOTS.a : OPEN_SHOTS.b)(t); }
 // 最後の暗転の注意書き（2026-11-02 ユーザーの指示）
 function endNote(t) { const es = TL.ending_start; if (t < es) return; ui.fillStyle = `rgba(0,0,0,${easeInOut(clamp((t - es) / 1.0))})`; ui.fillRect(0, 0, W, H);   // 1 秒で真っ暗に
   if (t < es + .7) return; const k = clamp((t - es - .7) / .5);
