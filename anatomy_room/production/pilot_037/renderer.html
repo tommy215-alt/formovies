@@ -38,8 +38,9 @@ html,body{margin:0;background:#000}
 // pilot_037「あなたならどうする？——密林に、ひとり（ジュリアン・ケプケ）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。本物の写真：river（NASA、ISS から見たウカヤリ川、PD）、canopy（Geoff Gallice、CC BY 2.0）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['river', 'canopy'], ci: {}, hits: [],
-  opening: { img: null, bg: blShot("l00"), title: ["墜落。密林に、ひとり。", "待つか、歩くか。"], size1: 64, size2: 104, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: blShot("l00"), title: ["飛行機が墜落したら", "あなたは？"], size1: 70, size2: 110, credit: ["※再現CGを含みます"] } });
 loadImages(KIT.images);
+const CHOICE = { a: "その場で救助を待つ", b: "歩いて助けを探す", ans: "B", reveal: "l09" };
 // 機内の窓の枠（翼の場面：外が暗い嵐、窓は丸みのある四角）
 function winPath(c, x, y, w, h, r) { c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 function windowMask() { const wp = c => winPath(c, 150, 430, 780, 1060, 260); bg.save(); bg.fillStyle = "#1c1a17"; bg.beginPath(); bg.rect(0, 0, W, H); wp(bg); bg.fill("evenodd");
@@ -55,10 +56,10 @@ SHOTS = [
   { at: "l08", kind: "3d", draw: blShot("l08") },
   { at: "l09", kind: "3d", draw: blShot("l09") },
   { at: "l10", kind: "3d", draw: blShot("l10") },
-  { at: "l11", kind: "photo", img: "river", box: [90, 420, 990, 1020], cy: .5, z0: 1.0, z1: 1.18, credit: ["写真：NASA（国際宇宙ステーションから見たウカヤリ川）／パブリックドメイン"], creditY: 1080 },
+  { at: "l11", kind: "photo", img: "river", box: [90, 420, 990, 1020], cy: .5, z0: 1.0, z1: 1.18, credit: ["写真：NASA（宇宙から見た川）／PD"], creditY: 1080 },
   { at: "l12", kind: "3d", draw: blShot("l12") },
   { at: "l13", kind: "3d", draw: blShot("l13") },
-  { at: "l14", kind: "photo", img: "canopy", box: [190, 330, 890, 1380], cy: .5, z0: 1.0, z1: 1.12, credit: ["写真：Geoff Gallice／CC BY 2.0"], creditY: 1440 },
+  { at: "l14", kind: "photo", img: "canopy", box: [190, 330, 890, 1200], cy: .5, z0: 1.0, z1: 1.12, credit: ["写真：Geoff Gallice／CC BY 2.0"], creditY: 1250 },
 ];
 const FX = {
   l00: (t, u) => { POV.shake(t, 6); POV.rain(t, .7); POV.blur(2.5 * (1 - u)); POV.breath(t, .55, .55); POV.heart(t, 120, .35); },
@@ -77,6 +78,29 @@ function buildMood() { const c = CUE; MOOD = [[0, { cool: .35, sat: .75, vig: .7
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.canopy, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,8,6,.45)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .3, sat: .8, vig: .7 }]]); addGrain(0);
   label(ui, "墜落。密林に、ひとり。", 540, 520, 74, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "待つか、歩くか。", 540, 680, 112, "#FFD58A", { stroke: "#05080c", sw: .14 }); label(ui, "あなたなら、どうする？", 540, 1420, 70, "#EAF2F8", { stroke: "#05080c", sw: .14 }); }
 
+// ---------------------------------------------------------------- 選択肢の札（2026-11-02 ユーザーの指示：前半は「選択」が主役。A・B を同時に見せる）
+// CHOICE = { a, b, ans: "A"|"B", reveal: 答えを言う行の cue }
+function choiceCard(ctx, letter, text, x, y, w, h, k, hi = 0, dim = 0) { if (k <= 0) return;
+  const col = letter === "A" ? [80, 170, 255] : [255, 150, 70]; ctx.save(); ctx.globalAlpha = k * (1 - .65 * dim);
+  ctx.fillStyle = `rgba(6,12,20,${.72 + .15 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.fill();
+  ctx.lineWidth = 5 + 7 * hi; ctx.strokeStyle = `rgba(${col},${.8 + .2 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.stroke();
+  if (hi > 0) { ctx.shadowColor = `rgba(${col},.9)`; ctx.shadowBlur = 40 * hi; ctx.stroke(); ctx.shadowBlur = 0; }
+  ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(x + 62, y + h / 2, 42, 0, Math.PI * 2); ctx.fill();
+  label(ctx, letter, x + 62, y + h / 2 + 2, 60, "#06101a", { weight: 900 });
+  const lines = text.split("／"); lines.forEach((l, i) => label(ctx, l, x + 130 + (w - 150) / 2, y + h / 2 + (i - (lines.length - 1) / 2) * 52, lines.length > 1 ? 46 : 54, "#EAF2F8", { weight: 800 }));
+  ctx.restore(); }
+function choicePair(t, y, h, k, hiA = 0, hiB = 0, dimA = 0, dimB = 0) { choiceCard(ui, "A", CHOICE.a, 70, y, 940, h, k, hiA, dimA); choiceCard(ui, "B", CHOICE.b, 70, y + h + 34, 940, h, k, hiB, dimB); }
+function choiceUI(t, name) {
+  if (name === "open") { const k = k_(t, "t0", .5, .25); choicePair(t, 1000, 150, k); return; }
+  const { s } = shotAt(t), es = TL.ending_start;
+  if (name === "pov") { const k = clamp((t - CUE.pov) / .4) * clamp((CUE.ask - t) / .3); ui.save(); ui.globalAlpha = .85 * k;   // 上に小さく：A・B のどちらか
+    for (const [L, x, c] of [["A", 270, "rgba(80,170,255,.9)"], ["B", 810, "rgba(255,150,70,.9)"]]) { ui.fillStyle = "rgba(6,12,20,.6)"; rrect(ui, x - 250, 200, 500, 70, 35); ui.fill(); ui.strokeStyle = c; ui.lineWidth = 3; rrect(ui, x - 250, 200, 500, 70, 35); ui.stroke();
+      label(ui, L + "　" + (L === "A" ? CHOICE.a : CHOICE.b).replace("／", ""), x, 236, 30, "#EAF2F8", { weight: 700 }); } ui.restore(); }
+  if (name === "ask") { const k = clamp((t - CUE.ask) / .35); choicePair(t, 620, 170, k); }
+  const r = CUE[CHOICE.reveal]; if (r !== undefined && t >= r && t < r + 3.2) { const k = clamp((t - r) / .25) * clamp((r + 3.2 - t) / .4), hi = clamp((t - r - .3) / .3), A = CHOICE.ans === "A";
+    choicePair(t, 300, 150, k, A ? hi : 0, A ? 0 : hi, A ? 0 : hi, A ? hi : 0); }
+}
+{ const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (t < TL.ending_start) choiceUI(t, name); }; }
 // ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
 function fxEp(t, name) {
   if (name === "open") { (FX.l00 || (() => {}))(t, clamp(t / Math.max(.3, CUE.l01)), 0); return; }

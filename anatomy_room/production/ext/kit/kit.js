@@ -266,7 +266,7 @@ function renderFrame(t) {
   addGrain(t);
   if (D === "tragedy" && name !== "open") { const dk = darkK(t); bg.fillStyle = `rgba(0,6,14,${.32 + .22 * Math.pow(dk, 1.2)})`; bg.fillRect(0, 0, W, H); }   // 悲劇：最初から暗く張り詰めた画面、終盤ほどさらに暗く（2026-11-01〜）
   if (t < es) { drawUI(t, name); if (name !== "open") { if (D === "intel") S.docSub(ui, t, { endAt: es }); else popSub(ui, t, es); } }
-  else if (D === "tragedy") { const k = easeInOut(clamp((t - es) / Math.max(.1, (TL.blackout || .25) - .3))); bg.fillStyle = `rgba(0,0,0,${k})`; bg.fillRect(0, 0, W, H); }   // 共通エンディングなし：時間をかけて暗転
+  else if (D === "tragedy" || TL.no_ending) { const k = easeInOut(clamp((t - es) / Math.max(.1, (TL.blackout || .25) - .3))); bg.fillStyle = `rgba(0,0,0,${k})`; bg.fillRect(0, 0, W, H); }   // 共通エンディングなし：時間をかけて暗転
   else { const e = TL.lines.filter(x => x.ending), cr = TL.credits.join("／").split("／"), two = cr.length > 2;   // 声が 3 人以上なら、クレジットを 2 行に分けて描く（pilot_019 と同じ）
     HUD.endingOverlay(ui, t - es, { end1: e[0].start - es, end2: e[1].start - es, credits: two ? [] : TL.credits });
     if (two) { const k = clamp((t - es) / .4); ui.save(); ui.globalAlpha = k * .9; S.group(() => { text(ui, "音声：" + cr.slice(0, 2).join("／").replace(/^音声：/, ""), 540, 1150, 28, "#B8C7D6", { weight: 500 }); text(ui, cr.slice(2).join("／"), 540, 1192, 28, "#B8C7D6", { weight: 500 }); }); ui.restore(); } }

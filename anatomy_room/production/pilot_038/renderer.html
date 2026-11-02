@@ -38,8 +38,9 @@ html,body{margin:0;background:#000}
 // pilot_038「あなたならどうする？——発射直後の雷（アポロ12号）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。本物の写真：lightning（NASA、1969 年 11 月 14 日の落雷、PD）、launch（NASA、アポロ 12 号の発射、PD）、aaron（NASA、ジョン・アーロン、PD）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['lightning', 'launch', 'aaron'], ci: {}, hits: [],
-  opening: { img: "lightning", bg: blShot("l00"), box: [200, 640, 880, 1360], cy: .5, gray: 0, title: ["発射直後、雷。", "中止か、続行か。"], size1: 64, size2: 104, credit: ["写真：NASA（1969年11月14日）／パブリックドメイン", "※再現CGを含みます"] } });
+  opening: { img: "lightning", bg: blShot("l00"), box: [250, 560, 830, 960], cy: .5, gray: 0, title: ["発射直後に雷。計器が狂ったら", "あなたは？"], size1: 60, size2: 110, credit: ["写真：NASA（1969年11月14日）／PD", "※再現CGを含みます"] } });
 loadImages(KIT.images);
+const CHOICE = { a: "このまま続行", b: "打ち上げを中止", ans: "A", reveal: "l08" };
 // SCE の仕組み（模式）：センサー → SCE → 計器・地上。前半は乱れた信号、AUX に切り替えると整った信号
 function sceDiag(X, t, a) { panel(X); const k = clamp((t - a - 2.4) / .4);
   lab2(X, "センサー", 250, 560, T(30), "#B8DFF2", 700); lab2(X, "SCE", 540, 560, T(40), "#FFE2A8", 900); lab2(X, "計器・地上", 830, 560, T(30), "#B8DFF2", 700);
@@ -73,6 +74,29 @@ const FX = {
 function buildMood() { const c = CUE; MOOD = [[0, { cool: .4, sat: .8, vig: .7 }], [c.pov, { cool: .45, sat: .75, vig: .7 }], [c.l03, { cool: .5, sat: .7, vig: .8 }], [c.ask, { cool: .55, sat: .6, vig: .85 }], [c.exp, { warm: .05, sat: .9, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.lightning, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, cx: .7, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,4,10,.4)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .4, sat: .8, vig: .7 }]]); addGrain(0); label(ui, "発射直後、雷。", 540, 520, 80, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "中止か、続行か。", 540, 680, 112, "#FFD58A", { stroke: "#05080c", sw: .14 }); label(ui, "あなたなら、どうする？", 540, 1420, 70, "#EAF2F8", { stroke: "#05080c", sw: .14 }); }
 
+// ---------------------------------------------------------------- 選択肢の札（2026-11-02 ユーザーの指示：前半は「選択」が主役。A・B を同時に見せる）
+// CHOICE = { a, b, ans: "A"|"B", reveal: 答えを言う行の cue }
+function choiceCard(ctx, letter, text, x, y, w, h, k, hi = 0, dim = 0) { if (k <= 0) return;
+  const col = letter === "A" ? [80, 170, 255] : [255, 150, 70]; ctx.save(); ctx.globalAlpha = k * (1 - .65 * dim);
+  ctx.fillStyle = `rgba(6,12,20,${.72 + .15 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.fill();
+  ctx.lineWidth = 5 + 7 * hi; ctx.strokeStyle = `rgba(${col},${.8 + .2 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.stroke();
+  if (hi > 0) { ctx.shadowColor = `rgba(${col},.9)`; ctx.shadowBlur = 40 * hi; ctx.stroke(); ctx.shadowBlur = 0; }
+  ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(x + 62, y + h / 2, 42, 0, Math.PI * 2); ctx.fill();
+  label(ctx, letter, x + 62, y + h / 2 + 2, 60, "#06101a", { weight: 900 });
+  const lines = text.split("／"); lines.forEach((l, i) => label(ctx, l, x + 130 + (w - 150) / 2, y + h / 2 + (i - (lines.length - 1) / 2) * 52, lines.length > 1 ? 46 : 54, "#EAF2F8", { weight: 800 }));
+  ctx.restore(); }
+function choicePair(t, y, h, k, hiA = 0, hiB = 0, dimA = 0, dimB = 0) { choiceCard(ui, "A", CHOICE.a, 70, y, 940, h, k, hiA, dimA); choiceCard(ui, "B", CHOICE.b, 70, y + h + 34, 940, h, k, hiB, dimB); }
+function choiceUI(t, name) {
+  if (name === "open") { const k = k_(t, "t0", .5, .25); choicePair(t, 1000, 150, k); return; }
+  const { s } = shotAt(t), es = TL.ending_start;
+  if (name === "pov") { const k = clamp((t - CUE.pov) / .4) * clamp((CUE.ask - t) / .3); ui.save(); ui.globalAlpha = .85 * k;   // 上に小さく：A・B のどちらか
+    for (const [L, x, c] of [["A", 270, "rgba(80,170,255,.9)"], ["B", 810, "rgba(255,150,70,.9)"]]) { ui.fillStyle = "rgba(6,12,20,.6)"; rrect(ui, x - 250, 200, 500, 70, 35); ui.fill(); ui.strokeStyle = c; ui.lineWidth = 3; rrect(ui, x - 250, 200, 500, 70, 35); ui.stroke();
+      label(ui, L + "　" + (L === "A" ? CHOICE.a : CHOICE.b).replace("／", ""), x, 236, 30, "#EAF2F8", { weight: 700 }); } ui.restore(); }
+  if (name === "ask") { const k = clamp((t - CUE.ask) / .35); choicePair(t, 620, 170, k); }
+  const r = CUE[CHOICE.reveal]; if (r !== undefined && t >= r && t < r + 3.2) { const k = clamp((t - r) / .25) * clamp((r + 3.2 - t) / .4), hi = clamp((t - r - .3) / .3), A = CHOICE.ans === "A";
+    choicePair(t, 300, 150, k, A ? hi : 0, A ? 0 : hi, A ? 0 : hi, A ? hi : 0); }
+}
+{ const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (t < TL.ending_start) choiceUI(t, name); }; }
 // ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
 function fxEp(t, name) {
   if (name === "open") { (FX.l00 || (() => {}))(t, clamp(t / Math.max(.3, CUE.l01)), 0); return; }

@@ -46,6 +46,7 @@ def setup(samples=32, exposure=-3.2):
     except Exception:
         pass
     sc.cycles.adaptive_threshold = .03; sc.render.use_persistent_data = True
+    sc.cycles.volume_step_rate = 4.0; sc.cycles.volume_max_steps = 256   # 薄い霧・雲は粗い刻みで十分（2026-11-02、1 コマ 6 秒 → 短縮）
     sc.render.resolution_x, sc.render.resolution_y = 1080, 1920
     sc.render.fps = FPS
     sc.view_settings.view_transform = "AgX"; sc.view_settings.look = "AgX - Punchy"; sc.view_settings.exposure = exposure

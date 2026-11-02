@@ -288,13 +288,13 @@ def a_l00(u, t, f):   # 目を開けると木々の天井（オープニング�
     p = Vector((.6, -1.0, .45)) + bob(t, .02); cam.look(p, p + Vector((.3, .8, 6)), 18, roll=.25 * math.sin(t * .4)); flow(t)
 
 def s_l01():
-    show("cabin"); sky.set(0, -5, 150, 0); sc.view_settings.exposure = -1.0; sv.inputs["Density"].default_value = .02
+    show("cabin"); fog.hide_render = True; sky.set(0, -5, 150, 0); sc.view_settings.exposure = -1.0; sv.inputs["Density"].default_value = .02
     for b in BOLT: b.inputs["Emission Strength"].default_value = 0
 def a_l01(u, t, f):   # 窓側の席から前を見る（となりに母の肩）
     p = Vector((-1.0, .05, CZ - .12)) + Vector((math.sin(t * 7) * .004, 0, math.sin(t * 9.3) * .006)); cam.look(p, (-.2, -8, CZ - .1), 24)
 
 def s_l02():
-    s_l01()
+    s_l01(); fog.hide_render = False   # 窓の外の稲妻が霧に光る
 def a_l02(u, t, f):   # 激しい揺れ、荷物が落ちる、窓の外に稲妻
     k = .03 + .05 * u; p = Vector((-1.0, .05, CZ - .12)) + Vector((math.sin(t * 17) * k, math.sin(t * 13) * k * .5, math.sin(t * 21) * k * 1.4))
     cam.look(p, (-1.4, -6, CZ - .1 + math.sin(t * 15) * .3), 24, roll=math.sin(t * 11) * .06)
