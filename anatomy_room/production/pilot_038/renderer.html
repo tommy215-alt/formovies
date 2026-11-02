@@ -40,7 +40,7 @@ html,body{margin:0;background:#000}
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['lightning', 'launch', 'aaron'], ci: {}, hits: [],
   opening: { img: "lightning", bg: openBG, box: [250, 560, 830, 960], cy: .5, gray: 0, title: ["計器が狂った。飛行は続ける", "まず、どうする？"], size1: 62, size2: 110, credit: ["写真：NASA（1969年11月14日）／PD", "※再現CGを含みます"] } });
 loadImages(KIT.images);
-const CHOICE = { a: "燃料電池を つなぎ直す", b: "謎のスイッチ SCEをAUXへ", ans: "B", reveal: "l08b" };
+const CHOICE = { a: "計器の復活を進める", b: "電気回路の復活を進める", ans: "A", reveal: "l08b" };
 // SCE の仕組み（模式）：センサー → SCE → 計器・地上。前半は乱れた信号、AUX に切り替えると整った信号
 function sceDiag(X, t, a) { panel(X); const k = clamp((t - a - 2.4) / .4);
   lab2(X, "センサー", 250, 560, T(30), "#B8DFF2", 700); lab2(X, "SCE", 540, 560, T(40), "#FFE2A8", 900); lab2(X, "計器・地上", 830, 560, T(30), "#B8DFF2", 700);

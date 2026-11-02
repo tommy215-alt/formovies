@@ -245,14 +245,14 @@ def a_l13(u, t, f):   # 落ち着いた管制室（遠景）
 
 def s_l00a():
     show("panel"); indoor(-.2)
-def a_l00a(u, t, f):   # A：燃料電池をつなぎ直す（スイッチの列と、点滅する警告灯）
+def a_l00b(u, t, f):   # B：電気回路の復活を進める（燃料電池のスイッチの列と、点滅する警告灯）
     k = .012; cam.look((PX + .55 + math.sin(t * 17) * k, -.95, 1.55 + math.sin(t * 21) * k), (PX + .55, -.25, 1.3), 34)
     for i, b in enumerate(LAMPS):
         b.inputs["Emission Strength"].default_value = 12 if (int(t * 6) + i) % 3 else 2; b.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
 
 def s_l00b():
     show("panel"); indoor(-.2)
-def a_l00b(u, t, f):   # B：謎のスイッチ SCE を AUX へ（寄り）
+def a_l00a(u, t, f):   # A：計器の復活を進める（計器の信号の装置 SCE のスイッチ、寄り）
     cam.look((PX + .5, -.75, 1.15), (PX + .4, -.34, 1.0), 44)
     SCE.rotation_euler = (math.radians(60 - 60 * min(1, max(0, (u - .55) / .1))), 0, 0); SCE.keyframe_insert("rotation_euler", frame=f + 1)
     for b in LAMPS:
