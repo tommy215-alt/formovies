@@ -36,7 +36,7 @@ http://creativecommons.org/licenses/by/4.0/
 
 リバース。世界の仕組みを、はじめから。
 
-音声：VOICEVOX:玄野武宏／VOICEVOX:冥鳴ひまり
+音声：AivisSpeech: 阿井田 茂／VOICEVOX:冥鳴ひまり
 
 #モーズリー #原子番号 #周期表 #科学史 #リバース #shorts
 ```

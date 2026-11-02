@@ -55,7 +55,7 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - 026〜033 の予約は、ユーザーの指示で非公開に戻した（`yt_upload.js private`）。034〜036 は hold。もう一度予約するかはユーザーの指示待ち。シリーズは C 案（「あなたならどうする？」の選択型）で行く（企画はこれから）。
 - **ナレーション**：AivisSpeech Engine（無料）を導入（`docs/PC_SETUP.md` の 2b）。聞き比べ（同じ一文を 14 の声で、https://claude.ai/artifact/UJaQ2vbYU6SoQFX7iNmUT1 ）でユーザーが選んだのは 1 玄野武宏・3 VOICEVOX No.7 アナウンス（女性）・8 AivisSpeech 阿井田 茂 Calm・9 阿井田 茂 ノーマル。つなぎは `production/ext/aivis_ext.py`（`voice_override` に `"engine"`、共通エンディングの決めゼリフは W を差し替えても冥鳴ひまり）。
   - **試し**：pilot_029 を本編 阿井田 茂 Calm（話速 1.5）・冒頭 L00 No.7 アナウンス（1.3）で作り直した（59.4 秒）。元の mp4 は `_backup/voice_trial_029/`。ユーザーの感想待ち。AivisSpeech は読み（カナ）を返さないので、qc_report の「読み上げの照合」は文のまま（耳で確かめる）。No.7 の L00 は文末 +3.6 半音の上がりの警告。
-- 声はユーザーが「1 は OK」（2026-11-02）：029 の組み合わせ（本編 阿井田 茂 Calm＋冒頭 No.7）で決定。AivisSpeech のエンジンは書き出しの前に起動しておく（PC_SETUP の 2b）。
+- **声の既定（2026-11-02、ユーザーの指示、全設計）**：本編＝阿井田 茂 Calm、冒頭（L00）と最後の決めゼリフ＝冥鳴ひまり、ドパの叫ぶ行＝青山龍星「熱血」（`DESIGN_MODES.md` の「ナレーションの声」、`ext/aivis_ext.py` の preset aida）。029 と 035 をこの声で作り直した。035 は予約の一覧に載せる（ユーザーの指示）。AivisSpeech のエンジンは書き出しの前に起動しておく（PC_SETUP の 2b）。
 - **CG の方針（2026-11-02、ユーザーの承認）：3D の場面は Blender、図・文字・字幕はブラウザ**（`templates/DESIGN_MODES.md` の最後の節、土台 `production/ext/blender/`）。**pilot_035 を Blender 版で作り直した**（9 場面・725 コマ、`pilot_035/blender/scene.py`、見比べ https://claude.ai/artifact/4Vi3mZY543Qi5gkUaX5fFq ）。ユーザーの感想待ち。描き直したら `bl_pack.py` → `rv.py render all`（extra_files に `work/blender/index.js` を入れてあるので、描き直した場面だけ作り直す）。
 - **CG（最初の試作）**：Blender 5.2（Cycles・GPU）で 035 の成層圏の場面の試作（高度 31 km の多重散乱の空・手続き的な地表と雲・ゴンドラ・MPFB の人）。スクリプトはスクラッチ（`%TEMP%\claude\bl\strato.py`）。1 コマ約 17 秒（RTX 3070、128 サンプル）。今の 035 の同じ場面（l03b）と比べてもらう。
 

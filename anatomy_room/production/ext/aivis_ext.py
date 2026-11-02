@@ -11,10 +11,22 @@ AivisSpeech Engine（無料・LGPL）は VOICEVOX と同じ API なので、pipe
 - エンジンの起動：%LOCALAPPDATA%\\reverse_tools\\aivis\\Windows-x64\\run.exe --port 10101 --use_gpu（docs/PC_SETUP.md）。
 - 声のモデルは AivisHub の ACML 1.0（商用可・クレジット「AivisSpeech: 名前」）か CC0 だけ。ACML-NC は使わない。
 - 共通エンディングの決めゼリフは、W を差し替えた回も voices.json の版の W（冥鳴ひまり）が読む（クレジットにも足す）。
+
+全設計の既定（2026-11-02、ユーザーの指示）：本編のナレーション M＝阿井田 茂 Calm、冒頭（L00）と最後の決めゼリフ＝W 冥鳴ひまり（いままでどおり）、
+ドパ設計の叫ぶ行（style "shout"）＝VOICEVOX 青山龍星「熱血」のまま。lines.json には
+    "voices": "v7", "voice_override": {"M": {"preset": "aida", "speed": 1.5}, "W": {"speed": 1.3, "inton": 1.0}}
+と書く（preset の中身は PRESETS。書いた項目が preset より優先）。叫ぶ行がある回は credit を "AivisSpeech: 阿井田 茂／VOICEVOX:青山龍星" に。
+style_engine：スタイルごとの問い合わせ先（叫ぶ行だけ VOICEVOX に回す）。
 """
 import json
 
-VOICEVOX ="http://127.0.0.1:50021"
+VOICEVOX = "http://127.0.0.1:50021"
+AIVIS = "http://127.0.0.1:10101"
+PRESETS = {
+    "aida": {"name": "阿井田 茂", "display": "ナレーション", "credit": "AivisSpeech: 阿井田 茂", "engine": AIVIS,
+             "styles": {"calm": 1310138977, "normal": 1310138977, "plain": 1310138976, "shout": 81},   # normal は Calm と同じ（従来の行の書き方のまま）、shout は VOICEVOX 青山龍星「熱血」
+             "style_engine": {"shout": VOICEVOX}, "default_style": "calm", "speed": 1.5, "pitch": 0.0, "inton": 1.0, "merge_aux": False},
+}
 
 
 def apply(pipeline):
@@ -22,7 +34,14 @@ def apply(pipeline):
     if getattr(E, "_aivis_ext", False):
         return
     E._aivis_ext = True
-    vp0, sc0, init0, sv0 = E.voice_params, E.synth_cached, E.__init__, E.step_voice
+    vp0, sc0, init0, sv0, ln0 = E.voice_params, E.synth_cached, E.__init__, E.step_voice, E.lines
+
+    def lines(self):
+        d = ln0(self)
+        for who, ov in d.get("voice_override", {}).items():
+            if isinstance(ov, dict) and "preset" in ov:
+                d["voice_override"][who] = {**PRESETS[ov["preset"]], **{k: v for k, v in ov.items() if k != "preset"}}
+        return d
 
     def __init__(self, here, cfg):
         init0(self, here, cfg)
@@ -37,7 +56,8 @@ def apply(pipeline):
             finally:
                 self.voices = cur
         p = vp0(self, ln)
-        eng = self.voices[ln["who"]].get("engine")
+        v = self.voices[ln["who"]]
+        eng = v.get("style_engine", {}).get(p["style"], v.get("engine"))
         if eng and eng != VOICEVOX:
             p["engine"] = eng          # キャッシュのキーにも入る（VOICEVOX の声のキーは変わらない）
             p.pop("merge_aux", None)
@@ -61,4 +81,4 @@ def apply(pipeline):
             f.write_text(json.dumps(tl, ensure_ascii=False, indent=1), encoding="utf-8")
         return r
 
-    E.__init__, E.voice_params, E.synth_cached, E.step_voice = __init__, voice_params, synth_cached, step_voice
+    E.__init__, E.voice_params, E.synth_cached, E.step_voice, E.lines = __init__, voice_params, synth_cached, step_voice, lines

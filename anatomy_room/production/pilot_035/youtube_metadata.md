@@ -37,7 +37,7 @@ http://creativecommons.org/licenses/by/4.0/
 
 リバース。世界の仕組みを、はじめから。
 
-音声：VOICEVOX:玄野武宏／VOICEVOX:青山龍星／VOICEVOX:冥鳴ひまり
+音声：AivisSpeech: 阿井田 茂／VOICEVOX:青山龍星／VOICEVOX:冥鳴ひまり
 
 #キッティンジャー #エクセルシオール #空軍 #記録 #リバース #shorts
 ```

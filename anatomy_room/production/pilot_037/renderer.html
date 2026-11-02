@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_037 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script src="../ext/kit/pov.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
+<script>
+// pilot_037「あなたならどうする？——密林に、ひとり（ジュリアン・ケプケ）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。本物の写真：river（NASA、ISS から見たウカヤリ川、PD）、canopy（Geoff Gallice、CC BY 2.0）。
+// 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
+Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['river', 'canopy'], ci: {}, hits: [],
+  opening: { img: null, bg: blShot("l00"), title: ["墜落。密林に、ひとり。", "待つか、歩くか。"], size1: 64, size2: 104, credit: ["※再現CGを含みます"] } });
+loadImages(KIT.images);
+// 機内の窓の枠（翼の場面：外が暗い嵐、窓は丸みのある四角）
+function winPath(c, x, y, w, h, r) { c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function windowMask() { const wp = c => winPath(c, 150, 430, 780, 1060, 260); bg.save(); bg.fillStyle = "#1c1a17"; bg.beginPath(); bg.rect(0, 0, W, H); wp(bg); bg.fill("evenodd");
+  bg.strokeStyle = "rgba(160,150,135,.55)"; bg.lineWidth = 18; bg.beginPath(); wp(bg); bg.stroke(); bg.restore(); }
+SHOTS = [
+  { at: "l01", kind: "3d", draw: blShot("l01") },
+  { at: "l02", kind: "3d", draw: blShot("l02") },
+  { at: "l03", kind: "3d", draw: blShot("l03") },
+  { at: "l04", kind: "3d", draw: blShot("l04") },
+  { at: "l05", kind: "3d", draw: blShot("l05") },
+  { at: "l06", kind: "3d", draw: blShot("l06") },
+  { at: "l07", kind: "3d", draw: blShot("l07") },
+  { at: "l08", kind: "3d", draw: blShot("l08") },
+  { at: "l09", kind: "3d", draw: blShot("l09") },
+  { at: "l10", kind: "3d", draw: blShot("l10") },
+  { at: "l11", kind: "photo", img: "river", box: [90, 420, 990, 1020], cy: .5, z0: 1.0, z1: 1.18, credit: ["写真：NASA（国際宇宙ステーションから見たウカヤリ川）／パブリックドメイン"], creditY: 1080 },
+  { at: "l12", kind: "3d", draw: blShot("l12") },
+  { at: "l13", kind: "3d", draw: blShot("l13") },
+  { at: "l14", kind: "photo", img: "canopy", box: [190, 330, 890, 1380], cy: .5, z0: 1.0, z1: 1.12, credit: ["写真：Geoff Gallice／CC BY 2.0"], creditY: 1440 },
+];
+const FX = {
+  l00: (t, u) => { POV.shake(t, 6); POV.rain(t, .7); POV.blur(2.5 * (1 - u)); POV.breath(t, .55, .55); POV.heart(t, 120, .35); },
+  l01: (t, u) => { POV.shake(t, 2); POV.breath(t, .3, .25); },
+  l02: (t, u) => { POV.shake(t, 4 + 14 * u); POV.breath(t, .5, .35); },
+  l03: (t, u) => { POV.shake(t, 6); POV.rain(t, .35); windowMask(); POV.breath(t, .6, .3); },
+  l04: (t, u) => { POV.shake(t, 16); POV.blur(1.5 + 3 * u); POV.breath(t, .9, .5); POV.eyes(clamp((u - .85) / .15)); },
+  l05: (t, u, a) => { POV.blur(9 - 3 * u); POV.rain(t, .45); POV.breath(t, .45, .5); POV.eyes(1 - clamp((t - a) / 1.4)); },
+  l06: (t, u) => { POV.shake(t, 3); POV.blur(6); POV.breath(t, .45, .45); },
+  l07: (t, u) => { POV.shake(t, 3); POV.blur(4); POV.rain(t, .5); POV.breath(t, .45, .45); },
+  l08: (t, u, a) => { POV.shake(t, 3); POV.blur(3); POV.breath(t, .5, .45); POV.heart(t, 125, .25 + .45 * clamp((t - a) / 4)); },
+  l09: (t, u) => { POV.rain(t, .3); },
+  l10: (t, u) => { POV.rain(t, .3); },
+};
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .35, sat: .75, vig: .7 }], [c.pov, { cool: .4, sat: .7, vig: .72 }], [c.l04, { cool: .5, sat: .6, vig: .8 }], [c.l05, { cool: .3, sat: .7, vig: .75 }], [c.ask, { cool: .45, sat: .55, vig: .85 }], [c.exp, { warm: .1, sat: .85, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.canopy, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,8,6,.45)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .3, sat: .8, vig: .7 }]]); addGrain(0);
+  label(ui, "墜落。密林に、ひとり。", 540, 520, 74, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "待つか、歩くか。", 540, 680, 112, "#FFD58A", { stroke: "#05080c", sw: .14 }); label(ui, "あなたなら、どうする？", 540, 1420, 70, "#EAF2F8", { stroke: "#05080c", sw: .14 }); }
+
+// ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
+function fxEp(t, name) {
+  if (name === "open") { (FX.l00 || (() => {}))(t, clamp(t / Math.max(.3, CUE.l01)), 0); return; }
+  const { s, a, u } = shotAt(t); const f = FX[s.at]; if (f) f(t, u, a);
+}
+kitStart(() => {}); BL.install();
+</script>
+</body></html>

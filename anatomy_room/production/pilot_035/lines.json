@@ -1,16 +1,13 @@
 {
  "title": "高度31キロから飛び降りた男——ジョー・キッティンジャー",
  "theme": "高度31キロから飛び降りた男——ジョー・キッティンジャー",
- "note": "チャンネル「リバース」ドパ設計（閃光なし、カットインは文字なし・効果音たっぷり、叫ぶ声は style=shout の行だけ青山龍星「熱血」）＋ガイドライン v2.4。制作の土台は production/ext/kit。本編は M（v7：VOICEVOX:玄野武宏）、オープニング L00 は W（VOICEVOX:冥鳴ひまり）。fact は scripts/pilot_035/fact_check.md。台本は 2026-11-01 にユーザーが「OK」。",
+ "note": "チャンネル「リバース」ドパ設計（閃光なし、カットインは文字なし・効果音たっぷり、叫ぶ声は style=shout の行だけ青山龍星「熱血」）＋ガイドライン v2.4。制作の土台は production/ext/kit。本編は M（2026-11-02〜：AivisSpeech:阿井田 茂 Calm、ext/aivis_ext.py の preset aida、叫ぶ行は VOICEVOX:青山龍星「熱血」のまま。元は v7 の VOICEVOX:玄野武宏）、オープニング L00 は W（VOICEVOX:冥鳴ひまり）。fact は scripts/pilot_035/fact_check.md。台本は 2026-11-01 にユーザーが「OK」。",
  "voices": "v7",
  "voice_override": {
   "M": {
+   "preset": "aida",
    "speed": 1.5,
-   "credit": "VOICEVOX:玄野武宏／VOICEVOX:青山龍星",
-   "styles": {
-    "normal": 11,
-    "shout": 81
-   }
+   "credit": "AivisSpeech: 阿井田 茂／VOICEVOX:青山龍星"
   },
   "W": {
    "speed": 1.3,
