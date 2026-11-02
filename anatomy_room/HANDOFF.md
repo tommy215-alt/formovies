@@ -64,7 +64,7 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - 設計は `templates/DESIGN_MODES.md` の「5 つ目：選択設計」。2 択、前半は一人称（二人称の語り・当事者の目線）、後半は三人称の解説。オープニングは状況と 2 択だけ＋その場の環境音を強く（ユーザーの指示）。手は映してよい。
 - 1 本目〜3 本目：pilot_037 ケプケ（密林）・038 アポロ 12 号の落雷・039 プロスペリ（サハラ）。ChatGPT の結果 `scripts/batch_037_039/gpt_results.md` → Claude が本文で確かめ直し（BBC の本人の手記・Apollo Flight Journal・Guardian のインタビュー）→ 台本はユーザーが「OK」（2026-11-02）。
 - 土台：環境音のファイルを区間で敷く `production/ext/ambience.py`、目線の演出 `production/ext/kit/pov.js`、3D は Blender（各回の `blender/scene.py`）。生成スクリプト（scratch の make37.py・make37r.py・meta37.py）で lines.json・production_script.py・renderer.html・youtube_metadata.md を作った（直すときは各ファイルを直接直す）。
-- **書き出しの状況**：037 の Blender の描画 → 038 → 039 → 3 本を `bl_pack.py` → `rv.py render all` を、時間の上限なしの裏の処理で順に実行中（記録 `anatomy_room/_backup/chain37.log`）。終わったら video_qa の結果を確かめ、ユーザーに見てもらう。予約の一覧にはまだ載せていない。
+- **状況（2026-11-02 21:45）**：037（68.5 秒）・038（77.1 秒）は完成して予約済み（037＝11/3 19:00、038＝11/4 8:00）。**039 は途中で止めた**（ユーザーが 22 時からゲームで GPU を使う）：台本・声・制作データは最新（悩む理由と、待っても見つかる保証がない理由を足した版）。Blender の場面は l00・l08・l10 を描き直す必要がある（ほかは描いてある）→ `cd production/pilot_039/blender && blender -b -P scene.py -- l00 l08 l10 --samples 32` → `python production/ext/blender/bl_pack.py 039` → `rv.py 039 render all` → サムネイル（`render_frames.js --dir pilot_039 --thumb`）→ ユーザーに見てもらう。記録 `anatomy_room/_backup/chain37.log`。生成スクリプトはスクラッチの make37.py・make37r.py・meta37.py・drafts37.py（次の会話では各ファイルを直接直す）。
 - 029・035 は新しい声で作り直して予約の一覧に載せた（queued）。2026-11-02 は 1 日のアップロードの上限に当たったので、タスク スケジューラが上限の戻ったあとに上げる（029 は下書きが途中まである。`reupload`：同じ題名の古い非公開の版は無視し、下書きなら続きから）。
 
 ## 次の動画でやること（ガイドライン v2.4）

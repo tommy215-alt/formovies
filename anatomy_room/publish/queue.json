@@ -112,6 +112,15 @@
    "status": "scheduled",
    "note": "2026-11-02 選択設計の 1 本目（ユーザーが予約を指示）",
    "uploaded": "2026-11-02T12:15:50.955Z"
+  },
+  {
+   "id": "pilot_038",
+   "video": "anatomy_room/production/pilot_038/reverse_038_apollo12.mp4",
+   "meta": "anatomy_room/production/pilot_038/youtube_metadata.md",
+   "publish_at": "2026-11-04 08:00",
+   "status": "scheduled",
+   "note": "2026-11-02 選択設計の 2 本目（ユーザーが予約を指示）",
+   "uploaded": "2026-11-02T12:45:08.857Z"
   }
  ]
 }
