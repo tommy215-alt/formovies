@@ -60,7 +60,7 @@ SHOTS = [
   { at: "l13", kind: "photo", img: "mds", box: [90, 470, 990, 1080], cy: .5, z0: 1.0, z1: 1.15, gray: 0, credit: ["写真：Ben Hammersley（マラソン・デ・サーブル）／CC BY 2.0"], creditY: 1140 },
 ];
 const FX = {
-  l00: (t, u) => { POV.shake(t, 9); POV.sand(t, .95, 1); POV.breath(t, .8, .55); POV.heart(t, 130, .3); },
+  l00: (t, u) => { const s = t < CUE.l00a ? .95 : .18; POV.shake(t, t < CUE.l00a ? 9 : 4); POV.sand(t, s, 1); POV.breath(t, .8, .45); POV.heart(t, 130, .25); },   // 砂嵐が濃いのは状況を読むあいだだけ（A・B の目線の絵を見せる）
   l01: (t, u) => { POV.shake(t, 6); POV.breath(t, .7, .3); },
   l02: (t, u) => { POV.shake(t, 5 + 6 * u); POV.sand(t, .2 + .85 * u, 1); POV.breath(t, .8, .4); },
   l03: (t, u) => { POV.shake(t, 2); POV.breath(t, .5, .35); },

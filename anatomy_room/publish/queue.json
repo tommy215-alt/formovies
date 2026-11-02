@@ -119,10 +119,11 @@
    "meta": "anatomy_room/production/pilot_038/youtube_metadata.md",
    "publish_at": "2026-11-04 08:00",
    "status": "scheduled",
-   "note": "2026-11-02 呼吸音を小さく、アラートと赤い警告灯にした版で差し替え（前の版は非公開）",
+   "note": "2026-11-02 深夜 前半を一人称だけにした版で差し替え（前の 2 つの版は非公開）",
    "old_private_upload": "2026-11-02T12:45:08.857Z",
    "reupload": true,
-   "uploaded": "2026-11-02T14:27:22.864Z"
+   "old_private_upload_2": "2026-11-02T14:27:22.864Z",
+   "uploaded": "2026-11-02T15:20:10.007Z"
   }
  ]
 }
