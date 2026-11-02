@@ -38,7 +38,7 @@ html,body{margin:0;background:#000}
 // pilot_039「あなたならどうする？——砂漠で迷子（マウロ・プロスペリ）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。砂嵐の砂と戸口の枠は pov.js とこのファイル。本物の写真：mds（Ben Hammersley、マラソン・デ・サーブル、CC BY 2.0）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['mds'], ci: {}, hits: [],
-  opening: { img: null, bg: openBG, title: ["砂漠で迷子。水もない", "あなたは？"], size1: 70, size2: 110, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["砂漠で迷子。屋根のある墓", "あなたは？"], size1: 66, size2: 110, credit: ["※再現CGを含みます"] } });
 loadImages(KIT.images);
 const CHOICE = { a: "雲の方へ歩く", b: "屋根の下で救助を待つ", ans: "A", reveal: "l09b" };
 // 廟の戸口の枠（内側の暗い壁と、上が丸い入口）
@@ -71,7 +71,7 @@ const FX = {
   l08: (t, u, a) => { doorFrame(); POV.breath(t, .45, .4); POV.heart(t, 125, .25 + .45 * clamp((t - a) / 4)); },
 };
 function buildMood() { const c = CUE; MOOD = [[0, { warm: .25, sat: .9, vig: .7 }], [c.pov, { warm: .2, sat: .95, vig: .65 }], [c.l04, { cool: .5, sat: .6, vig: .8 }], [c.l05, { warm: .2, sat: .9, vig: .65 }], [c.l07, { warm: .35, sat: .95, vig: .75 }], [c.ask, { warm: .3, sat: .8, vig: .85 }], [c.exp, { warm: .2, sat: .9, vig: .6 }], [c.after, { warm: .25, sat: 1.0, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
-function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.mds, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, gray: 0, frame: "none" }); bg.fillStyle = "rgba(20,10,0,.4)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { warm: .3, sat: .9, vig: .7 }]]); addGrain(0); label(ui, "砂漠で迷子。水もない", 540, 470, 70, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "あなたは？", 540, 620, 120, "#FFD58A", { stroke: "#05080c", sw: .14 }); choicePair(0, 1000, 170, 1); }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.mds, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, gray: 0, frame: "none" }); bg.fillStyle = "rgba(20,10,0,.4)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { warm: .3, sat: .9, vig: .7 }]]); addGrain(0); label(ui, "砂漠で迷子。屋根のある墓", 540, 470, 66, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "あなたは？", 540, 620, 120, "#FFD58A", { stroke: "#05080c", sw: .14 }); choicePair(0, 1000, 170, 1); }
 
 // ---------------------------------------------------------------- 選択肢の札（2026-11-02 ユーザーの指示：前半は「選択」が主役。A・B を同時に見せる）
 // CHOICE = { a, b, ans: "A"|"B", reveal: 答えを言う行の cue }

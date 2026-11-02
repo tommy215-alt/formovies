@@ -244,16 +244,19 @@ def a_l13(u, t, f):   # 落ち着いた管制室（遠景）
 
 
 def s_l00a():
-    s_l06()
-def a_l00a(u, t, f):   # A：このまま続行（雨雲を抜けて上がり続ける）
-    rocket_at(t, 900, 110); z = ROCK.location.z; cam.look((RX - 70, -110, z - 50), (RX, 0, z + 50), 30)
+    show("panel"); indoor(-.2)
+def a_l00a(u, t, f):   # A：燃料電池をつなぎ直す（スイッチの列と、点滅する警告灯）
+    k = .012; cam.look((PX + .55 + math.sin(t * 17) * k, -.95, 1.55 + math.sin(t * 21) * k), (PX + .55, -.25, 1.3), 34)
+    for i, b in enumerate(LAMPS):
+        b.inputs["Emission Strength"].default_value = 12 if (int(t * 6) + i) % 3 else 2; b.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
 
 def s_l00b():
-    s_l06()
-def a_l00b(u, t, f):   # B：打ち上げを中止（脱出用のロケットで司令船が離れる。もしもの場合の模式）
-    rocket_at(t, 700, 40); z = ROCK.location.z; tt = max(0, t - .15)
-    CMG.location = (6 * tt * tt, 0, 18 * tt + 22 * tt * tt); ESC.inputs["Emission Strength"].default_value = 60 if t > .15 else 0; ESC.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
-    cam.look((RX - 120, -170, z + 60), (RX + 10, 0, z + 100), 32)
+    show("panel"); indoor(-.2)
+def a_l00b(u, t, f):   # B：謎のスイッチ SCE を AUX へ（寄り）
+    cam.look((PX + .5, -.75, 1.15), (PX + .4, -.34, 1.0), 44)
+    SCE.rotation_euler = (math.radians(60 - 60 * min(1, max(0, (u - .55) / .1))), 0, 0); SCE.keyframe_insert("rotation_euler", frame=f + 1)
+    for b in LAMPS:
+        b.inputs["Emission Strength"].default_value = 12; b.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
 
 SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l12", "l13"]}
 ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]

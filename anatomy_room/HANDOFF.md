@@ -59,9 +59,9 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - **CG の方針（2026-11-02、ユーザーの承認）：3D の場面は Blender、図・文字・字幕はブラウザ**（`templates/DESIGN_MODES.md` の最後の節、土台 `production/ext/blender/`）。**pilot_035 を Blender 版で作り直した**（9 場面・725 コマ、`pilot_035/blender/scene.py`、見比べ https://claude.ai/artifact/4Vi3mZY543Qi5gkUaX5fFq ）。ユーザーの感想待ち。描き直したら `bl_pack.py` → `rv.py render all`（extra_files に `work/blender/index.js` を入れてあるので、描き直した場面だけ作り直す）。
 - **CG（最初の試作）**：Blender 5.2（Cycles・GPU）で 035 の成層圏の場面の試作（高度 31 km の多重散乱の空・手続き的な地表と雲・ゴンドラ・MPFB の人）。スクリプトはスクラッチ（`%TEMP%\claude\bl\strato.py`）。1 コマ約 17 秒（RTX 3070、128 サンプル）。今の 035 の同じ場面（l03b）と比べてもらう。
 
-## 新シリーズ「あなたならどうする？」（当事者設計、2026-11-02〜）
+## 新シリーズ「あなたならどうする？」（選択設計〔旧・当事者設計〕、2026-11-02〜）
 
-- 設計は `templates/DESIGN_MODES.md` の「5 つ目：当事者設計」。2 択、前半は一人称（二人称の語り・当事者の目線）、後半は三人称の解説。オープニングは状況と 2 択だけ＋その場の環境音を強く（ユーザーの指示）。手は映してよい。
+- 設計は `templates/DESIGN_MODES.md` の「5 つ目：選択設計」。2 択、前半は一人称（二人称の語り・当事者の目線）、後半は三人称の解説。オープニングは状況と 2 択だけ＋その場の環境音を強く（ユーザーの指示）。手は映してよい。
 - 1 本目〜3 本目：pilot_037 ケプケ（密林）・038 アポロ 12 号の落雷・039 プロスペリ（サハラ）。ChatGPT の結果 `scripts/batch_037_039/gpt_results.md` → Claude が本文で確かめ直し（BBC の本人の手記・Apollo Flight Journal・Guardian のインタビュー）→ 台本はユーザーが「OK」（2026-11-02）。
 - 土台：環境音のファイルを区間で敷く `production/ext/ambience.py`、目線の演出 `production/ext/kit/pov.js`、3D は Blender（各回の `blender/scene.py`）。生成スクリプト（scratch の make37.py・make37r.py・meta37.py）で lines.json・production_script.py・renderer.html・youtube_metadata.md を作った（直すときは各ファイルを直接直す）。
 - **書き出しの状況**：037 の Blender の描画 → 038 → 039 → 3 本を `bl_pack.py` → `rv.py render all` を、時間の上限なしの裏の処理で順に実行中（記録 `anatomy_room/_backup/chain37.log`）。終わったら video_qa の結果を確かめ、ユーザーに見てもらう。予約の一覧にはまだ載せていない。
