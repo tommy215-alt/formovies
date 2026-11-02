@@ -72,7 +72,7 @@ const FX = {
   l07: (t, u, a) => { POV.shake(t, 2); POV.breath(t, .5, .4); POV.heart(t, 130, .3 + .45 * clamp((t - a) / 4)); },
 };
 function buildMood() { const c = CUE; MOOD = [[0, { cool: .4, sat: .8, vig: .7 }], [c.pov, { cool: .45, sat: .75, vig: .7 }], [c.l03, { cool: .5, sat: .7, vig: .8 }], [c.ask, { cool: .55, sat: .6, vig: .85 }], [c.exp, { warm: .05, sat: .9, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
-function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.lightning, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, cx: .7, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,4,10,.4)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .4, sat: .8, vig: .7 }]]); addGrain(0); label(ui, "発射直後、雷。", 540, 520, 80, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "中止か、続行か。", 540, 680, 112, "#FFD58A", { stroke: "#05080c", sw: .14 }); label(ui, "あなたなら、どうする？", 540, 1420, 70, "#EAF2F8", { stroke: "#05080c", sw: .14 }); }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.lightning, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, cx: .7, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,4,10,.4)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .4, sat: .8, vig: .7 }]]); addGrain(0); label(ui, "発射直後に雷。計器が狂ったら", 540, 470, 70, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "あなたは？", 540, 620, 120, "#FFD58A", { stroke: "#05080c", sw: .14 }); choicePair(0, 1000, 170, 1); }
 
 // ---------------------------------------------------------------- 選択肢の札（2026-11-02 ユーザーの指示：前半は「選択」が主役。A・B を同時に見せる）
 // CHOICE = { a, b, ans: "A"|"B", reveal: 答えを言う行の cue }
@@ -100,7 +100,8 @@ function choiceUI(t, name) {
 const OPEN_SHOTS = { s: blShot("l00"), a: blShot("l00a"), b: blShot("l00b") };
 function openBG(t) { (t < CUE.l00a ? OPEN_SHOTS.s : t < CUE.l00b ? OPEN_SHOTS.a : OPEN_SHOTS.b)(t); }
 // 最後の暗転の注意書き（2026-11-02 ユーザーの指示）
-function endNote(t) { const es = TL.ending_start; if (t < es + .5) return; const k = clamp((t - es - .5) / .5);
+function endNote(t) { const es = TL.ending_start; if (t < es) return; ui.fillStyle = `rgba(0,0,0,${easeInOut(clamp((t - es) / 1.0))})`; ui.fillRect(0, 0, W, H);   // 1 秒で真っ暗に
+  if (t < es + .7) return; const k = clamp((t - es - .7) / .5);
   ui.save(); ui.globalAlpha = k; ["※これは過去の出来事の紹介です。", "必ずしも正しい選択を", "示すものではありません。"].forEach((l, i) => label(ui, l, 540, 900 + i * 66, 44, "#D8E2EA", { stroke: "#000", sw: .1 })); ui.restore(); }
 { const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (t < TL.ending_start) choiceUI(t, name); }; }
 // ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
