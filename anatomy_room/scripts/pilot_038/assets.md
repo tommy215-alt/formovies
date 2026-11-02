@@ -8,3 +8,5 @@
 - BGM：Decisions（Kevin MacLeod、CC BY 4.0）。候補 Devastation and Revenge。
 - 効果音（Freesound、CC0 を確認）：Rocket Launch.flac（qubodup, 182794）・shuttlelaunch.wav（klangfabrik, 220127）・Close lightning strike（csengeri, 434359）・control_room.wav（Diboz, 211683）・Radio Noise.wav（RutgerMuller, 50750）・Scared Male Heavy Breathing（casiba842, 554307）・Heartbeat Sound [60bpm]（Seth_Makes_Sounds, 850306）。警告音は自前の合成。
 - NASA の実際の交信の音声は、該当箇所のファイルを確かめられなかったので使わない（台詞はナレーションで言う）。
+
+- 効果音のファイルは `production/pilot_038/assets/sfx/`（Freesound のプレビュー。取り込むときに各ページで CC0 を確かめた）。

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_038 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script src="../ext/kit/pov.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
+<script>
+// pilot_038「あなたならどうする？——発射直後の雷（アポロ12号）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。本物の写真：lightning（NASA、1969 年 11 月 14 日の落雷、PD）、launch（NASA、アポロ 12 号の発射、PD）、aaron（NASA、ジョン・アーロン、PD）。
+// 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
+Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['lightning', 'launch', 'aaron'], ci: {}, hits: [],
+  opening: { img: "lightning", bg: blShot("l00"), box: [200, 640, 880, 1360], cy: .5, gray: 0, title: ["発射直後、雷。", "中止か、続行か。"], size1: 64, size2: 104, credit: ["写真：NASA（1969年11月14日）／パブリックドメイン", "※再現CGを含みます"] } });
+loadImages(KIT.images);
+// SCE の仕組み（模式）：センサー → SCE → 計器・地上。前半は乱れた信号、AUX に切り替えると整った信号
+function sceDiag(X, t, a) { panel(X); const k = clamp((t - a - 2.4) / .4);
+  lab2(X, "センサー", 250, 560, T(30), "#B8DFF2", 700); lab2(X, "SCE", 540, 560, T(40), "#FFE2A8", 900); lab2(X, "計器・地上", 830, 560, T(30), "#B8DFF2", 700);
+  X.strokeStyle = "rgba(159,216,255,.8)"; X.lineWidth = 4; X.strokeRect(440, 500, 200, 120);
+  for (const [x0, x1] of [[320, 440], [640, 760]]) { X.beginPath(); for (let x = x0; x <= x1; x += 3) { const ph = (x - t * 220) / 18, n = (1 - k) * (Math.sin(ph * 3.7) * 22 + Math.sin(ph * 9.1) * 14) + Math.sin(ph) * 16; X.lineTo(x, 700 + n); } X.strokeStyle = k > .5 ? "#9AF0D0" : "#FF9A8A"; X.lineWidth = 5; X.stroke(); }
+  lab2(X, k > .5 ? "AUX：信号が戻る" : "雷で電圧が乱れる", 540, 840, T(32), k > .5 ? "#9AF0D0" : "#FF9A8A", 800); }
+SHOTS = [
+  { at: "l01", kind: "3d", draw: blShot("l01") },
+  { at: "l02", kind: "photo", img: "launch", box: [190, 330, 890, 1230], cy: .4, z0: 1.0, z1: 1.12, gray: 0, credit: ["写真：NASA（アポロ12号の発射）／パブリックドメイン"], creditY: 1290 },
+  { at: "l03", kind: "3d", draw: blShot("l03") },
+  { at: "l04", kind: "3d", draw: blShot("l04") },
+  { at: "l05", kind: "3d", draw: blShot("l05") },
+  { at: "l06", kind: "3d", draw: blShot("l06") },
+  { at: "l07", kind: "3d", draw: blShot("l07") },
+  { at: "l08", kind: "photo", img: "aaron", box: [90, 470, 990, 1060], cy: .4, z0: 1.0, z1: 1.15, gray: 0, credit: ["写真：NASA（管制官ジョン・アーロン）／パブリックドメイン"], creditY: 1120 },
+  { at: "l09", kind: "3d", draw: blShot("l09") },
+  { at: "l10", kind: "3d", draw: blShot("l10") },
+  { at: "l11", kind: "holo", draw: (X, t) => sceDiag(X, t, CUE.l11) },
+  { at: "l12", kind: "3d", draw: blShot("l12") },
+  { at: "l13", kind: "3d", draw: blShot("l13") },
+];
+const FX = {
+  l00: (t, u) => { POV.shake(t, 5); POV.breath(t, .6, .45); POV.heart(t, 125, .35); },
+  l01: (t, u) => { POV.shake(t, 1.5); POV.breath(t, .3, .25); },
+  l03: (t, u, a) => { POV.shake(t, 2 + 4 * clamp((t - a) / 1.5)); POV.heart(t, 115, .3); },
+  l04: (t, u) => { POV.shake(t, 9); POV.breath(t, .6, .4); },
+  l05: (t, u) => { POV.shake(t, 7 + 8 * (u > .45 ? 1 : 0)); POV.breath(t, .65, .45); },
+  l06: (t, u) => { POV.shake(t, 6); },
+  l07: (t, u, a) => { POV.shake(t, 2); POV.breath(t, .5, .4); POV.heart(t, 130, .3 + .45 * clamp((t - a) / 4)); },
+};
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .4, sat: .8, vig: .7 }], [c.pov, { cool: .45, sat: .75, vig: .7 }], [c.l03, { cool: .5, sat: .7, vig: .8 }], [c.ask, { cool: .55, sat: .6, vig: .85 }], [c.exp, { warm: .05, sat: .9, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.lightning, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, cx: .7, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,4,10,.4)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .4, sat: .8, vig: .7 }]]); addGrain(0); label(ui, "発射直後、雷。", 540, 520, 80, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "中止か、続行か。", 540, 680, 112, "#FFD58A", { stroke: "#05080c", sw: .14 }); label(ui, "あなたなら、どうする？", 540, 1420, 70, "#EAF2F8", { stroke: "#05080c", sw: .14 }); }
+
+// ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
+function fxEp(t, name) {
+  if (name === "open") { (FX.l00 || (() => {}))(t, clamp(t / Math.max(.3, CUE.l01)), 0); return; }
+  const { s, a, u } = shotAt(t); const f = FX[s.at]; if (f) f(t, u, a);
+}
+kitStart(() => {}); BL.install();
+</script>
+</body></html>
