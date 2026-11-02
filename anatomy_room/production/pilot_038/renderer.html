@@ -38,7 +38,7 @@ html,body{margin:0;background:#000}
 // pilot_038「あなたならどうする？——発射直後の雷（アポロ12号）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。本物の写真：lightning（NASA、1969 年 11 月 14 日の落雷、PD）、launch（NASA、アポロ 12 号の発射、PD）、aaron（NASA、ジョン・アーロン、PD）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['lightning', 'launch', 'aaron'], ci: {}, hits: [],
-  opening: { img: "lightning", bg: openBG, box: [250, 560, 830, 960], cy: .5, gray: 0, title: ["計器が狂った。飛行は続ける", "まず、どうする？"], size1: 62, size2: 92, credit: ["写真：NASA（1969年11月14日）／PD", "※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["計器が狂った。飛行は続ける", "まず、どうする？"], size1: 62, size2: 92, credit: ["※再現CGを含みます"] } });
 loadImages(KIT.images);
 const CHOICE = { a: "計器の復活を進める", b: "電気回路の復活を進める", ans: "A", reveal: "l08b" };
 // SCE の仕組み（模式）：センサー → SCE → 計器・地上。前半は乱れた信号、AUX に切り替えると整った信号
@@ -49,7 +49,7 @@ function sceDiag(X, t, a) { panel(X); const k = clamp((t - a - 2.4) / .4);
   lab2(X, k > .5 ? "AUX：信号が戻る" : "雷で電圧が乱れる", 540, 840, T(32), k > .5 ? "#9AF0D0" : "#FF9A8A", 800); }
 SHOTS = [
   { at: "l01", kind: "3d", draw: blShot("l01") },
-  { at: "l02", kind: "photo", img: "launch", box: [190, 330, 890, 1230], cy: .4, z0: 1.0, z1: 1.12, gray: 0, credit: ["写真：NASA（アポロ12号の発射）／パブリックドメイン"], creditY: 1290 },
+  { at: "l02", kind: "3d", draw: blShot("l02") },
   { at: "l03", kind: "3d", draw: blShot("l03") },
   { at: "l04", kind: "3d", draw: blShot("l04") },
   { at: "l05", kind: "3d", draw: blShot("l05") },
@@ -65,6 +65,7 @@ SHOTS = [
 const FX = {
   l00: (t, u) => { POV.shake(t, 4); POV.alert(t, .55); },
   l01: (t, u) => { POV.shake(t, 1.5); },
+  l02: (t, u) => { POV.shake(t, 2 + 3 * u); },
   l03: (t, u, a) => { POV.shake(t, 2 + 4 * clamp((t - a) / 1.5)); POV.alert(t, .7 * clamp((t - a - .4) / .6)); },
   l04: (t, u) => { POV.shake(t, 9); POV.alert(t, .85); },
   l05: (t, u) => { POV.shake(t, 7 + 8 * (u > .45 ? 1 : 0)); POV.alert(t, .9, 1.6); },

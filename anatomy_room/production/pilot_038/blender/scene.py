@@ -168,13 +168,10 @@ def rocket_at(t, z0=200, v=60):
 
 # ---------------------------------------------------------------- ショット
 def s_l00():
-    show("rocket"); sky.set(0, 20, 120, 2.5); sc.view_settings.exposure = -.6; sc.world.node_tree.nodes["Background"].inputs[1].default_value = .5
-def a_l00(u, t, f):   # 雨雲を突き抜けるロケットに雷（オープニングの背景）
-    rocket_at(t, 150); z = ROCK.location.z
-    cam.look((RX - 70, -95, z + 20), (RX, 0, z + 45), 40)
-    for k, (b, segs, bg_) in enumerate(BOLTS):
-        b.inputs["Emission Strength"].default_value = 25 if (k == 0 and t > 1.0) else 0; b.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
-        bg_.location.z = z - 60 + 30 * k
+    show("room"); indoor(-.5)
+def a_l00(u, t, f):   # オープニング：管制官の卓の目線。画面の数字が崩れる（赤い警告灯は pov.js）
+    p = Vector((.4, 1.1, 1.42)) + Vector((math.sin(t * 1.7) * .006, 0, math.sin(t * 2.3) * .005)); cam.look(p, mix((.2, -8, 2.2), (.55, .16, 1.22), K.ease(u)), 28)
+    garble(t > .8, f)
 
 def s_l01():
     show("room"); indoor()
@@ -205,9 +202,15 @@ def a_l05(u, t, f):   # 計器の針が下がる、2 回目
         nd.rotation_euler = (math.radians(60), math.radians(-60 + 120 * (1 - u) - i * 15), 0); nd.keyframe_insert("rotation_euler", frame=f + 1)
 
 def s_l06():
-    show("rocket"); sky.set(0, 20, 120, 2.5); sc.view_settings.exposure = -.6; sc.world.node_tree.nodes["Background"].inputs[1].default_value = .5
-def a_l06(u, t, f):   # ロケットは上がり続ける
-    rocket_at(t, 600, 90); z = ROCK.location.z; cam.look((RX + 60, -120, z - 40), (RX, 0, z + 40), 34)
+    show("room"); indoor(-.4)
+def a_l06(u, t, f):   # ロケットは上がり続ける：正面の大画面の軌跡を見上げる（管制官の目線）
+    p = Vector((.3, 1.2, 1.55)); cam.look(p, mix((0, -23, 4.2), (0, -23, 5.4), K.ease(u)), mix((30,), (40,), K.ease(u))[0])
+    garble(True, f)
+
+def s_l02():
+    show("room"); indoor(-.4)
+def a_l02(u, t, f):   # 雨雲の中へ上がっていく：管制室の正面の大画面（管制官の目線）
+    p = Vector((.2, 1.3, 1.6)) + Vector((0, 0, math.sin(t * 2) * .004)); cam.look(p, mix((0, -23, 3.6), (0, -23, 4.8), K.ease(u)), 26)
 
 def s_l07():
     show("room"); indoor()
@@ -244,7 +247,7 @@ def a_l13(u, t, f):   # 落ち着いた管制室（遠景）
 
 
 def s_l00a():
-    show("panel"); indoor(-.2)
+    show("room"); indoor(-.5)
 def a_l00b(u, t, f):   # B：電気回路の復活を進める（燃料電池のスイッチの列と、点滅する警告灯）
     k = .012; cam.look((PX + .55 + math.sin(t * 17) * k, -.95, 1.55 + math.sin(t * 21) * k), (PX + .55, -.25, 1.3), 34)
     for i, b in enumerate(LAMPS):
@@ -252,13 +255,11 @@ def a_l00b(u, t, f):   # B：電気回路の復活を進める（燃料電池の
 
 def s_l00b():
     show("panel"); indoor(-.2)
-def a_l00a(u, t, f):   # A：計器の復活を進める（計器の信号の装置 SCE のスイッチ、寄り）
-    cam.look((PX + .5, -.75, 1.15), (PX + .4, -.34, 1.0), 44)
-    SCE.rotation_euler = (math.radians(60 - 60 * min(1, max(0, (u - .55) / .1))), 0, 0); SCE.keyframe_insert("rotation_euler", frame=f + 1)
-    for b in LAMPS:
-        b.inputs["Emission Strength"].default_value = 12; b.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
+def a_l00a(u, t, f):   # A：計器の復活を進める（崩れた計器の画面に、身を乗り出す）
+    p = Vector((.6, .95 - .25 * K.ease(u), 1.35)); cam.look(p, (.65, .16, 1.22), 30)
+    garble(True, f)
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l12", "l13"]}
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l12", "l13"]}
 ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
 anim = [cam.o, ROCK, CMG] + NEEDLES + [SCE] + [bg_ for b, segs, bg_ in BOLTS]
 K.render_shots(HERE, SHOTS, ORDER, O, anim)

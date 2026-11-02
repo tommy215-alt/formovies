@@ -241,15 +241,15 @@ def a_l12(u, t, f):   # ヤギを連れた少女（遠景）
 
 
 def s_l00a():
-    show("runner", "clouds"); day(6, 200, -1.2)
-def a_l00a(u, t, f):   # A：雲の方へ歩く（後ろ姿、足もとの近く）
-    RUN.location = (0, -60 - 2.5 * t, H(0, -60 - 2.5 * t)); RUN.rotation_euler = (0, 0, 0)
-    z0 = H(0, -60); cam.look((1.2, -55.5 - 2.5 * t, z0 + .9), (-1, -100, z0 + 6), 26)
+    show("clouds"); day(6, 200, -1.2)
+def a_l00a(u, t, f):   # A：雲の方へ歩く（歩く目線、足もとの砂と遠くの雲）
+    y = -58 - 2.6 * t; p = eye(0, y, 1.65) + run_bob(t, .045); cam.look(p, p + Vector((-.5, -40, -3.5)), 24)
 
 def s_l00b():
-    s_l09()
-def a_l00b(u, t, f):   # B：屋根の下で救助を待つ（廟の中、座る後ろ姿）
-    a_l09(u, t, f)
+    show("shrine"); day(20, 160, -.6)
+def a_l00b(u, t, f):   # B：屋根の下で救助を待つ（墓の中に座り、コウモリの壁を見上げる目線）
+    z0 = SHR.location.z; p = Vector((SX + .2, SY - .9, z0 + .95)) + Vector((0, 0, math.sin(t * 1.6) * .006))
+    cam.look(p, mix((SX, SY + 1.9, z0 + 1.8), (SX - .2, SY + 1.9, z0 + 2.4), K.ease(u)), 24)
 
 SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]}
 ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
