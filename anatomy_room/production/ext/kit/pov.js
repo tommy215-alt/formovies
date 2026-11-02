@@ -6,6 +6,7 @@
 //   POV.heart(t, bpm, k)  心拍に合わせて周辺が赤黒く脈打つ
 //   POV.blink(t, t0, d)   t0 から d 秒のまばたき（閉じて開く）。POV.eyes(k)：まぶたの閉じ具合 0〜1
 //   POV.rain(t, k)        雨の筋。POV.sand(t, k, dir)：砂嵐（黄色いかすみと横に流れる砂）
+//   POV.alert(t, k, hz)   赤い警告灯の脈打ち（画面の周りが赤く点滅する。閃光ではない：明るさは上げず、赤い縁と回る光の帯だけ。2026-11-02、038）
 const POV = (() => {
   let tmp = null;
   const copy = () => { if (!tmp) { tmp = document.createElement("canvas"); tmp.width = W; tmp.height = H; } const x = tmp.getContext("2d"); x.clearRect(0, 0, W, H); x.drawImage(bg.canvas, 0, 0); return tmp; };
@@ -25,5 +26,10 @@ const POV = (() => {
   function sand(t, k = .5, dir = 1) { if (k <= 0) return; bg.fillStyle = `rgba(196,150,82,${.75 * Math.min(1, k)})`; bg.fillRect(0, 0, W, H);
     const r = S.rng(Math.floor(t * 30) * 13 + 5); bg.save(); bg.strokeStyle = `rgba(235,200,140,${.45 * k})`; bg.lineWidth = 2;
     for (let i = 0; i < 260 * k; i++) { const y = r() * H, x = r() * W, L = 40 + r() * 160; bg.beginPath(); bg.moveTo(x, y); bg.lineTo(x + dir * L, y + (r() - .5) * 12); bg.stroke(); } bg.restore(); }
-  return { shake, blur, breath, heart, eyes, blink, rain, sand };
+  function alert(t, k = .6, hz = 1.25) { if (k <= 0) return; const p = (t * hz) % 1, on = Math.pow(Math.max(0, Math.sin(p * Math.PI)), 2) * k;
+    const g = bg.createRadialGradient(W / 2, H / 2, H * .22, W / 2, H / 2, H * .66); g.addColorStop(0, "rgba(255,20,10,0)"); g.addColorStop(1, `rgba(200,0,0,${.55 * on})`); bg.fillStyle = g; bg.fillRect(0, 0, W, H);
+    bg.save(); bg.globalCompositeOperation = "multiply"; bg.fillStyle = `rgba(255,${Math.round(255 - 120 * on)},${Math.round(255 - 140 * on)},1)`; bg.fillRect(0, 0, W, H); bg.restore();   // 部屋全体が赤い灯に染まる（暗くなる方向だけ）
+    const a = t * 2.4; bg.save(); bg.translate(W / 2, 120); bg.rotate(a); const lg = bg.createLinearGradient(-500, 0, 500, 0); lg.addColorStop(0, "rgba(255,30,20,0)"); lg.addColorStop(.5, `rgba(255,40,20,${.18 * k})`); lg.addColorStop(1, "rgba(255,30,20,0)");
+    bg.fillStyle = lg; bg.fillRect(-500, -18, 1000, 36); bg.restore(); }   // 上で回る警告灯の光
+  return { shake, blur, breath, heart, eyes, blink, rain, sand, alert };
 })();

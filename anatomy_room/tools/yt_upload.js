@@ -138,8 +138,10 @@ async function makePrivate(item) {   // 動画の編集画面で、公開設定�
     await page.goto("https://studio.youtube.com/"); await page.waitForTimeout(4000); await dismiss();
     if (!/studio\.youtube\.com\/channel\//.test(page.url())) throw new Error("ログインしていない");
     const ch = page.url().match(/channel\/([^/?#]+)/)[1]; let href = null;
-    for (const tab of ["short", "upload"]) { await page.goto(`https://studio.youtube.com/channel/${ch}/videos/${tab}`); await page.waitForTimeout(5000); await dismiss();
-      const row = page.locator("ytcp-video-row", { hasText: stem }).first(); if (!(await row.count())) continue;
+    for (const tab of ["short", "upload", "short"]) { await page.goto(`https://studio.youtube.com/channel/${ch}/videos/${tab}`); await page.waitForTimeout(5000); await dismiss();
+      const row = page.locator("ytcp-video-row", { hasText: stem }).first();
+      await row.waitFor({ timeout: 10000 }).catch(() => {});   // 一覧の読み込みが遅いことがある（2026-11-02：1 回目は見つからなかった）
+      if (!(await row.count())) continue;
       href = await row.locator("a[href*='/video/']").first().getAttribute("href"); if (href) break; }
     if (!href) throw new Error("動画が見つからない：" + stem);
     const id = href.match(/video\/([^/]+)/)[1]; await page.goto(`https://studio.youtube.com/video/${id}/edit`); await page.waitForTimeout(5000); await dismiss(); await shot("edit_" + item.id);

@@ -63,13 +63,13 @@ SHOTS = [
   { at: "l13", kind: "3d", draw: blShot("l13") },
 ];
 const FX = {
-  l00: (t, u) => { POV.shake(t, 5); POV.breath(t, .6, .45); POV.heart(t, 125, .35); },
-  l01: (t, u) => { POV.shake(t, 1.5); POV.breath(t, .3, .25); },
-  l03: (t, u, a) => { POV.shake(t, 2 + 4 * clamp((t - a) / 1.5)); POV.heart(t, 115, .3); },
-  l04: (t, u) => { POV.shake(t, 9); POV.breath(t, .6, .4); },
-  l05: (t, u) => { POV.shake(t, 7 + 8 * (u > .45 ? 1 : 0)); POV.breath(t, .65, .45); },
+  l00: (t, u) => { POV.shake(t, 4); POV.alert(t, .55); },
+  l01: (t, u) => { POV.shake(t, 1.5); },
+  l03: (t, u, a) => { POV.shake(t, 2 + 4 * clamp((t - a) / 1.5)); POV.alert(t, .7 * clamp((t - a - .4) / .6)); },
+  l04: (t, u) => { POV.shake(t, 9); POV.alert(t, .85); },
+  l05: (t, u) => { POV.shake(t, 7 + 8 * (u > .45 ? 1 : 0)); POV.alert(t, .9, 1.6); },
   l06: (t, u) => { POV.shake(t, 6); },
-  l07: (t, u, a) => { POV.shake(t, 2); POV.breath(t, .5, .4); POV.heart(t, 130, .3 + .45 * clamp((t - a) / 4)); },
+  l07: (t, u, a) => { POV.shake(t, 2); POV.alert(t, .7); POV.heart(t, 120, .15 * clamp((t - a) / 4)); },
 };
 function buildMood() { const c = CUE; MOOD = [[0, { cool: .4, sat: .8, vig: .7 }], [c.pov, { cool: .45, sat: .75, vig: .7 }], [c.l03, { cool: .5, sat: .7, vig: .8 }], [c.ask, { cool: .55, sat: .6, vig: .85 }], [c.exp, { warm: .05, sat: .9, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.lightning, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, cx: .7, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,4,10,.4)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .4, sat: .8, vig: .7 }]]); addGrain(0); label(ui, "計器が狂った。飛行は続ける", 540, 470, 66, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "まず、どうする？", 540, 620, 110, "#FFD58A", { stroke: "#05080c", sw: .14 }); choicePair(0, 1000, 170, 1); }
