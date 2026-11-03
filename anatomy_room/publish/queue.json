@@ -124,6 +124,15 @@
    "reupload": true,
    "old_private_upload_2": "2026-11-02T14:27:22.864Z",
    "uploaded": "2026-11-02T15:20:10.007Z"
+  },
+  {
+   "id": "pilot_039",
+   "video": "anatomy_room/production/pilot_039/reverse_039_prosperi.mp4",
+   "meta": "anatomy_room/production/pilot_039/youtube_metadata.md",
+   "publish_at": "2026-11-04 19:00",
+   "status": "scheduled",
+   "note": "2026-11-03 選択設計の 3 本目（ユーザーが予約を指示）",
+   "uploaded": "2026-11-03T00:59:37.139Z"
   }
  ]
 }
