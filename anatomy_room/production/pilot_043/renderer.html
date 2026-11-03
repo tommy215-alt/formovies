@@ -40,7 +40,7 @@ html,body{margin:0;background:#000}
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['thumbbg', 'map'], ci: {}, hits: [],
   opening: { img: null, bg: openBG, title: ["街に広がるコレラ", "あなたは？"], size1: 62, size2: 100, credit: ["※再現CGを含みます"] } });
 loadImages(KIT.images);
-const CHOICE = { a: "街の悪い空気を／清める", b: "井戸のポンプの柄を／外す", ans: "B", reveal: "l07b" };
+const CHOICE = { a: "患者を／街の外の病院へ", b: "井戸のポンプの柄を／外させる", ans: "B", reveal: "l07b" };
 
 SHOTS = [
   { at: "l01", kind: "3d", draw: blShot("l01") },

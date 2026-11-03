@@ -95,11 +95,23 @@ for k in range(10):
     o = K.lathe(f"barrel{k}", [(.0, 0), (.45, 0), (.55, .5), (.45, 1.0), (.0, 1.0)], wood, loc=(-4 + (k % 5) * 1.3, 2.5 + (k // 5) * 1.3, 0)); o.parent = BREW
 K.box("brewwall", (14, .3, 8), (0, 4.5, 4), brick, bevel=0, parent=BREW); K.box("brewfl", (14, 14, .1), (0, -2, -.05), cob, bevel=0, parent=BREW)
 BREW.location = (0, 0, -80)
+# 荷車（A：患者を街の外の病院へ運ぶ。毛布をかけた患者の形・木の車輪）
+CART = group("cart"); cw = K.mat("cartw", (.22, .15, .09), .8); blanket = K.mat("blanket", (.32, .3, .26), .95)
+K.box("cbed", (1.3, 2.4, .12), (0, 0, .75), cw, parent=CART)
+for x in (-.65, .65):
+    K.box(f"cside{x}", (.05, 2.4, .3), (x, 0, .95), cw, parent=CART)
+    for y in (-.7, .7):
+        bpy.ops.mesh.primitive_cylinder_add(radius=.5, depth=.08, vertices=24, location=(x * 1.12, y, .5), rotation=(0, math.radians(90), 0)); w_ = bpy.context.object; w_.data.materials.append(cw); w_.parent = CART
+for k, y in enumerate((-.55, .55)):
+    K.box(f"pat{k}", (.5, 1.0, .25), (0, y * .9, .95), blanket, bevel=.1, parent=CART)
+for x in (-.35, .35):
+    K.tube((x, -1.2, .8), (x, -2.4, .9), .03, cw, CART, 8)
+CART.location = (0, 0, -60)
 # 人（路地の人々：遠景の後ろ姿）
 PEOPLE = []
 for k in range(10):
     h = K.human("man_walk" if k % 2 else "man_stand", suit=(R.uniform(.05, .15), R.uniform(.05, .12), R.uniform(.05, .1)), helmet=False, pack=False); PEOPLE.append(h)
-ALL = {"street": ST, "pump": PUMP, "lime": LIME, "table": TABLE, "brew": BREW}
+ALL = {"street": ST, "pump": PUMP, "lime": LIME, "table": TABLE, "brew": BREW, "cart": CART}
 
 
 def unhide(o):
@@ -121,7 +133,7 @@ def show(*names, people=0, hand=False, stream=False, fog=.03):
     for k, h in enumerate(PEOPLE):
         hide(h, k >= people)
     hide(HAND, not hand); STREAM.hide_render = not stream or "pump" not in names
-    HANDLE.location = (0, .1, 1.4); HANDLE.rotation_euler = (0, 0, 0); TABLE.location = (0, 0, -40); BREW.location = (0, 0, -80)
+    HANDLE.location = (0, .1, 1.4); HANDLE.rotation_euler = (0, 0, 0); TABLE.location = (0, 0, -40); BREW.location = (0, 0, -80); CART.location = (0, 0, -60)
     sky.set(0, 6, 120, 2.0); sc.view_settings.exposure = -1.0; sc.world.node_tree.nodes["Background"].inputs[1].default_value = .6
     set_fog(fog)
 
@@ -154,10 +166,12 @@ def a_l00(u, t, f):   # 霧の路地と、通りの真ん中のポンプ
     p = eye(t, 8 - 2.2 * u, .6); cam.look(p, (0, 0, 1.1), 24)
 
 def s_l00a():
-    show("street", "lime", people=2, fog=.06)
-def a_l00a(u, t, f):   # A：悪い空気を清める（道に石灰をまく、煙の濃い路地）
-    place_people([(-3, 1.5, -1.2), (-6, -1.5, -1.9)], t, .2)
-    p = eye(t, 2, 0); cam.look(p, mix((-4, .5, .2), (-5, -.5, .1), K.ease(u)), 24)
+    show("street", "cart", people=3, fog=.06)
+def a_l00a(u, t, f):   # A：患者を荷車に乗せて、街の外へ運ぶ（引く人の背中を追う）
+    CART.location = (-6 - 1.3 * t, 0, 0); CART.rotation_euler = (0, 0, math.radians(-90))
+    PEOPLE[0].location = (-8.6 - 1.3 * t, 0, 0); PEOPLE[0].rotation_euler = (0, 0, math.radians(-90))
+    place_people([(0, 0, 0), (-5, 1.2, -1.5), (-7, -1.2, -1.6)], t, .9); PEOPLE[0].location = (-8.6 - 1.3 * t, 0, 0); PEOPLE[0].rotation_euler = (0, 0, math.radians(-90))
+    p = eye(t, -2.2 - 1.3 * t, .3); cam.look(p, (p.x - 6, -.1, 1.0), 24)
 
 def s_l00b():
     show("street", "pump", fog=.03); unhide(HAND)
@@ -234,4 +248,4 @@ def a_l12(u, t, f):   # 柄のないポンプ
 
 SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l12"]}
 ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]
-K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, HANDLE, HAND, TABLE, CUP, BREW] + PEOPLE)
+K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, HANDLE, HAND, TABLE, CUP, BREW, CART] + PEOPLE)
