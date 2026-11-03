@@ -105,6 +105,7 @@ def show(*names):
             m.node_tree.animation_data_clear()
     for mx in SCR:
         mx.inputs[0].default_value = 1
+    CK.rotation_euler = (0, 0, 0)
     LAMP.inputs["Emission Strength"].default_value = 0; SPARK.inputs["Emission Strength"].default_value = 0
 
     def hide(o, h):
@@ -154,9 +155,12 @@ def a_l00a(u, t, f):   # A：左に旋回して、近くの空軍の基地へ（
     p = eye(A0 - 3000, t, .006); cam.look(p, p + Vector((-1.6, -4, -.9)), 22, roll=.28 * K.ease(u)); keyscr(f, 0)
 
 def s_l00b():
-    show("cockpit"); evening(A0 - 3000); at_alt(A0 - 3000)
-def a_l00b(u, t, f):   # B：まっすぐ、遠くの大きな空港へ（もやの向こう）
-    p = eye(A0 - 3000, t, .006); cam.look(p, p + Vector((.1, -4, -.35)), 24); keyscr(f, 0)
+    show("cockpit"); evening(400)
+def a_l00b(u, t, f):   # B：湖へ不時着する（低く、水面が迫る）
+    z = 260 - 55 * t; x0, y0 = -60000, -30000 - 75 * t; CK.location = (x0, y0, z); PLANE.location = (0, 0, -9000)
+    EARTH.altitude(z, .45); sc.view_settings.exposure = -2.6
+    CK.rotation_euler = (math.radians(10 + 3 * u), math.radians(1.5 * math.sin(t * 2)), 0); bpy.context.view_layer.update(); M = CK.matrix_world
+    p = M @ Vector((-.55 + math.sin(t * 9) * .008, .25, .66 + math.sin(t * 11) * .008)); cam.look(p, M @ Vector((-.45, -4, .25)), 22); keyscr(f, 0)
 
 def s_l01():
     show("cockpit"); evening(A0 + 1800); at_alt(A0 + 1800)
@@ -226,4 +230,4 @@ def a_l12(u, t, f):   # 夕暮れの滑走路と機体
 
 SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]}
 ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]
-K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, PLANE])
+K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, PLANE, CK])
