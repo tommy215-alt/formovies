@@ -117,13 +117,14 @@
    "id": "pilot_038",
    "video": "anatomy_room/production/pilot_038/reverse_038_apollo12.mp4",
    "meta": "anatomy_room/production/pilot_038/youtube_metadata.md",
-   "publish_at": "2026-11-04 08:00",
-   "status": "private",
-   "note": "2026-11-02 深夜 前半を一人称だけにした版で差し替え（前の 2 つの版は非公開）",
+   "publish_at": "2026-11-05 08:00",
+   "status": "scheduled",
+   "note": "2026-11-04 55 秒・複数カットの版で差し替え（前の版は非公開）",
    "old_private_upload": "2026-11-02T12:45:08.857Z",
    "reupload": true,
    "old_private_upload_2": "2026-11-02T14:27:22.864Z",
-   "uploaded": "2026-11-02T15:20:10.007Z"
+   "old_private_upload_55": "2026-11-02T15:20:10.007Z",
+   "uploaded": "2026-11-03T22:58:12.152Z"
   },
   {
    "id": "pilot_039",
@@ -131,8 +132,10 @@
    "meta": "anatomy_room/production/pilot_039/youtube_metadata.md",
    "publish_at": "2026-11-04 19:00",
    "status": "scheduled",
-   "note": "2026-11-03 選択設計の 3 本目（ユーザーが予約を指示）",
-   "uploaded": "2026-11-03T00:59:37.139Z"
+   "note": "2026-11-04 55 秒・複数カットの版で差し替え（前の版は非公開）",
+   "old_private_upload_55": "2026-11-03T00:59:37.139Z",
+   "reupload": true,
+   "uploaded": "2026-11-03T23:24:24.717Z"
   }
  ]
 }
