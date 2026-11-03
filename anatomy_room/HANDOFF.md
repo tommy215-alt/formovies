@@ -77,6 +77,8 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - 040 ギムリー・グライダー（答え A）・041 ロゴゾフの自己手術（B）・042 ケルシーとサリドマイド（A）・043 ジョン・スノウのポンプ（B）・044 シャクルトンのジェームズ・ケアード号（A）。台本はユーザーが「OK」（2026-11-03）。事実確認・素材は `scripts/pilot_04N/`、YouTube の文は各 `youtube_metadata.md`。
 - 3D は各回の `blender/scene.py`（前半は当事者の目線だけ）。11:48 から連続の書き出し（Blender 全ショット 32 サンプル → サムネイルの背景 `assets/src_thumb.jpg` → `bl_pack.py` → `rv.py render all` → `--thumb`）を 040 から順に。記録は `anatomy_room/_backup/chain40.log`（台本はスクラッチの chain40.sh）。1 本 約 2 時間。途中で止まったら、その回から同じ手順で。
 - 予約はユーザーが見て指示してから（queue.json に載せる）。
+- **2026-11-03 23 時の作り直し（ユーザーの指示）**：全体 55 秒以内、冒頭は 0 秒目から文字、冒頭と一人称に複数のカット（決まりは `templates/DESIGN_MODES.md` の選択設計の表）。対象は 038〜044（037 は公開済みなのでそのまま）。カットの区切りは各 renderer の `const CUTS`、Blender は `blkit.renderer_cuts`・`renderer_order` が同じ定義を読む。040 は客室のカット（`s_cab`）を新しく作った。詰め直しの前の版は `_backup/cut55/`。
+- 書き出しは 038 → 039 → 040〜044 の順（スクラッチの chain55.sh・queue55.txt、記録は `_backup/chain40.log`）。038・039 は完成したら swap55.sh が古い版を非公開にし、同じ枠（11/4 8:00・19:00）に予約し直す。
 - 注意：Bash ツールのコマンドが 10 分を超えて裏に回ると、Blender が最後の画像の書き込みで止まることがあった（2 回）。長い描画は Start-Process で切り離して動かす。
 
 ## 次の動画でやること（ガイドライン v2.4）
