@@ -1,0 +1,46 @@
+# pilot_044 YouTube のタイトル・説明文
+
+> 内容は `scripts/pilot_044/fact_check.md`、画像・曲・効果音のクレジットは `scripts/pilot_044/assets.md` に合わせた。
+
+## タイトル
+
+南極の海で船を失った28人。あなたは？ A 遠い島へ、追い風で／B 近い南米へ、向かい風で #shorts
+
+## 説明文
+
+```
+南極の海で、船を失った。28人で、小さな島に。あなたは。A、遠い島へ、風に乗って、小舟で行く。B、近い南米へ、向かい風の中を、小舟で行く。
+
+1916年4月。あなたは、南極探検隊の隊長。船は、氷に押しつぶされて沈んだ。氷の上を何か月もさまよい、28人で、エレファント島にたどり着いた。ここにいることを、誰も知らない。助けを呼ぶには、小さな救命ボートで、海を渡るしかない。近いのは、南米の岬。でも、強い向かい風と、海流に逆らうことになる。遠いのは、サウスジョージア島。約1500キロ。でも、風と海流が、背中を押してくれる。ボートは7メートル足らず。冬が、近い。A、遠い島へ、風に乗って行く。B、近い南米へ、向かい風の中を行く。あなたなら、どっち？1916年、同じ状況に立たされた、アーネスト・シャクルトン。答えは、A。遠いサウスジョージア島へ。6人で、4月24日に出発。荒れた海で、ボートは氷に覆われた。星や太陽を測れたのは、ほんの数回。それでも、5月10日、島にたどり着いた。近くても、風に逆らえば、小舟は進めない。遠くても、風に乗れば、届く。3人が島の山を越えて、捕鯨基地へ。救助の船が、送り出された。8月30日、島に残った22人も、救い出された。全員が、生きて帰った。
+
+▼ご注意
+・これは過去の出来事の紹介です。必ずしも正しい選択を示すものではありません。
+・海・島・ボート・氷原は再現CGです。人物の顔は再現していません。
+
+▼ 出典
+・Bergman et al., Navigation of the James Caird on the Shackleton Expedition, 2018（Canterbury Museum）
+・Ernest Shackleton, South, 1919（Project Gutenberg）
+
+▼ 画像・素材
+・写真：Frank Hurley（1916年4月24日、ジェームズ・ケアード号の出発）／パブリックドメイン
+・3D の素材：MakeHuman / MPFB（CC0）。3D の場面は Blender で制作
+
+▼ 音楽
+"Ghostpocalypse - 7 Master" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+
+▼ 効果音（Freesound、CC0）
+・storm_sea：Powerful Storm Waves – Rough Sea and Surf（bassimat）
+・waves：Rough Baltic Sea（GirlWithSoundRecorder）
+・creak：ship_creak.mp3（Walter_Odington）
+・wind：Howling winter storm ambient sounds（DBlover）
+・breath：Scared Male Heavy Breathing（casiba842）
+・heartbeat：Heartbeat Sound [60bpm]（Seth_Makes_Sounds）
+
+
+
+音声：AivisSpeech: 阿井田 茂／VOICEVOX:冥鳴ひまり
+
+#あなたならどうする #シャクルトン #南極探検 #実話 #リバース #shorts
+```

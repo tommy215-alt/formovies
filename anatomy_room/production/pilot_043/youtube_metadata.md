@@ -1,0 +1,47 @@
+# pilot_043 YouTube のタイトル・説明文
+
+> 内容は `scripts/pilot_043/fact_check.md`、画像・曲・効果音のクレジットは `scripts/pilot_043/assets.md` に合わせた。
+
+## タイトル
+
+街にコレラが広がる。あなたは？ A 悪い空気を清める／B 井戸のポンプの柄を外す #shorts
+
+## 説明文
+
+```
+街で、コレラが広がっていく。あなたは。A、街の悪い空気を、清める。B、井戸のポンプの柄を、外す。
+
+1854年、ロンドン。あなたは医者。8月31日の夜から、ソーホーの一角で、コレラが急に広がった。9月1日だけで、143人が倒れる。街では、病気は悪い空気でうつると考えられている。道には、消毒の石灰がまかれる。あなたは、亡くなった人の家を、一軒ずつ訪ねる。多くの家が、ブロード街の、同じ井戸の水を飲んでいた。でも、その水を調べても、汚れは、ほとんど見えない。A、街の悪い空気を、清める。B、井戸のポンプの柄を、外す。あなたなら、どっち？1854年、同じ状況に立たされた、ジョン・スノウ。答えは、B。ポンプの柄を、外させた。決め手は、例外だった。井戸のすぐ近くのビール工場では、70人あまりの働き手に、重い患者が出なかった。工場には、自前の井戸があった。ポンプの水を、樽に汲んで置いていた工場では、18人が亡くなった。病気を運んでいたのは、空気ではなく、水だった。9月7日、彼は教区の委員会に話し、翌日、柄が外された。ただ、そのときには、流行はすでに下火だった。のちに、井戸のすぐそばの汚水だめから、病気が漏れ出していたとわかる。
+
+▼ご注意
+・これは過去の出来事の紹介です。必ずしも正しい選択を示すものではありません。
+・路地・ポンプ・ビール工場は再現CGです。人物の顔は再現していません。
+
+▼ 出典
+・John Snow, On the Mode of Communication of Cholera, 2nd ed., 1855（Project Gutenberg）
+・UCLA の Snow のサイト
+
+▼ 画像・素材
+・図：John Snow のコレラの地図（1854〜55）／パブリックドメイン
+・3D の素材：MakeHuman / MPFB（CC0）。3D の場面は Blender で制作
+
+▼ 音楽
+"Ghostpocalypse - 1 Departure" Kevin MacLeod (incompetech.com)
+Licensed under Creative Commons: By Attribution 4.0 License
+http://creativecommons.org/licenses/by/4.0/
+
+▼ 効果音（Freesound、CC0）
+・crowd：Generic Exterior Walla（brunoboselli）
+・horses：G18-12-Horses on Cobblestones.wav（craigsmith）
+・bell：Church bell.wav（Audeption）
+・cough：Cough.wav（Harris85）
+・pump：HandWaterPump.wav（Bent.B.C.）
+・breath：Scared Male Heavy Breathing（casiba842）
+・heartbeat：Heartbeat Sound [60bpm]（Seth_Makes_Sounds）
+
+
+
+音声：AivisSpeech: 阿井田 茂／VOICEVOX:冥鳴ひまり
+
+#あなたならどうする #ジョンスノウ #コレラ #疫学 #実話 #リバース #shorts
+```

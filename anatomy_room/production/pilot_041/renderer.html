@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_041 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script src="../ext/kit/pov.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
+<script>
+// pilot_041 のレンダラー（選択設計）。ロゴゾフ。前半は本人の目線（南極の基地の部屋、吹雪）。3D は Blender。写真なし（権利の確かなものがない）。
+// 選択設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
+Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['thumbbg'], ci: {}, hits: [],
+  opening: { img: null, bg: openBG, title: ["ただひとりの医者が虫垂炎に", "あなたは？"], size1: 62, size2: 100, credit: ["※再現CGを含みます"] } });
+loadImages(KIT.images);
+const CHOICE = { a: "素人の仲間に／手術を任せる", b: "自分で／自分を手術する", ans: "B", reveal: "l07b" };
+
+SHOTS = [
+  { at: "l01", kind: "3d", draw: blShot("l01") },
+  { at: "l02", kind: "3d", draw: blShot("l02") },
+  { at: "l03", kind: "3d", draw: blShot("l03") },
+  { at: "l04", kind: "3d", draw: blShot("l04") },
+  { at: "l05", kind: "3d", draw: blShot("l05") },
+  { at: "l06", kind: "3d", draw: blShot("l06") },
+  { at: "l07", kind: "3d", draw: blShot("l07") },
+  { at: "l08", kind: "3d", draw: blShot("l08") },
+  { at: "l09", kind: "3d", draw: blShot("l09") },
+  { at: "l10", kind: "3d", draw: blShot("l10") },
+  { at: "l11", kind: "3d", draw: blShot("l11") },
+  { at: "l12", kind: "3d", draw: blShot("l12") },
+];
+const FX = {
+  l00: (t, u) => { POV.blur(2 * (1 - u)); POV.breath(t, .55, .55); POV.heart(t, 110, .3); },
+  l01: (t, u) => { POV.breath(t, .35, .3); },
+  l02: (t, u) => { POV.breath(t, .35, .3); },
+  l03: (t, u) => { POV.shake(t, 1.5); POV.blur(1.5); POV.breath(t, .5, .5); },
+  l04: (t, u) => { POV.breath(t, .45, .4); },
+  l05: (t, u) => { POV.shake(t, 2.5); POV.blur(2.5); POV.breath(t, .65, .6); POV.heart(t, 120, .3); },
+  l06: (t, u, a) => { POV.blur(1.5); POV.breath(t, .55, .5); POV.heart(t, 125, .25 + .4 * clamp((t - a) / 4)); },
+};
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .4, sat: .8, vig: .72 }], [c.pov, { cool: .42, sat: .78, vig: .72 }], [c.ask, { cool: .5, sat: .6, vig: .86 }], [c.exp, { warm: .05, sat: .9, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.thumbbg, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,4,10,.35)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .4, sat: .85, vig: .7 }]]); addGrain(0); label(ui, "ただひとりの医者が虫垂炎に", 540, 470, 66, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "あなたは？", 540, 620, 110, "#FFD58A", { stroke: "#05080c", sw: .14 }); choicePair(0, 1000, 170, 1); }
+
+// ---------------------------------------------------------------- 選択肢の札（2026-11-02 ユーザーの指示：前半は「選択」が主役。A・B を同時に見せる）
+// CHOICE = { a, b, ans: "A"|"B", reveal: 答えを言う行の cue }
+function choiceCard(ctx, letter, text, x, y, w, h, k, hi = 0, dim = 0) { if (k <= 0) return;
+  const col = letter === "A" ? [80, 170, 255] : [255, 150, 70]; ctx.save(); ctx.globalAlpha = k * (1 - .65 * dim);
+  ctx.fillStyle = `rgba(6,12,20,${.72 + .15 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.fill();
+  ctx.lineWidth = 5 + 7 * hi; ctx.strokeStyle = `rgba(${col},${.8 + .2 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.stroke();
+  if (hi > 0) { ctx.shadowColor = `rgba(${col},.9)`; ctx.shadowBlur = 40 * hi; ctx.stroke(); ctx.shadowBlur = 0; }
+  ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(x + 62, y + h / 2, 42, 0, Math.PI * 2); ctx.fill();
+  label(ctx, letter, x + 62, y + h / 2 + 2, 60, "#06101a", { weight: 900 });
+  const lines = text.split("／"); lines.forEach((l, i) => label(ctx, l, x + 130 + (w - 150) / 2, y + h / 2 + (i - (lines.length - 1) / 2) * 52, lines.length > 1 ? 46 : 54, "#EAF2F8", { weight: 800 }));
+  ctx.restore(); }
+function choicePair(t, y, h, k, hiA = 0, hiB = 0, dimA = 0, dimB = 0) { choiceCard(ui, "A", CHOICE.a, 70, y, 940, h, k, hiA, dimA); choiceCard(ui, "B", CHOICE.b, 70, y + h + 34, 940, h, k, hiB, dimB); }
+function choiceUI(t, name) {
+  if (name === "open") { const k = k_(t, "t0", .5, .25), a = CUE.l00a, b = CUE.l00b; choicePair(t, 1000, 150, k, t >= a && t < b ? clamp((t - a) / .15) : 0, t >= b ? clamp((t - b) / .15) : 0, t >= b ? .6 : 0, t >= a && t < b ? .6 : 0); return; }
+  const { s } = shotAt(t), es = TL.ending_start;
+  if (name === "pov") { const k = clamp((t - CUE.pov) / .4) * clamp((CUE.ask - t) / .3); ui.save(); ui.globalAlpha = .85 * k;   // 上に小さく：A・B のどちらか
+    for (const [L, x, c] of [["A", 270, "rgba(80,170,255,.9)"], ["B", 810, "rgba(255,150,70,.9)"]]) { ui.fillStyle = "rgba(6,12,20,.6)"; rrect(ui, x - 250, 200, 500, 70, 35); ui.fill(); ui.strokeStyle = c; ui.lineWidth = 3; rrect(ui, x - 250, 200, 500, 70, 35); ui.stroke();
+      label(ui, L + "　" + (L === "A" ? CHOICE.a : CHOICE.b).replace("／", ""), x, 236, 30, "#EAF2F8", { weight: 700 }); } ui.restore(); }
+  if (name === "ask") { const k = clamp((t - CUE.ask) / .35); choicePair(t, 620, 170, k); }
+  const r = CUE[CHOICE.reveal]; if (r !== undefined && t >= r && t < r + 3.2) { const k = clamp((t - r) / .25) * clamp((r + 3.2 - t) / .4), hi = clamp((t - r - .3) / .3), A = CHOICE.ans === "A";
+    choicePair(t, 300, 150, k, A ? hi : 0, A ? 0 : hi, A ? 0 : hi, A ? hi : 0); }
+}
+// オープニングの背景：状況 → A の行動の CG → B の行動の CG（2026-11-02 ユーザーの指示）
+const OPEN_SHOTS = { s: blShot("l00"), a: blShot("l00a"), b: blShot("l00b") };
+function openBG(t) { const o = KIT.opening; if (o.img0 === undefined) { o.img0 = o.img; o.credit0 = o.credit; } o.img = t < CUE.l00a ? o.img0 : null; o.credit = o.img ? o.credit0 : o.credit0.filter(c => !c.startsWith("写真"));   // 本物の写真は状況を読むあいだだけ、A・B では CG を全面に
+  (t < CUE.l00a ? OPEN_SHOTS.s : t < CUE.l00b ? OPEN_SHOTS.a : OPEN_SHOTS.b)(t); }
+// 最後の暗転の注意書き（2026-11-02 ユーザーの指示）
+function endNote(t) { const es = TL.ending_start; if (t < es) return; ui.fillStyle = `rgba(0,0,0,${easeInOut(clamp((t - es) / 1.0))})`; ui.fillRect(0, 0, W, H);   // 1 秒で真っ暗に
+  if (t < es + .7) return; const k = clamp((t - es - .7) / .5);
+  ui.save(); ui.globalAlpha = k; ["※これは過去の出来事の紹介です。", "必ずしも正しい選択を", "示すものではありません。"].forEach((l, i) => label(ui, l, 540, 900 + i * 66, 44, "#D8E2EA", { stroke: "#000", sw: .1 })); ui.restore(); }
+{ const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (t < TL.ending_start) choiceUI(t, name); }; }
+// ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
+function fxEp(t, name) {
+  if (name === "open") { (FX.l00 || (() => {}))(t, clamp(t / Math.max(.3, CUE.l01)), 0); return; }
+  const { s, a, u } = shotAt(t); const f = FX[s.at]; if (f) f(t, u, a);
+}
+kitStart(() => {}); BL.install();
+{ const rf = window.renderFrame; window.renderFrame = t => { const r = rf(t); if (r && r.then) return r.then(() => endNote(t)); endNote(t); return r; }; }
+</script>
+</body></html>
