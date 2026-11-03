@@ -67,7 +67,7 @@ const FX = {
   l06: (t, u, a) => { POV.shake(t, 1); POV.breath(t, .35, .3); POV.heart(t, 100, .12 + .2 * clamp((t - a) / 4)); },
 };
 Object.assign(FX, {l05_2: FX.l05 || (() => {})});   // カットにも同じ揺れ
-function buildMood() { const c = CUE; for (const k in CUTS) CUE[k] = CUE[CUTS[k][0]] + CUTS[k][1]; MOOD = [[0, { cool: .4, sat: .8, vig: .72 }], [c.pov, { cool: .42, sat: .78, vig: .72 }], [c.ask, { cool: .5, sat: .6, vig: .86 }], [c.exp, { warm: .05, sat: .9, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
+function buildMood() { const c = CUE; for (const k in CUTS) CUE[k] = CUE[CUTS[k][0]] + CUTS[k][1]; MOOD = [[0, { cool: .4, sat: .8, vig: .45 }], [c.pov, { cool: .42, sat: .78, vig: .72 }], [c.ask, { cool: .5, sat: .6, vig: .86 }], [c.exp, { warm: .05, sat: .9, vig: .6 }], [c.after, { warm: .2, sat: .95, glow: .2, glowX: .5, glowY: .4, vig: .5 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.thumbbg, 1, 1.05, 1.05, 0, { box: [0, 0, 1080, 1920], cy: .5, gray: 0, frame: "none" }); bg.fillStyle = "rgba(0,4,10,.35)"; bg.fillRect(0, 0, W, H); S.moodGrade(bg, 0, [[0, { cool: .4, sat: .85, vig: .7 }]]); addGrain(0); label(ui, "急かされる薬の承認", 540, 470, 66, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "あなたは？", 540, 620, 110, "#FFD58A", { stroke: "#05080c", sw: .14 }); choicePair(0, 1000, 170, 1); }
 
 // ---------------------------------------------------------------- 選択肢の札（2026-11-02 ユーザーの指示：前半は「選択」が主役。A・B を同時に見せる）
@@ -106,7 +106,11 @@ function endNote(t) { const es = TL.ending_start; if (t < es) return; ui.fillSty
   ui.save(); ui.globalAlpha = k; ["※これは過去の出来事の紹介です。", "必ずしも正しい選択を", "示すものではありません。"].forEach((l, i) => label(ui, l, 540, 900 + i * 66, 44, "#D8E2EA", { stroke: "#000", sw: .1 })); ui.restore(); }
 { const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (t < TL.ending_start) choiceUI(t, name); }; }
 // ---------------------------------------------------------------- 目線の演出（pov.js）。FX[ショット] = (t, u, a) => { ... }
+// 冒頭は暗くしすぎない：何が起きているか分かる明るさに（2026-11-03 ユーザーの指示。揺れ・警告灯などの緊迫感はそのまま）
+const LIFT_C = document.createElement("canvas"); LIFT_C.width = W; LIFT_C.height = H; const LIFT_X = LIFT_C.getContext("2d");
+function liftOpen(k) { if (k <= 1.001) return; LIFT_X.clearRect(0, 0, W, H); LIFT_X.drawImage(bg.canvas, 0, 0); bg.save(); bg.filter = `brightness(${k}) contrast(1.06) saturate(1.08)`; bg.drawImage(LIFT_C, 0, 0); bg.restore(); }
 function fxEp(t, name) {
+  liftOpen(name === "open" ? 1.5 : 1 + .5 * (1 - clamp((t - CUE.pov) / 1.2)));
   if (name === "open") { (FX.l00 || (() => {}))(t, clamp(t / Math.max(.3, CUE.l01)), 0); return; }
   const { s, a, u } = shotAt(t); const f = FX[s.at]; if (f) f(t, u, a);
 }
