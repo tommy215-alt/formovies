@@ -259,7 +259,8 @@ def a_l00a(u, t, f):   # A：計器の復活を進める（崩れた計器の画
     p = Vector((.6, .95 - .25 * K.ease(u), 1.35)); cam.look(p, (.65, .16, 1.22), 30)
     garble(True, f)
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l12", "l13"]}
-ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l01", "l03", "l04", "l06", "l07", "l09", "l10", "l13", "l00", "l00a", "l00b"]}
+SHOTS.update({k: (globals()["s_" + v], globals()["a_" + v]) for k, v in {"l00_2": "l12", "l00_3": "l04", "l03_2": "l12", "l04_2": "l05"}.items()})   # カット（2026-11-03〜）
+ORDER = None   # renderer の SHOTS とカットから時刻の順に（blkit.renderer_order）
 anim = [cam.o, ROCK, CMG] + NEEDLES + [SCE] + [bg_ for b, segs, bg_ in BOLTS]
 K.render_shots(HERE, SHOTS, ORDER, O, anim)

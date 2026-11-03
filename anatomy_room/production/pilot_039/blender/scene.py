@@ -251,6 +251,7 @@ def a_l00b(u, t, f):   # B：屋根の下で救助を待つ（墓の中に座り
     z0 = SHR.location.z; p = Vector((SX + .2, SY - .9, z0 + .95)) + Vector((0, 0, math.sin(t * 1.6) * .006))
     cam.look(p, mix((SX, SY + 1.9, z0 + 1.8), (SX - .2, SY + 1.9, z0 + 2.4), K.ease(u)), 24)
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]}
-ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13"]
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l01", "l02", "l03", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l00", "l00a", "l00b"]}
+SHOTS.update({k: (globals()["s_" + v], globals()["a_" + v]) for k, v in {"l00_2": "l03", "l00_3": "l05", "l03_2": "l10", "l06_2": "l09"}.items()})   # カット（2026-11-03〜）
+ORDER = None   # renderer の SHOTS とカットから時刻の順に（blkit.renderer_order）
 K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, HELI, ROT, FL, RUN])

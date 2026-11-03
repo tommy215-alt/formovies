@@ -96,7 +96,30 @@ for x in (-.55, .55):   # 操縦かん
     K.tube((x, -.55, -.6), (x, -.62, -.05), .03, frame, CK, 12); K.box(f"yoke{x}", (.32, .04, .1), (x, -.63, -.02), frame, parent=CK)
 K.box("seatL", (.55, .55, .8), (-.55, .4, -.4), K.mat("seat", (.04, .035, .03), .8), parent=CK); K.box("seatR", (.55, .55, .8), (.55, .4, -.4), K.mat("seat2", (.04, .035, .03), .8), parent=CK)
 cl = bpy.data.lights.new("cklight", "AREA"); cl.energy = 8; cl.size = 1.5; cl.color = (1, .9, .8); clo = bpy.data.objects.new("cklight", cl); sc.collection.objects.link(clo); clo.location = (0, .2, 1.1); clo.parent = CK
-ALL = {"runway": RW, "plane": PLANE, "cockpit": CK}
+# ---------------------------------------------------------------- 客室（カット用：揺れる客室、乗客の後ろ姿、下りた酸素マスク、非常灯。人の顔は描かない）2026-11-03
+CAB = group("cabin"); cabw = K.mat("cabwall", (.55, .55, .52), .6); seatm = K.mat("seatc", (.08, .1, .2), .8)
+bpy.ops.mesh.primitive_cylinder_add(radius=2.6, depth=30, vertices=48, location=(0, 0, 1.6), rotation=(math.pi / 2, 0, 0)); cy_ = bpy.context.object
+cy_.data.materials.append(cabw); cy_.modifiers.new("s", "SOLIDIFY").thickness = .05; cy_.parent = CAB; bpy.ops.object.shade_smooth()
+K.box("cfloor", (5, 30, .1), (0, 0, 0), K.mat("carpet", (.12, .1, .12), .9), bevel=0, parent=CAB)
+for side in (-1, 1):
+    K.box(f"bin{side}", (1.2, 30, .5), (side * 1.7, 0, 2.6), cabw, (0, side * math.radians(-12), 0), parent=CAB)
+MASK = K.mat("mask", (.85, .75, .2), .6)
+PAX = []
+for r in range(7):
+    y = -r * .85
+    for x in (-1.6, -1.1, 1.1, 1.6):
+        K.box(f"st{r}{x}", (.45, .5, .55), (x, y - .1, .35), seatm, parent=CAB); K.box(f"sb{r}{x}", (.45, .12, .75), (x, y + .15, .85), seatm, parent=CAB)
+        K.tube((x, y - .25, 2.25), (x, y - .25, 1.45), .004, MASK, CAB, 6)
+        bpy.ops.mesh.primitive_cone_add(radius1=.06, radius2=.04, depth=.08, location=(x, y - .25, 1.42)); mk = bpy.context.object; mk.data.materials.append(MASK); mk.parent = CAB
+for r in range(1, 6):
+    for x in (-1.6, 1.1, 1.6) if r % 2 else (-1.1, -1.6, 1.6):
+        g_ = R.uniform(.06, .22); h = K.human("man_sit", suit=(g_, g_ * R.uniform(.9, 1.1), g_ * R.uniform(.9, 1.3)), helmet=False, pack=False); h.parent = CAB; h.location = (x, -r * .85 + .05, .05); h.rotation_euler = (0, 0, 0); PAX.append(h)
+EL_M, EL = emit("exitlight", (1, .25, .1), 0)
+for k in range(8):
+    K.box(f"el{k}", (.06, .3, .03), ((-1) ** k * 1.0, -k * 1.9, .02), EL_M, bevel=0, parent=CAB)
+cbl = bpy.data.lights.new("cabL", "AREA"); cbl.energy = 160; cbl.size = 6; cbl.color = (1, .55, .35); cblo = bpy.data.objects.new("cabL", cbl); sc.collection.objects.link(cblo); cblo.parent = CAB; cblo.location = (0, -3, 2.4)
+CAB.location = (0, 0, -3000)
+ALL = {"runway": RW, "plane": PLANE, "cockpit": CK, "cabin": CAB}
 
 
 def show(*names):
@@ -105,7 +128,7 @@ def show(*names):
             m.node_tree.animation_data_clear()
     for mx in SCR:
         mx.inputs[0].default_value = 1
-    CK.rotation_euler = (0, 0, 0)
+    CK.rotation_euler = (0, 0, 0); CAB.location = (0, 0, -3000); CAB.rotation_euler = (0, 0, 0); cbl.animation_data_clear()
     LAMP.inputs["Emission Strength"].default_value = 0; SPARK.inputs["Emission Strength"].default_value = 0
 
     def hide(o, h):
@@ -161,6 +184,14 @@ def a_l00b(u, t, f):   # B：湖へ不時着する（低く、水面が迫る）
     EARTH.altitude(z, .45); sc.view_settings.exposure = -2.6
     CK.rotation_euler = (math.radians(10 + 3 * u), math.radians(1.5 * math.sin(t * 2)), 0); bpy.context.view_layer.update(); M = CK.matrix_world
     p = M @ Vector((-.55 + math.sin(t * 9) * .008, .25, .66 + math.sin(t * 11) * .008)); cam.look(p, M @ Vector((-.45, -4, .25)), 22); keyscr(f, 0)
+
+def s_cab():
+    show("cabin"); evening(4000, -0.8); CAB.location = (0, 0, 4000)
+def a_cab(u, t, f):   # 客室：揺れる機体、下りた酸素マスク、乗客の背中（悲鳴とざわめきは音で）
+    CAB.rotation_euler = (math.radians(2 * math.sin(t * 7)), math.radians(4 * math.sin(t * 5.3)), 0)
+    EL.inputs["Emission Strength"].default_value = 6 if int(t * 3) % 2 else 2; EL.inputs["Emission Strength"].keyframe_insert("default_value", frame=f + 1)
+    cbl.energy = 900 if int(t * 5) % 3 else 350; cbl.keyframe_insert("energy", frame=f + 1)
+    p = Vector((.05 + math.sin(t * 11) * .03, 1.2, 4000 + 1.55 + math.sin(t * 9) * .03)); cam.look(p, (0, -6, 4000 + 1.0), 22, roll=.06 * math.sin(t * 4))
 
 def s_l01():
     show("cockpit"); evening(A0 + 1800); at_alt(A0 + 1800)
@@ -228,6 +259,7 @@ def a_l12(u, t, f):   # 夕暮れの滑走路と機体
     PLANE.location = (0, -1900, 3.0); PLANE.rotation_euler = (math.radians(-4), 0, 0); cam.look(mix((30, -1830, 3), (25, -1845, 2.5), K.ease(u)), (-5, -1950, 4), 26)
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]}
-ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]
-K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, PLANE, CK])
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l00", "l00a", "l00b"]}
+SHOTS.update({k: (globals()["s_" + v], globals()["a_" + v]) for k, v in {"l00_2": "l07", "l00_3": "cab", "l03_2": "cab", "l04_2": "l07"}.items()})   # カット（2026-11-03〜）
+ORDER = None   # renderer の SHOTS とカットから時刻の順に（blkit.renderer_order）
+K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, PLANE, CK, CAB])

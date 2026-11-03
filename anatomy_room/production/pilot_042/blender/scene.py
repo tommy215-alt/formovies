@@ -219,6 +219,7 @@ def a_l11(u, t, f):   # 治験用に配られた錠剤：棚の遠景
     cam.look(mix((0, -5.5, 1.2), (0, -6.5, 1.3), K.ease(u)), (0, 0, 1.1), 30)
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11"]}
-ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l00", "l00a", "l00b"]}
+SHOTS.update({k: (globals()["s_" + v], globals()["a_" + v]) for k, v in {"l00_2": "l03", "l00_3": "l04", "l05_2": "l03"}.items()})   # カット（2026-11-03〜）
+ORDER = None   # renderer の SHOTS とカットから時刻の順に（blkit.renderer_order）
 K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, RCV, FILES, STAMP, HAND, WOMAN, SHELF] + HANDS)

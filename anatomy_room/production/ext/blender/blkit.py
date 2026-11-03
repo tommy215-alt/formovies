@@ -208,7 +208,24 @@ def ease(u):
 def shot_lengths(here):
     """work/timeline.json から、ショット（cue 名）ごとの [開始, 終了] 秒。終了は次の cue（SHOTS の順は scene.py が渡す）"""
     tl = json.load(open(os.path.join(here, "..", "work", "timeline.json"), encoding="utf-8"))
-    return tl["cues"], tl["ending_start"]
+    cues = dict(tl["cues"]); cues.update({k: cues[b] + off for k, (b, off) in renderer_cuts(here).items()})
+    return cues, tl["ending_start"]
+
+
+def renderer_cuts(here):
+    """renderer.html の const CUTS = {名前: [もとの cue, 秒], ...};（カットの区切り。2026-11-03〜、選択設計）"""
+    import re
+    r = open(os.path.join(here, "..", "renderer.html"), encoding="utf-8").read()
+    m = re.search(r"const CUTS = (\{.*?\});", r, re.S)
+    return json.loads(re.sub(r"(\w+):", lambda x: '"%s":' % x.group(1), m.group(1))) if m else {}
+
+
+def renderer_order(here, extra=()):
+    """renderer.html の SHOTS の at と、scene.py のショット（extra）を時刻の順に（ショットの終わり＝次の名前）"""
+    import re
+    r = open(os.path.join(here, "..", "renderer.html"), encoding="utf-8").read()
+    names = re.findall(r'\{ at: "(\w+)"', r[r.index("SHOTS = ["):]); cues, _ = shot_lengths(here)
+    return sorted(set(names) | set(extra), key=lambda k: cues[k])
 
 
 def render_shots(here, shots, order, opts, objs_anim):
@@ -216,6 +233,7 @@ def render_shots(here, shots, order, opts, objs_anim):
     objs_anim：動かすオブジェクト（毎コマ keyframe を打って動きのぶれを出す）"""
     sc = bpy.context.scene
     cues, end = shot_lengths(here)
+    order = order or renderer_order(here, shots)
     todo = opts["shots"] or list(shots)
     for name in todo:
         i = order.index(name); a = cues[name]; b = cues[order[i + 1]] if i + 1 < len(order) else end

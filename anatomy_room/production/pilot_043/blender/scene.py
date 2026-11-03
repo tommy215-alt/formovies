@@ -246,6 +246,7 @@ def a_l12(u, t, f):   # 柄のないポンプ
     cam.look(mix((0, -5, 1.4), (0, -4, 1.4), K.ease(u)), (0, 0, 1.2), 30)
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l12"]}
-ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l12", "l00", "l00a", "l00b"]}
+SHOTS.update({k: (globals()["s_" + v], globals()["a_" + v]) for k, v in {"l00_2": "l02", "l00_3": "l04", "l02_2": "l03", "l04_2": "l09"}.items()})   # カット（2026-11-03〜）
+ORDER = None   # renderer の SHOTS とカットから時刻の順に（blkit.renderer_order）
 K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, HANDLE, HAND, TABLE, CUP, BREW, CART] + PEOPLE)

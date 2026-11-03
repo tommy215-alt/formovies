@@ -273,6 +273,7 @@ def mix(a, b, u):
     return tuple(x + (y - x) * u for x, y in zip(a, b))
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]}
-ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l01", "l02", "l03", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l00", "l00a", "l00b"]}
+SHOTS.update({k: (globals()["s_" + v], globals()["a_" + v]) for k, v in {"l00_2": "l07", "l00_3": "l05", "l02_2": "l11", "l03_2": "l04"}.items()})   # カット（2026-11-03〜）
+ORDER = None   # renderer の SHOTS とカットから時刻の順に（blkit.renderer_order）
 K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, SNOW, BULB, HAND, MIRROR] + MATE + [SITM])

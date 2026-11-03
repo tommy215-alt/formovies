@@ -256,6 +256,7 @@ def a_l12(u, t, f):   # 救助の船が浜に近づく（浜の仲間の背中�
     cam.look(mix((2, 24, HI(2, 24) + 3), (1, 22, HI(1, 22) + 2.6), K.ease(u)), (-10, -240, 4), 28)
 
 
-SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l11", "l12"]}
-ORDER = ["l00", "l00a", "l00b", "l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12"]
+SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l09", "l10", "l11", "l12", "l00", "l00a", "l00b"]}
+SHOTS.update({k: (globals()["s_" + v], globals()["a_" + v]) for k, v in {"l00_2": "l01", "l00_3": "l10", "l03_2": "l02"}.items()})   # カット（2026-11-03〜）
+ORDER = None   # renderer の SHOTS とカットから時刻の順に（blkit.renderer_order）
 K.render_shots(HERE, SHOTS, ORDER, O, [cam.o, BOAT, HAND, ICEF, MT, RESCUE] + MEN)
