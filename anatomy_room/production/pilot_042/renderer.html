@@ -79,14 +79,14 @@ function choiceCard(ctx, letter, text, x, y, w, h, k, hi = 0, dim = 0) { if (k <
   if (hi > 0) { ctx.shadowColor = `rgba(${col},.9)`; ctx.shadowBlur = 40 * hi; ctx.stroke(); ctx.shadowBlur = 0; }
   const r = Math.min(62, h * .28), cx = x + 30 + r; ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(cx, y + h / 2, r, 0, Math.PI * 2); ctx.fill();
   label(ctx, letter, cx, y + h / 2 + 2, r * 1.45, "#06101a", { weight: 900 });
-  const lines = text.split("／"), x0 = cx + r + 20, wt = x + w - 24 - x0, n = Math.max(...lines.map(l => l.length)),
+  const lines = text.split("／"), x0 = cx + r + 20, wt = Math.min(x + w - 24, 900) - x0, n = Math.max(...lines.map(l => l.length)),
     fs = Math.min(lines.length > 1 ? h * .34 : h * .44, wt / (n * 1.02)), lh = fs * 1.16;
   lines.forEach((l, i) => label(ctx, l, x0 + wt / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh, fs, "#EAF2F8", { weight: 800 }));
   ctx.restore(); }
 function choicePair(t, y, h, k, hiA = 0, hiB = 0, dimA = 0, dimB = 0) { choiceCard(ui, "A", CHOICE.a, 70, y, 940, h, k, hiA, dimA); choiceCard(ui, "B", CHOICE.b, 70, y + h + 34, 940, h, k, hiB, dimB); }
 function choiceUI(t, name) {
   if (name === "open") { const k = 1, a = CUE.l00a, b = CUE.l00b;   // 冒頭：1 秒で状況が分かる大きな見出し＋大きな札（2026-11-03）
-    HUD.title(ui, [[HEAD[0], 72, "#D8E6F0"], [HEAD[1], 126, "#FFFFFF"], ["あなたは？", 96, "#FFD58A"]], 540, 440, k, t);
+    HUD.title(ui, [[HEAD[0], Math.min(72, Math.floor(860 / HEAD[0].length)), "#D8E6F0"], [HEAD[1], Math.min(126, Math.floor(820 / HEAD[1].length)), "#FFFFFF"], ["あなたは？", 96, "#FFD58A"]], 540, 440, k, t);
     choicePair(t, 870, 236, k, t >= a && t < b ? clamp((t - a) / .15) : 0, t >= b ? clamp((t - b) / .15) : 0, t >= b ? .6 : 0, t >= a && t < b ? .6 : 0); return; }
   const { s } = shotAt(t), es = TL.ending_start;
   if (name === "pov") { const k = clamp((t - CUE.pov) / .4) * clamp((CUE.ask - t) / .3); ui.save(); ui.globalAlpha = .85 * k;   // 上に小さく：A・B のどちらか
