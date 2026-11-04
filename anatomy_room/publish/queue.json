@@ -44,10 +44,10 @@
    "meta": "anatomy_room/production/pilot_029/youtube_metadata.md",
    "publish_at": "2026-11-02 19:00",
    "status": "scheduled",
-   "old_private_upload": "2026-11-01T19:29:08.044Z",
    "reupload": true,
    "note": "2026-11-02 新しい声で作り直した版。前の版（非公開）は残っている",
-   "uploaded": "2026-11-02T09:01:41.309Z"
+   "uploaded": "2026-11-02T09:01:41.309Z",
+   "deleted_old_versions": "2026-11-04 YouTube から削除（ユーザーの指示。古い非公開の版）"
   },
   {
    "id": "pilot_030",
@@ -120,13 +120,10 @@
    "publish_at": "2026-11-05 08:00",
    "status": "scheduled",
    "note": "2026-11-04 ナレーションを直した版で差し替え（前の版は非公開）",
-   "old_private_upload": "2026-11-02T12:45:08.857Z",
    "reupload": true,
-   "old_private_upload_2": "2026-11-02T14:27:22.864Z",
-   "old_private_upload_55": "2026-11-02T15:20:10.007Z",
-   "old_private_upload_56": "2026-11-03T22:58:12.152Z",
    "uploaded": "2026-11-04T02:20:14.026Z",
-   "url": "https://youtube.com/shorts/AA9XH5yoIT8?feature=share"
+   "url": "https://youtube.com/shorts/AA9XH5yoIT8?feature=share",
+   "deleted_old_versions": "2026-11-04 YouTube から削除（ユーザーの指示。古い非公開の版）"
   },
   {
    "id": "pilot_039",
@@ -135,10 +132,9 @@
    "publish_at": "2026-11-04 19:00",
    "status": "scheduled",
    "note": "2026-11-04 ナレーションを直した版で差し替え（前の版は非公開）",
-   "old_private_upload_55": "2026-11-03T00:59:37.139Z",
    "reupload": true,
-   "old_private_upload_56": "2026-11-03T23:24:24.717Z",
-   "uploaded": "2026-11-04T01:52:08.764Z"
+   "uploaded": "2026-11-04T01:52:08.764Z",
+   "deleted_old_versions": "2026-11-04 YouTube から削除（ユーザーの指示。古い非公開の版）"
   }
  ]
 }

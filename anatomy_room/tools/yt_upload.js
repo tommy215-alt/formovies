@@ -169,9 +169,51 @@ function lockOn() {   // タスク スケジューラと手で動かしたのが
 }
 function logRun(s) { fs.appendFileSync(path.join(LOG, "run.log"), `${new Date().toISOString()} ${s}\n`, "utf-8"); }
 
+// list：Studio の動画の一覧（ID・題名・公開設定）。delete ID…：指定した動画を完全に削除（元に戻せない。ユーザーの指示があるときだけ。2026-11-04 追加）
+async function studioRows() {
+  const ch = page.url().match(/channel\/([^/?#]+)/)[1], out = [];
+  for (const tab of ["short", "upload"]) { await page.goto(`https://studio.youtube.com/channel/${ch}/videos/${tab}`); await page.waitForTimeout(6000); await dismiss();
+    await page.locator("ytcp-video-row").first().waitFor({ timeout: 15000 }).catch(() => {});
+    for (const r of await page.locator("ytcp-video-row").all()) {
+      const href = await r.locator("a[href*='/video/']").first().getAttribute("href").catch(() => null); if (!href) continue;
+      const id = href.match(/video\/([^/]+)/)[1], title = (await r.locator("#video-title").first().innerText().catch(() => "")).trim();
+      const vis = (await r.locator(".tablecell-visibility, ytcp-video-row-cell-visibility, #visibility").first().innerText().catch(() => "")).replace(/\s+/g, " ").trim();
+      out.push({ tab, id, title, vis, row: r }); } }
+  return out;
+}
+async function listVideos() {
+  const ctx = await open(!SHOW); page = ctx.pages()[0] || await ctx.newPage();
+  try { await page.goto("https://studio.youtube.com/"); await page.waitForTimeout(4000); await dismiss();
+    if (!/studio\.youtube\.com\/channel\//.test(page.url())) throw new Error("ログインしていない");
+    for (const r of await studioRows()) say(`${r.tab}	${r.id}	${r.vis}	${r.title}`);
+  } finally { await ctx.close(); }
+}
+async function deleteVideos(ids) {
+  const ctx = await open(!SHOW); page = ctx.pages()[0] || await ctx.newPage();
+  try { await page.goto("https://studio.youtube.com/"); await page.waitForTimeout(4000); await dismiss();
+    if (!/studio\.youtube\.com\/channel\//.test(page.url())) throw new Error("ログインしていない");
+    for (const id of ids) {
+      const r = (await studioRows()).find(x => x.id === id); if (!r) { say(`❌ 見つからない：${id}`); continue; }
+      if (!/非公開|Private/.test(r.vis) || /予約|スケジュール|Scheduled|公開済み|Public/.test(r.vis)) { say(`❌ 非公開ではないので消さない：${id}（${r.vis}）`); continue; }
+      const ch = page.url().match(/channel\/([^/?#]+)/)[1]; await page.goto(`https://studio.youtube.com/channel/${ch}/videos/${r.tab}`); await page.waitForTimeout(6000); await dismiss();
+      const row = page.locator("ytcp-video-row", { has: page.locator(`a[href*='${id}']`) }).first(); await row.waitFor({ timeout: 15000 });
+      await row.hover(); await page.waitForTimeout(800);
+      await row.locator("ytcp-icon-button#overflow-menu-button, #hover-items ytcp-icon-button:last-child, ytcp-icon-button[aria-label*='オプション'], ytcp-icon-button[aria-label*='Options']").last().click();
+      await page.waitForTimeout(1000); await clickFirst(["tp-yt-paper-item:has-text('完全に削除')", "tp-yt-paper-item:has-text('Delete forever')", "ytcp-text-menu tp-yt-paper-item:has-text('削除')"]);
+      await page.waitForTimeout(1500); await shot("delete_" + id);
+      await clickFirst(["tp-yt-paper-dialog ytcp-checkbox-lit #checkbox-container", "ytcp-dialog ytcp-checkbox-lit #checkbox-container", "tp-yt-paper-dialog >> text=取り消しできない"]); await page.waitForTimeout(600);
+      await clickFirst(["ytcp-button#confirm-button:not([disabled])", "#confirm-button", "ytcp-button:has-text('完全に削除')", "ytcp-button:has-text('Delete forever')"]); await page.waitForTimeout(5000);
+      const still = (await studioRows()).find(x => x.id === id);
+      if (still) { const f = await shot("delete_fail_" + id); say(`❌ 消えたか確かめられない：${id}（画面：${f}）`); } else { say(`✅ 削除しました：${id}　${r.title}`); logRun(`deleted ${id} ${r.title}`); }
+    }
+  } catch (e) { const f = await shot("error"); e.message += `（画面：${f}）`; throw e; } finally { await ctx.close(); }
+}
+
 (async () => {
   const cmd = args[0];
   if (cmd === "login") return login();
+  if (cmd === "list") return listVideos();
+  if (cmd === "delete") return deleteVideos(args.slice(1));
   if (!lockOn()) { say("別の投稿が動いているので、今回はやめます"); return; }
   const q = JSON.parse(fs.readFileSync(QUEUE, "utf-8")), save = () => fs.writeFileSync(QUEUE, JSON.stringify(q, null, 1) + "\n", "utf-8");
   // private：予約を外して非公開に戻す（動画は消さない）。回を指定しなければ、まだ公開されていない予約を全部
