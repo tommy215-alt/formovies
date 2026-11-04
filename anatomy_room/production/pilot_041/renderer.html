@@ -41,6 +41,7 @@ Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "aft
   opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: [] } });
 loadImages(KIT.images);
 const HEAD = ["南極で ただ一人の医者", "自分が虫垂炎"];   // 冒頭の見出し（上：場面、中：核心）
+const SYUKU = '"YujiSyuku", serif';   // 札の字体（OFL、assets.js の font_syuku）
 const CHOICE = { a: "素人の仲間に／手術を任せる", b: "自分で／自分を手術する", ans: "B", reveal: "l07b" };
 
 const CUTS = {l00_2: ["l00", 1.0], l00_3: ["l00", 2.2], l02_2: ["l02", 1.0], l03_2: ["l03", 1.6]};   // カットの区切り（もとの cue からの秒。2026-11-03〜）
@@ -74,25 +75,33 @@ function thumb() { CUE = CUE || {}; CUE.t0 = 0; photo(bg, IMG.thumbbg, 1, 1.05, 
 
 // ---------------------------------------------------------------- 選択肢の札（2026-11-02 ユーザーの指示：前半は「選択」が主役。A・B を同時に見せる）
 // CHOICE = { a, b, ans: "A"|"B", reveal: 答えを言う行の cue }
-function choiceCard(ctx, letter, text, x, y, w, h, k, hi = 0, dim = 0) { if (k <= 0) return;   // 札の文字と丸は札の高さに合わせて大きく（2026-11-03：冒頭は大きな文字で）
-  const col = letter === "A" ? [80, 170, 255] : [255, 150, 70]; ctx.save(); ctx.globalAlpha = k * (1 - .65 * dim);
-  ctx.fillStyle = `rgba(6,12,20,${.72 + .15 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.fill();
-  ctx.lineWidth = 5 + 7 * hi; ctx.strokeStyle = `rgba(${col},${.8 + .2 * hi})`; rrect(ctx, x, y, w, h, 26); ctx.stroke();
-  if (hi > 0) { ctx.shadowColor = `rgba(${col},.9)`; ctx.shadowBlur = 40 * hi; ctx.stroke(); ctx.shadowBlur = 0; }
-  const r = Math.min(62, h * .28), cx = x + 30 + r; ctx.fillStyle = `rgb(${col})`; ctx.beginPath(); ctx.arc(cx, y + h / 2, r, 0, Math.PI * 2); ctx.fill();
-  label(ctx, letter, cx, y + h / 2 + 2, r * 1.45, "#06101a", { weight: 900 });
+const GRIT = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256), r = S.rng(77);
+  for (let i = 0; i < d.data.length; i += 4) { const v = r(); d.data[i + 3] = v < .55 ? 0 : (v - .55) * 170; } x.putImageData(d, 0, 0); return c; })();   // 札のざらつき
+function choiceCard(ctx, letter, text, x, y, w, h, k, hi = 0, dim = 0) { if (k <= 0) return;   // 札：おどろおどろしい背景（A＝赤、B＝青）と筆の字体 Yuji Syuku（2026-11-04 ユーザーの指示）
+  const A = letter === "A", col = A ? [225, 48, 40] : [60, 120, 255], tt = NOW || 0, fl = .85 + .15 * Math.sin(tt * 9 + (A ? 0 : 2)) * Math.sin(tt * 3.1);
+  ctx.save(); ctx.globalAlpha = k * (1 - .65 * dim);
+  ctx.save(); rrect(ctx, x, y, w, h, 18); ctx.clip();
+  const g = ctx.createLinearGradient(x, y, x + w * .3, y + h); g.addColorStop(0, A ? "#3e0707" : "#07143e"); g.addColorStop(.55, A ? "#170203" : "#020819"); g.addColorStop(1, "#030103");
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  const rg = ctx.createRadialGradient(x + w * .5, y + h * .5, h * .2, x + w * .5, y + h * .5, w * .62); rg.addColorStop(0, `rgba(${col},${.22 * fl + .2 * hi})`); rg.addColorStop(1, "rgba(0,0,0,.6)");
+  ctx.fillStyle = rg; ctx.fillRect(x, y, w, h); ctx.fillStyle = ctx.createPattern(GRIT, "repeat"); ctx.fillRect(x, y, w, h); ctx.restore();
+  ctx.lineWidth = 4 + 6 * hi; ctx.strokeStyle = `rgba(${col},${.75 * fl + .25 * hi})`; ctx.shadowColor = `rgba(${col},.9)`; ctx.shadowBlur = 18 + 30 * hi; rrect(ctx, x, y, w, h, 18); ctx.stroke(); ctx.shadowBlur = 0;
+  const r = Math.min(62, h * .28), cx = x + 30 + r;
+  ctx.fillStyle = `rgba(${col},.95)`; ctx.beginPath(); ctx.arc(cx, y + h / 2, r, 0, Math.PI * 2); ctx.fill();
+  label(ctx, letter, cx, y + h / 2 + 2, r * 1.5, "#0a0204", { font: SYUKU, sw: 0 });
   const lines = text.split("／"), x0 = cx + r + 20, wt = Math.min(x + w - 24, 900) - x0, n = Math.max(...lines.map(l => l.length)),
-    fs = Math.min(lines.length > 1 ? h * .34 : h * .44, wt / (n * 1.02)), lh = fs * 1.16;
-  lines.forEach((l, i) => label(ctx, l, x0 + wt / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh, fs, "#EAF2F8", { weight: 800 }));
+    fs = Math.min(lines.length > 1 ? h * .34 : h * .44, wt / (n * 1.02)), lh = fs * 1.18;
+  lines.forEach((l, i) => label(ctx, l, x0 + wt / 2, y + h / 2 + (i - (lines.length - 1) / 2) * lh, fs, "#F1E8E2", { font: SYUKU, stroke: "#050102", sw: .12 }));
   ctx.restore(); }
 function choicePair(t, y, h, k, hiA = 0, hiB = 0, dimA = 0, dimB = 0) { choiceCard(ui, "A", CHOICE.a, 70, y, 940, h, k, hiA, dimA); choiceCard(ui, "B", CHOICE.b, 70, y + h + 34, 940, h, k, hiB, dimB); }
 function choiceUI(t, name) {
   if (name === "open") { const k = 1, a = CUE.l00a, b = CUE.l00b;   // 冒頭：1 秒で状況が分かる大きな見出し＋大きな札（2026-11-03）
+    if (t >= a) { const A = t < b; choiceCard(ui, A ? "A" : "B", A ? CHOICE.a : CHOICE.b, 50, 190, 980, 300, k, .5 + .5 * clamp((t - (A ? a : b)) / .2), 0); return; }   // A・B を読むところは、その札だけを上に大きく（2026-11-04）
     HUD.title(ui, [[HEAD[0], Math.min(72, Math.floor(860 / HEAD[0].length)), "#D8E6F0"], [HEAD[1], Math.min(126, Math.floor(820 / HEAD[1].length)), "#FFFFFF"], ["あなたは？", 96, "#FFD58A"]], 540, 440, k, t);
-    choicePair(t, 870, 236, k, t >= a && t < b ? clamp((t - a) / .15) : 0, t >= b ? clamp((t - b) / .15) : 0, t >= b ? .6 : 0, t >= a && t < b ? .6 : 0); return; }
+    choicePair(t, 870, 236, k, 0, 0, 0, 0); return; }
   const { s } = shotAt(t), es = TL.ending_start;
   if (name === "pov") { const k = clamp((t - CUE.pov) / .4) * clamp((CUE.ask - t) / .3); ui.save(); ui.globalAlpha = .85 * k;   // 上に小さく：A・B のどちらか
-    for (const [L, x, c] of [["A", 270, "rgba(80,170,255,.9)"], ["B", 810, "rgba(255,150,70,.9)"]]) { ui.fillStyle = "rgba(6,12,20,.6)"; rrect(ui, x - 250, 200, 500, 70, 35); ui.fill(); ui.strokeStyle = c; ui.lineWidth = 3; rrect(ui, x - 250, 200, 500, 70, 35); ui.stroke();
+    for (const [L, x, c] of [["A", 270, "rgba(225,48,40,.9)"], ["B", 810, "rgba(60,120,255,.9)"]]) { ui.fillStyle = "rgba(6,12,20,.6)"; rrect(ui, x - 250, 200, 500, 70, 35); ui.fill(); ui.strokeStyle = c; ui.lineWidth = 3; rrect(ui, x - 250, 200, 500, 70, 35); ui.stroke();
       label(ui, L + "　" + (L === "A" ? CHOICE.a : CHOICE.b).replace("／", ""), x, 236, 30, "#EAF2F8", { weight: 700 }); } ui.restore(); }
   if (name === "ask") { const k = clamp((t - CUE.ask) / .35); choicePair(t, 620, 170, k); }
   const r = CUE[CHOICE.reveal]; if (r !== undefined && t >= r && t < r + 3.2) { const k = clamp((t - r) / .25) * clamp((r + 3.2 - t) / .4), hi = clamp((t - r - .3) / .3), A = CHOICE.ans === "A";
@@ -117,6 +126,7 @@ function fxEp(t, name) {
   const { s, a, u } = shotAt(t); const f = FX[s.at]; if (f) f(t, u, a);
 }
 kitStart(() => {}); BL.install();
+window.READY = window.READY.then(() => window.ASSETS.font_syuku ? new FontFace("YujiSyuku", b64buf(window.ASSETS.font_syuku)).load().then(f => document.fonts.add(f)) : 0);
 { const rf = window.renderFrame; window.renderFrame = t => { const r = rf(t); if (r && r.then) return r.then(() => endNote(t)); endNote(t); return r; }; }
 </script>
 </body></html>

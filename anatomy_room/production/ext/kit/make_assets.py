@@ -57,6 +57,16 @@ def episode(here, photos, size=1800, fonts=True):
     print({k: len(v) for k, v in out.items()})
 
 
+def add_font(here, key, file, chars):
+    """assets.js にフォントを 1 つ足す（使う文字だけ）。2026-11-04〜：選択設計の札の字体 Yuji Syuku（OFL）"""
+    here = Path(here); p = here / "assets.js"; s = p.read_text(encoding="utf-8")
+    out = json.loads(s[len("window.ASSETS = "):].rstrip().rstrip(";"))
+    kana = "".join(chr(c) for c in range(0x3041, 0x3097)) + "".join(chr(c) for c in range(0x30A1, 0x30FB)) + "ー・「」『』（）！？。、…〜／"
+    text = "".join(sorted(set(chars) | set(kana) | set(string.ascii_letters + string.digits)))
+    out["font_" + key] = b64(font_subset(SRC / "fonts" / file, text))
+    p.write_text("window.ASSETS = " + json.dumps(out) + ";\n", encoding="utf-8"); print("font", key, len(out["font_" + key]))
+
+
 def shared():
     s3 = {"glb": {p.stem: b64(p.read_bytes()) for p in sorted((SRC / "human").glob("*.glb"))},
           "hdr": b64((SRC / "ph" / "wooden_lounge_1k.hdr").read_bytes()),

@@ -9,3 +9,4 @@ import make_assets as kit  # noqa: E402
 
 if __name__ == "__main__":
     kit.episode(HERE, {'lightning': ('src_lightning.jpg', 'L'), 'launch': ('src_launch.jpg', 'L'), 'aaron': ('src_aaron.jpg', 'L')}, fonts=False)
+    kit.add_font(HERE, "syuku", "YujiSyuku-Regular.ttf", (HERE.parent / "renderer.html").read_text(encoding="utf-8"))   # 札の字体（2026-11-04）
