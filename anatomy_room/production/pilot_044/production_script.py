@@ -15,7 +15,7 @@ import epkit  # noqa: E402
 
 pipeline, standard = epkit.setup(HERE, "intel", bgm=("Ghostpocalypse - 7 Master.mp3", 160))
 import noend_ext  # noqa: E402
-noend_ext.apply(pipeline, black=3.4)   # 暗転の上に注意書き（renderer）   # 当事者設計は共通エンディングなし（2026-11-02、ユーザー「エンディングは不要」）。最後は暗転
+noend_ext.apply(pipeline, black=2.8)   # 暗転の上に注意書き（renderer）   # 当事者設計は共通エンディングなし（2026-11-02、ユーザー「エンディングは不要」）。最後は暗転
 import ambience  # noqa: E402
 
 ambience.timeline(HERE / "work" / "timeline.json")
@@ -31,7 +31,8 @@ EP = standard.config({
     "id": "pilot_044",
     "out": "reverse_044_shackleton.mp4",
     "cues": {"open": ["L00", 0.0], "pov": ["L01", 0.0], "ask": ["L06", 0.0], "exp": ["L07", 0.0], "after": ["L12", 0.0], "l00": ["L00", 0.0], "l00m": ["L00", 0.5], "l00a": ["L00a", 0.0], "l00am": ["L00a", 0.5], "l00b": ["L00b", 0.0], "l00bm": ["L00b", 0.5], "l01": ["L01", 0.0], "l01m": ["L01", 0.5], "l02": ["L02", 0.0], "l02m": ["L02", 0.5], "l03": ["L03", 0.0], "l03m": ["L03", 0.5], "l04": ["L04", 0.0], "l04m": ["L04", 0.5], "l05": ["L05", 0.0], "l05m": ["L05", 0.5], "l06": ["L06", 0.0], "l06m": ["L06", 0.5], "l07": ["L07", 0.0], "l07m": ["L07", 0.5], "l07b": ["L07b", 0.0], "l07bm": ["L07b", 0.5], "l08": ["L08", 0.0], "l08m": ["L08", 0.5], "l09": ["L09", 0.0], "l09m": ["L09", 0.5], "l10": ["L10", 0.0], "l10m": ["L10", 0.5], "l11": ["L11", 0.0], "l11m": ["L11", 0.5], "l12": ["L12", 0.0], "l12m": ["L12", 0.5]},
-    "sfx": [["sea", "l00", 1.2, 0], ["wind", "l00", 1.0, 0], ["breath", "l00", 0.5, 0.2], ["click", "l00", 1.0, 0.35], ["click", "l00a", 1.0, 0], ["creak", "l00a", 0.8, 0.2], ["click", "l00b", 1.0, 0], ["waves", "l01", 0.8, 0], ["breath", "l03", 0.5, 0], ["creak", "l05", 0.6, 0], ["breath", "l05", 0.45, 1.0], ["click", "ask", 1.0, 0], ["heart", "ask", 0.7, 0], ["breath", "ask", 0.45, 0], ["click2", "l07b", 1.0, 0], ["creak", "l08", 0.9, 0], ["creak", "l00", 0.8, 1.0], ["waves", "l03", 0.8, 2.0]],
+    "sfx": [["sea", "l00", 0.72, 0], ["wind", "l00", 0.6, 0], ["breath", "l00", 0.3, 0.2], ["click", "l00", 1.0, 0.35], ["click", "l00a", 1.0, 0], ["creak", "l00a", 0.48, 0.2], ["click", "l00b", 1.0, 0], ["waves", "l01", 0.8, 0], ["breath", "l03", 0.5, 0], ["creak", "l05", 0.6, 0], ["breath", "l05", 0.45, 1.0], ["click", "ask", 1.0, 0], ["heart", "ask", 0.7, 0], ["breath", "ask", 0.45, 0], ["click2", "l07b", 1.0, 0], ["creak", "l08", 0.9, 0], ["creak", "l00", 0.48, 1.0], ["waves", "l03", 0.8, 2.0]],
+    "final_hold": 0.9,   # 最後のセリフのあとの余韻（2026-11-04）
     "sfx_duck": 0.55,
     "music": {"style": "file_044", "sections": [["t0", 0.0, "f_15"], ["pov", -0.05, "f_mid"], ["l06", -0.3, "f_full"], ["l06m", 1.5, "f_mute"], ["l07", -0.05, "f_mid"], ["l12", -0.1, "f_low"]]},
     "segments": ["open", "pov", "ask", "exp", "after"],
@@ -44,3 +45,4 @@ EP = standard.config({
 
 if __name__ == "__main__":
     pipeline.main(__file__, EP)
+# OPEN_AMB=0.6：冒頭の環境音は声が聞き取れる大きさに（2026-11-04）

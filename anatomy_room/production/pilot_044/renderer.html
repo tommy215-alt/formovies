@@ -38,7 +38,7 @@ html,body{margin:0;background:#000}
 // pilot_044 のレンダラー（選択設計）。シャクルトン。前半は隊長の目線（エレファント島、荒海）。写真は後半だけ（出発の写真、PD）。
 // 選択設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['thumbbg', 'caird'], ci: {}, hits: [],
-  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: [] } });
 loadImages(KIT.images);
 const HEAD = ["南極の海で 船を失った", "28人で孤島に"];   // 冒頭の見出し（上：場面、中：核心）
 const CHOICE = { a: "遠い島へ／追い風で行く", b: "近い南米へ／向かい風で行く", ans: "A", reveal: "l07b" };

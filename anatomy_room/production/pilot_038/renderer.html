@@ -38,7 +38,7 @@ html,body{margin:0;background:#000}
 // pilot_038「あなたならどうする？——発射直後の雷（アポロ12号）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。本物の写真：lightning（NASA、1969 年 11 月 14 日の落雷、PD）、launch（NASA、アポロ 12 号の発射、PD）、aaron（NASA、ジョン・アーロン、PD）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['lightning', 'launch', 'aaron'], ci: {}, hits: [],
-  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: [] } });
 loadImages(KIT.images);
 const HEAD = ["アポロ12号 発射直後", "雷が直撃"];   // 冒頭の見出し（上：場面、中：核心）
 const CHOICE = { a: "計器の／復活を進める", b: "電気回路の／復活を進める", ans: "A", reveal: "l08b" };

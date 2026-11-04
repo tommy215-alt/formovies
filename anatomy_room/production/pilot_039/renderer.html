@@ -38,7 +38,7 @@ html,body{margin:0;background:#000}
 // pilot_039「あなたならどうする？——砂漠で迷子（マウロ・プロスペリ）」のレンダラー（当事者設計）。3D は Blender（blender/scene.py）。砂嵐の砂と戸口の枠は pov.js とこのファイル。本物の写真：mds（Ben Hammersley、マラソン・デ・サーブル、CC BY 2.0）。
 // 当事者設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['mds'], ci: {}, hits: [],
-  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: [] } });
 loadImages(KIT.images);
 const HEAD = ["サハラ砂漠 水もない", "砂漠で迷子"];   // 冒頭の見出し（上：場面、中：核心）
 const CHOICE = { a: "雲の方へ／歩く", b: "屋根の下で／救助を待つ", ans: "A", reveal: "l09b" };

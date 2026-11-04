@@ -15,7 +15,7 @@ import epkit  # noqa: E402
 
 pipeline, standard = epkit.setup(HERE, "intel", bgm=("Smoking Gun.mp3", 88))
 import noend_ext  # noqa: E402
-noend_ext.apply(pipeline, black=3.4)   # 暗転の上に注意書き（renderer）   # 当事者設計は共通エンディングなし（2026-11-02、ユーザー「エンディングは不要」）。最後は暗転
+noend_ext.apply(pipeline, black=2.8)   # 暗転の上に注意書き（renderer）   # 当事者設計は共通エンディングなし（2026-11-02、ユーザー「エンディングは不要」）。最後は暗転
 import ambience  # noqa: E402
 
 ambience.timeline(HERE / "work" / "timeline.json")
@@ -39,7 +39,8 @@ EP = standard.config({
     "id": "pilot_039",
     "out": "reverse_039_prosperi.mp4",
     "cues": {"open": ["L00", 0.0], "pov": ["L01", 0.0], "ask": ["L08", 0.0], "exp": ["L09", 0.0], "after": ["L13", 0.0], "l00": ["L00", 0.0], "l00m": ["L00", 0.5], "l00a": ["L00a", 0.0], "l00am": ["L00a", 0.5], "l00b": ["L00b", 0.0], "l00bm": ["L00b", 0.5], "l01": ["L01", 0.0], "l01m": ["L01", 0.5], "l02": ["L02", 0.0], "l02m": ["L02", 0.5], "l03": ["L03", 0.0], "l03m": ["L03", 0.5], "l05": ["L05", 0.0], "l05m": ["L05", 0.5], "l06": ["L06", 0.0], "l06m": ["L06", 0.5], "l07": ["L07", 0.0], "l07m": ["L07", 0.5], "l08": ["L08", 0.0], "l08m": ["L08", 0.5], "l09": ["L09", 0.0], "l09m": ["L09", 0.5], "l09b": ["L09b", 0.0], "l09bm": ["L09b", 0.5], "l10": ["L10", 0.0], "l10m": ["L10", 0.5], "l11": ["L11", 0.0], "l11m": ["L11", 0.5], "l12": ["L12", 0.0], "l12m": ["L12", 0.5], "l13": ["L13", 0.0], "l13m": ["L13", 0.5]},
-    "sfx": [["open_storm", "l00", 1.7, 0], ["open_breath", "l00", 1.2, 0], ["heart", "l00", 0.8, 0], ["click", "l00", 1.0, 0.35], ["click", "l00a", 1.0, 0], ["steps_o", "l00a", 1.5, 0], ["click", "l00b", 1.0, 0], ["bats_o", "l00b", 1.0, 0], ["click", "ask", 1.0, 0], ["wind_ask", "ask", 0.9, 0], ["bats_ask", "ask", 0.5, 0], ["click2", "l09b", 1.0, 0], ["run", "l01", 0.9, 0], ["steps", "l01", 0.7, 0], ["storm", "l02", 1.4, 0], ["heli", "l05", 1.1, 0], ["bats", "l06", 0.5, 0.4], ["breath", "l07", 0.7, 0], ["heart", "l08", 1.2, 0], ["steps", "l11", 0.5, 0], ["heli", "l00", 0.9, 2.1], ["desert", "l03", 0.8, 0]],
+    "sfx": [["open_storm", "l00", 1.02, 0], ["open_breath", "l00", 0.72, 0], ["heart", "l00", 0.48, 0], ["click", "l00", 1.0, 0.35], ["click", "l00a", 1.0, 0], ["steps_o", "l00a", 0.9, 0], ["click", "l00b", 1.0, 0], ["bats_o", "l00b", 0.6, 0], ["click", "ask", 1.0, 0], ["wind_ask", "ask", 0.9, 0], ["bats_ask", "ask", 0.5, 0], ["click2", "l09b", 1.0, 0], ["run", "l01", 0.9, 0], ["steps", "l01", 0.7, 0], ["storm", "l02", 1.4, 0], ["heli", "l05", 1.1, 0], ["bats", "l06", 0.5, 0.4], ["breath", "l07", 0.7, 0], ["heart", "l08", 1.2, 0], ["steps", "l11", 0.5, 0], ["heli", "l00", 0.54, 2.1], ["desert", "l03", 0.8, 0]],
+    "final_hold": 0.9,   # 最後のセリフのあとの余韻（2026-11-04）
     "sfx_duck": 0.55,
     "music": {"style": "file_039", "sections": [["t0", 0.0, "f_15"], ["pov", -0.05, "f_mid"], ["l08", -0.3, "f_full"], ["l08m", 1.5, "f_mute"], ["l09", -0.05, "f_mid"], ["l13", -0.1, "f_low"]]},
     "segments": ["open", "pov", "ask", "exp", "after"],
@@ -52,3 +53,4 @@ EP = standard.config({
 
 if __name__ == "__main__":
     pipeline.main(__file__, EP)
+# OPEN_AMB=0.6：冒頭の環境音は声が聞き取れる大きさに（2026-11-04）

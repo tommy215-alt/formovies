@@ -38,10 +38,10 @@ html,body{margin:0;background:#000}
 // pilot_043 のレンダラー（選択設計）。ジョン・スノウ。前半は医者の目線（1854 年のソーホー）。図は後半だけ（スノウの地図、PD）。
 // 選択設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['thumbbg', 'map'], ci: {}, hits: [],
-  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: [] } });
 loadImages(KIT.images);
 const HEAD = ["1854年 ロンドン", "コレラが広がる"];   // 冒頭の見出し（上：場面、中：核心）
-const CHOICE = { a: "患者を／街の外の病院へ移す", b: "井戸のポンプの柄を／外させる", ans: "B", reveal: "l07b" };
+const CHOICE = { a: "患者を／街の外の病院へ移す", b: "井戸のポンプのハンドルを／外させる", ans: "B", reveal: "l07b" };
 
 const CUTS = {l00_2: ["l00", 1.0], l00_3: ["l00", 2.0], l02_2: ["l02", 1.8], l04_2: ["l04", 1.8]};   // カットの区切り（もとの cue からの秒。2026-11-03〜）
 SHOTS = [

@@ -38,7 +38,7 @@ html,body{margin:0;background:#000}
 // pilot_042 のレンダラー（選択設計）。ケルシー。前半は審査官の目線（1960 年の審査室）。写真は後半だけ（1962 年の表彰、PD）。
 // 選択設計（templates/DESIGN_MODES.md）：前半は当事者の目線（Blender の POV＋pov.js）、後半は三人称の解説。文字は知的設計の字幕だけ（オープニングの問いは大きく）。
 Object.assign(KIT, { design: "intel", scenes: ["open", "pov", "ask", "exp", "after"], images: ['thumbbg', 'kelsey'], ci: {}, hits: [],
-  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: ["※再現CGを含みます"] } });
+  opening: { img: null, bg: openBG, title: ["", ""], size1: 1, size2: 1, credit: [] } });
 loadImages(KIT.images);
 const HEAD = ["外国で大人気の睡眠薬", "承認を急かされる"];   // 冒頭の見出し（上：場面、中：核心）
 const CHOICE = { a: "追加の安全データを／求める", b: "外国の実績を信じて／承認する", ans: "A", reveal: "l07b" };
