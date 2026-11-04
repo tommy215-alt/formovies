@@ -100,7 +100,7 @@ function choiceUI(t, name) {
   const { s } = shotAt(t), es = TL.ending_start;
   if (name === "pov") { const k = clamp((t - CUE.pov) / .4) * clamp((CUE.ask - t) / .3); ui.save(); ui.globalAlpha = .85 * k;   // 上に小さく：A・B のどちらか
     for (const [L, x, c] of [["A", 270, "rgba(225,48,40,.9)"], ["B", 810, "rgba(60,120,255,.9)"]]) { ui.fillStyle = "rgba(6,12,20,.6)"; rrect(ui, x - 250, 200, 500, 70, 35); ui.fill(); ui.strokeStyle = c; ui.lineWidth = 3; rrect(ui, x - 250, 200, 500, 70, 35); ui.stroke();
-      label(ui, L + "　" + (L === "A" ? CHOICE.a : CHOICE.b).replace("／", ""), x, 236, 30, "#EAF2F8", { weight: 700 }); } ui.restore(); }
+      { const s = L + "　" + (L === "A" ? CHOICE.a : CHOICE.b).replace("／", ""); label(ui, s, x, 236, Math.min(30, Math.floor(440 / s.length)), "#EAF2F8", { weight: 700 }); } } ui.restore(); }
   if (name === "ask") { const k = clamp((t - CUE.ask) / .35); choicePair(t, 620, 170, k); }
   const r = CUE[CHOICE.reveal]; if (r !== undefined && t >= r && t < r + 3.2) { const k = clamp((t - r) / .25) * clamp((r + 3.2 - t) / .4), hi = clamp((t - r - .3) / .3), A = CHOICE.ans === "A";
     choicePair(t, 300, 150, k, A ? hi : 0, A ? 0 : hi, A ? 0 : hi, A ? hi : 0); }
