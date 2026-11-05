@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>long_001 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#0a1220}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="gl" width="1920" height="1080"></canvas>
+  <canvas id="ui" width="1920" height="1080"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="assets/assets.js"></script>
+<script src="kit_long.js"></script>
+<script>
+// long_001 v2「心理学の3分の2は、やり直すと消えた」の描画（台本 v3、横長）。部品は kit_long.js。v1 は versions/renderer_v1.html。
+// 画面は「ビート」（1 行〜数行のセリフに 1 つの画）の連なり。ビートの頭で画が切り替わり（クロスフェード＋横に少し滑る＋一瞬の寄り）、
+// 背景のテーマ（色と模様）もビートごとに変える（実験は lab・種明かしは red など。ユーザーの指示 2026-11-05）。3D は冒頭 L00 と最後 L73〜L74 だけ。
+"use strict";
+
+// ---------------------------------------------------------------- 5 枚のカード
+const CARD = [
+  { cap: "見た目が55%", col: C.cyan, art: () => { picto(-40, 40, .9, C.ink); icon("eye", 50, -40, .7, C.cyan); txt("55%", 50, 40, 52, C.cyan, "center", 900); } },
+  { cap: "モーツァルトで頭が良くなる", col: C.violet, art: () => { icon("note", -50, 0, .9, C.violet); arrow(-5, 0, 25, 0, 1, C.ink, 5); icon("brain", 70, 0, .7, C.ink); } },
+  { cap: "一瞬の「コーラを飲め」", col: C.red, art: () => { icon("film", -45, 0, .85, C.ink); icon("bottle", 65, 0, 1, C.red); } },
+  { cap: "右脳型と左脳型", col: C.pink, art: () => { icon("brainLR", 0, -6, 1.15, C.ink); txt("左", -40, 64, 30, C.cyan, "center", 900); txt("右", 40, 64, 30, C.pink, "center", 900); } },
+  { cap: "1万時間で一流に", col: C.amber, art: () => { icon("violin", -40, 0, .95, C.amber); icon("clock", 60, -10, .7, C.ink); txt("1万時間", 60, 58, 28, C.amber, "center", 900); } },
+];
+function card(i, x, y, s, a = 1, rot = 0, dim = 0) {
+  const c = CARD[i];
+  at(x, y, s, a, () => {
+    panel(-160, -190, 320, 380, 1, c.col, "rgba(16,30,52,0.95)", 26);
+    g.save(); g.translate(0, -40); c.art(); g.restore();
+    txt(c.cap, 0, 130, 32, C.ink, "center", 800, 1, 280);
+    if (dim > 0) { g.save(); g.globalAlpha *= dim * .6; g.fillStyle = "#050a14"; rr(-160, -190, 320, 380, 26); g.fill(); g.restore(); }
+  }, rot);
+}
+const ROW = [-720, -360, 0, 360, 720].map(x => W / 2 + x);
+const T = S;
+const LX = W * .27, RX = W * .7;
+
+// ---------------------------------------------------------------- ビート
+// beat(行の ID の配列, テーマ, 章の表示, 描画 fn(t, A))
+const BEATS = [];
+function beat(ids, theme, tag, fn) { BEATS.push({ ids, theme, tag, fn }); }
+function layout() {
+  BEATS.forEach((b, i) => { b.a = (i === 0 ? 0 : T(b.ids[0]) - .3); });
+  BEATS.forEach((b, i) => { b.b = i < BEATS.length - 1 ? BEATS[i + 1].a : 1e9; });
+}
+const XF = .45;
+
+function title2(a, s1, s2, col, A, y = H * .44) {      // 章の札（大きな番号と 2 行の題）
+  const k = pr(NOW, a, .55, ease.back);
+  txt(s1[0], W / 2 - 520, y, 340 * (2 - k), col, "center", 900, A * .9 * Math.min(1, k * 2));
+  txt("理由", W / 2 - 140, y - 110, 46, C.dim, "left", 700, A * k);
+  txt(s2[0], W / 2 - 140 + (1 - k) * 200, y, 76, C.ink, "left", 900, A * k, 1020);
+  txt(s2[1], W / 2 - 140 + (1 - k) * 260, y + 110, 70, col, "left", 900, A * k, 1020);
+}
+function face(x, y, s, a, mood = 0, col = C.ink, pen = null) {   // 顔のない丸い顔。mood：1＝笑顔の口、-1＝とがらせた口
+  at(x, y, s, a, () => {
+    g.strokeStyle = col; g.lineWidth = 7; g.beginPath(); g.arc(0, 0, 60, 0, 7); g.stroke();
+    g.lineCap = "round"; g.beginPath();
+    if (mood > 0) { g.arc(0, 8, 30, .2 * Math.PI, .8 * Math.PI); } else if (mood < 0) { g.ellipse(0, 26, 10, 8, 0, 0, 7); } else { g.moveTo(-20, 26); g.lineTo(20, 26); }
+    g.stroke();
+    if (pen) { g.strokeStyle = C.amber; g.lineWidth = 9; g.beginPath(); if (pen === "teeth") { g.moveTo(-58, 30); g.lineTo(58, 30); } else { g.moveTo(-6, 26); g.lineTo(-76, 56); } g.stroke(); }
+  });
+}
+function bigNote(s, y, col, A, size = 64) { txt(s, W / 2, y, size, col, "center", 900, A, 1700); }
+function darken(a) { if (a <= 0) return; g.save(); g.globalAlpha = a; g.fillStyle = "#050a14"; g.fillRect(0, 0, W, H); g.restore(); }
+function personRow(n, x0, y, gap, s, col, A, k0, kd = .03) { for (let i = 0; i < n; i++) picto(x0 + i * gap, y, s * pr(NOW, k0 + i * kd, .35, ease.back), col, "stand", 0, A); }
+const gcol = i => `hsl(${i * 18},80%,62%)`;
+function gummy(x, y, s, col, a, glowOn = false) {
+  at(x, y, s, a, () => { g.fillStyle = col; if (glowOn) glow(C.green, 30); g.beginPath(); g.arc(0, -34, 22, 0, 7); g.fill(); g.beginPath(); g.arc(-17, -50, 9, 0, 7); g.arc(17, -50, 9, 0, 7); g.fill(); rr(-26, -16, 52, 58, 20); g.fill(); });
+}
+function head(x, y, s, a, col = C.cyan) {
+  at(x, y, s, a, () => {
+    g.fillStyle = "rgba(79,209,255,0.08)"; g.strokeStyle = col; g.lineWidth = 8; glow(col, 20);
+    g.beginPath(); g.moveTo(-150, 220); g.lineTo(-150, 120); g.bezierCurveTo(-250, 40, -230, -230, 0, -240); g.bezierCurveTo(200, -240, 250, -100, 220, 0);
+    g.lineTo(260, 60); g.lineTo(220, 80); g.bezierCurveTo(230, 140, 180, 160, 120, 150); g.lineTo(120, 220); g.fill(); g.stroke(); g.shadowBlur = 0;
+  });
+}
+let NOWB = null;
+function reveal(n, title, t, A) { chip(`種明かし ${n}`, 220, 140, C.amber, A * pr(t, NOWB.a + .3, .4, ease.back), 32); txt(title, W / 2 + 80, 140, 46, C.ink, "center", 900, A * pr(t, NOWB.a + .3, .4), 1300); }
+function milgram(t, A, k, lvl) {
+  g.save(); g.globalAlpha = A * k; g.strokeStyle = C.line; g.lineWidth = 6; g.beginPath(); g.moveTo(W * .56, H * .26); g.lineTo(W * .56, H * .8); g.stroke(); g.restore();
+  picto(W * .3, H * .66, 1.4 * k, C.cyan, "sit", 0, A); txt("先生役（参加者）", W * .3, H * .82, 28, C.cyan, "center", 800, A * k);
+  picto(W * .14, H * .62, 1.5 * k, "#e8eef8", "stand", 0, A); txt("実験者", W * .14, H * .82, 28, C.dim, "center", 800, A * k);
+  picto(W * .76, H * .66, 1.4 * k, C.pink, "sit", 0, A); txt("生徒役", W * .76, H * .82, 28, C.pink, "center", 800, A * k);
+  at(W * .42, H * .5, k, A, () => { g.fillStyle = "#2a3a55"; rr(-90, -60, 180, 120, 10); g.fill(); for (let i = 0; i < 6; i++) { g.fillStyle = i < lvl * 6 ? (i > 3 ? C.red : C.amber) : "#46587a"; rr(-76 + i * 26, -30, 18, 40, 4); g.fill(); } txt("ショック", 0, 40, 22, C.ink, "center", 800); });
+  if (lvl > 0) icon("bolt", W * .66, H * .48, .8 * k, C.amber, A * (.5 + .5 * Math.sin(t * 12)));
+}
+
+function setup() {
+  BEATS.length = 0;
+  // ============ 冒頭 ============
+  beat(["L00", "L01", "L02", "L03", "L04", "L05", "L06", "L07"], "base", null, (t, A) => {
+    if (t < E("L00") + .3) return;                    // L00 は 3D
+    const tIn = ["L01", "L02", "L03", "L04", "L05"].map(id => T(id));
+    const tStamp = T("L06", .62), tOut = T("L07");
+    for (let i = 0; i < 5; i++) {
+      const k = pr(t, tIn[i] - .15, .55, ease.back); if (k <= 0) continue;
+      const nxt = i < 4 ? tIn[i + 1] : T("L06");
+      const big = (t < nxt - .1 ? 1 : 0) * pr(t, tIn[i] - .15, .5) * (1 - pr(t, nxt - .2, .4));
+      const out = pr(t, tOut, .8, ease.inOut);
+      const x = ROW[i] + (i - 2) * 260 * out + (1 - k) * 600, y = H * .44 - big * 30;
+      const s = lerp(.88, 1.3, big) * (1 - .3 * out);
+      const ks = pr(t, tStamp + i * .16, .35);
+      card(i, x, y + ks * 14, s, A * k * (1 - out), ks * (i % 2 ? .06 : -.06), ks);
+      if (ks > 0) at(x, y + ks * 14, s, A * (1 - out), () => stamp("？", 0, -10, (t - tStamp - i * .16) / .5, C.red, 150, -.12));
+      const kb = pr(t, T("L06") + .25 + i * .1, .4, ease.back) * (1 - pr(t, tStamp + i * .16, .2));
+      if (kb > 0) at(x + 120 * s, y - 170 * s, kb, A * (1 - out), () => badge("check", 0, 0, .55, C.green));
+    }
+    if (t > T("L06") - .2 && t < tStamp + 1) chip("科学で証明された", W / 2, 150, C.green, A * win(t, T("L06"), tStamp + .6, .3, .4), 40);
+    const kb = pr(t, tOut + .3, .7, ease.back), kt = pr(t, E("L07") + .2, .7, ease.back);
+    if (kb > 0) {
+      const fade = 1 - pr(t, E("L07"), .4);
+      badge("brain", W / 2 - 160, H * .44, 1.5 * kb, C.cyan, A * fade);
+      icon("question", W / 2 - 160, H * .44 - 150, kb, C.amber, A * fade * win(t, tOut + .5, T("L07", .6), .3, .3));
+      const kl = pr(t, T("L07", .62), .5, ease.back);
+      arrow(W / 2 - 20, H * .44, W / 2 + 120, H * .44, kl, C.amber, 8, 0, A * fade);
+      badge("lock", W / 2 + 230, H * .44, 1.3 * kl, C.amber, A * fade);
+    }
+    if (kt > 0) {
+      txt("心理学の3分の2は、", W / 2, H * .36, 104, C.ink, "center", 900, A * kt);
+      txt("やり直すと消えた", W / 2, H * .36 + 140, 128, C.amber, "center", 900, A * kt);
+      for (let i = 0; i < 3; i++) {
+        const fade = i === 0 ? 1 : 1 - pr(t, E("L07") + 1.0 + i * .25, .5);
+        g.save(); g.globalAlpha = A * kt; g.lineWidth = 6; g.strokeStyle = C.amber; g.fillStyle = C.amber; glow(C.amber, 20);
+        g.beginPath(); g.arc(W / 2 + (i - 1) * 110, H * .36 + 290, 30, 0, 7); g.stroke(); g.globalAlpha *= fade; g.fill(); g.restore();
+      }
+    }
+  });
+  // ============ 第 1 部 5 つの話の、もとの研究 ============
+  beat(["L08"], "base", "5つの話の、もとの研究", (t, A) => {
+    for (let i = 0; i < 5; i++) card(i, ROW[i], H * .46, .82, A * pr(t, T("L08") + i * .1, .5, ease.back));
+    chip("本当は 何が分かっていた？", W / 2, 150, C.cyan, A * pr(t, T("L08") + .4, .4, ease.back), 44);
+  });
+  // --- メラビアン
+  beat(["L09"], "violet", "① 見た目が55%", (t, A) => {
+    card(0, LX, H * .48, 1.15, A * pr(t, T("L09"), .5, ease.back));
+    arrow(LX + 230, H * .48, RX - 200, H * .48, pr(t, T("L09", .5), .6), C.violet, 9, -40, A);
+    picto(RX, H * .56, 1.8 * pr(t, T("L09", .55), .6, ease.back), C.violet, "think", 0, A);
+    chip("心理学者 メラビアンの実験", RX, H * .26, C.violet, A * pr(t, T("L09", .6), .4, ease.back), 40);
+  });
+  beat(["L10"], "violet", "① 見た目が55%", (t, A) => {
+    const items = [["speech", "言葉", "「好き」「嫌い」", C.cyan], ["wave", "声の調子", "やさしい／冷たい", C.violet], ["face", "顔写真の表情", "笑顔／しかめ顔", C.amber]];
+    items.forEach(([ic, nm, ex, col], j) => {
+      const k = pr(t, T("L10") + .6 + j * .7, .5, ease.back), y = H * .26 + j * 200;
+      badge(ic, W * .14, y, .75 * k, col, A); txt(nm, W * .22, y - 20, 40, C.ink, "left", 900, A * k); txt(ex, W * .22, y + 26, 30, col, "left", 700, A * k);
+      arrow(W * .42, y, W * .58, H * .48, pr(t, T("L10") + 1.0 + j * .7, .5), col, 6, 30 * (j - 1), A);
+    });
+    picto(W * .68, H * .56, 1.7 * pr(t, T("L10", .6), .5, ease.back), C.ink, "think", 0, A);
+    at(W * .84, H * .3, pr(t, T("L10", .75), .5, ease.back), A, () => { panel(-190, -60, 380, 120, 1, C.violet); txt("この人は 自分を", 0, -18, 32, C.ink, "center", 800); txt("どう思ってる？", 0, 24, 32, C.violet, "center", 900); });
+  });
+  beat(["L11"], "violet", "① 見た目が55%", (t, A) => {
+    const k = pr(t, T("L11"), .5, ease.back);
+    chip("食い違うと…", W * .2, H * .14, C.ink, A * k, 36);
+    at(W * .2, H * .32, k, A, () => { ICON.speech(C.cyan); txt("好き", 0, -6, 34, C.bg0, "center", 900); });
+    badge("wave", W * .2, H * .52, .7 * k, C.violet, A); txt("冷たい声", W * .2 + 90, H * .52, 32, C.violet, "left", 800, A * k);
+    face(W * .2, H * .72, .75 * k, A, -1, C.amber); txt("しかめ顔", W * .2 + 90, H * .72, 32, C.amber, "left", 800, A * k);
+    const kp = pr(t, T("L11", .3), .6, ease.inOut);
+    arrow(W * .33, H * .52, W * .44, H * .5, kp, C.violet, 8, 0, A); arrow(W * .33, H * .72, W * .44, H * .56, kp, C.amber, 8, 0, A);
+    txt("声と表情を", W * .5, H * .5, 40, C.ink, "left", 900, A * kp); txt("信じやすい", W * .5, H * .57, 40, C.ink, "left", 900, A * kp);
+    const kb = pr(t, T("L11", .55), 1.0, ease.out);
+    [["言葉", 7, C.cyan], ["声", 38, C.violet], ["表情", 55, C.amber]].forEach(([nm, v, col], j) => vbar(W * .7 + j * 170, H * .86, 110, 300, v / 60 * kb, col, nm, `${Math.round(v * kb)}%`, A * pr(t, T("L11", .5), .4)));
+  });
+  beat(["L12"], "violet", "① 見た目が55%", (t, A) => {
+    chip("気持ちが 食い違って伝わったときの 実験", W / 2, 140, C.violet, A * pr(t, T("L12"), .4, ease.back), 40);
+    const kq = pr(t, T("L12", .25), .6, ease.back);
+    panel(W * .5 - 640, H * .25, 1280, 190, A * kq, C.amber);
+    txt("相手が 自分の気持ちを話している場面でなければ、", W / 2, H * .25 + 62, 40, C.ink, "center", 800, A * kq, 1200);
+    txt("この式は 当てはまらない", W / 2, H * .25 + 120, 46, C.amber, "center", 900, A * kq);
+    txt("— A. メラビアン（本人のサイト）", W * .5 + 620, H * .25 + 220, 26, C.dim, "right", 500, A * kq);
+    const kx = pr(t, T("L12", .66), .6, ease.back);
+    picto(W * .42, H * .82, 1.2 * kx, C.dim, "stand", 0, A); picto(W * .58, H * .82, 1.2 * kx, C.dim, "point", 0, A);
+    txt("初めて会った人の印象", W / 2, H * .64, 40, C.ink, "center", 800, A * kx);
+    icon("cross", W / 2, H * .76, 2.0 * pr(t, T("L12", .8), .4, ease.back), C.red, A);
+  });
+  // --- モーツァルト
+  beat(["L13"], "warm", "② モーツァルト", (t, A) => {
+    const k = pr(t, T("L13"), .6, ease.back);
+    image("mozart", W * .14, H * .48, 250 * k + 1, A, -.03);
+    txt("Barbara Krafft（1819）／パブリックドメイン", W * .14, H * .48 + 195, 20, C.dim, "center", 500, A * k);
+    chip("1993年の実験", W * .5, 130, C.amber, A * pr(t, T("L13", .15), .4, ease.back), 40);
+    const k1 = pr(t, T("L13", .25), .5, ease.back);
+    badge("headphones", W * .36, H * .4, .8 * k1, C.amber, A); txt("10分間 聴く", W * .36, H * .4 + 90, 32, C.ink, "center", 800, A * k1);
+    arrow(W * .43, H * .4, W * .52, H * .4, pr(t, T("L13", .4), .4), C.amber, 7, 0, A);
+    const k2 = pr(t, T("L13", .5), 2.4, ease.inOut);
+    at(W * .7, H * .4, 1, A * pr(t, T("L13", .45), .4), () => {
+      const f = Math.min(1, k2 * 2);
+      g.fillStyle = "#e9eef6"; g.fillRect(-150, -110, 300 - 150 * f, 220);
+      g.strokeStyle = C.amber; g.setLineDash([10, 8]); g.lineWidth = 3; g.beginPath(); g.moveTo(0, -110); g.lineTo(0, 110); g.stroke(); g.setLineDash([]);
+      if (k2 > .5) { icon("scissors", -60, -20, .8, C.red); g.fillStyle = "#3a2a18"; g.beginPath(); g.arc(-150, 0, 40 * (k2 - .5) * 2, -Math.PI / 2, Math.PI / 2); g.fill(); }
+    });
+    txt("紙を折って切ると、広げたらどんな形？", W * .7, H * .4 + 170, 34, C.ink, "center", 800, A * pr(t, T("L13", .6), .4), 760);
+    icon("question", W * .9, H * .36, pr(t, T("L13", .8), .4, ease.back), C.amber, A);
+  });
+  beat(["L14"], "warm", "② モーツァルト", (t, A) => {
+    const kb = pr(t, T("L14") + .3, 1.0, ease.out);
+    [["何も聴かない", .55, C.dim], ["リラックス用", .56, C.dim], ["モーツァルト", .66, C.amber]].forEach(([nm, v, col], j) =>
+      vbar(W * .12 + j * 270, H * .78, 150, 330, v * kb, col, nm, "", A * pr(t, T("L14") + j * .3, .4)));
+    txt("図形の問題の成績（模式図）", W * .4, H * .2, 30, C.dim, "center", 700, A);
+    const kc = pr(t, T("L14", .3), .6, ease.back);
+    badge("clock", W * .76, H * .28, .9 * kc, C.amber, A); txt("10〜15分ほどで 消えた", W * .76, H * .28 + 110, 40, C.amber, "center", 900, A * kc);
+    const kx = pr(t, T("L14", .5), .5, ease.back);
+    chip("頭が良くなった", W * .76, H * .56, C.dim, A * kx, 40);
+    g.save(); g.globalAlpha = A * kx; g.strokeStyle = C.red; g.lineWidth = 8; g.beginPath(); g.moveTo(W * .76 - 170, H * .56); g.lineTo(W * .76 - 170 + 340 * pr(t, T("L14", .55), .4), H * .56); g.stroke(); g.restore();
+    const km = pr(t, T("L14", .75), .6);
+    txt("多くの研究をまとめると：効果は小さい", W * .76, H * .72, 32, C.ink, "center", 800, A * km, 700);
+    hbar(W * .76 - 260, H * .77, 520, 20, .18 * km, C.violet, A * km);
+  });
+  // --- コーラ
+  beat(["L15"], "cinema", "③ 一瞬の「コーラを飲め」", (t, A) => {
+    chip("1957年 アメリカ", W / 2, 130, C.red, A * pr(t, T("L15"), .4, ease.back), 40);
+    const kf = pr(t, T("L15") + .3, .5);
+    g.save(); g.globalAlpha = A * kf; g.fillStyle = "#1a1012"; g.fillRect(0, H * .24, W, 260); g.restore();
+    for (let i = 0; i < 9; i++) {
+      const x = ((i * 240 - (t * 260)) % (W + 240) + W + 240) % (W + 240) - 120, flash = i === 4;
+      g.save(); g.globalAlpha = A * kf; g.fillStyle = flash ? "#fff2dc" : "#3a2a2e"; rr(x - 100, H * .24 + 30, 200, 200, 8); g.fill(); g.restore();
+      if (flash) { txt("コーラを", x, H * .24 + 100, 36, C.red, "center", 900, A * kf); txt("飲め", x, H * .24 + 150, 36, C.red, "center", 900, A * kf); }
+      else picto(x, H * .24 + 175, .7, "rgba(200,180,190,0.6)", "stand", 0, A * kf);
+    }
+    txt("目に見えないほど 一瞬だけ映した", W / 2, H * .24 + 300, 36, C.ink, "center", 800, A * pr(t, T("L15", .45), .4));
+    const ks = pr(t, T("L15", .75), .6, ease.back);
+    badge("popcorn", W * .26, H * .8, .7 * ks, C.amber, A); badge("bottle", W * .38, H * .8, .7 * ks, C.red, A);
+    arrow(W * .46, H * .82, W * .56, H * .76, pr(t, T("L15", .8), .5), C.green, 9, 0, A);
+    txt("売店の売り上げが 増えた、と発表", W * .72, H * .8, 36, C.green, "center", 900, A * ks, 640);
+  });
+  beat(["L16"], "cinema", "③ 一瞬の「コーラを飲め」", (t, A) => {
+    const k = pr(t, T("L16"), .6, ease.back);
+    badge("paper", W * .25, H * .38, 1.1 * k, C.dim, A); icon("question", W * .25 + 70, H * .38 - 70, .6 * k, C.red, A);
+    txt("詳しい記録は 示されず", W * .25, H * .6, 36, C.ink, "center", 800, A * k);
+    txt("同じ結果を確かめた人も いない", W * .25, H * .66, 32, C.dim, "center", 700, A * k);
+    const k2 = pr(t, T("L16", .45), .6, ease.back);
+    picto(W * .64, H * .64, 1.6 * k2, C.ink, "stand", 0, A);
+    at(W * .78, H * .34, k2, A, () => { panel(-250, -70, 500, 140, 1, C.amber); txt("「データは少なすぎて", 0, -20, 34, C.ink, "center", 800); txt("意味がなかった」", 0, 26, 34, C.amber, "center", 900); });
+    txt("と認めたと伝えられる（1962年のインタビュー）", W * .74, H * .8, 26, C.dim, "center", 600, A * k2);
+  });
+  // --- 右脳と左脳
+  beat(["L17"], "teal", "④ 右脳型と左脳型", (t, A) => {
+    chip("1981年 ノーベル賞 ── スペリーの研究", W / 2, 130, C.cyan, A * pr(t, T("L17"), .4, ease.back), 40);
+    const k = pr(t, T("L17", .2), .6, ease.back);
+    at(W * .3, H * .5, 2.2 * k, A, () => ICON.brainLR(C.ink));
+    const kc = pr(t, T("L17", .45), .6);
+    g.save(); g.globalAlpha = A * kc; g.strokeStyle = C.amber; g.lineWidth = 6; g.setLineDash([12, 10]); g.beginPath(); g.moveTo(W * .3, H * .5 - 120); g.lineTo(W * .3, H * .5 + 110); g.stroke(); g.setLineDash([]); g.restore();
+    icon("scissors", W * .3 + 40, H * .5 - 150, .8 * kc, C.amber, A, -.6);
+    txt("左右をつなぐ部分を 切った患者を調べた", W * .3, H * .8, 32, C.ink, "center", 800, A * kc, 700);
+    const k2 = pr(t, T("L17", .7), .6, ease.back);
+    badge("speech", W * .66, H * .38, .7 * k2, C.cyan, A); txt("左側", W * .66, H * .38 + 90, 32, C.cyan, "center", 900, A * k2);
+    badge("cube", W * .84, H * .38, .7 * k2, C.pink, A); txt("右側", W * .84, H * .38 + 90, 32, C.pink, "center", 900, A * k2);
+    txt("得意な働きが 違う", W * .75, H * .64, 48, C.ink, "center", 900, A * pr(t, T("L17", .8), .4));
+  });
+  beat(["L18"], "teal", "④ 右脳型と左脳型", (t, A) => {
+    const k1 = pr(t, T("L18"), .5, ease.back) * (1 - pr(t, T("L18", .3), .4));
+    if (k1 > 0) { card(3, W * .5, H * .44, 1.2 * k1, A * k1); txt("性格のタイプ？", W * .5, H * .8, 44, C.pink, "center", 900, A * k1); }
+    const kg = pr(t, T("L18", .32), .5);
+    if (kg > 0) {
+      chip("2013年　7〜29歳　1,011人の 脳の画像", W / 2, 130, C.cyan, A * kg, 40);
+      for (let i = 0; i < 1000; i++) {
+        const k = clamp((t - T("L18", .34) - i * .0016) / .2);
+        if (k <= 0) continue;
+        const x = W * .5 - 24.5 * 32 + (i % 50) * 32, y = H * .24 + Math.floor(i / 50) * 26;
+        g.save(); g.globalAlpha = A * k * .9; g.fillStyle = (i % 7 === 0) ? C.cyan : (i % 11 === 0) ? C.pink : "rgba(180,200,230,0.55)"; g.beginPath(); g.arc(x, y, 8, 0, 7); g.fill(); g.restore();
+      }
+      const kr = pr(t, T("L18", .75), .6, ease.back);
+      if (kr > 0) { darken(A * kr * .55); bigNote("右脳型・左脳型の人は 見つからなかった", H * .6, C.amber, A * kr, 64); }
+    }
+  });
+  // --- 1万時間
+  beat(["L19"], "amber", "⑤ 1万時間", (t, A) => {
+    const k = pr(t, T("L19"), .6, ease.back);
+    picto(W * .18, H * .62, 1.9 * k, C.amber, "stand", 0, A); icon("violin", W * .18 + 100, H * .5, 1.1 * k, C.amber, A);
+    chip("バイオリンを学ぶ 学生の研究", W * .2, H * .2, C.amber, A * k, 36);
+    const kt = pr(t, T("L19", .35), 2.0, ease.inOut);
+    const x0 = W * .42, x1 = W * .9, y = H * .7;
+    g.save(); g.globalAlpha = A * pr(t, T("L19", .3), .4); g.strokeStyle = C.line; g.lineWidth = 4; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); g.restore();
+    for (let a = 0; a <= 20; a += 5) txt(`${a}歳`, lerp(x0, x1, a / 20), y + 40, 28, C.dim, "center", 700, A * pr(t, T("L19", .3), .4));
+    g.save(); g.globalAlpha = A; g.fillStyle = C.amber; glow(C.amber, 16); g.beginPath(); g.moveTo(x0, y); g.lineTo(lerp(x0, x1, kt), y); g.lineTo(lerp(x0, x1, kt), y - 300 * kt * kt); g.closePath(); g.fill(); g.restore();
+    txt("一人で練習した時間", (x0 + x1) / 2, H * .2, 34, C.ink, "center", 800, A * pr(t, T("L19", .3), .4));
+    chip("平均すると およそ1万時間", x1 - 160, y - 360, C.amber, A * pr(t, T("L19", .7), .6, ease.back), 40);
+  });
+  beat(["L20"], "amber", "⑤ 1万時間", (t, A) => {
+    const k = pr(t, T("L20"), .5);
+    txt("平均なので、少ない人も 多い人もいる", W * .3, H * .18, 40, C.ink, "center", 900, A * k, 860);
+    g.save(); g.globalAlpha = A * k; g.strokeStyle = C.amber; g.lineWidth = 4; g.setLineDash([10, 8]); g.beginPath(); g.moveTo(W * .3, H * .3); g.lineTo(W * .3, H * .7); g.stroke(); g.setLineDash([]); g.restore();
+    txt("平均", W * .3, H * .27, 28, C.amber, "center", 800, A * k);
+    for (let i = 0; i < 12; i++) { const off = (hash(i * 5.1) - .5) * 520; picto(W * .3 + off, H * .52 + (i % 3) * 60, .55 * pr(t, T("L20") + .2 + i * .05, .4, ease.back), C.ink, "stand", 0, A); }
+    chip("1万時間で 誰でも一流", W * .3, H * .82, C.dim, A * pr(t, T("L20", .3), .5, ease.back), 38);
+    icon("cross", W * .3, H * .82, 1.3 * pr(t, T("L20", .38), .4, ease.back), C.red, A);
+    const kp = pr(t, T("L20", .55), 1.2, ease.out);
+    if (kp > 0) {
+      const cx = W * .74, cy = H * .5, r = 190;
+      g.save(); g.globalAlpha = A * pr(t, T("L20", .5), .4); g.fillStyle = "rgba(255,255,255,0.08)"; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill();
+      g.fillStyle = C.amber; glow(C.amber, 18); g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * .21 * kp); g.closePath(); g.fill(); g.restore();
+      txt("約2割", cx + 90, cy - 90, 52, C.amber, "center", 900, A * kp);
+      txt("練習の量で説明できる 腕前の差（音楽）", cx, cy + r + 50, 30, C.ink, "center", 800, A * kp, 640);
+      txt("2014年　88の研究のまとめ", cx, cy - r - 40, 28, C.dim, "center", 700, A * kp);
+    }
+  });
+  beat(["L21"], "base", null, (t, A) => {
+    for (let i = 0; i < 5; i++) card(i, ROW[i], H * .3, .5, A * (1 - pr(t, T("L21", .45), .5)), 0, .3);
+    const kd = pr(t, T("L21", .55), .6, ease.back);
+    ["統計の罠", "成功だけが残る", "伝わり方と心理"].forEach((s, i) => {
+      const col = [C.cyan, C.violet, C.amber][i];
+      at(W * .25 + i * W * .25, H * .58, kd, A, () => { panel(-180, -150, 360, 300, 1, col); txt(["①", "②", "③"][i], 0, -60, 90, col, "center", 900); txt(s, 0, 70, 36, C.ink, "center", 900); });
+    });
+    bigNote("なぜ、こんなことが 起きるのか", H * .2, C.ink, A * pr(t, T("L21", .5), .4), 60);
+  });
+  // ============ 理由① 統計の罠 ============
+  beat(["L22"], "base", "理由① 統計の罠", (t, A) => title2(T("L22") - .2, ["1"], ["偶然を「発見」と", "見間違えてしまう"], C.cyan, A));
+  beat(["L23"], "lab2", "理由① 統計の罠", (t, A) => {
+    txt("ふつうのコインを 10回投げる", W / 2, 150, 44, C.ink, "center", 900, A * pr(t, T("L23"), .4));
+    const res = "表表裏表表表裏表表表";
+    for (let i = 0; i < 10; i++) {
+      const tf = T("L23", .45) + i * .22, flip = clamp((t - tf + .3) / .3);
+      const x = W / 2 - 4.5 * 150 + i * 150;
+      at(x, H * .5, 1, A * (t > tf - .3 ? 1 : .35), () => { g.scale(Math.abs(Math.cos(flip * Math.PI * 3)) * .9 + .1, 1); ICON.coin(res[i] === "表" && t > tf ? C.amber : C.dim, t > tf ? res[i] : "?"); });
+    }
+    chip("10回のうち 8回 表", W / 2, H * .72, C.amber, A * pr(t, T("L23", .45) + 2.4, .5, ease.back), 44);
+    txt("表と裏は だいたい半分ずつ…のはず", W / 2, H * .3, 34, C.dim, "center", 700, A * pr(t, T("L23", .2), .4));
+  });
+  beat(["L24"], "lab2", "理由① 統計の罠", (t, A) => {
+    txt("10回のうち 8回以上 表が出る確率", W / 2, 150, 44, C.ink, "center", 900, A);
+    const kn = pr(t, T("L24", .2), 1.2, ease.out);
+    txt(`およそ ${(5 * kn).toFixed(0)}%`, W * .28, H * .45, 110, C.amber, "center", 900, A * pr(t, T("L24", .15), .3));
+    for (let i = 0; i < 20; i++) {
+      const k = pr(t, T("L24", .45) + i * .04, .3, ease.back), x = W * .55 + (i % 10) * 76, y = H * .38 + Math.floor(i / 10) * 76;
+      g.save(); g.globalAlpha = A * k; g.fillStyle = i === 13 ? C.amber : "rgba(255,255,255,0.14)"; if (i === 13) glow(C.amber, 22); rr(x - 30, y - 30, 60, 60, 10); g.fill(); g.restore();
+    }
+    txt("＝ 20回に1回くらい", W * .55 + 340, H * .38 + 190, 48, C.amber, "center", 900, A * pr(t, T("L24", .55), .4, ease.back));
+    bigNote("ふつうのコインでも 起きてしまう", H * .8, C.ink, A * pr(t, T("L24", .75), .4), 52);
+  });
+  beat(["L25"], "lab", "理由① 統計の罠", (t, A) => {
+    const k = pr(t, T("L25"), .5, ease.back);
+    personRow(5, W * .14, H * .46, 70, .8, C.cyan, A, T("L25") + .2); badge("pill", W * .21, H * .27, .7 * k, C.cyan, A); txt("薬を飲んだ人", W * .21, H * .58, 32, C.cyan, "center", 800, A * k);
+    personRow(5, W * .64, H * .46, 70, .8, C.dim, A, T("L25") + .4); txt("飲まなかった人", W * .71, H * .58, 32, C.dim, "center", 800, A * k);
+    const kb = pr(t, T("L25", .5), .8, ease.out);
+    vbar(W * .21, H * .82, 140, 110, .62 * kb, C.cyan, "", "", A * kb); vbar(W * .71, H * .82, 140, 110, .55 * kb, C.dim, "", "", A * kb);
+    chip("本当は効果がなくても、偶然 少しの差が出る", W / 2, H * .14, C.amber, A * pr(t, T("L25", .6), .4, ease.back), 38);
+  });
+  beat(["L26"], "lab", "理由① 統計の罠", (t, A) => {
+    chip("科学の決まり", W / 2, 140, C.cyan, A * pr(t, T("L26"), .4, ease.back), 42);
+    at(W / 2, H * .45, pr(t, T("L26", .2), .6, ease.back), A, () => {
+      panel(-760, -150, 1520, 300, 1, C.cyan);
+      txt("「効果がないのに、偶然だけで", 0, -70, 46, C.ink, "center", 800);
+      txt("これほどの差が出る確率」を計算する", 0, -10, 46, C.ink, "center", 800);
+      txt("5%より小さければ → 効果あり", 0, 80, 60, C.cyan, "center", 900);
+    });
+    badge("check", W / 2 + 640, H * .45 + 80, .6 * pr(t, T("L26", .75), .4, ease.back), C.green, A);
+  });
+  beat(["L27"], "lab", "理由① 統計の罠", (t, A) => {
+    bigNote("でも、落とし穴がある", H * .16, C.amber, A * pr(t, T("L27"), .4), 56);
+    for (let i = 0; i < 20; i++) {
+      const tk = T("L27", .45) + i * .1, hit = i === 11 && t > tk;
+      at(W / 2 - 9.5 * 86 + i * 86, H * .48, pr(t, tk, .25, ease.back), A, () => { g.fillStyle = hit ? C.amber : "rgba(255,255,255,0.14)"; if (hit) glow(C.amber, 28); rr(-34, -50, 68, 100, 12); g.fill(); g.shadowBlur = 0; txt(hit ? "当" : `${i + 1}`, 0, 0, hit ? 40 : 26, hit ? C.bg0 : C.dim, "center", 900); });
+    }
+    txt("効果のないものでも、20回調べれば", W / 2, H * .68, 40, C.ink, "center", 800, A * pr(t, T("L27", .55), .4));
+    txt("1回くらいは 偶然「効果あり」", W / 2, H * .77, 52, C.amber, "center", 900, A * pr(t, T("L27", .75), .4, ease.back));
+  });
+  beat(["L28"], "base", "理由① 統計の罠（たとえ話）", (t, A) => {
+    gummy(W * .3, H * .58, 3 * pr(t, T("L28", .2), .6, ease.back), "#ff9fb5", A); arrow(W * .38, H * .5, W * .52, H * .5, pr(t, T("L28", .45), .4), C.ink, 9, 0, A);
+    face(W * .64, H * .5, 1.4 * pr(t, T("L28", .5), .5, ease.back), A, 0, C.ink);
+    for (let i = 0; i < 5; i++) { g.save(); g.globalAlpha = A * pr(t, T("L28", .55), .4); g.fillStyle = C.red; g.beginPath(); g.arc(W * .64 + [-40, 30, -10, 45, -50][i], H * .5 + [-30, -20, 10, 30, 40][i], 7, 0, 7); g.fill(); g.restore(); }
+    chip("たとえ話", W / 2, 120, C.dim, A, 32);
+    txt("グミを食べると ニキビが減る？", W / 2, H * .24, 52, C.ink, "center", 900, A * pr(t, T("L28", .2), .4));
+    chip("結果：効果なし", W * .64, H * .8, C.dim, A * pr(t, T("L28", .8), .4, ease.back), 44);
+  });
+  beat(["L29", "L30", "L31"], "base", "理由① 統計の罠（たとえ話）", (t, A) => {
+    const GX = i => W / 2 - 4.5 * 150 + (i % 10) * 150, GY = i => H * .40 + Math.floor(i / 10) * 170;
+    const tNews = T("L31") - .1, sc = 1 - pr(t, tNews, .6, ease.inOut);
+    const scan = clamp((t - T("L29", .7)) / (T("L30") - T("L29", .7))) * 20;
+    for (let i = 0; i < 20; i++) {
+      const k = pr(t, T("L29", .25) + i * .05, .5, ease.back), hit = i === 7 && t > T("L30");
+      const gray = t > T("L30") && !hit ? .6 : 0;
+      gummy(GX(i), GY(i) - (hit ? 20 * pr(t, T("L30"), .4, ease.back) : 0), (hit ? 1.35 : 1) * k * (hit ? 1 : sc), hit ? C.green : gcol(i), A * (hit ? 1 : sc) * (1 - gray * .7), hit);
+    }
+    if (t < T("L30")) chip("色ごとに 1色ずつ 調べ直す", W / 2, 180, C.cyan, A * pr(t, T("L29"), .4, ease.back), 40);
+    if (t < T("L30") + .3) { const i = Math.min(19, Math.floor(scan)); icon("magnifier", GX(i) + 30, GY(i) - 90, 1.1, C.ink, A * sc * win(t, T("L29", .65), T("L30"), .3, .3)); }
+    if (t > T("L30")) chip("緑だけ「効果あり」！", GX(7), GY(7) - 160, C.green, A * sc * pr(t, T("L30"), .4, ease.back), 40);
+    const k64 = pr(t, T("L30", .6), 1.6, ease.out);
+    if (k64 > 0 && t < tNews + .5) {
+      txt("効かないものを20回調べて、少なくとも1回 偶然当たる確率", W / 2, H * .78 - 40, 32, C.ink, "center", 700, A * sc);
+      hbar(W / 2 - 400, H * .80, 800, 30, .64 * k64, C.amber, A * sc); txt(`${Math.round(64 * k64)}%`, W / 2 + 470, H * .80 + 15, 56, C.amber, "center", 900, A * sc);
+    }
+    const kn = pr(t, tNews, .6, ease.back);
+    if (kn > 0) at(W / 2 + 160, H * .45, kn, A, () => {
+      g.fillStyle = "#efe9dc"; rr(-420, -230, 840, 460, 10); g.fill();
+      txt("THE DAILY SCIENCE", 0, -180, 40, "#222", "center", 900); g.fillStyle = "#222"; g.fillRect(-380, -150, 760, 4);
+      txt("緑のグミが", 0, -70, 88, "#111", "center", 900); txt("ニキビに効く！", 0, 40, 88, "#c81e2e", "center", 900);
+      for (let i = 0; i < 4; i++) { g.fillStyle = "#999"; g.fillRect(-380, 120 + i * 22, i === 3 ? 400 : 760, 8); }
+    }, -.04);
+  });
+  beat(["L32"], "lab2", "理由① わざと使ってみせた実験", (t, A) => {
+    chip("2011年　アメリカの3人の心理学者", W / 2, 140, C.cyan, A * pr(t, T("L32"), .4, ease.back), 40);
+    for (let i = 0; i < 3; i++) picto(W * .22 + (i - 1) * 110, H * .58, 1.5 * pr(t, T("L32", .2) + i * .12, .5, ease.back), C.cyan, "stand", 0, A);
+    at(W * .64, H * .5, pr(t, T("L32", .5), .6, ease.back), A, () => { panel(-460, -170, 920, 340, 1, C.amber); txt("目的", 0, -110, 34, C.amber, "center", 900); txt("ありえない結論でも", 0, -30, 50, C.ink, "center", 900); txt("よくある分析のやり方で", 0, 36, 40, C.ink, "center", 800); txt("「証明」できてしまうと 見せる", 0, 100, 44, C.amber, "center", 900); });
+  });
+  beat(["L33"], "lab2", "理由① わざと使ってみせた実験", (t, A) => {
+    const k = pr(t, T("L33"), .6, ease.back);
+    badge("headphones", W * .3, H * .42, 1.4 * k, C.amber, A);
+    txt("ビートルズ", W * .3, H * .64, 40, C.ink, "center", 800, A * k); txt("「When I'm Sixty-Four」", W * .3, H * .71, 40, C.amber, "center", 900, A * k);
+    arrow(W * .44, H * .45, W * .56, H * .45, pr(t, T("L33", .4), .4), C.amber, 9, 0, A);
+    const k2 = pr(t, T("L33", .5), .6, ease.back);
+    picto(W * .66, H * .6, 1.5 * k2, C.dim, "stand", 0, A); arrow(W * .71, H * .5, W * .78, H * .5, k2, C.ink, 6, 0, A); child(W * .84, H * .6, 1.6 * k2, C.amber, A);
+    bigNote("若返る？", H * .84, C.amber, A * pr(t, T("L33", .7), .4, ease.back), 72);
+  });
+  beat(["L34"], "lab", "理由① 実験の手順（論文に書かれたもの）", (t, A) => {
+    chip("大学生 20人", W / 2, 140, C.ink, A * pr(t, T("L34", .2), .4, ease.back), 40);
+    for (let i = 0; i < 20; i++) {
+      const grp = i % 2, k = pr(t, T("L34", .2) + i * .03, .4, ease.back), sp = pr(t, T("L34", .4), .8, ease.inOut);
+      const x = lerp(W / 2 - 475 + (i % 10) * 105, (grp ? W * .7 : W * .3) - 200 + (Math.floor(i / 2) % 5) * 100, sp);
+      const y = lerp(H * .42 + Math.floor(i / 10) * 140, H * .56, sp);
+      picto(x, y, .7 * k, grp ? C.dim : C.amber, "stand", 0, A);
+    }
+    const kh = pr(t, T("L34", .55), .5, ease.back);
+    badge("headphones", W * .3, H * .3, .8 * kh, C.amber, A); badge("headphones", W * .7, H * .3, .8 * kh, C.dim, A);
+    txt("ビートルズの曲", W * .3, H * .74, 36, C.amber, "center", 800, A * kh); txt("別の曲", W * .7, H * .74, 36, C.dim, "center", 800, A * kh);
+  });
+  beat(["L35"], "lab", "理由① 実験の手順（論文に書かれたもの）", (t, A) => {
+    at(W * .3, H * .52, pr(t, T("L35"), .6, ease.back), A, () => {
+      g.fillStyle = "#e9eef6"; rr(-260, -280, 520, 560, 14); g.fill();
+      txt("アンケート", 0, -220, 40, "#223", "center", 900);
+      txt("誕生日", -200, -110, 36, "#223", "left", 800); g.fillStyle = "#9aa7ba"; g.fillRect(-60, -90, 250, 4);
+      txt("父親の年齢", -200, 0, 36, "#223", "left", 800); g.fillRect(-10, 20, 200, 4);
+      for (let i = 0; i < 3; i++) g.fillRect(-200, 100 + i * 50, 380, 10);
+    });
+    chip("関係のないアンケートの ふり", W * .62, H * .74, C.dim, A * pr(t, T("L35", .1), .4, ease.back), 34);
+    arrow(W * .3 + 200, H * .52 - 110, W * .58, H * .4, pr(t, T("L35", .6), .6), C.amber, 8, -40, A);
+    at(W * .74, H * .4, pr(t, T("L35", .65), .5, ease.back), A, () => { panel(-240, -90, 480, 180, 1, C.amber); txt("誕生日がわかれば", 0, -30, 34, C.ink, "center", 800); txt("本当の年齢が わかる", 0, 30, 44, C.amber, "center", 900); });
+  });
+  beat(["L36"], "lab", "理由① 実験の結果（論文に書かれたもの）", (t, A) => {
+    const kr = pr(t, T("L36") + .3, 1.2, ease.out);
+    txt(`${lerp(21.5, 20.1, kr).toFixed(1)}歳`, W * .3, H * .44, 130, C.amber, "center", 900, A * pr(t, T("L36"), .4));
+    txt("21.5歳", W * .7, H * .44, 130, C.dim, "center", 900, A * pr(t, T("L36"), .4));
+    txt("ビートルズの曲", W * .3, H * .28, 36, C.amber, "center", 800, A); txt("別の曲", W * .7, H * .28, 36, C.dim, "center", 800, A);
+    chip("1歳半近く 若い", W / 2, H * .63, C.amber, A * pr(t, T("L36", .35), .4, ease.back), 46);
+    chip("5%の基準も クリア", W / 2, H * .77, C.green, A * pr(t, T("L36", .6), .4, ease.back), 40);
+  });
+  beat(["L37"], "red", "理由① 種明かし", (t, A) => {
+    const k = pr(t, T("L37"), .6, ease.back);
+    picto(W * .5, H * .62, 1.6 * k, C.dim, "stand", 0, A); icon("question", W * .5, H * .32, k, C.amber, A);
+    txt("生まれた日は 変わらない", W * .5, H * .8, 48, C.ink, "center", 900, A * pr(t, T("L37", .2), .4));
+    const k2 = pr(t, T("L37", .55), .6, ease.back);
+    if (k2 > 0) { darken(A * k2 * .8); stamp("種明かし", W / 2, H * .42, (t - T("L37", .55)) / .5, C.amber, 150, -.08); txt("論文の後半に、書いていなかったことを すべて書いていた", W / 2, H * .68, 40, C.ink, "center", 800, A * pr(t, T("L37", .7), .4), 1600); }
+  });
+  beat(["L38"], "lab2", "理由① 種明かし", (t, A) => {
+    reveal(1, "本当は 34人、曲は 3曲", t, A);
+    const kn = pr(t, T("L38") + .5, 1.2, ease.out);
+    txt(`${Math.round(lerp(20, 34, kn))}人`, W * .22, H * .45, 130, C.amber, "center", 900, A);
+    txt("論文には 20人と書いた", W * .22, H * .62, 32, C.dim, "center", 700, A * kn);
+    [["ビートルズ", C.amber], ["別の曲", C.dim], ["子ども向けの曲", C.pink]].forEach(([nm, col], i) => {
+      const k = pr(t, T("L38", .45) + i * .2, .5, ease.back), x = W * .48 + i * 260;
+      badge("headphones", x, H * .44, .7 * k, col, A); txt(nm, x, H * .44 + 90, 30, col, "center", 800, A * k);
+    });
+    const kh = pr(t, T("L38", .75), .5, ease.back);
+    if (kh > 0) { g.save(); g.globalAlpha = A * kh * .85; g.fillStyle = "#050a14"; rr(W * .48 + 520 - 130, H * .44 - 90, 260, 230, 20); g.fill(); g.restore(); txt("論文に書かず", W * .48 + 520, H * .44, 30, C.red, "center", 900, A * kh); }
+  });
+  beat(["L39"], "lab2", "理由① 種明かし", (t, A) => {
+    reveal(2, "10人ごとに計算、終わりは 決めていない", t, A);
+    const x0 = W * .1, x1 = W * .9, y = H * .5;
+    g.save(); g.globalAlpha = A; g.strokeStyle = C.line; g.lineWidth = 6; g.beginPath(); g.moveTo(x0, y); g.lineTo(lerp(x0, x1, pr(t, T("L39"), 2.4, ease.inOut)), y); g.stroke(); g.restore();
+    for (let s = 1; s <= 3; s++) {
+      const k = pr(t, T("L39") + s * .7, .4, ease.back), x = lerp(x0, x1, s / 3.4);
+      for (let i = 0; i < 10; i++) picto(x - 210 + i * 24 + 100, y - 70, .4 * k, C.ink, "stand", 0, A);
+      badge("calc", x, y + 90, .55 * k, C.amber, A); txt(`${s * 10}人`, x, y + 170, 30, C.ink, "center", 800, A * k);
+    }
+    chip("何人でやめるか、前もって決めていない", W / 2, H * .86, C.red, A * pr(t, T("L39", .55), .4, ease.back), 38);
+  });
+  beat(["L40"], "lab2", "理由① 種明かし", (t, A) => {
+    reveal(3, "たくさんの質問から 使うものを選んだ", t, A);
+    const qs = ["誕生日", "父親の年齢", "母親の年齢", "自分を何歳くらいに感じるか", "政治の好み", "レストランの割引を使うか", "100の平方根", "「昔はよかった」と言う回数"];
+    qs.forEach((q, i) => {
+      const k = pr(t, T("L40", .1) + i * .12, .4, ease.back), y = H * .24 + i * 72, pick = i < 2;
+      at(W * .33, y, k, A, () => { panel(-330, -30, 660, 60, 1, pick ? C.amber : C.line, pick ? "rgba(60,40,10,0.9)" : C.panel, 12); txt(q, -300, 0, 30, pick ? C.amber : C.ink, "left", 800); });
+    });
+    const kp = pr(t, T("L40", .7), .5, ease.back);
+    arrow(W * .56, H * .27, W * .68, H * .4, kp, C.amber, 8, -30, A);
+    chip("都合のいいものを 使う", W * .8, H * .45, C.amber, A * kp, 40);
+  });
+  beat(["L41"], "lab2", "理由① 種明かし", (t, A) => {
+    reveal(4, "父親の年齢で 年齢を補正", t, A);
+    const k = pr(t, T("L41"), .6, ease.back);
+    picto(W * .16, H * .58, 1.4 * k, C.ink, "stand", 0, A); picto(W * .16 + 130, H * .53, 1.7 * k, C.dim, "stand", 0, A); txt("父親の年齢", W * .16 + 130, H * .73, 30, C.dim, "center", 800, A * k);
+    txt("もともとの年齢の ばらつきを", W * .2, H * .26, 32, C.ink, "center", 800, A * pr(t, T("L41", .2), .4)); txt("ならす、という理由", W * .2, H * .31, 32, C.ink, "center", 800, A * pr(t, T("L41", .2), .4));
+    badge("calc", W * .2, H * .86, .6 * pr(t, T("L41", .35), .4, ease.back), C.amber, A);
+    const kb = pr(t, T("L41", .45), .6);
+    panel(W * .44, H * .22, W * .5, H * .3, A * kb, C.green); txt("補正した", W * .69, H * .22 + 50, 34, C.green, "center", 900, A * kb);
+    txt("20.1歳 対 21.5歳 → 差あり", W * .69, H * .22 + 130, 44, C.ink, "center", 900, A * kb, 900);
+    const kc = pr(t, T("L41", .75), .6, ease.back);
+    panel(W * .44, H * .58, W * .5, H * .3, A * kc, C.red); txt("補正しないと", W * .69, H * .58 + 50, 34, C.red, "center", 900, A * kc);
+    txt("20.3歳 対 21.2歳 → 基準を満たさない", W * .69, H * .58 + 130, 40, C.ink, "center", 900, A * kc, 900);
+  });
+  beat(["L42"], "lab", "理由① 種明かし", (t, A) => {
+    bigNote("一つひとつは、研究でよく使われるやり方", H * .18, C.ink, A * pr(t, T("L42"), .4), 50);
+    const kb = pr(t, T("L42", .45), 2.2, ease.out), v = lerp(.05, .61, kb), col = kb > .3 ? C.red : C.amber;
+    txt("効果がないのに「効果あり」になる確率", W / 2, H * .4, 38, C.ink, "center", 800, A * pr(t, T("L42", .35), .4));
+    hbar(W * .12, H * .5, W * .66, 50, v, col, A);
+    txt(`${Math.round(lerp(5, 61, kb))}%`, W * .12 + W * .66 * v + 100, H * .5 + 26, 72, col, "center", 900, A);
+    txt("5%のはずが", W * .12, H * .62, 32, C.dim, "left", 700, A * pr(t, T("L42", .4), .4));
+    chip("最大 61%（3人の計算）", W / 2, H * .78, C.red, A * pr(t, T("L42", .78), .4, ease.back), 42);
+  });
+  beat(["L43"], "base", "理由① 統計の罠", (t, A) => {
+    picto(W * .16, H * .6, 1.7 * pr(t, T("L43"), .8, ease.inOut), C.ink, "walk", t, A);
+    for (let i = 0; i < 4; i++) {
+      const x = W * .28 + i * 300, y = H * .56 + (i % 2 ? -50 : 50);
+      arrow(x, H * .56, x + 230, y, pr(t, T("L43", .2) + i * .3, .4), C.green, 8, 0, A);
+      txt("正しい道？", x + 150, y + (i % 2 ? -50 : 50), 26, C.green, "center", 800, A * pr(t, T("L43", .25) + i * .3, .4));
+    }
+    bigNote("悪気なく、選んでしまう", H * .2, C.ink, A * pr(t, T("L43", .1), .4), 60);
+    bigNote("見つけたい結果に近づく道が、正しく見える", H * .84, C.amber, A * pr(t, T("L43", .55), .5), 46);
+  });
+  // ============ 理由② 成功だけが残る ============
+  beat(["L44"], "base", "理由② 成功だけが残る", (t, A) => title2(T("L44") - .2, ["2"], ["成功した研究だけが", "世の中に残る"], C.violet, A));
+  beat(["L45"], "violet", "理由② 研究の世界の心理", (t, A) => {
+    const k = pr(t, T("L45"), .6, ease.back);
+    picto(W * .16, H * .6, 1.7 * k, C.ink, "sit", 0, A); badge("flask", W * .16 + 120, H * .48, .6 * k, C.violet, A);
+    badge("clock", W * .16, H * .28, .6 * pr(t, T("L45", .1), .4, ease.back), C.dim, A); txt("何か月も、何年も", W * .16, H * .28 + 80, 30, C.dim, "center", 800, A * k);
+    const k2 = pr(t, T("L45", .3), .6, ease.back);
+    at(W * .44, H * .46, k2, A, () => { ICON.paper("#e9eef6"); txt("効果なし", 0, -76, 28, C.ink, "center", 900); });
+    arrow(W * .49, H * .46, W * .62, H * .46, pr(t, T("L45", .35), .4), C.dim, 7, 0, A);
+    at(W * .7, H * .46, k2, A, () => { panel(-100, -130, 200, 260, 1, C.amber, "rgba(40,30,12,0.92)"); txt("雑誌", 0, -80, 30, C.amber, "center", 900); });
+    icon("cross", W * .7, H * .49, 1.2 * pr(t, T("L45", .42), .4, ease.back), C.red, A);
+    chip("載りにくい", W * .7, H * .72, C.red, A * pr(t, T("L45", .45), .4, ease.back), 34);
+    chip("評価 ＝ 載った論文", W * .5, H * .8, C.violet, A * pr(t, T("L45", .65), .6, ease.back), 40);
+    txt("「効果あり」を 見つけたい", W * .5, H * .14, 52, C.amber, "center", 900, A * pr(t, T("L45", .82), .4));
+  });
+  beat(["L46", "L47"], "violet", "理由② 引き出し問題", (t, A) => {
+    const LXf = i => W * .12 + (i % 5) * 140, LYf = i => H * .2 + Math.floor(i / 5) * 150;
+    const tDrw = T("L46", .55), tPub = T("L47");
+    const dX = W * .74, dY = H * .7, jX = W * .74, jY = H * .3;
+    const kj0 = pr(t, tPub - .2, .5, ease.back);
+    if (kj0 > 0) { panel(jX - 130, jY - 170, 260, 330, A * kj0, C.amber, "rgba(40,30,12,0.92)"); txt("雑誌", jX, jY - 120, 36, C.amber, "center", 900, A * kj0); }
+    for (let i = 0; i < 20; i++) {
+      const w1 = i === 12, k = pr(t, T("L46") + i * .04, .45, ease.back), res = pr(t, T("L46", .3) + i * .03, .3);
+      icon("building", LXf(i), LYf(i), .65 * k, w1 && res > 0 ? C.amber : C.ink, A * (res > 0 && !w1 ? .55 : 1));
+      if (res > 0) at(LXf(i) + 38, LYf(i) - 38, .3 * ease.back(res), A, () => ICON[w1 ? "check" : "cross"](w1 ? C.green : C.dim));
+      const kf = w1 ? pr(t, tPub + .2, 1.0, ease.inOut) : pr(t, tDrw + i * .05, .8, ease.inOut);
+      if ((kf > 0 && kf < 1) || (w1 && kf >= 1)) {
+        const tx = w1 ? jX : dX, ty = w1 ? jY : dY - 10;
+        icon("paper", lerp(LXf(i), tx, kf), lerp(LYf(i), ty, kf) - Math.sin(kf * Math.PI) * 120, lerp(.45, w1 ? .9 : .3, kf), w1 ? C.amber : "#cfd8e6", A * (w1 ? 1 : 1 - clamp((kf - .85) / .15)), kf * (w1 ? 0 : 1.5));
+      }
+    }
+    const open = clamp(pr(t, T("L46", .4), .4) - pr(t, tDrw + 1.6, .4));
+    icon("drawer", dX, dY, 1.6 * pr(t, T("L46", .35), .5, ease.back), C.violet, A, 0, open);
+    txt("引き出し", dX, dY + 110, 34, C.violet, "center", 800, A * pr(t, T("L46", .35), .4));
+    chip("19：効果なし → 発表しない", W * .12 + 280, H * .2 + 640, C.dim, A * win(t, T("L46", .35), tPub, .4, .3), 32);
+    if (t > tPub) txt("世の中には「効果あり」だけが残る", jX, jY + 220, 32, C.ink, "center", 800, A * pr(t, T("L47", .35), .4), 600);
+    const kr = pr(t, T("L47", .65), .6, ease.back);
+    if (kr > 0) { panel(W * .5 - 360, H * .72, 720, 150, A * kr, C.violet); txt("「引き出し問題」", W * .5, H * .72 + 58, 54, C.violet, "center", 900, A * kr); txt("ローゼンタール（1979年）", W * .5, H * .72 + 116, 30, C.dim, "center", 600, A * kr); }
+  });
+  beat(["L48", "L49", "L50"], "teal", "理由② どれくらい起きていたのか", (t, A) => {
+    const DX = i => W * .5 - 4.5 * 54 + (i % 10) * 54, DY = i => H * .21 + Math.floor(i / 10) * 48;
+    const t97 = T("L49") + .3, tDrop = T("L49", .4), tQ = T("L50", .3);
+    chip("2015年　100の研究を 同じ方法で やり直す", W / 2 + 120, 150, C.cyan, A * pr(t, T("L48", .35), .4, ease.back), 38);
+    for (let i = 0; i < 100; i++) {
+      const k = pr(t, T("L48", .45) + i * .015, .35, ease.back), on = i < 97 && t > t97 + i * .01, keep = (i * 37) % 100 < 36;
+      const gone = keep ? 0 : pr(t, tDrop + ((i * 53) % 100) * .012, .5), q = !keep && t > tQ ? pr(t, tQ + ((i * 17) % 64) * .01, .4) : 0;
+      g.save(); g.globalAlpha = A * k; g.lineWidth = 3; g.strokeStyle = on ? C.green : C.mute; g.fillStyle = on ? C.green : C.mute; if (on && !gone) glow(C.green, 10);
+      g.beginPath(); g.arc(DX(i), DY(i), 18, 0, 7); g.stroke(); g.globalAlpha *= (1 - gone); g.fill(); g.restore();
+      if (q > 0) txt("?", DX(i), DY(i) + 2, 26, C.amber, "center", 900, A * q);
+    }
+    const lx = W * .17, rx = W * .83;
+    txt("もとの論文", lx, H * .32, 36, C.ink, "center", 700, A * pr(t, t97, .4));
+    txt(`${Math.round(97 * pr(t, t97, 1.2))}%`, lx, H * .44, 120, C.green, "center", 900, A * pr(t, t97, .4));
+    txt("が「効果あり」", lx, H * .55, 32, C.ink, "center", 700, A * pr(t, t97, .4));
+    const k36 = pr(t, tDrop, 2.0, ease.out);
+    txt("やり直すと", rx, H * .32, 36, C.ink, "center", 700, A * pr(t, tDrop, .4));
+    txt(`${Math.round(lerp(97, 36, k36))}%`, rx, H * .44, 120, C.amber, "center", 900, A * pr(t, tDrop, .4));
+    txt("効果の大きさも 半分", rx, H * .55, 32, C.ink, "center", 700, A * pr(t, T("L49", .75), .4));
+    hbar(rx - 150, H * .6, 300, 20, lerp(1, .5, pr(t, T("L49", .78), .8)), C.violet, A * pr(t, T("L49", .75), .4));
+    const kt = pr(t, T("L50"), .5, ease.back);
+    if (kt > 0) {
+      const PY = H * .7, ks = pr(t, T("L50", .15), .5), kn = pr(t, T("L50", .3), .5);
+      panel(W / 2 - 660, PY - 75, 1320, 150, A * kt, C.amber);
+      txt("3分の2は、やり直すと", W / 2 - 330, PY, 52, C.ink, "center", 900, A * kt);
+      txt("消えた", W / 2 + 160, PY, 56, C.amber, "center", 900, A * kt * (1 - ks * .5) * (1 - kn));
+      g.save(); g.globalAlpha = A * kt * ks * (1 - kn); g.strokeStyle = C.red; g.lineWidth = 7; g.beginPath(); g.moveTo(W / 2 + 70, PY); g.lineTo(W / 2 + 70 + 180 * ks, PY); g.stroke(); g.restore();
+      txt("はっきり確かめられなかった", W / 2 + 40, PY, 50, C.amber, "left", 900, A * kn, 600);
+      chip("効果がないと 決まったわけではない", W / 2 - 330, H * .83, C.ink, A * pr(t, T("L50", .6), .4, ease.back), 30);
+      chip("反論もある（Gilbert ら 2016）", W / 2 + 360, H * .83, C.dim, A * pr(t, T("L50", .82), .4, ease.back), 30);
+    }
+  });
+  beat(["L52"], "green", "理由② 新しい仕組み", (t, A) => {
+    const st = [["paper", "何をどう調べるか", T("L52", .35)], ["check", "先に審査", T("L52", .5)], ["news", "結果がどうでも 載せる約束", T("L52", .65)], ["flask", "それから実験", T("L52", .8)]];
+    st.forEach(([ic, nm, a], i) => { const k = pr(t, a, .5, ease.back), x = W * .16 + i * 420; badge(ic, x, H * .48, .9 * k, C.green, A); txt(nm, x, H * .48 + 110, 34, C.ink, "center", 800, A * k, 380); if (i) arrow(x - 320, H * .48, x - 100, H * .48, pr(t, a - .2, .4), C.green, 7, 0, A); });
+    bigNote("実験の前に、載せるかどうかを決める", H * .2, C.green, A * pr(t, T("L52", .3), .4), 52);
+  });
+  beat(["L53"], "green", "理由② 新しい仕組み", (t, A) => {
+    const k1 = pr(t, T("L53") + .3, 1.2, ease.out), k2 = pr(t, T("L53", .35), 1.2, ease.out);
+    vbar(W * .65, H * .82, 220, 460, .44 * k1, C.green, "新しい仕組みの論文", `${Math.round(44 * k1)}%`, A);
+    vbar(W * .35, H * .82, 220, 460, .96 * k2, C.amber, "ふつうの論文", `${Math.round(96 * k2)}%`, A * pr(t, T("L53", .35), .3));
+    txt("仮説どおりの結果が出た割合", W / 2, 110, 40, C.ink, "center", 800, A);
+    chip("成功しか残らない仕組みが 結果をかたよらせていた", W * .66, H * .26, C.amber, A * pr(t, T("L53", .7), .4, ease.back), 30);
+  });
+  beat(["L58"], "base", "理由③ 伝わり方と私たちの心理", (t, A) => title2(T("L58") - .2, ["3"], ["話は伝わるうちに大きくなり、", "私たちは信じたくなる"], C.amber, A));
+  beat(["L59", "L60"], "warm", "理由③ 伝言ゲーム", (t, A) => {
+    const chain = [["paper", "研究"], ["building", "大学の発表"], ["news", "ニュース"], ["tv", "テレビ"], ["book", "本"], ["phone", "SNS"]];
+    const up = pr(t, T("L60"), .8, ease.inOut);
+    chain.forEach(([ic, nm], i) => {
+      const k = pr(t, T("L59") + i * .4, .45, ease.back), x = W * .09 + i * 330, y = lerp(H * .42, H * .16, up);
+      badge(ic, x, y, lerp(.85, .55, up) * k, C.amber, A); txt(nm, x, y + lerp(100, 66, up), lerp(32, 26, up), C.ink, "center", 700, A * k);
+      if (i) arrow(x - 270, y, x - 70, y, pr(t, T("L59") + i * .4 - .15, .35), C.amber, 6, -20, A);
+    });
+    if (up > 0) {
+      txt("イギリスの20の大学の 発表文とニュースを調べた研究（2014年）", W / 2, H * .32, 30, C.dim, "center", 700, A * up);
+      const k1 = pr(t, T("L60", .45), 1.2, ease.out), k2 = pr(t, T("L60", .82), 1.0, ease.out);
+      vbar(W * .62, H * .8, 170, 260, .86 * k1, C.red, "人に当てはめた発表", `${Math.round(86 * k1)}%`, A * pr(t, T("L60", .4), .4));
+      vbar(W * .84, H * .8, 170, 260, .10 * k2, C.green, "慎重な発表", `${Math.round(10 * k2)}%`, A * pr(t, T("L60", .8), .4));
+      const kq = pr(t, T("L60", .3), .5, ease.back);
+      panel(W * .05, H * .46, 700, 220, A * kq, C.red);
+      txt("動物の実験なのに、", W * .05 + 350, H * .46 + 60, 36, C.ink, "center", 800, A * kq);
+      txt("人にも当てはまるように書いた", W * .05 + 350, H * .46 + 110, 36, C.ink, "center", 800, A * kq);
+      txt("→ ニュースも同じように書いた割合", W * .05 + 350, H * .46 + 172, 30, C.red, "center", 800, A * kq);
+    }
+  });
+  beat(["L61"], "warm", "理由③ 伝言ゲーム", (t, A) => {
+    image("mozart", W * .1, H * .3, 160 * pr(t, T("L61"), .5, ease.back) + 1, A, .05);
+    const s1 = 1 - pr(t, T("L61", .3), .4), s2 = pr(t, T("L61", .3), .6, ease.back);
+    txt("「図形の問題が 少し上がった」", W * .55, H * .3, 44, C.ink, "center", 800, A * s1 * pr(t, T("L61", .05), .4));
+    txt("「モーツァルトで 頭が良くなる！」", W * .55, H * .3, 44 + 26 * s2, C.amber, "center", 900, A * s2, 1300);
+    const kg = pr(t, T("L61", .5), .6, ease.back);
+    if (kg > 0) {
+      chip("1998年 アメリカ・ジョージア州の知事", W * .3, H * .5, C.amber, A * kg, 36);
+      for (let i = 0; i < 12; i++) { const k = pr(t, T("L61", .6) + i * .08, .4, ease.back), x = W * .1 + (i % 6) * 150, y = H * .64 + Math.floor(i / 6) * 150; icon("baby", x, y, 1.0 * k, C.ink, A); icon("cd", x + 52, y + 30, .42 * k, C.violet, A); }
+      const kn = pr(t, T("L61", .8), 1.2, ease.out);
+      txt(`$${Math.round(105000 * kn).toLocaleString("en-US")}`, W * .78, H * .64, 110, C.amber, "center", 900, A * pr(t, T("L61", .78), .3));
+      txt("赤ちゃん全員に クラシック音楽を配る予算", W * .78, H * .64 + 90, 30, C.ink, "center", 700, A * pr(t, T("L61", .78), .3), 600);
+    }
+  });
+  beat(["L63"], "night", "理由③ 私たちの心理", (t, A) => {
+    const kh = pr(t, T("L63") - .2, .7, ease.back), hx = W * .64, hy = H * .5;
+    head(hx, hy, 1.4 * kh, A); badge("brain", hx - 10, hy - 90, 1.1 * kh, C.cyan, A);
+    chip("分かりやすい ＝ 本当っぽい", hx, 120, C.amber, A * pr(t, T("L63", .3), .4, ease.back), 38);
+    [["数字が 一つだけ", "chart", T("L63", .5)], ["物語がある", "book", T("L63", .58)], ["教訓がある", "bulb", T("L63", .66)]].forEach(([nm, ic, a], i) => {
+      const y = H * .3 + i * 190, mv = pr(t, T("L63", .8), .8, ease.inOut), x = lerp(W * .1, hx - 60, mv);
+      badge(ic, x, y, .7 * pr(t, a - .2, .4, ease.back), C.amber, A * (1 - pr(t, T("L63", .85), .3)));
+      txt(nm, x + 90, y, 34, C.ink, "left", 800, A * pr(t, a - .2, .4) * (1 - mv));
+    });
+    const kc = pr(t, T("L63", .75), .9, ease.inOut);
+    if (kc > 0) { card(0, lerp(W * .2, hx - 30, kc), lerp(H * .5, hy - 60, kc), lerp(.8, .25, kc), A, -.1); card(4, lerp(W * .2 + 300, hx + 40, kc), lerp(H * .5, hy - 40, kc), lerp(.8, .25, kc), A, .1); }
+  });
+  beat(["L64"], "night", "理由③ 私たちの心理", (t, A) => {
+    picto(W * .16, H * .6, 1.8 * pr(t, T("L64"), .5, ease.back), C.ink, "stand", 0, A);
+    for (let i = 0; i < 8; i++) at(W * .34 + (i % 4) * 180, H * .26 + Math.floor(i / 4) * 150, pr(t, T("L64") + .3 + i * .35, .5, ease.back), A * .9, () => { ICON.speech(i % 2 ? C.dim : C.amber); txt("55%", 0, -6, 26, C.bg0, "center", 900); });
+    chip("何度も聞くと 本当だと感じる", W * .6, H * .66, C.amber, A * pr(t, T("L64", .2), .4, ease.back), 40);
+    txt("正しい答えを知っていても 起きる（Fazio ら 2015）", W * .6, H * .76, 30, C.ink, "center", 700, A * pr(t, T("L64", .5), .4));
+    const kn = pr(t, T("L64", .8), .6, ease.back);
+    if (kn > 0) { darken(A * kn * .6); bigNote("真実性の錯覚", H * .45, C.pink, A * kn, 110); }
+  });
+  beat(["L65"], "base", "理由③ 私たちの心理", (t, A) => {
+    for (let i = 0; i < 5; i++) { const k = pr(t, T("L65") + i * .1, .5, ease.back), rep = pr(t, T("L65", .4), 1.5); for (let e = 3; e >= 0; e--) { const off = e * 14 * rep; card(i, ROW[i] + off, H * .4 - off, .74, A * k * (e ? .35 * rep : 1)); } }
+    const op = pr(t, T("L65", .45), .5);
+    badge("repeat", W * .3, H * .8, .9 * op, C.pink, A); txt("何度も聞いた", W * .3 + 90, H * .8, 40, C.pink, "left", 900, A * op);
+    badge("bulb", W * .6, H * .8, .9 * pr(t, T("L65", .75), .4, ease.back), C.amber, A); txt("分かりやすかった", W * .6 + 90, H * .8, 40, C.amber, "left", 900, A * pr(t, T("L65", .75), .4));
+  });
+  // ============ 結論 ============
+  beat(["L66"], "green", "確かめられた研究", (t, A) => {
+    for (let i = 0; i < 36; i++) { const k = pr(t, T("L66") + i * .03, .4, ease.back); g.save(); g.globalAlpha = A * k; g.fillStyle = C.green; glow(C.green, 14); g.beginPath(); g.arc(W / 2 - 8.5 * 70 + (i % 18) * 70, H * .45 + Math.floor(i / 18) * 70, 20, 0, 7); g.fill(); g.restore(); }
+    bigNote("やり直しても、確かめられた研究もある", H * .2, C.green, A * pr(t, T("L66", .4), .4), 56);
+    chip("たとえば ミルグラムの実験", W / 2, H * .76, C.ink, A * pr(t, T("L66", .8), .4, ease.back), 40);
+  });
+  beat(["L67a"], "lab2", "確かめられた研究：ミルグラムの実験", (t, A) => {
+    chip("1960年代のはじめ　ミルグラムの実験", W / 2, 120, C.cyan, A * pr(t, T("L67a"), .4, ease.back), 38);
+    milgram(t, A, pr(t, T("L67a", .3), .6, ease.back), pr(t, T("L67a", .75), 1.5));
+    txt("問題を間違えるたびに 電気ショックを与えて", W / 2, H * .22, 34, C.ink, "center", 800, A * pr(t, T("L67a", .65), .4));
+  });
+  beat(["L67b"], "lab2", "確かめられた研究：ミルグラムの実験", (t, A) => {
+    milgram(t, A, 1, pr(t, T("L67b", .3), 6, ease.inOut));
+    chip("生徒役は 演技。電気は流れていない", W * .74, H * .16, C.pink, A * pr(t, T("L67b"), .4, ease.back), 30);
+    if (t > T("L67b", .35)) at(W * .86, H * .44, pr(t, T("L67b", .35), .4, ease.back), A, () => { ICON.speech(C.pink); txt("うっ…！", 0, -6, 26, C.bg0, "center", 900); });
+    if (t > T("L67b", .55)) at(W * .14, H * .36, pr(t, T("L67b", .55), .4, ease.back), A, () => { panel(-150, -44, 300, 88, 1, "#e8eef8"); txt("続けてください", 0, 0, 30, C.ink, "center", 900); });
+    const kr = pr(t, T("L67b", .78), .6, ease.back);
+    if (kr > 0) { darken(A * kr * .7); bigNote("3分の2ほどの人が、いちばん強いショックまで", H * .45, C.amber, A * kr, 56); }
+  });
+  beat(["L67c"], "green", "確かめられた研究：ミルグラムの実験", (t, A) => {
+    chip("2006年　「やめてくれ」の所で止める形で やり直し", W / 2, 120, C.cyan, A * pr(t, T("L67c"), .4, ease.back), 34);
+    const k1 = pr(t, T("L67c", .45), 1.0, ease.out);
+    vbar(W * .38, H * .76, 200, 400, .82 * k1, C.dim, "ミルグラム（1960年代）", "", A);
+    vbar(W * .62, H * .76, 200, 400, .70 * k1, C.cyan, "2006年", "", A * pr(t, T("L67c", .5), .3));
+    txt("続けようとした人の割合：少し低いだけ", W / 2, H * .2, 34, C.ink, "center", 800, A * pr(t, T("L67c", .55), .4));
+    const kn = pr(t, T("L67c", .75), .6, ease.back);
+    if (kn > 0) { darken(A * kn * .6); bigNote("命令されると、思った以上に従ってしまう", H * .4, C.green, A * kn, 54); bigNote("45年たっても 変わらなかった", H * .54, C.ink, A * kn, 46); }
+  });
+  beat(["L69", "L70", "L71", "L72"], "base", "根拠を確かめる 3つのチェック", (t, A) => {
+    if (t < T("L70") - .2) {
+      badge("sieve", W / 2, H * .38, 1.4 * pr(t, T("L69"), .6, ease.back), C.cyan, A);
+      chip("確かめられた話", W * .28, H * .64, C.green, A * pr(t, T("L69") + .8, .4, ease.back), 40);
+      chip("それらしいだけの話", W * .72, H * .64, C.dim, A * pr(t, T("L69") + 1.4, .4, ease.back), 40);
+      bigNote("三つだけ 確かめる", H * .8, C.ink, A * pr(t, T("L69", .65), .4), 52);
+      return;
+    }
+    const its = [["L70", "magnifier", "もとの研究は 本当にそう言っている？", C.cyan], ["L71", "repeat", "ほかの研究者が やり直して確かめた？", C.green], ["L72", "paper", "その数字は どこから来た？", C.amber]];
+    its.forEach(([id, ic, s, col], i) => {
+      const k = pr(t, T(id) - .2, .6, ease.back), y = H * .24 + i * 190, cur = t >= T(id) - .2 && (i === 2 || t < T(its[i + 1][0]) - .2);
+      panel(W * .14, y - 75, W * .72, 150, A * k, cur ? col : C.line, cur ? "rgba(24,44,72,0.95)" : C.panel);
+      txt(`${i + 1}`, W * .14 + 80, y, 80, col, "center", 900, A * k);
+      badge(ic, W * .14 + 210, y, .6 * k, col, A);
+      txt(s, W * .14 + 310, y, 50, C.ink, "left", 900, A * k, W * .55);
+    });
+  });
+  beat(["L73", "L74"], "night", null, () => {});   // 3D
+}
+
+// ---------------------------------------------------------------- 3D（冒頭 L00・最後 L73〜L74）
+function cg(t) {
+  if (t < E("L00") + .5) { G3.stamp(clamp(t / (E("L00") + .5))); return 1 - pr(t, E("L00") + .1, .5); }
+  if (t >= S("L73") - .3) { G3.card(clamp((t - S("L73") + .3) / (E("L74") - S("L73") + .3)), (t - S("L73", .75)) / .5); return pr(t, S("L73") - .3, .5); }
+  G3.clear(); return 0;
+}
+function cgOverlay(t) {
+  if (t < E("L00") + .5) {
+    txt("今から言う5つ。", W / 2, H * .09, 56, C.ink, "center", 900, pr(t, .2, .8) * (1 - pr(t, E("L00"), .4)));
+    txt("あなたは、たぶん全部 聞いたことがある。", W / 2, H * .09 + 70, 46, C.amber, "center", 900, pr(t, S("L00", .45), .6) * (1 - pr(t, E("L00"), .4)));
+  }
+  if (t >= S("L73") - .3) {
+    const a = 1 - pr(t, S("L74") - .2, .4);
+    txt("よく聞く、それっぽい話", W / 2, H * .12, 48, C.dim, "center", 800, a * pr(t, S("L73"), .5));
+    const k = pr(t, S("L74"), .6, ease.back);
+    if (k > 0) {
+      darken(k * .86);
+      txt("それらしい話ほど、", W / 2, H * .3, 80, C.ink, "center", 900, k);
+      txt("一度だけ、根拠を調べる。", W / 2, H * .3 + 110, 80, C.amber, "center", 900, pr(t, S("L74", .2), .6));
+      txt("本当のことは、調べても、逃げません。", W / 2, H * .62, 60, C.ink, "center", 800, pr(t, S("L74", .55), .8));
+      ["magnifier", "repeat", "paper"].forEach((n, i) => badge(n, W / 2 + (i - 1) * 200, H * .8 - 20, .55 * pr(t, S("L74", .3) + i * .15, .5, ease.back), [C.cyan, C.green, C.amber][i], k));
+    }
+  }
+}
+function ending(t) {
+  const es = TL.ending_start; if (t < es - .1) return;
+  const k = pr(t, es, .6), k2 = pr(t, LN.END2 ? LN.END2.start : es + 1, .6);
+  darken(k * .93);
+  txt("リバース", W / 2, H * .42, 150, C.ink, "center", 900, k);
+  txt("世界の仕組みを、はじめから。", W / 2, H * .42 + 130, 56, C.amber, "center", 800, k2);
+  ["ナレーション：" + TL.credits.join("／"), "音楽：Kevin MacLeod (incompetech.com) CC BY 4.0"].forEach((s, i) => txt(s, W / 2, H * .82 + i * 40, 24, C.dim, "center", 500, k2, 1700));
+}
+
+// ---------------------------------------------------------------- 1 コマを描く
+function kick(t) {
+  let v = 0;
+  for (const b of BEATS) { const d = t - (b.a + .3); if (d > 0 && d < 1.2) v += .026 * Math.exp(-d * 4.5) * Math.sin(Math.min(d * 9, Math.PI / 2)); }
+  return v;
+}
+function themeAt(t) {
+  const i = BEATS.findIndex(b => t >= b.a && t < b.b); if (i < 0) return ["base", null, 0];
+  const b = BEATS[i], p = i > 0 ? BEATS[i - 1] : null, k = clamp((t - b.a) / .6);
+  return p && p.theme !== b.theme && k < 1 ? [p.theme, b.theme, ease.inOut(k)] : [b.theme, null, 0];
+}
+function draw(t) {
+  const cgA = cg(t);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+  if (cgA < 1) {
+    const [th0, th1, tk] = themeAt(t);
+    g.save(); g.globalAlpha = 1 - cgA; background(t, th0, th1, tk); g.restore();
+    const z = 1 + kick(t) + .012 * Math.sin(t * .21);
+    g.save(); g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-W / 2, -H / 2); g.globalAlpha = 1 - cgA;
+    let tag = null;
+    for (const b of BEATS) {
+      if (t < b.a || t > b.b + XF) continue;
+      const A = clamp(Math.min((t - b.a) / XF, 1 - (t - b.b) / XF));
+      if (A <= 0) continue;
+      if (t < b.b) tag = b;
+      NOWB = b;
+      const slide = (1 - ease.out(clamp((t - b.a) / .5))) * 50 - (t > b.b ? ease.inOut(clamp((t - b.b) / XF)) * 50 : 0);
+      g.save(); g.globalAlpha *= A; g.translate(slide, 0); b.fn(t, A); g.restore();
+    }
+    g.restore();
+    if (tag && tag.tag) chapterTag(tag.tag, C.cyan, (1 - cgA) * clamp((t - tag.a) / .5));
+  }
+  cgOverlay(t);
+  ending(t);
+  subtitle(t);
+}
+
+window.setTimeline = tl => { TL = tl; LN = {}; tl.lines.forEach(x => LN[x.id] = x); setup(); layout(); };
+window.READY = READY_IMG;
+window.renderFrame = t => { NOW = t; TEXTLOG.length = 0; draw(t); };
+window.renderThumb = () => {
+  TEXTLOG.length = 0; G3.clear(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); background(12);
+  for (let i = 0; i < 5; i++) { card(i, 230 + i * 130, 760 + (i % 2) * 30, .62, 1, (i - 2) * .07, .55); at(230 + i * 130, 740, .62, 1, () => stamp("？", 0, -10, 1, C.red, 150, -.12)); }
+  txt("心理学の", 1300, 250, 120, C.ink, "center", 900);
+  txt("3分の2は", 1300, 420, 170, C.amber, "center", 900);
+  txt("やり直すと消えた", 1300, 590, 110, C.ink, "center", 900);
+  for (let i = 0; i < 3; i++) { g.save(); g.lineWidth = 8; g.strokeStyle = C.amber; g.fillStyle = C.amber; glow(C.amber, 24); g.beginPath(); g.arc(1180 + i * 120, 760, 40, 0, 7); g.stroke(); if (!i) g.fill(); g.restore(); }
+  txt("100の研究を やり直したら", 1300, 880, 52, C.dim, "center", 800);
+};
+</script>
+</body></html>
