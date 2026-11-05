@@ -42,7 +42,7 @@ ROOT = HERE.parents[1]                      # anatomy_room
 PROD = ROOT / "production"
 PORT = 8765
 SR = 48000
-DEFAULT_SETTINGS = {"pitch": -0.5, "reverb": 18, "rate": 7.0, "credit": ""}   # ピッチ（半音）・響き（%）・目標の速さ（モーラ/秒）
+DEFAULT_SETTINGS = {"pitch": -1.0, "reverb": 0, "rate": 7.0, "credit": "", "proc": 2}   # ピッチ（半音）・響き（%）・目標の速さ（モーラ/秒）・加工の版
 PUNCT = re.compile(r"[\s、。，．,.!！?？「」『』（）()・…ー〜~]")
 
 # ---------------------------------------------------------------------------- 台本
@@ -75,18 +75,22 @@ class Project:
             sf = d / "studio.json"
             saved = json.loads(sf.read_text(encoding="utf-8")) if sf.exists() else {}
             self.settings = {**DEFAULT_SETTINGS, **saved.get("settings", {})}
+            if self.settings.get("proc", 1) < PROC_VERSION:    # 加工の版が上がったら、ピッチと響きも新しい既定値に
+                self.settings.update(pitch=DEFAULT_SETTINGS["pitch"], reverb=DEFAULT_SETTINGS["reverb"], proc=PROC_VERSION)
+            for ln in lines:
+                ln["moras"] = moras(ln["speech"])
             self.status = {}
             for ln in lines:
                 st = saved.get("status", {}).get(ln["id"])
                 raw = self.raw_path(ln["id"])
-                if raw and st and st.get("state") in ("完了", "失敗"):
+                if raw and st and st.get("state") == "完了" and st.get("proc", 1) < PROC_VERSION:
+                    self.status[ln["id"]] = {**st, "state": "処理待ち"}; JOBS.put((ln["id"], "render"))   # 新しい加工で作り直す
+                elif raw and st and st.get("state") in ("完了", "失敗"):
                     self.status[ln["id"]] = st
                 elif raw:
                     self.status[ln["id"]] = {"state": "処理待ち"}; JOBS.put((ln["id"], "full"))
                 else:
                     self.status[ln["id"]] = {"state": "未録音"}
-            for ln in lines:
-                ln["moras"] = moras(ln["speech"])
             self.save()
 
     def raw_path(self, lid):
@@ -202,14 +206,54 @@ def edit(lid):
 
 
 # ---------------------------------------------------------------------------- ② 声の加工（ピッチと響きはここだけ）
-def impulse(seconds=1.6, seed=3):
-    """合成の残響（部屋の響き）。初期反射＋指数的に減る雑音"""
+PROC_VERSION = 2   # 加工の版。上げると、開いたときに完了済みの行を新しい加工で作り直す
+# v2（2026-11-05、ユーザー「加工が弱い・お風呂にいるみたい。スタジオのように、声はかなり強めに」）：
+#   部屋の反響を取り除く（残響抑制）、足す響きは小さな部屋の短い響きに（既定 0）、低音・箱鳴りの削り・コンプを強く、言葉の間の部屋の音を下げる
+
+
+def impulse(seconds=0.35, seed=3):
+    """足す響き：録音ブースのような小さな部屋（短い初期反射＋0.35 秒で消える残響）"""
     r = np.random.default_rng(seed); n = int(seconds * SR); t = np.arange(n) / SR
-    ir = r.standard_normal(n) * np.exp(-t / (seconds / 6.5))
-    for d, g in ((.011, .5), (.019, .35), (.027, .3), (.041, .22)):
+    ir = r.standard_normal(n) * np.exp(-t / (seconds / 6.5)) * .5
+    for d, g in ((.004, .5), (.007, .35), (.011, .3), (.016, .22)):
         ir[int(d * SR)] += g * 8
-    lp = np.convolve(ir, np.ones(9) / 9, "same")       # 高い音を少し丸める
+    lp = np.convolve(ir, np.ones(15) / 15, "same")      # 高い音を丸める（金属的に響かないように）
     return lp / np.sqrt(np.sum(lp ** 2))
+
+
+def stft(x, n=1024, hop=256):
+    w = np.hanning(n)
+    pad = np.concatenate([np.zeros(n), x, np.zeros(n)])
+    frames = np.lib.stride_tricks.sliding_window_view(pad, n)[::hop] * w
+    return np.fft.rfft(frames, axis=1), w
+
+
+def istft(X, w, length, n=1024, hop=256):
+    frames = np.fft.irfft(X, n, axis=1) * w
+    out = np.zeros(hop * (len(frames) - 1) + n); norm = np.zeros_like(out)
+    for i, f in enumerate(frames):
+        out[i * hop:i * hop + n] += f; norm[i * hop:i * hop + n] += w ** 2
+    return (out / np.maximum(norm, 1e-8))[n:n + length]
+
+
+def dereverb(x, t60=0.6, strength=1.6, floor_db=-18):
+    """部屋の反響（後部残響）と定常の雑音を、周波数ごとに引き算する（Lebart らの方法）。
+    いまの音の強さから「少し前の音が残響として残っている分」を見積もり、それを超えない分だけを残す"""
+    hop = 256
+    X, w = stft(x, hop=hop)
+    Pw = np.abs(X) ** 2
+    Pw_s = Pw.copy()                                  # 時間方向になめらかにした強さ
+    for i in range(1, len(Pw_s)):
+        Pw_s[i] = .6 * Pw_s[i - 1] + .4 * Pw[i]
+    td = int(.05 * SR / hop)                          # 50 ms より後ろの反響を消す
+    decay = np.exp(-2 * (3 * np.log(10) / t60) * td * hop / SR)
+    late = np.zeros_like(Pw); late[td:] = decay * Pw_s[:-td]
+    noise = np.percentile(Pw_s, 12, axis=0)           # いちばん静かな部分＝部屋の雑音
+    g = 1 - (strength * late + 1.5 * noise) / np.maximum(Pw, 1e-12)
+    g = np.clip(g, 10 ** (floor_db / 20), 1)
+    for i in range(1, len(g)):                        # ゲインの急な変化（ぶくぶくした音）を抑える
+        g[i] = np.maximum(g[i], .7 * g[i - 1] + .3 * g[i])
+    return istft(X * g, w, len(x), hop=hop)
 
 
 IR = None
@@ -228,23 +272,41 @@ def render(lid):
     target = ln["moras"] / st["rate"]                       # 目標の速さで読んだときの長さ
     tempo = max(.88, min(1.15, dur / target)) if target > 0 else 1.0   # 速さをそろえる（0.88〜1.15 倍まで）
     pitch = 2 ** (st["pitch"] / 12)
-    af = ",".join([
-        "highpass=f=70", "afftdn=nr=10:nf=-48:tn=1", "deesser=i=0.35:m=0.5:f=0.5",
-        "bass=g=4.5:f=120:w=0.8",                       # 低音を強め（聞き心地のよい厚み）
-        "equalizer=f=320:t=q:w=1.1:g=-2",               # こもりを抑える
-        "equalizer=f=3200:t=q:w=1.0:g=1.8",             # 言葉の明瞭さ
-        "treble=g=-1.5:f=9000",                         # 耳に刺さる高音を少し丸める
-        "acompressor=threshold=-21dB:ratio=3:attack=8:release=160:makeup=2.5",
+    # 順番が大事：コンプは言葉の後ろの反響まで持ち上げる（強いコンプだけだと、大きい音と静かな音の差が 18→8 dB に縮んで
+    # お風呂のように聞こえた）。反響をコンプの前で強く取り、コンプのあとでもう一度軽く取る（ユーザーの録音で、静かな部分が
+    # 録音そのままより約 11 dB 下がることを確かめた）
+    x = ffmpeg_filter(x, "highpass=f=75:p=2")
+    x = x / (np.abs(x).max() + 1e-9) * .7
+    x = dereverb(x, t60=0.8, strength=3, floor_db=-25)       # 部屋の反響と雑音を取る（お風呂のような響きの元）
+    x = x / (np.abs(x).max() + 1e-9) * .7                   # 以下のしきい値が録音の大きさに左右されないように
+    x = ffmpeg_filter(x, ",".join([
+        "bass=g=10:f=120:w=0.7",                         # 低音を強く（近くで話すような厚み）
+        "equalizer=f=190:t=q:w=1.0:g=2",                 # 胸の響きの温かさ
+        "equalizer=f=420:t=q:w=1.2:g=-4.5",              # PC マイクの箱鳴り・こもりを削る
+        "equalizer=f=900:t=q:w=1.5:g=-1.5",              # 鼻にかかった音を抑える
+        "equalizer=f=3500:t=q:w=1.0:g=3",                # 言葉の輪郭
+        "treble=g=1.5:f=11000",                          # 空気感（明るさ）
+        "acompressor=threshold=-20dB:ratio=3.5:attack=5:release=200:knee=4:makeup=3",   # 声の大きさをそろえて前に出す
+        "asoftclip=type=tanh:threshold=0.95",            # 少しだけ温かい歪み
+    ]))
+    x = dereverb(x, t60=0.6, strength=2, floor_db=-20)       # コンプで持ち上がった反響をもう一度取る
+    y = ffmpeg_filter(x, ",".join([
+        "deesser=i=0.5:m=0.6:f=0.5",
         f"rubberband=pitch={pitch:.5f}:tempo={tempo:.4f}:formant=preserved:transients=smooth",
-    ])
-    y = ffmpeg_filter(x, af)
+    ]))
     if st["reverb"] > 0:
         if IR is None:
             IR = impulse()
-        wet = fftconv(np.concatenate([y, np.zeros(int(.6 * SR))]), IR)
-        y = np.concatenate([y, np.zeros(int(.6 * SR))]) * (1 - st["reverb"] / 250) + wet * (st["reverb"] / 100) * .35
+        y = np.concatenate([y, np.zeros(int(.4 * SR))])
+        wet = fftconv(y, IR)
+        y = y + wet * (st["reverb"] / 100) * .25
         tail = np.where(np.abs(y) > 1e-3)[0]; y = y[:tail[-1] + int(.05 * SR)] if len(tail) else y
-    y = ffmpeg_filter(y, "loudnorm=I=-18:TP=-2:LRA=7,alimiter=limit=0.89:level=disabled")
+    # 音量：話している部分の大きさを -18 dBFS（RMS）にそろえる。loudnorm は短い音だと静かな部分を持ち上げるので使わない
+    n = int(.02 * SR); m = len(y) // n
+    e = (y[:m * n].reshape(m, n) ** 2).mean(1)
+    act = e[e > e.max() * 10 ** (-3.5)] if m else np.array([1e-4])
+    y = y * 10 ** (-18 / 20) / np.sqrt(act.mean() + 1e-12)
+    y = ffmpeg_filter(y, "alimiter=limit=0.89:attack=2:release=40:level=disabled")
     pad = np.zeros(int(.03 * SR)); y = np.concatenate([pad, y, pad])
     write_wav(P.dir / "out" / f"{lid}.wav", y)
     return len(y) / SR, tempo
@@ -262,7 +324,7 @@ def worker():
                 info = edit(lid)
             dur, tempo = render(lid)
             P.status[lid] = {**P.status[lid], **info, "state": "完了", "dur": round(dur, 2), "tempo": round(tempo, 3),
-                             "rev": time.time()}
+                             "rev": time.time(), "proc": PROC_VERSION}
         except Exception as e:
             P.status[lid] = {**P.status.get(lid, {}), "state": "失敗", "msg": str(e)[:300]}
         finally:
