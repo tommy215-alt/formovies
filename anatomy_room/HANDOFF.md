@@ -93,7 +93,7 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - ChatGPT への依頼文 `scripts/long_001/gpt_fact_check_prompt.md` → ユーザーが結果を貼る → Claude が出典で確かめて `fact_check.md`・`assets.md` → 台本 → ユーザーの「OK」。長い動画用の設計（声・BGM・図の部品）はこれから決める。
 - 2026-11-05：ChatGPT の結果を確かめ直して `fact_check.md`・`assets.md`・`script_draft.md`（L00〜L58、約 3,000 字）を作成。冒頭のカードは「笑顔」をやめ「パワーポーズ」に（笑顔は 2022 年の研究で効果ありの面があるので結論側へ）。ユーザーの「OK」（2026-11-05、横長で、ピクトグラム・図・矢印・アイコンを多めに、動きにメリハリ、ナレーションはやや低温で落ち着いた温かいトーン）。
 - **制作（2026-11-05）**：`production/long_001/`（横長 1920×1080、8 分 38 秒）。長い動画の部品は `production/ext/long/`（`long_ext.py`：横長の書き出し `render_frames_long.js` に差し替え・場面ごとに曲を切り替える BGM）。描画は `kit_long.js`（ピクトグラム・アイコン・矢印・3D の問いかけ）＋`renderer.html`（場面）。声は阿井田 茂 Calm 話速 1.15・抑揚 0.9（行間 0.22）。書き出しは `python production_script.py audio textcheck render mux docs qc`（rv.py は縦長用なので使わない）。1 コマ約 0.2 秒、2 本同時（映像 約 20 分）。音声のミックスは 8 分の長さで約 30 分かかる（pipeline のダッキングの畳み込みが長さに比例して重い）。
-- **完成（2026-11-05）**：（8 分 38 秒、113 MB）。GitHub の 1 ファイル 100 MB の上限を超えるので **mp4 は git に入れない**（.gitignore。PC の作業フォルダにだけある）。サムネイル 、タイトル・説明文（チャプター付き）。video_qa の NG は「解像度」（横長なので想定どおり）・「最初のコマ」（thumbnail.png を使う）・「冒頭 3 秒の動き」（3D の判子がゆっくり迫る）。ユーザーの感想待ち。YouTube へのアップロードはユーザーの指示まで行わない。
+- **完成（2026-11-05）**：`production/long_001/reverse_long_001_replication.mp4`（8 分 38 秒、113 MB）。GitHub の 1 ファイル 100 MB の上限を超えるので **mp4 は git に入れない**（.gitignore。PC の作業フォルダにだけある）。サムネイル `thumbnail.png`、タイトル・説明文（チャプター付き）`youtube_metadata.md`。video_qa の NG は「解像度」（横長なので想定どおり）・「最初のコマ」（thumbnail.png を使う）・「冒頭 3 秒の動き」（3D の判子がゆっくり迫る）。ユーザーの感想待ち。YouTube へのアップロードはユーザーの指示まで行わない。
 
 ## 次の動画でやること（ガイドライン v2.4）
 
