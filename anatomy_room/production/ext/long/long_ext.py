@@ -2,7 +2,8 @@
 
 1. 書き出し：pipeline が呼ぶ common/render_frames.js を、横長の複製 ext/long/render_frames_long.js に差し替える
    （pipeline の subprocess を包み、引数のパスだけを置き換える）。
-2. BGM：場面ごとに曲を切り替える（曲ごとに続きから鳴らし、切り替えは xfade 秒で重ねる）。
+2. 音声の工程の高速化：pipeline の np.convolve（セリフ中に BGM を下げるダッキング）を FFT に差し替える（結果は同じ）。
+3. BGM：場面ごとに曲を切り替える（曲ごとに続きから鳴らし、切り替えは xfade 秒で重ねる）。
      long_ext.register_bgm("long_001", {"inv": path, "dawn": path, ...})
      "music": {"style": "long_001", "sections": [(cue, off, "inv"), (cue, off, "dawn@60"), (cue, off, "mute"), ...]}
    モードは "曲の名前" か "曲の名前@音量%"、"mute" は無音、"ending" は直前の曲を 35% で続ける。
@@ -47,6 +48,33 @@ class _Sub:
 
     def __getattr__(self, name):
         return getattr(_sp, name)
+
+
+class _NP:
+    """pipeline の numpy の代わり：長い配列どうしの np.convolve を FFT で計算する（結果は数値誤差の範囲で同じ。長い動画で音声の工程が 30 分以上かかったため）"""
+
+    def __init__(self, np_):
+        self._np = np_
+
+    def convolve(self, a, v, mode="full"):
+        a, v = np.asarray(a, dtype=float), np.asarray(v, dtype=float)
+        if min(len(a), len(v)) < 512:
+            return np.convolve(a, v, mode=mode)
+        n = len(a) + len(v) - 1
+        N = 1 << (n - 1).bit_length()
+        r = np.fft.irfft(np.fft.rfft(a, N) * np.fft.rfft(v, N), N)[:n]
+        if mode == "full":
+            return r
+        if mode == "same":
+            m = max(len(a), len(v))
+            s = (n - m) // 2
+            return r[s:s + m]
+        m = max(len(a), len(v)) - min(len(a), len(v)) + 1
+        s = min(len(a), len(v)) - 1
+        return r[s:s + m]
+
+    def __getattr__(self, name):
+        return getattr(self._np, name)
 
 
 def _decode(path):
@@ -116,6 +144,8 @@ def setup(here):
     aivis_ext.apply(pipeline)
     if not isinstance(pipeline.subprocess, _Sub):
         pipeline.subprocess = _Sub(pipeline.COMMON)
+    if not isinstance(pipeline.np, _NP):
+        pipeline.np = _NP(pipeline.np)
     if not getattr(music, "_LONG_LOADED", False):
         music._LONG_LOADED = True
         prev = music.bgm_techno

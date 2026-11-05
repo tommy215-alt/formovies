@@ -36,3 +36,8 @@ Content ID の申し立てに備え、ダウンロードの記録を残す。
 - Ioannidis 2005：PLOS の PDF（https://journals.plos.org/plosmedicine/article/file?id=10.1371/journal.pmed.0020124&type=printable）の 1 ページ目を PyMuPDF で画像にし、下の PLOS のロゴの帯を切り落とした（`assets/src/ioannidis_p1.jpg`）。ページの Copyright 欄に「open-access article distributed under the terms of the Creative Commons Attribution License」とある（本文で確認）。
 - BGM：incompetech の曲一覧（pieces.json）で 5 曲の題名とファイル名を確認し、公式の mp3 をダウンロード（`production/long_001/assets/bgm/`）。「Satiate - only strings」のファイル名は Satiate Strings.mp3。FAQ のページで Creative Commons: By Attribution 4.0 を確認。
 - Sumner 2014 のページの画像は使っていない（数字だけ自作の棒グラフに）。
+
+## v4（2026-11-05 の作り直し）で使うもの
+
+- 画像：モーツァルトの肖像画だけ（Ioannidis 2005 の 1 ページ目は、台本から外れたので使っていない。assets.js には残っている）。
+- BGM：Investigations・Lightless Dawn・Crypto・Comfortable Mystery の 4 曲（Satiate - only strings は、正直さの研究の場面を削ったので使っていない）。
