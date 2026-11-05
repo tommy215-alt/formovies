@@ -23,3 +23,6 @@ anatomy_room/production/*/assets/src_*
 
 # YouTube 投稿の画面の記録（tools/yt_upload.js）
 anatomy_room/publish/log/
+
+# 長い動画の完成版は 100 MB を超えるので git に入れない（GitHub の上限。PC の作業フォルダにだけ置く）
+anatomy_room/production/long_*/reverse_long_*.mp4
