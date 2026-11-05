@@ -3,159 +3,137 @@
 <title>long_001 thumbnail</title>
 <style>
 @font-face { font-family: "Dela"; src: url("../assets/fonts/delagothicone_DelaGothicOne-Regular.ttf"); }
+@font-face { font-family: "NotoBlack"; src: url("fonts/NotoSansJP-VF.ttf"); font-weight: 100 900; }
+@font-face { font-family: "ZenKaku"; src: url("fonts/ZenKakuGothicNew-Black.ttf"); }
+@font-face { font-family: "MPlus"; src: url("fonts/MPLUS1p-Black.ttf"); }
+@font-face { font-family: "Shippori"; src: url("fonts/ShipporiMinchoB1-ExtraBold.ttf"); }
+@font-face { font-family: "Tokumin"; src: url("fonts/KaiseiTokumin-ExtraBold.ttf"); }
+@font-face { font-family: "ZenAntique"; src: url("fonts/ZenAntique-Regular.ttf"); }
+@font-face { font-family: "Reggae"; src: url("fonts/ReggaeOne-Regular.ttf"); }
+@font-face { font-family: "Rampart"; src: url("fonts/RampartOne-Regular.ttf"); }
 html, body { margin: 0; background: #000; }
 #c { display: block; }
 </style>
 </head><body>
 <canvas id="c" width="2560" height="1440"></canvas>
 <script>
-// long_001「なぜ、間違った科学ほど広まるのか」のサムネイル（YouTube 用 1280×720 を 2 倍で描く）。
-// ユーザーの指示（2026-11-05）：「間違った科学」「広まるのか」を強調、字体は「零ゴシック」（割れた文字）を参考に、
-// 背景の頭は 2D でもっと写実的に、そこからネットワークに広がる画。零ゴシックは配布元の BOOTH にログインが要るので、
-// Dela Gothic One（OFL）に「割れ」を描画で加えて近づけている（零ゴシックのファイルが手に入ったら font-face を差し替える）。
+// long_001「なぜ、間違った科学ほど広まるのか」のサムネイル（YouTube 用 1280×720 を 2 倍で描く）。thumb.html?font=ZenKaku のように字体を選ぶ。
+// ユーザーの指示（2026-11-05）：フォントが AI っぽい → いくつか試す。文字は一回り小さく。頭は、添付の参考のように
+// 横顔のシルエットを細かいアイコン（グラフ・歯車・画面・回路など）で埋め、後頭部から回路とネットワークが外へ広がる画に。
+// 文字は発光とグラデーションを控え、単色＋白と黒の二重の縁取り（実際のサムネイルでよく見る付け方）。フォントはすべて OFL。
+const FONT = new URLSearchParams(location.search).get("font") || "ZenKaku";
+const FW = FONT === "NotoBlack" ? "900 " : "";
 const cv = document.getElementById("c"), g = cv.getContext("2d"), W = 2560, H = 1440;
-let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+let seed = 23; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
 function bg() {
-  const gr = g.createRadialGradient(W * .74, H * .45, 80, W * .6, H * .5, W * .85);
-  gr.addColorStop(0, "#1b3d68"); gr.addColorStop(.4, "#0c1d3a"); gr.addColorStop(1, "#02050b");
+  const gr = g.createRadialGradient(W * .74, H * .45, 80, W * .62, H * .5, W * .85);
+  gr.addColorStop(0, "#173a63"); gr.addColorStop(.45, "#0a1a33"); gr.addColorStop(1, "#02050b");
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  g.strokeStyle = "rgba(120,180,255,0.05)"; g.lineWidth = 2;
-  for (let x = 0; x < W; x += 80) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
-  for (let y = 0; y < H; y += 80) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
 }
 
-// 写実的な横顔（左向き、首と肩まで）
+// 横顔（左向き）。額が出て後頭部が大きい頭、首まで
 function headPath(cx, cy, s) {
   const p = new Path2D(), P = (x, y) => [cx + x * s, cy + y * s];
-  p.moveTo(...P(470, 720));
-  p.bezierCurveTo(...P(470, 600), ...P(400, 560), ...P(330, 520));
-  p.bezierCurveTo(...P(300, 430), ...P(300, 330), ...P(310, 260));
-  p.bezierCurveTo(...P(380, 120), ...P(380, -170), ...P(240, -330));
-  p.bezierCurveTo(...P(110, -450), ...P(-150, -460), ...P(-260, -330));
-  p.bezierCurveTo(...P(-320, -250), ...P(-330, -170), ...P(-318, -110));
-  p.bezierCurveTo(...P(-330, -90), ...P(-345, -80), ...P(-340, -60));
-  p.bezierCurveTo(...P(-345, -30), ...P(-375, 10), ...P(-392, 40));
-  p.bezierCurveTo(...P(-400, 55), ...P(-385, 70), ...P(-350, 72));
-  p.bezierCurveTo(...P(-345, 85), ...P(-352, 100), ...P(-345, 112));
-  p.bezierCurveTo(...P(-360, 122), ...P(-352, 140), ...P(-338, 145));
-  p.bezierCurveTo(...P(-345, 160), ...P(-340, 185), ...P(-330, 200));
-  p.bezierCurveTo(...P(-335, 235), ...P(-320, 265), ...P(-280, 280));
-  p.bezierCurveTo(...P(-220, 300), ...P(-170, 300), ...P(-140, 320));
-  p.bezierCurveTo(...P(-120, 400), ...P(-120, 470), ...P(-160, 540));
-  p.bezierCurveTo(...P(-300, 600), ...P(-420, 640), ...P(-470, 720));
+  p.moveTo(...P(150, 560));
+  p.bezierCurveTo(...P(150, 470), ...P(170, 400), ...P(230, 330));
+  p.bezierCurveTo(...P(330, 230), ...P(400, 60), ...P(380, -110));
+  p.bezierCurveTo(...P(360, -330), ...P(170, -470), ...P(-60, -460));
+  p.bezierCurveTo(...P(-240, -450), ...P(-330, -330), ...P(-350, -200));
+  p.bezierCurveTo(...P(-355, -150), ...P(-345, -110), ...P(-360, -80));
+  p.bezierCurveTo(...P(-375, -50), ...P(-410, 10), ...P(-420, 40));
+  p.bezierCurveTo(...P(-425, 58), ...P(-405, 70), ...P(-372, 74));
+  p.bezierCurveTo(...P(-372, 92), ...P(-382, 104), ...P(-372, 118));
+  p.bezierCurveTo(...P(-388, 130), ...P(-380, 146), ...P(-366, 150));
+  p.bezierCurveTo(...P(-374, 170), ...P(-366, 196), ...P(-352, 208));
+  p.bezierCurveTo(...P(-356, 245), ...P(-340, 280), ...P(-296, 292));
+  p.bezierCurveTo(...P(-240, 306), ...P(-190, 306), ...P(-160, 330));
+  p.bezierCurveTo(...P(-140, 400), ...P(-130, 480), ...P(-140, 560));
   p.closePath();
   return p;
 }
+
+// 小さなアイコン（タイルの中に描く）
+const MINI = [
+  (s) => { g.beginPath(); g.arc(0, 0, s * .32, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, s * .18, -2.2, 1.2); g.stroke(); g.beginPath(); g.moveTo(0, 0); g.lineTo(s * .22, -s * .1); g.stroke(); },
+  (s) => { g.strokeRect(-s * .22, -s * .22, s * .44, s * .44); for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(-s * .34, k * s * .12); g.lineTo(-s * .22, k * s * .12); g.moveTo(s * .22, k * s * .12); g.lineTo(s * .34, k * s * .12); g.stroke(); } },
+  (s) => { [-.2, 0, .2].forEach((x, k) => g.fillRect(x * s - s * .06, s * .25 - s * (.15 + k * .12), s * .12, s * (.15 + k * .12))); },
+  (s) => { g.strokeRect(-s * .32, -s * .22, s * .64, s * .38); g.beginPath(); g.moveTo(-s * .12, s * .28); g.lineTo(s * .12, s * .28); g.stroke(); g.beginPath(); g.moveTo(-s * .2, s * .05); g.lineTo(-s * .05, -s * .08); g.lineTo(s * .08, s * .02); g.lineTo(s * .22, -s * .12); g.stroke(); },
+  (s) => { for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; g.beginPath(); g.moveTo(Math.cos(a) * s * .2, Math.sin(a) * s * .2); g.lineTo(Math.cos(a) * s * .32, Math.sin(a) * s * .32); g.stroke(); } g.beginPath(); g.arc(0, 0, s * .2, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, s * .08, 0, 7); g.stroke(); },
+  (s) => { g.beginPath(); g.arc(0, 0, s * .3, 0, 7); g.stroke(); g.beginPath(); g.ellipse(0, 0, s * .12, s * .3, 0, 0, 7); g.stroke(); g.beginPath(); g.moveTo(-s * .3, 0); g.lineTo(s * .3, 0); g.stroke(); },
+  (s) => { g.strokeRect(-s * .24, -s * .3, s * .48, s * .6); for (let k = 0; k < 4; k++) g.fillRect(-s * .16, -s * .18 + k * s * .11, s * (k === 3 ? .18 : .32), s * .04); },
+  (s) => { g.beginPath(); g.arc(0, 0, s * .3, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, s * .18, 0, 7); g.stroke(); g.beginPath(); g.arc(0, 0, s * .06, 0, 7); g.fill(); },
+  (s) => { g.beginPath(); for (let k = 0; k <= 20; k++) { const x = -s * .32 + k * s * .032, y = Math.sin(k * .9) * s * .14; k ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); },
+  (s) => { g.beginPath(); g.moveTo(-s * .25, s * .2); g.lineTo(-s * .25, -s * .05); g.lineTo(0, -s * .05); g.lineTo(0, -s * .25); g.lineTo(s * .25, -s * .25); g.stroke(); [[-.25, .2], [.25, -.25]].forEach(([x, y]) => { g.beginPath(); g.arc(x * s, y * s, s * .06, 0, 7); g.fill(); }); },
+];
 function head(cx, cy, s) {
   const hp = headPath(cx, cy, s);
-  g.save();
-  const fill = g.createLinearGradient(cx - 400 * s, cy - 400 * s, cx + 450 * s, cy + 500 * s);
-  fill.addColorStop(0, "rgba(80,170,255,0.42)"); fill.addColorStop(.45, "rgba(25,70,140,0.55)"); fill.addColorStop(1, "rgba(5,15,35,0.9)");
-  g.fillStyle = fill; g.fill(hp);
-  g.clip(hp);
-  for (let i = 0; i < 1600; i++) {
-    const x = cx + (rnd() - .5) * 900 * s, y = cy + (rnd() - .55) * 1250 * s;
-    if (!g.isPointInPath(hp, x, y)) continue;
-    g.fillStyle = `rgba(140,210,255,${.08 + rnd() * .25})`; g.beginPath(); g.arc(x, y, 1.5 + rnd() * 3, 0, 7); g.fill();
+  g.save(); g.fillStyle = "#0d1f36"; g.fill(hp); g.clip(hp);
+  const x0 = cx - 450 * s, y0 = cy - 480 * s, x1 = cx + 420 * s, y1 = cy + 580 * s;
+  function tile(x, y, sz, depth) {
+    const inside = g.isPointInPath(hp, x + sz / 2, y + sz / 2);
+    const nearEdge = [[x, y], [x + sz, y], [x, y + sz], [x + sz, y + sz]].some(([a, b]) => !g.isPointInPath(hp, a, b)) && [[x, y], [x + sz, y], [x, y + sz], [x + sz, y + sz]].some(([a, b]) => g.isPointInPath(hp, a, b));
+    if ((nearEdge || rnd() < .55) && sz > 26 && depth < 4) { const h = sz / 2; tile(x, y, h, depth + 1); tile(x + h, y, h, depth + 1); tile(x, y + h, h, depth + 1); tile(x + h, y + h, h, depth + 1); return; }
+    if (!inside && !nearEdge) return;
+    const light = .55 + rnd() * .45;
+    g.save(); g.translate(x + sz / 2, y + sz / 2);
+    g.fillStyle = `rgba(${20 + 30 * rnd()},${45 + 40 * rnd()},${80 + 50 * rnd()},0.9)`; g.fillRect(-sz / 2 + 1.5, -sz / 2 + 1.5, sz - 3, sz - 3);
+    g.strokeStyle = "rgba(207,230,255,0.18)"; g.lineWidth = 1.5; g.strokeRect(-sz / 2 + 1.5, -sz / 2 + 1.5, sz - 3, sz - 3);
+    g.strokeStyle = `rgba(207,230,255,${light})`; g.fillStyle = `rgba(207,230,255,${light})`; g.lineWidth = Math.max(1.5, sz * .045);
+    if (sz >= 28) MINI[Math.floor(rnd() * MINI.length)](sz);
+    g.restore();
   }
-  const bx = cx - 20 * s, by = cy - 200 * s;
-  const glowB = g.createRadialGradient(bx, by, 10, bx, by, 300 * s); glowB.addColorStop(0, "rgba(255,190,90,0.55)"); glowB.addColorStop(.5, "rgba(255,90,110,0.18)"); glowB.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = glowB; g.fillRect(bx - 320 * s, by - 320 * s, 640 * s, 640 * s);
-  g.lineCap = "round";
-  for (let i = 0; i < 46; i++) {
-    let x = bx + (rnd() - .5) * 420 * s, y = by + (rnd() - .5) * 280 * s;
-    g.strokeStyle = rnd() < .3 ? "rgba(255,180,90,0.7)" : "rgba(120,220,255,0.55)"; g.lineWidth = 2 + rnd() * 3;
-    g.shadowColor = g.strokeStyle; g.shadowBlur = 14; g.beginPath(); g.moveTo(x, y);
-    for (let k = 0; k < 5; k++) { x += (rnd() - .5) * 70 * s; y += (rnd() - .5) * 50 * s; g.lineTo(x, y); }
-    g.stroke();
-  }
-  for (let i = 0; i < 60; i++) { const x = bx + (rnd() - .5) * 440 * s, y = by + (rnd() - .5) * 300 * s; g.fillStyle = rnd() < .4 ? "#ffcf7a" : "#9fe6ff"; g.shadowColor = g.fillStyle; g.shadowBlur = 20; g.beginPath(); g.arc(x, y, 3 + rnd() * 5, 0, 7); g.fill(); }
+  for (let y = y0; y < y1; y += 112) for (let x = x0; x < x1; x += 112) tile(x, y, 112, 0);
+  const sh = g.createLinearGradient(cx - 420 * s, 0, cx + 420 * s, 0); sh.addColorStop(0, "rgba(140,200,255,0.10)"); sh.addColorStop(1, "rgba(0,0,10,0.45)");
+  g.fillStyle = sh; g.fillRect(x0, y0, x1 - x0, y1 - y0);
   g.restore();
-  g.save(); g.shadowColor = "#4fd1ff"; g.shadowBlur = 50; g.strokeStyle = "rgba(140,225,255,0.9)"; g.lineWidth = 6; g.stroke(hp);
-  g.shadowBlur = 0; g.strokeStyle = "rgba(255,255,255,0.35)"; g.lineWidth = 2; g.stroke(hp); g.restore();
+  g.save(); g.strokeStyle = "rgba(207,230,255,0.85)"; g.lineWidth = 4; g.shadowColor = "#7cc8ff"; g.shadowBlur = 24; g.stroke(hp); g.restore();
 }
-
-// 頭からネットワークに広がる
-function network(ox, oy) {
-  const nodes = [];
-  for (let i = 0; i < 110; i++) {
-    const x = ox + (rnd() - .62) * 2600, y = oy + (rnd() - .45) * 1500;
-    if (x < 0 || x > W || y < 0 || y > H) continue;
-    nodes.push({ x, y, r: 4 + rnd() * 10, red: rnd() < .22 });
+// 後頭部から外へ：回路の線と点、ネットワーク
+function spread(cx, cy, s) {
+  for (let i = 0; i < 46; i++) {
+    const a = -1.9 + rnd() * 2.6;
+    let x = cx + Math.cos(a) * 400 * s + 40 * s, y = cy - 120 * s + Math.sin(a) * 400 * s;
+    g.save(); g.strokeStyle = `rgba(207,230,255,${.35 + rnd() * .4})`; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x, y);
+    const n = 3 + Math.floor(rnd() * 4);
+    for (let k = 0; k < n; k++) { if (k % 2) x += (40 + rnd() * 120) * s; else y += (rnd() - .6) * 140 * s; g.lineTo(x, y); }
+    g.stroke(); g.fillStyle = rnd() < .2 ? "#ff6b6b" : "#cfe6ff"; g.shadowColor = g.fillStyle; g.shadowBlur = 16; g.beginPath(); g.arc(x, y, (4 + rnd() * 7) * s, 0, 7); g.fill(); g.restore();
   }
-  nodes.sort((a, b) => Math.hypot(a.x - ox, a.y - oy) - Math.hypot(b.x - ox, b.y - oy));
-  nodes.forEach((n, i) => {
-    let from = { x: ox, y: oy };
-    if (i > 6) { const cand = nodes.slice(0, i).sort((a, b) => Math.hypot(a.x - n.x, a.y - n.y) - Math.hypot(b.x - n.x, b.y - n.y)); from = cand[0]; }
-    const d = Math.hypot(n.x - ox, n.y - oy), a = Math.max(.15, 1 - d / 2400);
-    const gr = g.createLinearGradient(from.x, from.y, n.x, n.y); gr.addColorStop(0, `rgba(120,220,255,${.6 * a})`); gr.addColorStop(1, n.red ? `rgba(255,90,110,${.75 * a})` : `rgba(120,220,255,${.4 * a})`);
-    g.save(); g.strokeStyle = gr; g.lineWidth = 3; g.shadowColor = "#4fd1ff"; g.shadowBlur = 10; g.beginPath(); g.moveTo(from.x, from.y); g.lineTo(n.x, n.y); g.stroke(); g.restore();
-    n.a = a;
-  });
+  const nodes = []; for (let i = 0; i < 60; i++) nodes.push({ x: cx + (150 + rnd() * 700) * s, y: cy + (-620 + rnd() * 900) * s, r: (3 + rnd() * 8) * s, red: rnd() < .18 });
   nodes.forEach(n => {
-    g.save(); g.globalAlpha = Math.min(1, n.a + .25); g.fillStyle = n.red ? "#ff5a6a" : "#9fe6ff"; g.shadowColor = g.fillStyle; g.shadowBlur = 24;
-    g.beginPath(); g.arc(n.x, n.y, n.r, 0, 7); g.fill(); g.restore();
+    nodes.slice().sort((a, b) => Math.hypot(a.x - n.x, a.y - n.y) - Math.hypot(b.x - n.x, b.y - n.y)).slice(1, 3)
+      .forEach(m => { g.save(); g.strokeStyle = "rgba(160,210,255,0.28)"; g.lineWidth = 2; g.beginPath(); g.moveTo(n.x, n.y); g.lineTo(m.x, m.y); g.stroke(); g.restore(); });
   });
+  nodes.forEach(n => { g.save(); g.fillStyle = n.red ? "#ff6b6b" : "#e6f2ff"; g.shadowColor = g.fillStyle; g.shadowBlur = 18; g.beginPath(); g.arc(n.x, n.y, n.r, 0, 7); g.fill(); g.strokeStyle = "rgba(230,242,255,0.6)"; g.lineWidth = 2; g.beginPath(); g.arc(n.x, n.y, n.r * 1.9, 0, 7); g.stroke(); g.restore(); });
 }
 
-// 割れた極太の文字（零ゴシック風）：文字を斜めの線で切り分け、かけらを少しずつずらし、ひびの線を引く
-function crackedText(s, x, y, size, stops, glowCol, rim) {
-  const off = document.createElement("canvas"); off.width = W; off.height = H; const o = off.getContext("2d");
-  o.font = `${size}px Dela`; o.textBaseline = "alphabetic"; o.lineJoin = "round";
-  const w = o.measureText(s).width;
-  // 発光は割らずに先に描く（ひびが光の中に見えないように）
-  g.save(); g.font = `${size}px Dela`; g.textBaseline = "alphabetic"; g.lineJoin = "round"; g.shadowColor = glowCol; g.shadowBlur = size * .3; g.lineWidth = size * .13; g.strokeStyle = "rgba(4,7,13,0.6)"; g.strokeText(s, x, y); g.restore();
-  o.lineWidth = size * .13; o.strokeStyle = "#04070d"; o.strokeText(s, x, y);
-  o.lineWidth = size * .03; o.strokeStyle = rim; o.strokeText(s, x, y);
-  const gr = o.createLinearGradient(0, y - size * .9, 0, y + size * .1); stops.forEach(([p, c]) => gr.addColorStop(p, c)); o.fillStyle = gr; o.fillText(s, x, y);
-  const box = { x0: x - 40, y0: y - size * 1.05, x1: x + w + 40, y1: y + size * .25 };
-  const n = 6, lines = [];
-  for (let i = 0; i < n; i++) {
-    const px = box.x0 + (i + .5 + (rnd() - .5) * .5) / n * (box.x1 - box.x0), py = box.y0 + (.2 + rnd() * .6) * (box.y1 - box.y0);
-    const ang = (i % 2 ? .3 : -.3) * Math.PI + (rnd() - .5) * .9;
-    lines.push({ px, py, dx: Math.cos(ang), dy: Math.sin(ang) });
-  }
-  // ひび：文字の中だけを細く切り抜く（文字の外には線を引かない）
-  o.globalCompositeOperation = "destination-out"; o.lineWidth = size * .018;
-  lines.forEach(L => { o.beginPath(); o.moveTo(L.px - L.dx * 3000, L.py - L.dy * 3000); o.lineTo(L.px + L.dx * 3000, L.py + L.dy * 3000); o.stroke(); });
-  o.globalCompositeOperation = "source-over";
-  for (let c = 0; c < (1 << n); c++) {
-    g.save();
-    lines.forEach((L, i) => {
-      const side = (c >> i) & 1 ? 1 : -1, nx = -L.dy * side, ny = L.dx * side, R = 6000;
-      g.beginPath(); g.moveTo(L.px - L.dx * R, L.py - L.dy * R); g.lineTo(L.px + L.dx * R, L.py + L.dy * R);
-      g.lineTo(L.px + L.dx * R + nx * R, L.py + L.dy * R + ny * R); g.lineTo(L.px - L.dx * R + nx * R, L.py - L.dy * R + ny * R); g.closePath(); g.clip();
-    });
-    g.drawImage(off, (rnd() - .5) * size * .05, (rnd() - .5) * size * .05); g.restore();
-  }
-}
-function plainText(s, x, y, size, color, glowCol) {
-  g.save(); g.font = `${size}px Dela`; g.textBaseline = "alphabetic"; g.lineJoin = "round";
-  g.shadowColor = glowCol; g.shadowBlur = size * .25; g.lineWidth = size * .14; g.strokeStyle = "#04070d"; g.strokeText(s, x, y);
-  g.shadowBlur = 0; g.fillStyle = color; g.fillText(s, x, y); g.restore();
+// 文字：単色＋白と黒の二重の縁取り＋軽い影
+function word(s, x, y, size, color) {
+  g.save(); g.font = `${FW}${size}px ${FONT}`; g.textBaseline = "alphabetic"; g.lineJoin = "round";
+  g.shadowColor = "rgba(0,0,0,0.6)"; g.shadowBlur = size * .08; g.shadowOffsetY = size * .05;
+  g.lineWidth = size * .22; g.strokeStyle = "#05080f"; g.strokeText(s, x, y);
+  g.shadowColor = "transparent";
+  g.lineWidth = size * .1; g.strokeStyle = "#ffffff"; g.strokeText(s, x, y);
+  g.fillStyle = color; g.fillText(s, x, y); g.restore();
 }
 function ribbon(s, x, y) {
-  g.save(); g.font = "62px Dela"; const w = g.measureText(s).width + 90;
-  const gr = g.createLinearGradient(x, 0, x + w, 0); gr.addColorStop(0, "rgba(200,30,46,0.95)"); gr.addColorStop(1, "rgba(120,10,24,0.95)");
-  g.fillStyle = gr; g.beginPath(); g.moveTo(x, y - 52); g.lineTo(x + w, y - 52); g.lineTo(x + w - 30, y + 42); g.lineTo(x - 30, y + 42); g.closePath(); g.fill();
-  g.fillStyle = "#fff"; g.textBaseline = "middle"; g.fillText(s, x + 30, y - 3); g.restore();
+  g.save(); g.font = `${FW}54px ${FONT}`; const w = g.measureText(s).width + 80;
+  g.fillStyle = "#d8242f"; g.beginPath(); g.moveTo(x, y - 46); g.lineTo(x + w, y - 46); g.lineTo(x + w - 26, y + 38); g.lineTo(x - 26, y + 38); g.closePath(); g.fill();
+  g.fillStyle = "#fff"; g.textBaseline = "middle"; g.fillText(s, x + 28, y - 3); g.restore();
 }
 
 (async () => {
-  await document.fonts.load("200px Dela", "なぜ、間違った科学ほど広まるのかあなたの常識本当に正しい？");
+  await document.fonts.load(`${FW}200px ${FONT}`, "なぜ、間違った科学ほど広まるのかあなたの常識本当に正しい？");
   bg();
-  const cx = W * .85, cy = H * .58, s = .95;
-  network(cx - 20 * s, cy - 230 * s);
+  const cx = W * .81, cy = H * .52, s = .98;
+  spread(cx, cy, s);
   head(cx, cy, s);
-  const lg = g.createLinearGradient(0, 0, W * .62, 0); lg.addColorStop(0, "rgba(2,5,11,0.7)"); lg.addColorStop(1, "rgba(2,5,11,0)"); g.fillStyle = lg; g.fillRect(0, 0, W, H);
-  ribbon("あなたの常識、本当に正しい？", 90, 150);
-  plainText("なぜ、", 110, 420, 170, "#eaf4ff", "rgba(79,209,255,0.8)");
-  crackedText("間違った科学", 70, 770, 305, [[0, "#ffd9dd"], [.35, "#ff4a5c"], [1, "#9a0c1b"]], "rgba(255,50,70,0.95)", "#ffe3e7");
-  plainText("ほど", 110, 1150, 170, "#eaf4ff", "rgba(79,209,255,0.8)");
-  crackedText("広まるのか", 450, 1220, 320, [[0, "#fff6cf"], [.45, "#ffc24a"], [1, "#d06a10"]], "rgba(255,170,60,0.95)", "#fff3d6");
-  const vg = g.createRadialGradient(W / 2, H / 2, H * .55, W / 2, H / 2, W * .78); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.5)");
-  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  const lg = g.createLinearGradient(0, 0, W * .58, 0); lg.addColorStop(0, "rgba(2,5,11,0.6)"); lg.addColorStop(1, "rgba(2,5,11,0)"); g.fillStyle = lg; g.fillRect(0, 0, W, H);
+  ribbon("あなたの常識、本当に正しい？", 100, 170);
+  word("なぜ、", 110, 450, 150, "#ffffff");
+  word("間違った科学", 90, 760, 250, "#ff3b3b");
+  word("ほど", 110, 1080, 150, "#ffffff");
+  word("広まるのか", 400, 1120, 250, "#ffd23f");
   window.DONE = true;
 })();
 </script>
