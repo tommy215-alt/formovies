@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ナレーション収録スタジオ</title>
+<style>
+:root {
+  --bg: #0b1220; --panel: #121c2e; --line: #26354f; --fg: #eef3fb; --dim: #8796ad; --mute: #4a5872;
+  --accent: #ffb648; --rec: #ff4d5e; --ok: #45d39a; --cyan: #4fd1ff;
+  --font: "Noto Sans JP", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button:hover { border-color: var(--cyan); }
+button:disabled { opacity: .4; cursor: default; }
+header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+header h1 { font-size: 17px; margin: 0 12px 0 0; font-weight: 700; }
+select, input[type=text] { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.grow { flex: 1; }
+.app { display: grid; grid-template-columns: 300px minmax(0, 1fr) 280px; height: calc(100vh - 58px); }
+@media (max-width: 1100px) { .app { grid-template-columns: 240px minmax(0, 1fr); } .side { display: none; } }
+#list { overflow: auto; border-right: 1px solid var(--line); padding: 6px; }
+#list button { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 6px; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 8px; border-radius: 6px; font-size: 13px; line-height: 1.45; }
+#list button[aria-current=true] { background: rgba(255, 182, 72, .14); }
+#list .id { font-family: Consolas, monospace; font-size: 12px; color: var(--dim); }
+#list .st { display: block; font-size: 11px; color: var(--mute); }
+#list .st.done { color: var(--ok); } #list .st.busy { color: var(--accent); } #list .st.err { color: var(--rec); }
+main { display: grid; grid-template-rows: 1fr auto; min-width: 0; }
+.prompter { display: flex; flex-direction: column; justify-content: center; gap: 28px; padding: 40px 6vw; }
+.meta { color: var(--dim); font-size: 14px; display: flex; gap: 16px; }
+#now { font-size: clamp(30px, 3.6vw, 52px); font-weight: 700; line-height: 1.55; letter-spacing: .02em; }
+#now span { color: var(--fg); transition: color .08s; }
+#now.rec span { color: var(--mute); }
+#now.rec span.on { color: var(--fg); }
+#now.rec span.cur { color: var(--accent); }
+#next { font-size: 20px; color: var(--dim); line-height: 1.6; }
+#next::before { content: "次：　"; color: var(--mute); }
+.controls { border-top: 1px solid var(--line); padding: 16px 24px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+#rec { width: 74px; height: 74px; border-radius: 50%; padding: 0; background: #2a1720; border: 3px solid var(--rec); display: grid; place-items: center; }
+#rec i { width: 28px; height: 28px; border-radius: 50%; background: var(--rec); transition: all .15s; }
+#rec.on i { border-radius: 5px; width: 26px; height: 26px; }
+#rec.on { box-shadow: 0 0 0 6px rgba(255, 77, 94, .25); }
+.meter { width: 160px; height: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--ok), var(--accent) 75%, var(--rec)); }
+#timer { font-family: Consolas, monospace; font-size: 18px; min-width: 64px; }
+.hint { color: var(--dim); font-size: 13px; }
+.side { border-left: 1px solid var(--line); padding: 16px; display: grid; gap: 18px; align-content: start; overflow: auto; }
+.side h2 { font-size: 14px; margin: 0; color: var(--dim); font-weight: 700; }
+.box { display: grid; gap: 8px; }
+.row { display: flex; justify-content: space-between; font-size: 14px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.small { font-size: 12px; color: var(--dim); line-height: 1.6; }
+#info { font-size: 12px; color: var(--dim); line-height: 1.6; white-space: pre-wrap; }
+dialog { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; width: min(720px, 92vw); }
+dialog textarea { width: 100%; height: 300px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ナレーション収録スタジオ</h1>
+  <select id="ep"><option value="">動画の回を選ぶ</option></select>
+  <button id="openEp">開く</button>
+  <button id="openText">台本を貼り付ける</button>
+  <span class="grow"></span>
+  <span id="proj" class="hint"></span>
+  <button id="export">書き出す</button>
+</header>
+<div class="app">
+  <nav id="list"></nav>
+  <main>
+    <div class="prompter">
+      <div class="meta"><span id="lid">—</span><span id="target"></span><span id="stat"></span></div>
+      <div id="now">台本を開いてください</div>
+      <div id="next"></div>
+    </div>
+    <div class="controls">
+      <button id="rec" title="録音（スペースキー）"><i></i></button>
+      <div>
+        <div id="timer">0:00.0</div>
+        <div class="meter"><i id="lv"></i></div>
+      </div>
+      <button id="prev">← 前の行</button>
+      <button id="nextBtn">次の行 →</button>
+      <button id="playRaw">録った声</button>
+      <button id="playOut">仕上がり</button>
+      <span class="hint">スペース：録音／停止　← →：行の移動　P：仕上がりを聞く</span>
+    </div>
+  </main>
+  <aside class="side">
+    <div class="box">
+      <h2>声の加工（全部の行にかかります）</h2>
+      <div class="row"><span>ピッチ</span><b id="pv"></b></div>
+      <input type="range" id="pitch" min="-4" max="3" step="0.5">
+      <div class="row"><span>響き</span><b id="rv"></b></div>
+      <input type="range" id="reverb" min="0" max="60" step="2">
+      <div class="row"><span>クレジット</span></div>
+      <input type="text" id="credit" placeholder="例：ナレーション：○○">
+      <button id="apply">この設定で作り直す</button>
+      <p class="small">自動で行うこと：「あー」「えー」などの除去、言い直しは最後の読み直しを使う、長い間を詰める、雑音の軽減、サ行の刺さりを抑える、低音を強めて厚みを出す、音量と話す速さをそろえる。</p>
+    </div>
+    <div class="box">
+      <h2>この行の編集</h2>
+      <div id="info">—</div>
+    </div>
+  </aside>
+</div>
+<dialog id="dlg">
+  <form method="dialog" style="display:grid;gap:10px">
+    <b>台本を貼り付ける（文ごとに 1 行になります）</b>
+    <input type="text" id="tname" placeholder="名前（例：test_01）">
+    <textarea id="ttext"></textarea>
+    <div style="display:flex;gap:10px;justify-content:flex-end"><button value="cancel">やめる</button><button id="tok" value="ok">開く</button></div>
+  </form>
+</dialog>
+<script>
+const $ = id => document.getElementById(id);
+let S = { lines: [] }, cur = 0, recorder = null, chunks = [], t0 = 0, raf = 0, stream = null, analyser = null, audio = new Audio();
+
+async function api(path, body, type) {
+  const r = await fetch(path, body === undefined ? {} : { method: "POST", body, headers: { "Content-Type": type || "application/json" } });
+  return r.json();
+}
+async function refresh() {
+  S = await api("/api/state");
+  const sel = $("ep");
+  if (sel.options.length === 1) S.episodes.forEach(e => sel.add(new Option(e, e)));
+  $("proj").textContent = S.name ? `${S.name}　${S.lines.filter(l => l.state === "完了").length}/${S.lines.length} 行が完了` + (S.queue ? `（処理中 ${S.queue}）` : "") : "";
+  if (S.settings && document.activeElement.type !== "range" && document.activeElement.id !== "credit" && !refresh.touched) {
+    $("pitch").value = S.settings.pitch; $("reverb").value = S.settings.reverb; $("credit").value = S.settings.credit || "";
+  }
+  labels(); drawList();
+  if (!recorder) show();
+}
+function labels() {
+  const p = +$("pitch").value; $("pv").textContent = (p > 0 ? "+" : "") + p + " 半音";
+  $("rv").textContent = $("reverb").value + " %";
+}
+function drawList() {
+  const nav = $("list"); nav.innerHTML = "";
+  S.lines.forEach((l, i) => {
+    const b = document.createElement("button");
+    const cls = l.state === "完了" ? "done" : l.state === "失敗" ? "err" : (l.state === "処理中" || l.state === "処理待ち") ? "busy" : "";
+    b.innerHTML = `<span class="id"></span><span><span class="tx"></span><span class="st ${cls}"></span></span>`;
+    b.querySelector(".id").textContent = l.id;
+    b.querySelector(".tx").textContent = l.sub.replace(/\n/g, " ");
+    b.querySelector(".st").textContent = l.state + (l.dur ? `　${l.dur.toFixed(1)} 秒` : "");
+    b.setAttribute("aria-current", i === cur);
+    b.onclick = () => { if (!recorder) { cur = i; show(); drawList(); } };
+    nav.append(b);
+  });
+  const c = nav.children[cur]; if (c) c.scrollIntoView({ block: "nearest" });
+}
+function targetSec(l) { return l.moras / (S.settings.rate || 7); }
+function show() {
+  const l = S.lines[cur]; if (!l) return;
+  $("lid").textContent = `${cur + 1} / ${S.lines.length}　${l.id}`;
+  $("target").textContent = `目安 ${targetSec(l).toFixed(1)} 秒`;
+  $("stat").textContent = l.state;
+  const now = $("now"); now.innerHTML = "";
+  [...l.speech].forEach(ch => { const s = document.createElement("span"); s.textContent = ch; now.append(s); });
+  $("next").textContent = S.lines[cur + 1] ? S.lines[cur + 1].speech : "（最後の行です）";
+  $("info").textContent = l.state === "完了"
+    ? (l.match < .4 ? "⚠ 台本と合いません（読み間違い・無音？）。前後の無音だけを切りました。録り直してください\n" : "")
+      + `聞き取り：${(l.words || []).join("")}\n除いた部分：${(l.cut || []).length ? l.cut.join("・") : "なし"}\n速さの調整：×${l.tempo}\n仕上がり：${l.dur} 秒`
+    : l.state === "失敗" ? "失敗：" + (l.msg || "") : l.state;
+}
+function karaoke() {
+  const l = S.lines[cur], spans = $("now").children, el = (performance.now() - t0) / 1000;
+  const n = Math.min(spans.length, Math.floor(el / (targetSec(l) * 1.08) * spans.length));   // 目安の速さより少しゆっくり進む
+  for (let i = 0; i < spans.length; i++) spans[i].className = i < n ? "on" : i === n ? "cur" : "";
+  $("timer").textContent = `${Math.floor(el / 60)}:${(el % 60).toFixed(1).padStart(4, "0")}`;
+  if (analyser) {
+    const d = new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(d);
+    const peak = d.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    $("lv").style.width = Math.min(100, Math.max(0, (20 * Math.log10(peak + 1e-6) + 50) * 2)) + "%";
+  }
+  raf = requestAnimationFrame(karaoke);
+}
+async function startRec() {
+  if (!S.lines.length) return;
+  if (!stream) {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+    const ctx = new AudioContext(); analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+  }
+  audio.pause();
+  chunks = [];
+  recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 192000 });
+  recorder.ondataavailable = e => chunks.push(e.data);
+  const id = S.lines[cur].id;
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: "audio/webm" });
+    await fetch("/api/record/" + id, { method: "POST", body: blob, headers: { "Content-Type": "audio/webm" } });
+    refresh();
+  };
+  recorder.start();
+  $("rec").classList.add("on"); $("now").classList.add("rec"); t0 = performance.now(); karaoke();
+}
+function stopRec() {
+  recorder.stop(); recorder = null; cancelAnimationFrame(raf); $("lv").style.width = "0";
+  $("rec").classList.remove("on"); $("now").classList.remove("rec");
+  if (cur < S.lines.length - 1) cur++;
+  show(); drawList();
+}
+function toggle() { recorder ? stopRec() : startRec().catch(e => alert("マイクが使えません：" + e.message)); }
+function move(d) { if (recorder) return; cur = Math.max(0, Math.min(S.lines.length - 1, cur + d)); show(); drawList(); }
+function play(kind) {
+  const l = S.lines[cur]; if (!l) return;
+  audio.src = `/api/audio/${l.id}/${kind}?t=${l.rev || Date.now()}`; audio.play().catch(() => alert("まだ音声がありません"));
+}
+
+$("rec").onclick = toggle;
+$("prev").onclick = () => move(-1);
+$("nextBtn").onclick = () => move(1);
+$("playRaw").onclick = () => play("raw");
+$("playOut").onclick = () => play("out");
+$("pitch").oninput = $("reverb").oninput = () => { refresh.touched = true; labels(); };
+$("credit").oninput = () => { refresh.touched = true; };
+$("apply").onclick = async () => {
+  await api("/api/settings", JSON.stringify({ pitch: +$("pitch").value, reverb: +$("reverb").value, credit: $("credit").value }));
+  refresh.touched = false; refresh();
+};
+$("openEp").onclick = async () => { if ($("ep").value) { await api("/api/open", JSON.stringify({ episode: $("ep").value })); cur = 0; refresh(); } };
+$("openText").onclick = () => $("dlg").showModal();
+$("tok").onclick = async e => {
+  if (!$("ttext").value.trim()) return;
+  await api("/api/open", JSON.stringify({ name: $("tname").value || "text", text: $("ttext").value })); cur = 0; refresh();
+};
+$("export").onclick = async () => {
+  const r = await api("/api/export", "{}");
+  alert(r.error ? "失敗：" + r.error : r.file ? `書き出しました：${r.file}` :
+    `${r.count} 行を書き出しました：${r.dir}` + (r.missing.length ? `\nまだの行：${r.missing.join("、")}` : "\n動画は rv.py で作り直してください"));
+};
+document.addEventListener("keydown", e => {
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || $("dlg").open) return;
+  if (e.code === "Space") { e.preventDefault(); toggle(); }
+  else if (e.key === "ArrowLeft") move(-1);
+  else if (e.key === "ArrowRight") move(1);
+  else if (e.key === "p" || e.key === "P") play("out");
+});
+refresh(); setInterval(() => { if (!recorder) refresh(); }, 2000);
+</script>
+</body>
+</html>

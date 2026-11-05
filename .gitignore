@@ -29,3 +29,6 @@ anatomy_room/production/long_*/reverse_long_*.mp4
 
 # サムネイルの比較用の書き出し
 anatomy_room/production/long_001/thumb/out/*.png
+# 自分で読んだナレーションの録音（narration_studio。PC の中だけに置く）
+anatomy_room/production/*/recording/
+anatomy_room/tools/narration_studio/projects/

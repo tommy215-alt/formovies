@@ -140,8 +140,10 @@ def setup(here):
     import music
     import ending_ext
     import aivis_ext
+    import recorded_ext
     ending_ext.apply(pipeline)
     aivis_ext.apply(pipeline)
+    recorded_ext.apply(pipeline)   # 自分で読んだナレーション（lines.json の "recorded": true の回だけ）
     if not isinstance(pipeline.subprocess, _Sub):
         pipeline.subprocess = _Sub(pipeline.COMMON)
     if not isinstance(pipeline.np, _NP):
