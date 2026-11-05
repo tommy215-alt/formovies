@@ -22,6 +22,7 @@
 """
 import json
 import math
+import os
 import queue
 import re
 import subprocess
@@ -42,7 +43,7 @@ ROOT = HERE.parents[1]                      # anatomy_room
 PROD = ROOT / "production"
 PORT = 8765
 SR = 48000
-DEFAULT_SETTINGS = {"pitch": -1.0, "reverb": 0, "rate": 7.0, "credit": "", "proc": 2}   # ピッチ（半音）・響き（%）・目標の速さ（モーラ/秒）・加工の版
+DEFAULT_SETTINGS = {"pitch": 0.0, "reverb": 0, "rate": 7.0, "credit": "", "mode": "ai", "proc": 3}   # ピッチ（半音）・響き（%）・目標の速さ（モーラ/秒）・加工の版
 PUNCT = re.compile(r"[\s、。，．,.!！?？「」『』（）()・…ー〜~]")
 
 # ---------------------------------------------------------------------------- 台本
@@ -76,7 +77,8 @@ class Project:
             saved = json.loads(sf.read_text(encoding="utf-8")) if sf.exists() else {}
             self.settings = {**DEFAULT_SETTINGS, **saved.get("settings", {})}
             if self.settings.get("proc", 1) < PROC_VERSION:    # 加工の版が上がったら、ピッチと響きも新しい既定値に
-                self.settings.update(pitch=DEFAULT_SETTINGS["pitch"], reverb=DEFAULT_SETTINGS["reverb"], proc=PROC_VERSION)
+                self.settings.update(pitch=DEFAULT_SETTINGS["pitch"], reverb=DEFAULT_SETTINGS["reverb"],
+                                     mode=DEFAULT_SETTINGS["mode"], proc=PROC_VERSION)
             for ln in lines:
                 ln["moras"] = moras(ln["speech"])
             self.status = {}
@@ -206,7 +208,8 @@ def edit(lid):
 
 
 # ---------------------------------------------------------------------------- ② 声の加工（ピッチと響きはここだけ）
-PROC_VERSION = 2   # 加工の版。上げると、開いたときに完了済みの行を新しい加工で作り直す
+PROC_VERSION = 3   # 加工の版。上げると、開いたときに完了済みの行を新しい加工で作り直す
+# v3：AI（Resemble Enhance）で作り直し＋薄い仕上げ（render_ai）。v2 の加工は「従来の加工」として残す（render_classic）
 # v2（2026-11-05、ユーザー「加工が弱い・お風呂にいるみたい。スタジオのように、声はかなり強めに」）：
 #   部屋の反響を取り除く（残響抑制）、足す響きは小さな部屋の短い響きに（既定 0）、低音・箱鳴りの削り・コンプを強く、言葉の間の部屋の音を下げる
 
@@ -264,8 +267,89 @@ def fftconv(a, b):
     return np.fft.irfft(np.fft.rfft(a, N) * np.fft.rfft(b, N), N)[:len(a)]
 
 
+class Enhancer:
+    """AI の声の作り直し（enhance_runner.py）を専用の環境で常駐させる。環境がなければ使えない（従来の加工になる）"""
+    PY = Path(os.environ.get("LOCALAPPDATA", "")) / "reverse_tools" / "enhance" / "Scripts" / "python.exe"
+
+    def __init__(self):
+        self.proc, self.lock = None, threading.Lock()
+
+    def available(self):
+        return self.PY.exists()
+
+    def run(self, src, dst, lambd=0.9, tau=0.5):
+        with self.lock:
+            if self.proc is None or self.proc.poll() is not None:
+                self.proc = subprocess.Popen([str(self.PY), str(HERE / "enhance_runner.py")], stdin=subprocess.PIPE,
+                                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
+                ready = json.loads(self.proc.stdout.readline() or '{"ready": false}')
+                if not ready.get("ready"):
+                    raise RuntimeError("AI の準備に失敗しました")
+            self.proc.stdin.write(json.dumps({"in": str(src), "out": str(dst), "lambd": lambd, "tau": tau}) + "\n")
+            self.proc.stdin.flush()
+            r = json.loads(self.proc.stdout.readline() or '{"ok": false, "error": "AI のプロセスが止まりました"}')
+            if not r.get("ok"):
+                raise RuntimeError(r.get("error"))
+            return r
+
+
+ENH = Enhancer()
+
+
 def render(lid):
+    st = P.settings
+    if st.get("mode", "ai") == "ai" and ENH.available():
+        return render_ai(lid)
+    return render_classic(lid)
+
+
+def finish(y, lid, tempo):
+    """足す響き（スライダー）→ 話している部分の大きさを -18 dBFS（RMS）に → 書き出し"""
     global IR
+    st = P.settings
+    if st["reverb"] > 0:
+        if IR is None:
+            IR = impulse()
+        y = np.concatenate([y, np.zeros(int(.4 * SR))])
+        wet = fftconv(y, IR)
+        y = y + wet * (st["reverb"] / 100) * .25
+        tail = np.where(np.abs(y) > 1e-3)[0]; y = y[:tail[-1] + int(.05 * SR)] if len(tail) else y
+    # loudnorm は短い音だと静かな部分を持ち上げるので使わない
+    n = int(.02 * SR); m = len(y) // n
+    e = (y[:m * n].reshape(m, n) ** 2).mean(1)
+    act = e[e > e.max() * 10 ** (-3.5)] if m else np.array([1e-4])
+    y = y * 10 ** (-18 / 20) / np.sqrt(act.mean() + 1e-12)
+    y = ffmpeg_filter(y, "alimiter=limit=0.89:attack=2:release=40:level=disabled")
+    pad = np.zeros(int(.03 * SR)); y = np.concatenate([pad, y, pad])
+    write_wav(P.dir / "out" / f"{lid}.wav", y)
+    return len(y) / SR, tempo
+
+
+def render_ai(lid):
+    """v3（2026-11-05、ユーザー「加工感が強くて違和感。生のアナウンサーが読んだような感じに」）：
+    AI（Resemble Enhance）で反響と雑音を取り、スタジオで録ったような声に作り直す。そのあとの加工は薄く（自然さを優先）：
+    ピッチは 0 なら変えない、速さはそろえるが幅を狭く（0.94〜1.06 倍）、低音は少しの温かさだけ、コンプは軽く"""
+    ln, st = P.line(lid), P.settings
+    src, ai = P.dir / "edit" / f"{lid}.wav", P.dir / "ai" / f"{lid}.wav"
+    ai.parent.mkdir(exist_ok=True)
+    if not ai.exists() or ai.stat().st_mtime < src.stat().st_mtime:   # AI の結果は、編集し直したときだけ作り直す
+        ENH.run(src, ai)
+    x = decode(ai)
+    dur = len(x) / SR
+    target = ln["moras"] / st["rate"]
+    tempo = max(.94, min(1.06, dur / target)) if target > 0 else 1.0
+    chain = ["highpass=f=60",
+             "bass=g=3:f=110:w=0.8",                     # 少しの温かさ（低音強めの好みに合わせて、やりすぎない）
+             "equalizer=f=350:t=q:w=1.2:g=-1.5",         # 軽いこもりの抑え
+             "acompressor=threshold=-18dB:ratio=2:attack=12:release=220:knee=6:makeup=1.5",   # 抑揚を残す軽いコンプ
+             "deesser=i=0.3:m=0.5:f=0.5"]
+    if abs(st["pitch"]) > 1e-6 or abs(tempo - 1) > .005:
+        chain.append(f"rubberband=pitch={2 ** (st['pitch'] / 12):.5f}:tempo={tempo:.4f}:formant=preserved")
+    return finish(ffmpeg_filter(x, ",".join(chain)), lid, tempo)
+
+
+def render_classic(lid):
+    """v2 の加工（手作りの残響抑制＋強めの加工）。設定の「従来の加工」で使う"""
     ln, st = P.line(lid), P.settings
     x = decode(P.dir / "edit" / f"{lid}.wav")
     dur = len(x) / SR
@@ -294,22 +378,7 @@ def render(lid):
         "deesser=i=0.5:m=0.6:f=0.5",
         f"rubberband=pitch={pitch:.5f}:tempo={tempo:.4f}:formant=preserved:transients=smooth",
     ]))
-    if st["reverb"] > 0:
-        if IR is None:
-            IR = impulse()
-        y = np.concatenate([y, np.zeros(int(.4 * SR))])
-        wet = fftconv(y, IR)
-        y = y + wet * (st["reverb"] / 100) * .25
-        tail = np.where(np.abs(y) > 1e-3)[0]; y = y[:tail[-1] + int(.05 * SR)] if len(tail) else y
-    # 音量：話している部分の大きさを -18 dBFS（RMS）にそろえる。loudnorm は短い音だと静かな部分を持ち上げるので使わない
-    n = int(.02 * SR); m = len(y) // n
-    e = (y[:m * n].reshape(m, n) ** 2).mean(1)
-    act = e[e > e.max() * 10 ** (-3.5)] if m else np.array([1e-4])
-    y = y * 10 ** (-18 / 20) / np.sqrt(act.mean() + 1e-12)
-    y = ffmpeg_filter(y, "alimiter=limit=0.89:attack=2:release=40:level=disabled")
-    pad = np.zeros(int(.03 * SR)); y = np.concatenate([pad, y, pad])
-    write_wav(P.dir / "out" / f"{lid}.wav", y)
-    return len(y) / SR, tempo
+    return finish(y, lid, tempo)
 
 
 def worker():
@@ -396,7 +465,7 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, {"ok": True})
             if u.path == "/api/settings":
                 d = json.loads(self.body())
-                for k in ("pitch", "reverb", "credit"):
+                for k in ("pitch", "reverb", "credit", "mode"):
                     if k in d:
                         P.settings[k] = d[k]
                 for ln in P.lines:

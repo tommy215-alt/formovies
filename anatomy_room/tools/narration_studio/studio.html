@@ -93,6 +93,11 @@ dialog textarea { width: 100%; height: 300px; background: var(--bg); border: 1px
   <aside class="side">
     <div class="box">
       <h2>声の加工（全部の行にかかります）</h2>
+      <div class="row"><span>方式</span></div>
+      <select id="mode">
+        <option value="ai">AI でスタジオの声に（自然）</option>
+        <option value="classic">従来の加工（強め）</option>
+      </select>
       <div class="row"><span>ピッチ</span><b id="pv"></b></div>
       <input type="range" id="pitch" min="-4" max="3" step="0.5">
       <div class="row"><span>響き</span><b id="rv"></b></div>
@@ -100,7 +105,7 @@ dialog textarea { width: 100%; height: 300px; background: var(--bg); border: 1px
       <div class="row"><span>クレジット</span></div>
       <input type="text" id="credit" placeholder="例：ナレーション：○○">
       <button id="apply">この設定で作り直す</button>
-      <p class="small">自動で行うこと：「あー」「えー」などの除去、言い直しは最後の読み直しを使う、長い間を詰める、雑音の軽減、サ行の刺さりを抑える、低音を強めて厚みを出す、音量と話す速さをそろえる。</p>
+      <p class="small">自動で行うこと：「あー」「えー」などの除去、言い直しは最後の読み直しを使う、長い間を詰める、部屋の反響と雑音を取る、サ行の刺さりを抑える、低音で温かさを足す、音量と話す速さをそろえる。</p>
     </div>
     <div class="box">
       <h2>この行の編集</h2>
@@ -131,6 +136,7 @@ async function refresh() {
   $("proj").textContent = S.name ? `${S.name}　${S.lines.filter(l => l.state === "完了").length}/${S.lines.length} 行が完了` + (S.queue ? `（処理中 ${S.queue}）` : "") : "";
   if (S.settings && document.activeElement.type !== "range" && document.activeElement.id !== "credit" && !refresh.touched) {
     $("pitch").value = S.settings.pitch; $("reverb").value = S.settings.reverb; $("credit").value = S.settings.credit || "";
+    $("mode").value = S.settings.mode || "ai";
   }
   labels(); drawList();
   if (!recorder) show();
@@ -219,9 +225,9 @@ $("nextBtn").onclick = () => move(1);
 $("playRaw").onclick = () => play("raw");
 $("playOut").onclick = () => play("out");
 $("pitch").oninput = $("reverb").oninput = () => { refresh.touched = true; labels(); };
-$("credit").oninput = () => { refresh.touched = true; };
+$("credit").oninput = $("mode").onchange = () => { refresh.touched = true; };
 $("apply").onclick = async () => {
-  await api("/api/settings", JSON.stringify({ pitch: +$("pitch").value, reverb: +$("reverb").value, credit: $("credit").value }));
+  await api("/api/settings", JSON.stringify({ pitch: +$("pitch").value, reverb: +$("reverb").value, credit: $("credit").value, mode: $("mode").value }));
   refresh.touched = false; refresh();
 };
 $("openEp").onclick = async () => { if ($("ep").value) { await api("/api/open", JSON.stringify({ episode: $("ep").value })); cur = 0; refresh(); } };
