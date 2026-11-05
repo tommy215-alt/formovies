@@ -96,27 +96,35 @@ function word(s, x, y, size, fill, o = {}) {
 }
 // 割れた文字：文字を別の画に描き、ひびの線で切り抜き、かけらを少しずつずらして重ねる（白い背景ではひびが白く見える）
 function crackWord(s, x, y, size, fill, o = {}) {
+  // 白い縁取り（c）と、赤い文字の本体（fc）を分けて描き、ひびは本体だけに入れる
   const off = document.createElement("canvas"); off.width = W; off.height = H; const c = off.getContext("2d");
-  c.font = `${size}px ${o.font}`; c.textBaseline = "alphabetic"; c.lineJoin = "round";
+  const fo = document.createElement("canvas"); fo.width = W; fo.height = H; const fc = fo.getContext("2d");
+  c.font = fc.font = `${size}px ${o.font}`; c.textBaseline = fc.textBaseline = "alphabetic"; c.lineJoin = "round";
   const w = c.measureText(s).width;
   c.lineWidth = size * (o.ow || .16); c.strokeStyle = o.outer || "#ffffff"; c.strokeText(s, x, y);
-  c.fillStyle = fill; c.fillText(s, x, y);
+  fc.fillStyle = fill; fc.fillText(s, x, y);
   const lines = [], n = o.cracks || 7;
   for (let i = 0; i < n; i++) {
     const px = x + (i + .5 + (rnd() - .5) * .5) / n * w, py = y - size * (.15 + rnd() * .65), ang = (i % 2 ? .32 : -.32) * Math.PI + (rnd() - .5) * .8;
     lines.push({ px, py, dx: Math.cos(ang), dy: Math.sin(ang) });
   }
-  c.globalCompositeOperation = "destination-out"; c.lineWidth = size * .026;
-  lines.forEach(L => { c.beginPath(); c.moveTo(L.px - L.dx * 3000, L.py - L.dy * 3000); c.lineTo(L.px + L.dx * 3000, L.py + L.dy * 3000); c.stroke(); });
-  // 細かいひびの枝
-  c.lineWidth = size * .013;
-  for (let i = 0; i < 16; i++) { const L = lines[i % n], t0 = (rnd() - .5) * size * 1.2; let bx = L.px + L.dx * t0, by = L.py + L.dy * t0; c.beginPath(); c.moveTo(bx, by); for (let k = 0; k < 2; k++) { bx += (rnd() - .5) * size * .35; by += (rnd() - .5) * size * .35; c.lineTo(bx, by); } c.stroke(); }
-  c.globalCompositeOperation = "source-over";
+  // 白いひび（本体を切り抜く）
+  fc.globalCompositeOperation = "destination-out"; fc.lineWidth = size * .02;
+  lines.forEach(L => { fc.beginPath(); fc.moveTo(L.px - L.dx * 3000, L.py - L.dy * 3000); fc.lineTo(L.px + L.dx * 3000, L.py + L.dy * 3000); fc.stroke(); });
+  fc.lineWidth = size * .01;
+  for (let i = 0; i < 10; i++) { const L = lines[i % n], t0 = (rnd() - .5) * size * 1.2; let bx = L.px + L.dx * t0, by = L.py + L.dy * t0; fc.beginPath(); fc.moveTo(bx, by); for (let k = 0; k < 2; k++) { bx += (rnd() - .5) * size * .35; by += (rnd() - .5) * size * .35; fc.lineTo(bx, by); } fc.stroke(); }
+  // 黒いひび（本体の上だけ）
+  fc.globalCompositeOperation = "source-atop"; fc.strokeStyle = "rgba(25,8,10,0.8)"; fc.lineCap = "round";
+  lines.forEach((L, i) => { if (i % 2) return; const d = size * .022; fc.lineWidth = size * .007; fc.beginPath(); fc.moveTo(L.px - L.dx * 3000 - L.dy * d, L.py - L.dy * 3000 + L.dx * d); fc.lineTo(L.px + L.dx * 3000 - L.dy * d, L.py + L.dy * 3000 + L.dx * d); fc.stroke(); });
+  fc.lineWidth = size * .008;
+  for (let i = 0; i < 10; i++) { let bx = x + rnd() * w, by = y - size * (.1 + rnd() * .7); fc.beginPath(); fc.moveTo(bx, by); for (let k = 0; k < 3; k++) { bx += (rnd() - .5) * size * .2; by += (rnd() - .5) * size * .2; fc.lineTo(bx, by); } fc.stroke(); }
+  fc.globalCompositeOperation = "source-over";
+  c.drawImage(fo, 0, 0);
   const use = lines.slice(0, 7);
   for (let k = 0; k < (1 << use.length); k++) {
     g.save();
     use.forEach((L, i) => { const sd = (k >> i) & 1 ? 1 : -1, nx = -L.dy * sd, ny = L.dx * sd, R = 6000; g.beginPath(); g.moveTo(L.px - L.dx * R, L.py - L.dy * R); g.lineTo(L.px + L.dx * R, L.py + L.dy * R); g.lineTo(L.px + L.dx * R + nx * R, L.py + L.dy * R + ny * R); g.lineTo(L.px - L.dx * R + nx * R, L.py - L.dy * R + ny * R); g.closePath(); g.clip(); });
-    g.drawImage(off, (rnd() - .5) * size * .045, (rnd() - .5) * size * .045); g.restore();
+    g.drawImage(off, (rnd() - .5) * size * .03, (rnd() - .5) * size * .03); g.restore();
   }
 }
 function vword(s, x, y, size, fill, o = {}) { [...s].forEach((ch, i) => { const r = "ー、".includes(ch); g.save(); g.translate(x, y + i * size * 1.02); if (r) { g.rotate(Math.PI / 2); } word(ch, 0, size * .38, size, fill, { ...o, align: "center" }); g.restore(); }); }
@@ -130,7 +138,7 @@ const LAYOUTS = {
     linear("#ffffff", "#dfe7f1", Math.PI / 2); dots("rgba(30,60,110,0.08)");
     head({ tile: [18, 38, 70], ink: "rgba(220,235,255,A)", base: "#13284a", edge: "rgba(19,40,74,0.9)", glow: 0, net: "rgba(25,60,110,A)", red: "#e0303a", cx: W * .78, cy: H * .52, s: 1.0 });
     word("なぜ、", 110, 400, 150, "#13284a", { inner: null, outer: "#ffffff", shadow: false });
-    crackWord("間違った科学", 90, 740, 270, "#e0303a", { font: "ZenAntique", outer: "#ffffff", ow: .16, cracks: 8 });
+    crackWord("間違った科学", 90, 740, 270, "#e0303a", { font: "ZenAntique", outer: "#ffffff", ow: .16, cracks: 7 });
     word("ほど", 110, 1040, 150, "#13284a", { inner: null, outer: "#ffffff", shadow: false });
     word("広まるのか", 400, 1090, 270, "#13284a", { font: "ZenAntique", outer: "#ffffff", ow: .16, inner: null, shadow: false });
     band(0, 1260, W, 180, "#13284a"); g.fillStyle = "#fff"; g.font = F.replace("%s", 70); g.textBaseline = "middle"; g.fillText("あなたの常識、本当に正しいですか？", 110, 1350);
