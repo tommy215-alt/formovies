@@ -91,6 +91,16 @@ async function upload(item) {
     }
     await page.locator("#title-textarea #textbox").first().waitFor({ timeout: 120000 }); await page.waitForTimeout(2500);
     await typeInto("#title-textarea #textbox", title); await typeInto("#description-textarea #textbox", desc); await shot("details");
+    // サムネイル（2026-11-05〜、queue.json の "thumbnail"。長い動画 long_001 から）：画像用のファイルの欄に入れ、画面で確かめる
+    if (item.thumbnail) {
+      const tf = path.join(ROOT, item.thumbnail);
+      if (!fs.existsSync(tf)) throw new Error("サムネイルがない：" + item.thumbnail);
+      const inp = page.locator("input[type=file][accept*='image']").first();
+      await inp.waitFor({ state: "attached", timeout: 30000 }); await inp.setInputFiles(tf); await page.waitForTimeout(6000);
+      const f = await shot("thumbnail");
+      if (await page.locator("text=/電話番号|確認が必要|verify|Verify/").first().isVisible().catch(() => false)) throw new Error("カスタム サムネイルにはチャンネルの確認が必要（画面：" + f + "）");
+      say("サムネイルを入れました（画面：" + f + "）");
+    }
     await clickFirst(["tp-yt-paper-radio-button[name=VIDEO_MADE_FOR_KIDS_NOT_MFK]"]);
     // 「AI の使用」（改変または合成されたコンテンツの申告）：見出しのすぐ下の「いいえ」を選び、選ばれたことを確かめる（ユーザーの指示）
     const aiNo = () => page.evaluate(() => {

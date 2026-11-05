@@ -4,6 +4,11 @@
 
 ## いまの状態
 
+- **ナレーション収録スタジオ（2026-11-05、途中で一旦止めた。続きはユーザーがまたやる）**：`tools/narration_studio/`（起動：`python anatomy_room/tools/narration_studio/narration_studio.py long_001`）。
+  - いまの加工は v4：AI（Resemble Enhance）で反響と雑音を取る → な行の詰まりを取る（`denasal`）→ 薄い仕上げ。ピッチは 0.25 半音きざみ＋「この行で試し聞き」。
+  - ユーザーの感想の流れ：v1「加工が弱い・お風呂みたい」→ v2（手作りの残響抑制＋強い加工）「加工感が強くて違和感。生のアナウンサーのように」→ v3（AI）「かなりいい」→ な行が鼻詰まり・ピッチ調整 → v4（感想待ち）。
+  - long_001 の 67 行は録音済み（`production/long_001/recording/`、git に入れない）。ただし完成版の動画は合成音声のまま。lines.json の `"recorded": true` は外してある（スタジオの「書き出す」でまた付く）。録音の声で動画を作るのは、ユーザーが仕上がりに満足してから。
+
 - pilot_016（ヴェーゲナー）は完成（BGM lab_melodic・CG の質の向上を入れた版、コミット 43238e2）。YouTube へのアップロードはユーザーの指示まで行わない。
 - **最新版の設定は `templates/REVERSE_GUIDELINE_v2.4.md`**（いまの設定の一覧つき）。
 - **pilot_017（ヘンリエッタ・リービット）は完成**（90.0 秒、video_qa OK、BGM lab_dub）。
