@@ -137,6 +137,52 @@
    "deleted_old_versions": "2026-11-04 YouTube から削除（ユーザーの指示。古い非公開の版）",
    "old_private_upload_57": "2026-11-04T01:52:08.764Z",
    "uploaded": "2026-11-04T06:06:09.922Z"
+  },
+  {
+   "id": "pilot_040",
+   "video": "anatomy_room/production/pilot_040/reverse_040_gimli.mp4",
+   "meta": "anatomy_room/production/pilot_040/youtube_metadata.md",
+   "publish_at": "2026-11-05 19:00",
+   "status": "scheduled",
+   "note": "2026-11-05 ユーザーが予約を指示",
+   "uploaded": "2026-11-05T00:53:44.888Z",
+   "url": "https://youtube.com/shorts/10qJsRpxvFw?feature=share"
+  },
+  {
+   "id": "pilot_041",
+   "video": "anatomy_room/production/pilot_041/reverse_041_rogozov.mp4",
+   "meta": "anatomy_room/production/pilot_041/youtube_metadata.md",
+   "publish_at": "2026-11-06 08:00",
+   "status": "scheduled",
+   "note": "2026-11-05 ユーザーが予約を指示",
+   "uploaded": "2026-11-05T00:55:16.322Z"
+  },
+  {
+   "id": "pilot_042",
+   "video": "anatomy_room/production/pilot_042/reverse_042_kelsey.mp4",
+   "meta": "anatomy_room/production/pilot_042/youtube_metadata.md",
+   "publish_at": "2026-11-06 19:00",
+   "status": "scheduled",
+   "note": "2026-11-05 ユーザーが予約を指示",
+   "uploaded": "2026-11-05T00:56:42.767Z"
+  },
+  {
+   "id": "pilot_043",
+   "video": "anatomy_room/production/pilot_043/reverse_043_snow.mp4",
+   "meta": "anatomy_room/production/pilot_043/youtube_metadata.md",
+   "publish_at": "2026-11-07 08:00",
+   "status": "scheduled",
+   "note": "2026-11-05 ユーザーが予約を指示",
+   "uploaded": "2026-11-05T00:58:09.199Z"
+  },
+  {
+   "id": "pilot_044",
+   "video": "anatomy_room/production/pilot_044/reverse_044_shackleton.mp4",
+   "meta": "anatomy_room/production/pilot_044/youtube_metadata.md",
+   "publish_at": "2026-11-07 19:00",
+   "status": "scheduled",
+   "note": "2026-11-05 ユーザーが予約を指示",
+   "uploaded": "2026-11-05T00:59:43.669Z"
   }
  ]
 }
