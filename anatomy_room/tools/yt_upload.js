@@ -57,8 +57,10 @@ async function login() {
 async function upload(item) {
   const { title, desc } = meta(item.meta), video = path.join(ROOT, item.video);
   if (!fs.existsSync(video)) throw new Error("動画がない：" + item.video);
-  const [d, hm] = item.publish_at.split(" "), [Y, Mo, D] = d.split("-").map(Number);
-  if (new Date(`${d}T${hm}:00+09:00`) < new Date(Date.now() + 20 * 60000)) throw new Error("公開日時が近すぎるか過ぎている：" + item.publish_at);   // 振り直しは呼ぶ側（next）で済ませてある
+  // publish_at が "now" の回はすぐ一般公開（2026-11-05〜、ユーザーの指示「今すぐ公開」。長い動画 long_001 から）
+  const NOW = item.publish_at === "now";
+  const [d, hm] = NOW ? ["", ""] : item.publish_at.split(" "), [Y, Mo, D] = NOW ? [] : d.split("-").map(Number);
+  if (!NOW && new Date(`${d}T${hm}:00+09:00`) < new Date(Date.now() + 20 * 60000)) throw new Error("公開日時が近すぎるか過ぎている：" + item.publish_at);   // 振り直しは呼ぶ側（next）で済ませてある
   const ctx = await open(!SHOW); page = ctx.pages()[0] || await ctx.newPage();
   try {
     await page.goto("https://studio.youtube.com/"); await page.waitForTimeout(4000);
@@ -116,6 +118,13 @@ async function upload(item) {
     if (!(await aiChecked())) throw new Error("「AI の使用」の「いいえ」を選べなかった");
     for (let i = 0; i < 3; i++) { await clickFirst(["#next-button"]); await page.waitForTimeout(1500); }
     await shot("visibility");
+    if (NOW) {   // すぐ一般公開：「公開」を選び、選ばれたことを確かめる
+      const pub = page.locator("tp-yt-paper-radio-button[name=PUBLIC]").first();
+      if (!(await pub.isVisible().catch(() => false))) { await clickFirst(["#first-container-expand-button", "text=保存または公開", "text=Save or publish"]); await page.waitForTimeout(800); }
+      await pub.click(); await page.waitForTimeout(800); await shot("public_input");
+      if ((await pub.getAttribute("aria-checked")) !== "true") throw new Error("「公開」を選べなかった");
+      say("公開の欄：公開");
+    } else {
     // 予約公開：日付は欄を全部消してから入れ、時刻は一覧から選ぶ
     const dateStr = `${Y}/${String(Mo).padStart(2, "0")}/${String(D).padStart(2, "0")}`, timeStr = hm.replace(/^0/, "");
     if (!(await page.locator("#datepicker-trigger").first().isVisible().catch(() => false))) { await clickFirst(["#second-container-expand-button", "ytcp-icon-button#second-container-expand-button"]); await page.waitForTimeout(800); }
@@ -131,6 +140,7 @@ async function upload(item) {
     const shown = await page.evaluate(() => [...document.querySelectorAll("ytcp-date-picker input, #time-of-day-trigger input, #time-of-day-container input, #datepicker-trigger, #time-of-day-trigger")].map(e => (e.value || e.innerText || "").trim()).join(" "));
     say("予約の欄：" + (shown + " " + sched).slice(0, 200));
     if (!(shown + sched).includes(dateStr) || !(shown + sched).includes(timeStr)) throw new Error(`予約の日時が入っていない（${dateStr} ${timeStr}）`);
+    }
     // アップロードと処理の完了を待って「スケジュールを設定」を押す
     const done = page.locator("#done-button").first(); const t0 = Date.now();
     while (Date.now() - t0 < 30 * 60000) { if (await done.isEnabled().catch(() => false)) break; await page.waitForTimeout(5000); }
@@ -239,10 +249,13 @@ async function deleteVideos(ids) {
   for (const item of items) {
     if (item.status === "scheduled") throw new Error("すでに予約済み：" + item.id);
     const [d, hm] = (item.publish_at || "").split(" ");
-    if (!item.publish_at || jst(d, hm) <= last || q.items.some(x => x !== item && x.status === "scheduled" && x.publish_at === item.publish_at)) {
+    if (item.publish_at !== "now" && (!item.publish_at || jst(d, hm) <= last || q.items.some(x => x !== item && x.status === "scheduled" && x.publish_at === item.publish_at))) {
       const at = nextSlot(q, last); say(`公開の枠を振り直し：${item.id} ${item.publish_at || "（未定）"} → ${at}`); logRun(`reslot ${item.id} ${item.publish_at || "-"} -> ${at}`); item.publish_at = at; save(); }
     try {
       const link = await upload(item);
+      if (item.publish_at === "now") {
+        item.status = "public"; item.uploaded = new Date().toISOString(); if (link) item.url = link; save();
+        say(`✅ 公開しました：${item.id}${link ? " " + link : ""}`); logRun(`public ${item.id}`); continue; }
       item.status = "scheduled"; item.uploaded = new Date().toISOString(); if (link) item.url = link; save();
       say(`✅ 予約しました：${item.id}（公開 ${item.publish_at}）${link ? " " + link : ""}`); logRun(`scheduled ${item.id} ${item.publish_at}`);
       const [d2, hm2] = item.publish_at.split(" "); last = jst(d2, hm2);

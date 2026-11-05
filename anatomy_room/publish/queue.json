@@ -183,6 +183,18 @@
    "status": "scheduled",
    "note": "2026-11-05 ユーザーが予約を指示",
    "uploaded": "2026-11-05T00:59:43.669Z"
+  },
+  {
+   "id": "long_001",
+   "video": "anatomy_room/production/long_001/reverse_long_001_replication.mp4",
+   "meta": "anatomy_room/production/long_001/youtube_metadata.md",
+   "thumbnail": "anatomy_room/production/long_001/thumbnail_youtube.png",
+   "publish_at": "now",
+   "status": "public",
+   "note": "長い動画の 1 本目（合成音声の版）。2026-11-05 ユーザーの指示で今すぐ公開、サムネイル付き",
+   "uploaded": "2026-11-05T13:53:29.885Z",
+   "url": "https://youtu.be/Au9pv7HmUks",
+   "thumbnail_status": "未設定：カスタム サムネイルはチャンネルの確認（電話番号、youtube.com/verify）が必要。ユーザーが確認したら編集画面から入れる"
   }
  ]
 }
