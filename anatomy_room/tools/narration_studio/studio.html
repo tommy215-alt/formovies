@@ -99,12 +99,14 @@ dialog textarea { width: 100%; height: 300px; background: var(--bg); border: 1px
         <option value="classic">従来の加工（強め）</option>
       </select>
       <div class="row"><span>ピッチ</span><b id="pv"></b></div>
-      <input type="range" id="pitch" min="-4" max="3" step="0.5">
+      <input type="range" id="pitch" min="-4" max="4" step="0.25">
+      <div style="display:flex;gap:6px"><button id="pdown" style="flex:1">− 0.25</button><button id="p0" style="flex:1">0</button><button id="pup" style="flex:1">＋ 0.25</button></div>
       <div class="row"><span>響き</span><b id="rv"></b></div>
       <input type="range" id="reverb" min="0" max="60" step="2">
       <div class="row"><span>クレジット</span></div>
       <input type="text" id="credit" placeholder="例：ナレーション：○○">
-      <button id="apply">この設定で作り直す</button>
+      <button id="preview">この行で試し聞き</button>
+      <button id="apply">この設定で全部の行を作り直す</button>
       <p class="small">自動で行うこと：「あー」「えー」などの除去、言い直しは最後の読み直しを使う、長い間を詰める、部屋の反響と雑音を取る、サ行の刺さりを抑える、低音で温かさを足す、音量と話す速さをそろえる。</p>
     </div>
     <div class="box">
@@ -226,6 +228,20 @@ $("playRaw").onclick = () => play("raw");
 $("playOut").onclick = () => play("out");
 $("pitch").oninput = $("reverb").oninput = () => { refresh.touched = true; labels(); };
 $("credit").oninput = $("mode").onchange = () => { refresh.touched = true; };
+const nudge = v => { $("pitch").value = v; refresh.touched = true; labels(); };
+$("pdown").onclick = () => nudge(+$("pitch").value - 0.25);
+$("pup").onclick = () => nudge(+$("pitch").value + 0.25);
+$("p0").onclick = () => nudge(0);
+$("preview").onclick = async () => {
+  const l = S.lines[cur]; if (!l || l.state !== "完了") return alert("この行はまだ仕上がっていません");
+  const b = $("preview"); b.disabled = true; b.textContent = "作っています…";
+  try {
+    const r = await fetch("/api/preview/" + l.id, { method: "POST", body: JSON.stringify({ pitch: +$("pitch").value, reverb: +$("reverb").value, mode: $("mode").value }) });
+    if (!r.ok) throw new Error((await r.json()).error);
+    audio.src = URL.createObjectURL(await r.blob()); audio.play();
+  } catch (e) { alert("試し聞きに失敗：" + e.message); }
+  b.disabled = false; b.textContent = "この行で試し聞き";
+};
 $("apply").onclick = async () => {
   await api("/api/settings", JSON.stringify({ pitch: +$("pitch").value, reverb: +$("reverb").value, credit: $("credit").value, mode: $("mode").value }));
   refresh.touched = false; refresh();

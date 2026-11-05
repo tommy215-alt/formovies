@@ -43,7 +43,7 @@ ROOT = HERE.parents[1]                      # anatomy_room
 PROD = ROOT / "production"
 PORT = 8765
 SR = 48000
-DEFAULT_SETTINGS = {"pitch": 0.0, "reverb": 0, "rate": 7.0, "credit": "", "mode": "ai", "proc": 3}   # ピッチ（半音）・響き（%）・目標の速さ（モーラ/秒）・加工の版
+DEFAULT_SETTINGS = {"pitch": 0.0, "reverb": 0, "rate": 7.0, "credit": "", "mode": "ai", "proc": 4}   # ピッチ（半音）・響き（%）・目標の速さ（モーラ/秒）・加工の版
 PUNCT = re.compile(r"[\s、。，．,.!！?？「」『』（）()・…ー〜~]")
 
 # ---------------------------------------------------------------------------- 台本
@@ -76,9 +76,10 @@ class Project:
             sf = d / "studio.json"
             saved = json.loads(sf.read_text(encoding="utf-8")) if sf.exists() else {}
             self.settings = {**DEFAULT_SETTINGS, **saved.get("settings", {})}
-            if self.settings.get("proc", 1) < PROC_VERSION:    # 加工の版が上がったら、ピッチと響きも新しい既定値に
+            if self.settings.get("proc", 1) < 3:                # AI になる前の設定なら、ピッチと響きも新しい既定値に
                 self.settings.update(pitch=DEFAULT_SETTINGS["pitch"], reverb=DEFAULT_SETTINGS["reverb"],
-                                     mode=DEFAULT_SETTINGS["mode"], proc=PROC_VERSION)
+                                     mode=DEFAULT_SETTINGS["mode"])
+            self.settings["proc"] = PROC_VERSION
             for ln in lines:
                 ln["moras"] = moras(ln["speech"])
             self.status = {}
@@ -208,7 +209,8 @@ def edit(lid):
 
 
 # ---------------------------------------------------------------------------- ② 声の加工（ピッチと響きはここだけ）
-PROC_VERSION = 3   # 加工の版。上げると、開いたときに完了済みの行を新しい加工で作り直す
+PROC_VERSION = 4   # 加工の版。上げると、開いたときに完了済みの行を新しい加工で作り直す
+# v4：な行（鼻音）の詰まりを取る（denasal）。ピッチ・響きの設定はそのまま引き継ぐ
 # v3：AI（Resemble Enhance）で作り直し＋薄い仕上げ（render_ai）。v2 の加工は「従来の加工」として残す（render_classic）
 # v2（2026-11-05、ユーザー「加工が弱い・お風呂にいるみたい。スタジオのように、声はかなり強めに」）：
 #   部屋の反響を取り除く（残響抑制）、足す響きは小さな部屋の短い響きに（既定 0）、低音・箱鳴りの削り・コンプを強く、言葉の間の部屋の音を下げる
@@ -259,6 +261,30 @@ def dereverb(x, t60=0.6, strength=1.6, floor_db=-18):
     return istft(X * g, w, len(x), hop=hop)
 
 
+def denasal(x, cut_db=3.5, lift_db=3.0):
+    """な行（鼻音）の詰まりを取る（ユーザー「な行が鼻が詰まって聞こえる」）。AI のあと、鼻音らしいコマでは 200〜350 Hz が
+    約 +1 dB、1.5〜4 kHz が約 −1〜2 dB になっていた（録音そのままと比べて、ユーザーの 4 行で測定）。
+    低い帯域に偏ったコマ（鼻音・こもった音）だけ、こもる帯域を下げて明瞭な帯域を戻す。母音や子音はそのまま"""
+    hop = 256
+    X, w = stft(x, hop=hop)
+    P = np.abs(X) ** 2
+    f = np.fft.rfftfreq(1024, 1 / SR)
+    band = lambda a, b: P[:, (f >= a) & (f < b)].sum(1) + 1e-12
+    lvl = 10 * np.log10(band(100, 8000))
+    tilt = 10 * np.log10(band(100, 500) / band(500, 4000))
+    voiced = lvl > lvl.max() - 30
+    if voiced.sum() < 5:
+        return x
+    t0 = np.percentile(tilt[voiced], 60)
+    wgt = np.clip((tilt - t0) / 6, 0, 1) * voiced
+    k = 7                                                # 約 40 ms でなめらかに（切り替わりのぷつぷつを防ぐ）
+    wgt = np.convolve(wgt, np.ones(k) / k, "same")
+    bell = lambda fc, oct_w: np.exp(-0.5 * (np.log2(np.maximum(f, 1) / fc) / oct_w) ** 2)
+    curve = -cut_db * bell(270, 0.6) + lift_db * bell(2600, 0.8)    # dB
+    G = 10 ** (wgt[:, None] * curve[None, :] / 20)
+    return istft(X * G, w, len(x), hop=hop)
+
+
 IR = None
 
 
@@ -296,17 +322,18 @@ class Enhancer:
 ENH = Enhancer()
 
 
-def render(lid):
-    st = P.settings
+def render(lid, st=None, out=None):
+    """st：設定（試し聞きでは保存前の値）、out：書き出し先（既定は out/<行>.wav）"""
+    st = st or P.settings
+    out = out or P.dir / "out" / f"{lid}.wav"
     if st.get("mode", "ai") == "ai" and ENH.available():
-        return render_ai(lid)
-    return render_classic(lid)
+        return render_ai(lid, st, out)
+    return render_classic(lid, st, out)
 
 
-def finish(y, lid, tempo):
+def finish(y, st, out, tempo):
     """足す響き（スライダー）→ 話している部分の大きさを -18 dBFS（RMS）に → 書き出し"""
     global IR
-    st = P.settings
     if st["reverb"] > 0:
         if IR is None:
             IR = impulse()
@@ -321,20 +348,20 @@ def finish(y, lid, tempo):
     y = y * 10 ** (-18 / 20) / np.sqrt(act.mean() + 1e-12)
     y = ffmpeg_filter(y, "alimiter=limit=0.89:attack=2:release=40:level=disabled")
     pad = np.zeros(int(.03 * SR)); y = np.concatenate([pad, y, pad])
-    write_wav(P.dir / "out" / f"{lid}.wav", y)
+    write_wav(out, y)
     return len(y) / SR, tempo
 
 
-def render_ai(lid):
+def render_ai(lid, st, out):
     """v3（2026-11-05、ユーザー「加工感が強くて違和感。生のアナウンサーが読んだような感じに」）：
     AI（Resemble Enhance）で反響と雑音を取り、スタジオで録ったような声に作り直す。そのあとの加工は薄く（自然さを優先）：
     ピッチは 0 なら変えない、速さはそろえるが幅を狭く（0.94〜1.06 倍）、低音は少しの温かさだけ、コンプは軽く"""
-    ln, st = P.line(lid), P.settings
+    ln = P.line(lid)
     src, ai = P.dir / "edit" / f"{lid}.wav", P.dir / "ai" / f"{lid}.wav"
     ai.parent.mkdir(exist_ok=True)
     if not ai.exists() or ai.stat().st_mtime < src.stat().st_mtime:   # AI の結果は、編集し直したときだけ作り直す
         ENH.run(src, ai)
-    x = decode(ai)
+    x = denasal(decode(ai))                                # v4：な行の詰まりを取る
     dur = len(x) / SR
     target = ln["moras"] / st["rate"]
     tempo = max(.94, min(1.06, dur / target)) if target > 0 else 1.0
@@ -345,12 +372,12 @@ def render_ai(lid):
              "deesser=i=0.3:m=0.5:f=0.5"]
     if abs(st["pitch"]) > 1e-6 or abs(tempo - 1) > .005:
         chain.append(f"rubberband=pitch={2 ** (st['pitch'] / 12):.5f}:tempo={tempo:.4f}:formant=preserved")
-    return finish(ffmpeg_filter(x, ",".join(chain)), lid, tempo)
+    return finish(ffmpeg_filter(x, ",".join(chain)), st, out, tempo)
 
 
-def render_classic(lid):
+def render_classic(lid, st, out):
     """v2 の加工（手作りの残響抑制＋強めの加工）。設定の「従来の加工」で使う"""
-    ln, st = P.line(lid), P.settings
+    ln = P.line(lid)
     x = decode(P.dir / "edit" / f"{lid}.wav")
     dur = len(x) / SR
     target = ln["moras"] / st["rate"]                       # 目標の速さで読んだときの長さ
@@ -378,7 +405,7 @@ def render_classic(lid):
         "deesser=i=0.5:m=0.6:f=0.5",
         f"rubberband=pitch={pitch:.5f}:tempo={tempo:.4f}:formant=preserved:transients=smooth",
     ]))
-    return finish(y, lid, tempo)
+    return finish(y, st, out, tempo)
 
 
 def worker():
@@ -473,6 +500,13 @@ class H(BaseHTTPRequestHandler):
                         P.status[ln["id"]]["state"] = "処理待ち"; JOBS.put((ln["id"], "render"))
                 P.save()
                 return self.send(200, {"ok": True})
+            if parts[:2] == ["api", "preview"] and len(parts) == 3:
+                # 試し聞き：保存前の設定で、この 1 行だけを作って返す（全部の行は作り直さない）
+                lid, d = parts[2], json.loads(self.body())
+                st = {**P.settings, **{k: d[k] for k in ("pitch", "reverb", "mode") if k in d}}
+                out = P.dir / "preview.wav"
+                render(lid, st, out)
+                return self.send(200, out.read_bytes(), "audio/wav")
             if u.path == "/api/export":
                 return self.send(200, export())
         except Exception as e:
