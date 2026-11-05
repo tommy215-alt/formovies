@@ -3,6 +3,7 @@
 <title>long_001 thumbnail layouts</title>
 <style>
 @font-face { font-family: "NotoBlack"; src: url("fonts/NotoSansJP-VF.ttf"); font-weight: 100 900; }
+@font-face { font-family: "ZenAntique"; src: url("fonts/ZenAntique-Regular.ttf"); }
 html, body { margin: 0; background: #000; }
 #c { display: block; }
 </style>
@@ -86,12 +87,37 @@ function spread(o) {
 
 // ---------------------------------------------------------------- 文字
 function word(s, x, y, size, fill, o = {}) {
-  g.save(); g.font = F.replace("%s", size); g.textAlign = o.align || "left"; g.textBaseline = "alphabetic"; g.lineJoin = "round";
+  g.save(); g.font = o.font ? `${size}px ${o.font}` : F.replace("%s", size); g.textAlign = o.align || "left"; g.textBaseline = "alphabetic"; g.lineJoin = "round";
   if (o.shadow !== false) { g.shadowColor = "rgba(0,0,0,0.5)"; g.shadowBlur = size * .08; g.shadowOffsetY = size * .05; }
   if (o.outer !== null) { g.lineWidth = size * (o.ow || .22); g.strokeStyle = o.outer || "#05080f"; g.strokeText(s, x, y); }
   g.shadowColor = "transparent";
   if (o.inner !== null) { g.lineWidth = size * .1; g.strokeStyle = o.inner || "#ffffff"; g.strokeText(s, x, y); }
   g.fillStyle = fill; g.fillText(s, x, y); g.restore();
+}
+// 割れた文字：文字を別の画に描き、ひびの線で切り抜き、かけらを少しずつずらして重ねる（白い背景ではひびが白く見える）
+function crackWord(s, x, y, size, fill, o = {}) {
+  const off = document.createElement("canvas"); off.width = W; off.height = H; const c = off.getContext("2d");
+  c.font = `${size}px ${o.font}`; c.textBaseline = "alphabetic"; c.lineJoin = "round";
+  const w = c.measureText(s).width;
+  c.lineWidth = size * (o.ow || .16); c.strokeStyle = o.outer || "#ffffff"; c.strokeText(s, x, y);
+  c.fillStyle = fill; c.fillText(s, x, y);
+  const lines = [], n = o.cracks || 7;
+  for (let i = 0; i < n; i++) {
+    const px = x + (i + .5 + (rnd() - .5) * .5) / n * w, py = y - size * (.15 + rnd() * .65), ang = (i % 2 ? .32 : -.32) * Math.PI + (rnd() - .5) * .8;
+    lines.push({ px, py, dx: Math.cos(ang), dy: Math.sin(ang) });
+  }
+  c.globalCompositeOperation = "destination-out"; c.lineWidth = size * .034;
+  lines.forEach(L => { c.beginPath(); c.moveTo(L.px - L.dx * 3000, L.py - L.dy * 3000); c.lineTo(L.px + L.dx * 3000, L.py + L.dy * 3000); c.stroke(); });
+  // 細かいひびの枝
+  c.lineWidth = size * .018;
+  for (let i = 0; i < 26; i++) { const L = lines[i % n], t0 = (rnd() - .5) * size * 1.2; let bx = L.px + L.dx * t0, by = L.py + L.dy * t0; c.beginPath(); c.moveTo(bx, by); for (let k = 0; k < 2; k++) { bx += (rnd() - .5) * size * .35; by += (rnd() - .5) * size * .35; c.lineTo(bx, by); } c.stroke(); }
+  c.globalCompositeOperation = "source-over";
+  const use = lines.slice(0, 7);
+  for (let k = 0; k < (1 << use.length); k++) {
+    g.save();
+    use.forEach((L, i) => { const sd = (k >> i) & 1 ? 1 : -1, nx = -L.dy * sd, ny = L.dx * sd, R = 6000; g.beginPath(); g.moveTo(L.px - L.dx * R, L.py - L.dy * R); g.lineTo(L.px + L.dx * R, L.py + L.dy * R); g.lineTo(L.px + L.dx * R + nx * R, L.py + L.dy * R + ny * R); g.lineTo(L.px - L.dx * R + nx * R, L.py - L.dy * R + ny * R); g.closePath(); g.clip(); });
+    g.drawImage(off, (rnd() - .5) * size * .07, (rnd() - .5) * size * .07); g.restore();
+  }
 }
 function vword(s, x, y, size, fill, o = {}) { [...s].forEach((ch, i) => { const r = "ー、".includes(ch); g.save(); g.translate(x, y + i * size * 1.02); if (r) { g.rotate(Math.PI / 2); } word(ch, 0, size * .38, size, fill, { ...o, align: "center" }); g.restore(); }); }
 function band(x, y, w, h, col, skew = 0) { g.fillStyle = col; g.beginPath(); g.moveTo(x + skew, y); g.lineTo(x + w + skew, y); g.lineTo(x + w, y + h); g.lineTo(x, y + h); g.closePath(); g.fill(); }
@@ -100,6 +126,15 @@ function chip(s, x, y, size, bgc, fg, skew = 26) { g.save(); g.font = F.replace(
 // ---------------------------------------------------------------- 10 のレイアウト
 const NAVY = { tile: [20, 45, 85], ink: "rgba(207,230,255,A)", edge: "rgba(207,230,255,0.9)", net: "rgba(170,215,255,A)", red: "#ff5a5a" };
 const LAYOUTS = {
+  11: () => { // 決定版：2 の白い背景、「間違った科学」「広まるのか」は Zen Antique（「間違った科学」はひび割れ）、ほかは Noto Sans JP Black
+    linear("#ffffff", "#dfe7f1", Math.PI / 2); dots("rgba(30,60,110,0.08)");
+    head({ tile: [18, 38, 70], ink: "rgba(220,235,255,A)", base: "#13284a", edge: "rgba(19,40,74,0.9)", glow: 0, net: "rgba(25,60,110,A)", red: "#e0303a", cx: W * .78, cy: H * .52, s: 1.0 });
+    word("なぜ、", 110, 400, 150, "#13284a", { inner: null, outer: "#ffffff", shadow: false });
+    crackWord("間違った科学", 90, 740, 270, "#e0303a", { font: "ZenAntique", outer: "#ffffff", ow: .16, cracks: 9 });
+    word("ほど", 110, 1040, 150, "#13284a", { inner: null, outer: "#ffffff", shadow: false });
+    word("広まるのか", 400, 1090, 270, "#13284a", { font: "ZenAntique", outer: "#ffffff", ow: .16, inner: null, shadow: false });
+    band(0, 1260, W, 180, "#13284a"); g.fillStyle = "#fff"; g.font = F.replace("%s", 70); g.textBaseline = "middle"; g.fillText("あなたの常識、本当に正しいですか？", 110, 1350);
+  },
   1: () => { // 定番：左に文字、右に頭（濃紺）
     radial("#173a63", "#0a1a33", "#02050b"); head({ ...NAVY, cx: W * .81, cy: H * .52, s: .98 });
     chip("あなたの常識、本当に正しい？", 100, 170, 54, "#d8242f", "#fff");
@@ -175,6 +210,7 @@ const LAYOUTS = {
 
 (async () => {
   await document.fonts.load("900 200px NotoBlack", "なぜ、間違った科学ほど広まるのかあなたの常識本当に正しいですか？");
+  await document.fonts.load("200px ZenAntique", "間違った科学広まるのか");
   LAYOUTS[L]();
   window.DONE = true;
 })();
