@@ -2,78 +2,138 @@
 <html lang="ja"><head><meta charset="utf-8">
 <title>long_001 thumbnail</title>
 <style>
-@font-face { font-family: "Dela"; src: url("../../pilot_021/assets/fonts/delagothicone_DelaGothicOne-Regular.ttf"); }
+@font-face { font-family: "Dela"; src: url("../assets/fonts/delagothicone_DelaGothicOne-Regular.ttf"); }
 html, body { margin: 0; background: #000; }
 #c { display: block; }
 </style>
 </head><body>
 <canvas id="c" width="2560" height="1440"></canvas>
 <script>
-// long_001 のサムネイル（YouTube 用 1280×720 を 2 倍で描く）。参考：ユーザーが送ったホラー系のサムネイル（太い文字・縁取り・グラデーション・発光）。
-// 「参考より少しスマートに」：血や汚れの質感は使わず、暗い青の背景に、点でできた横顔が崩れて消えていく画と、金・赤の極太の文字。フォントは Dela Gothic One（OFL）。
+// long_001「なぜ、間違った科学ほど広まるのか」のサムネイル（YouTube 用 1280×720 を 2 倍で描く）。
+// ユーザーの指示（2026-11-05）：「間違った科学」「広まるのか」を強調、字体は「零ゴシック」（割れた文字）を参考に、
+// 背景の頭は 2D でもっと写実的に、そこからネットワークに広がる画。零ゴシックは配布元の BOOTH にログインが要るので、
+// Dela Gothic One（OFL）に「割れ」を描画で加えて近づけている（零ゴシックのファイルが手に入ったら font-face を差し替える）。
 const cv = document.getElementById("c"), g = cv.getContext("2d"), W = 2560, H = 1440;
-const rnd = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
 function bg() {
-  const gr = g.createRadialGradient(W * .72, H * .48, 60, W * .6, H * .5, W * .8);
-  gr.addColorStop(0, "#16345a"); gr.addColorStop(.45, "#0b1a33"); gr.addColorStop(1, "#03060d");
+  const gr = g.createRadialGradient(W * .74, H * .45, 80, W * .6, H * .5, W * .85);
+  gr.addColorStop(0, "#1b3d68"); gr.addColorStop(.4, "#0c1d3a"); gr.addColorStop(1, "#02050b");
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  // 細い格子と、データの縦の流れ
-  g.strokeStyle = "rgba(120,180,255,0.06)"; g.lineWidth = 2;
+  g.strokeStyle = "rgba(120,180,255,0.05)"; g.lineWidth = 2;
   for (let x = 0; x < W; x += 80) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
   for (let y = 0; y < H; y += 80) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-  g.font = "700 26px monospace";
-  for (let i = 0; i < 70; i++) {
-    const x = W * .45 + rnd() * W * .55, y0 = rnd() * H;
-    for (let k = 0; k < 10; k++) { g.fillStyle = `rgba(90,200,255,${.05 + .12 * (1 - k / 10) * rnd()})`; g.fillText(rnd() > .5 ? "1" : "0", x, y0 + k * 30); }
-  }
 }
 
-// 横顔の形（右向き）。点で埋め、後頭部側（左）の点は崩れて左へ飛び、薄くなる
+// 写実的な横顔（左向き、首と肩まで）
 function headPath(cx, cy, s) {
-  const p = new Path2D();
-  const P = (x, y) => [cx + x * s, cy + y * s];
-  p.moveTo(...P(-150, 230)); p.lineTo(...P(-150, 120));
-  p.bezierCurveTo(...P(-250, 40), ...P(-230, -230), ...P(0, -240));
-  p.bezierCurveTo(...P(200, -240), ...P(250, -100), ...P(222, 0));
-  p.lineTo(...P(262, 62)); p.lineTo(...P(222, 82));
-  p.bezierCurveTo(...P(232, 140), ...P(182, 160), ...P(122, 150)); p.lineTo(...P(122, 230)); p.closePath();
+  const p = new Path2D(), P = (x, y) => [cx + x * s, cy + y * s];
+  p.moveTo(...P(470, 720));
+  p.bezierCurveTo(...P(470, 600), ...P(400, 560), ...P(330, 520));
+  p.bezierCurveTo(...P(300, 430), ...P(300, 330), ...P(310, 260));
+  p.bezierCurveTo(...P(380, 120), ...P(380, -170), ...P(240, -330));
+  p.bezierCurveTo(...P(110, -450), ...P(-150, -460), ...P(-260, -330));
+  p.bezierCurveTo(...P(-320, -250), ...P(-330, -170), ...P(-318, -110));
+  p.bezierCurveTo(...P(-330, -90), ...P(-345, -80), ...P(-340, -60));
+  p.bezierCurveTo(...P(-345, -30), ...P(-375, 10), ...P(-392, 40));
+  p.bezierCurveTo(...P(-400, 55), ...P(-385, 70), ...P(-350, 72));
+  p.bezierCurveTo(...P(-345, 85), ...P(-352, 100), ...P(-345, 112));
+  p.bezierCurveTo(...P(-360, 122), ...P(-352, 140), ...P(-338, 145));
+  p.bezierCurveTo(...P(-345, 160), ...P(-340, 185), ...P(-330, 200));
+  p.bezierCurveTo(...P(-335, 235), ...P(-320, 265), ...P(-280, 280));
+  p.bezierCurveTo(...P(-220, 300), ...P(-170, 300), ...P(-140, 320));
+  p.bezierCurveTo(...P(-120, 400), ...P(-120, 470), ...P(-160, 540));
+  p.bezierCurveTo(...P(-300, 600), ...P(-420, 640), ...P(-470, 720));
+  p.closePath();
   return p;
 }
-function head() {
-  const cx = W * .73, cy = H * .55, s = 2.25, hp = headPath(cx, cy, s);
-  // 輪郭の発光
-  g.save(); g.shadowColor = "#4fd1ff"; g.shadowBlur = 60; g.strokeStyle = "rgba(79,209,255,0.55)"; g.lineWidth = 5; g.stroke(hp); g.restore();
-  // 点で埋める
-  const step = 24;
-  for (let y = cy - 260 * s; y < cy + 240 * s; y += step) for (let x = cx - 270 * s; x < cx + 280 * s; x += step) {
+function head(cx, cy, s) {
+  const hp = headPath(cx, cy, s);
+  g.save();
+  const fill = g.createLinearGradient(cx - 400 * s, cy - 400 * s, cx + 450 * s, cy + 500 * s);
+  fill.addColorStop(0, "rgba(80,170,255,0.42)"); fill.addColorStop(.45, "rgba(25,70,140,0.55)"); fill.addColorStop(1, "rgba(5,15,35,0.9)");
+  g.fillStyle = fill; g.fill(hp);
+  g.clip(hp);
+  for (let i = 0; i < 1600; i++) {
+    const x = cx + (rnd() - .5) * 900 * s, y = cy + (rnd() - .55) * 1250 * s;
     if (!g.isPointInPath(hp, x, y)) continue;
-    const u = (x - (cx - 260 * s)) / (520 * s);         // 0：後頭部 … 1：顔
-    const brk = Math.max(0, .55 - u) / .55;              // 後頭部ほど崩れる
-    const fly = brk * brk * (200 + rnd() * 700), dy = (rnd() - .5) * brk * 260;
-    const a = Math.max(0, 1 - brk * (.6 + rnd() * .7));
-    if (a <= .03) continue;
-    const r = 5 + rnd() * 4 * (1 - brk);
-    g.save(); g.globalAlpha = a; g.fillStyle = rnd() < .08 + brk * .25 ? "#ffb648" : "#7fdcff"; g.shadowColor = g.fillStyle; g.shadowBlur = 18;
-    g.beginPath(); g.arc(x - fly, y + dy, r, 0, 7); g.fill(); g.restore();
+    g.fillStyle = `rgba(140,210,255,${.08 + rnd() * .25})`; g.beginPath(); g.arc(x, y, 1.5 + rnd() * 3, 0, 7); g.fill();
   }
-  // 脳の中の「？」
-  g.save(); g.font = "220px Dela"; g.textAlign = "center"; g.textBaseline = "middle"; g.shadowColor = "#ff3b4b"; g.shadowBlur = 60;
-  g.fillStyle = "#ff4d5e"; g.fillText("？", cx + 20 * s, cy - 70 * s); g.restore();
+  const bx = cx - 20 * s, by = cy - 200 * s;
+  const glowB = g.createRadialGradient(bx, by, 10, bx, by, 300 * s); glowB.addColorStop(0, "rgba(255,190,90,0.55)"); glowB.addColorStop(.5, "rgba(255,90,110,0.18)"); glowB.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = glowB; g.fillRect(bx - 320 * s, by - 320 * s, 640 * s, 640 * s);
+  g.lineCap = "round";
+  for (let i = 0; i < 46; i++) {
+    let x = bx + (rnd() - .5) * 420 * s, y = by + (rnd() - .5) * 280 * s;
+    g.strokeStyle = rnd() < .3 ? "rgba(255,180,90,0.7)" : "rgba(120,220,255,0.55)"; g.lineWidth = 2 + rnd() * 3;
+    g.shadowColor = g.strokeStyle; g.shadowBlur = 14; g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 5; k++) { x += (rnd() - .5) * 70 * s; y += (rnd() - .5) * 50 * s; g.lineTo(x, y); }
+    g.stroke();
+  }
+  for (let i = 0; i < 60; i++) { const x = bx + (rnd() - .5) * 440 * s, y = by + (rnd() - .5) * 300 * s; g.fillStyle = rnd() < .4 ? "#ffcf7a" : "#9fe6ff"; g.shadowColor = g.fillStyle; g.shadowBlur = 20; g.beginPath(); g.arc(x, y, 3 + rnd() * 5, 0, 7); g.fill(); }
+  g.restore();
+  g.save(); g.shadowColor = "#4fd1ff"; g.shadowBlur = 50; g.strokeStyle = "rgba(140,225,255,0.9)"; g.lineWidth = 6; g.stroke(hp);
+  g.shadowBlur = 0; g.strokeStyle = "rgba(255,255,255,0.35)"; g.lineWidth = 2; g.stroke(hp); g.restore();
 }
 
-// 極太の文字：外側の発光 → 太い黒の縁 → 細い明るい縁 → グラデーションの塗り → 上半分の光沢
-function bigText(s, x, y, size, stops, glowCol, opt = {}) {
-  g.save(); g.font = `${size}px Dela`; g.textBaseline = "alphabetic"; g.textAlign = opt.align || "left";
-  g.lineJoin = "round";
-  if (opt.skew) g.setTransform(1, 0, opt.skew, 1, 0, 0);
-  g.shadowColor = glowCol; g.shadowBlur = size * .35; g.lineWidth = size * .13; g.strokeStyle = "#04070d"; g.strokeText(s, x, y);
-  g.shadowBlur = 0; g.lineWidth = size * .032; g.strokeStyle = opt.rim || "#ffffff"; g.strokeText(s, x, y);
-  const gr = g.createLinearGradient(0, y - size * .9, 0, y + size * .1);
-  stops.forEach(([o, c]) => gr.addColorStop(o, c)); g.fillStyle = gr; g.fillText(s, x, y);
-  g.globalCompositeOperation = "source-atop";
-  const sh = g.createLinearGradient(0, y - size * .9, 0, y - size * .35); sh.addColorStop(0, "rgba(255,255,255,0.45)"); sh.addColorStop(1, "rgba(255,255,255,0)");
-  g.restore();
+// 頭からネットワークに広がる
+function network(ox, oy) {
+  const nodes = [];
+  for (let i = 0; i < 110; i++) {
+    const x = ox + (rnd() - .62) * 2600, y = oy + (rnd() - .45) * 1500;
+    if (x < 0 || x > W || y < 0 || y > H) continue;
+    nodes.push({ x, y, r: 4 + rnd() * 10, red: rnd() < .22 });
+  }
+  nodes.sort((a, b) => Math.hypot(a.x - ox, a.y - oy) - Math.hypot(b.x - ox, b.y - oy));
+  nodes.forEach((n, i) => {
+    let from = { x: ox, y: oy };
+    if (i > 6) { const cand = nodes.slice(0, i).sort((a, b) => Math.hypot(a.x - n.x, a.y - n.y) - Math.hypot(b.x - n.x, b.y - n.y)); from = cand[0]; }
+    const d = Math.hypot(n.x - ox, n.y - oy), a = Math.max(.15, 1 - d / 2400);
+    const gr = g.createLinearGradient(from.x, from.y, n.x, n.y); gr.addColorStop(0, `rgba(120,220,255,${.6 * a})`); gr.addColorStop(1, n.red ? `rgba(255,90,110,${.75 * a})` : `rgba(120,220,255,${.4 * a})`);
+    g.save(); g.strokeStyle = gr; g.lineWidth = 3; g.shadowColor = "#4fd1ff"; g.shadowBlur = 10; g.beginPath(); g.moveTo(from.x, from.y); g.lineTo(n.x, n.y); g.stroke(); g.restore();
+    n.a = a;
+  });
+  nodes.forEach(n => {
+    g.save(); g.globalAlpha = Math.min(1, n.a + .25); g.fillStyle = n.red ? "#ff5a6a" : "#9fe6ff"; g.shadowColor = g.fillStyle; g.shadowBlur = 24;
+    g.beginPath(); g.arc(n.x, n.y, n.r, 0, 7); g.fill(); g.restore();
+  });
+}
+
+// 割れた極太の文字（零ゴシック風）：文字を斜めの線で切り分け、かけらを少しずつずらし、ひびの線を引く
+function crackedText(s, x, y, size, stops, glowCol, rim) {
+  const off = document.createElement("canvas"); off.width = W; off.height = H; const o = off.getContext("2d");
+  o.font = `${size}px Dela`; o.textBaseline = "alphabetic"; o.lineJoin = "round";
+  const w = o.measureText(s).width;
+  // 発光は割らずに先に描く（ひびが光の中に見えないように）
+  g.save(); g.font = `${size}px Dela`; g.textBaseline = "alphabetic"; g.lineJoin = "round"; g.shadowColor = glowCol; g.shadowBlur = size * .3; g.lineWidth = size * .13; g.strokeStyle = "rgba(4,7,13,0.6)"; g.strokeText(s, x, y); g.restore();
+  o.lineWidth = size * .13; o.strokeStyle = "#04070d"; o.strokeText(s, x, y);
+  o.lineWidth = size * .03; o.strokeStyle = rim; o.strokeText(s, x, y);
+  const gr = o.createLinearGradient(0, y - size * .9, 0, y + size * .1); stops.forEach(([p, c]) => gr.addColorStop(p, c)); o.fillStyle = gr; o.fillText(s, x, y);
+  const box = { x0: x - 40, y0: y - size * 1.05, x1: x + w + 40, y1: y + size * .25 };
+  const n = 6, lines = [];
+  for (let i = 0; i < n; i++) {
+    const px = box.x0 + (i + .5 + (rnd() - .5) * .5) / n * (box.x1 - box.x0), py = box.y0 + (.2 + rnd() * .6) * (box.y1 - box.y0);
+    const ang = (i % 2 ? .3 : -.3) * Math.PI + (rnd() - .5) * .9;
+    lines.push({ px, py, dx: Math.cos(ang), dy: Math.sin(ang) });
+  }
+  // ひび：文字の中だけを細く切り抜く（文字の外には線を引かない）
+  o.globalCompositeOperation = "destination-out"; o.lineWidth = size * .018;
+  lines.forEach(L => { o.beginPath(); o.moveTo(L.px - L.dx * 3000, L.py - L.dy * 3000); o.lineTo(L.px + L.dx * 3000, L.py + L.dy * 3000); o.stroke(); });
+  o.globalCompositeOperation = "source-over";
+  for (let c = 0; c < (1 << n); c++) {
+    g.save();
+    lines.forEach((L, i) => {
+      const side = (c >> i) & 1 ? 1 : -1, nx = -L.dy * side, ny = L.dx * side, R = 6000;
+      g.beginPath(); g.moveTo(L.px - L.dx * R, L.py - L.dy * R); g.lineTo(L.px + L.dx * R, L.py + L.dy * R);
+      g.lineTo(L.px + L.dx * R + nx * R, L.py + L.dy * R + ny * R); g.lineTo(L.px - L.dx * R + nx * R, L.py - L.dy * R + ny * R); g.closePath(); g.clip();
+    });
+    g.drawImage(off, (rnd() - .5) * size * .05, (rnd() - .5) * size * .05); g.restore();
+  }
+}
+function plainText(s, x, y, size, color, glowCol) {
+  g.save(); g.font = `${size}px Dela`; g.textBaseline = "alphabetic"; g.lineJoin = "round";
+  g.shadowColor = glowCol; g.shadowBlur = size * .25; g.lineWidth = size * .14; g.strokeStyle = "#04070d"; g.strokeText(s, x, y);
+  g.shadowBlur = 0; g.fillStyle = color; g.fillText(s, x, y); g.restore();
 }
 function ribbon(s, x, y) {
   g.save(); g.font = "62px Dela"; const w = g.measureText(s).width + 90;
@@ -83,20 +143,18 @@ function ribbon(s, x, y) {
 }
 
 (async () => {
-  await document.fonts.load("200px Dela", "心理学の3分2が消えたあなたの常識本当に正しい？");
-  bg(); head();
+  await document.fonts.load("200px Dela", "なぜ、間違った科学ほど広まるのかあなたの常識本当に正しい？");
+  bg();
+  const cx = W * .85, cy = H * .58, s = .95;
+  network(cx - 20 * s, cy - 230 * s);
+  head(cx, cy, s);
+  const lg = g.createLinearGradient(0, 0, W * .62, 0); lg.addColorStop(0, "rgba(2,5,11,0.7)"); lg.addColorStop(1, "rgba(2,5,11,0)"); g.fillStyle = lg; g.fillRect(0, 0, W, H);
   ribbon("あなたの常識、本当に正しい？", 90, 150);
-  bigText("心理学の", 110, 470, 230, [[0, "#ffffff"], [1, "#9fc8ff"]], "rgba(79,209,255,0.9)", { rim: "#cfe8ff" });
-  bigText("3分の2", 90, 860, 380, [[0, "#fff3c4"], [.45, "#ffc24a"], [1, "#d9771a"]], "rgba(255,170,60,0.9)", { rim: "#fff2d0" });
-  bigText("が", 110, 1250, 230, [[0, "#ffd1d6"], [.4, "#ff4a5c"], [1, "#a3101f"]], "rgba(255,60,80,0.9)", { rim: "#ffe0e4" });
-  bigText("消えた", 380, 1260, 360, [[0, "#ffd1d6"], [.4, "#ff4a5c"], [1, "#a3101f"]], "rgba(255,60,80,0.9)", { rim: "#ffe0e4" });
-  // 「消えた」の右端が崩れて点になる
-  for (let i = 0; i < 160; i++) {
-    const x = 1420 + rnd() * 520, y = 960 + rnd() * 320, a = Math.max(0, 1 - (x - 1420) / 520) * .9;
-    g.save(); g.globalAlpha = a; g.fillStyle = rnd() < .5 ? "#ff4a5c" : "#ffd1d6"; g.shadowColor = "#ff3b4b"; g.shadowBlur = 14; g.fillRect(x, y, 10 + rnd() * 14, 10 + rnd() * 14); g.restore();
-  }
-  // 周辺を暗く
-  const vg = g.createRadialGradient(W / 2, H / 2, H * .5, W / 2, H / 2, W * .75); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.55)");
+  plainText("なぜ、", 110, 420, 170, "#eaf4ff", "rgba(79,209,255,0.8)");
+  crackedText("間違った科学", 70, 770, 305, [[0, "#ffd9dd"], [.35, "#ff4a5c"], [1, "#9a0c1b"]], "rgba(255,50,70,0.95)", "#ffe3e7");
+  plainText("ほど", 110, 1150, 170, "#eaf4ff", "rgba(79,209,255,0.8)");
+  crackedText("広まるのか", 450, 1220, 320, [[0, "#fff6cf"], [.45, "#ffc24a"], [1, "#d06a10"]], "rgba(255,170,60,0.95)", "#fff3d6");
+  const vg = g.createRadialGradient(W / 2, H / 2, H * .55, W / 2, H / 2, W * .78); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.5)");
   g.fillStyle = vg; g.fillRect(0, 0, W, H);
   window.DONE = true;
 })();
