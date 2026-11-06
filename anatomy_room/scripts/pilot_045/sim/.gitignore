@@ -1,0 +1,3 @@
+﻿data/
+maps/*
+!maps/sheet_*.png

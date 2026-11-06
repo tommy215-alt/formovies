@@ -100,6 +100,12 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - **制作（2026-11-05）**：`production/long_001/`（横長 1920×1080、8 分 38 秒）。長い動画の部品は `production/ext/long/`（`long_ext.py`：横長の書き出し `render_frames_long.js` に差し替え・場面ごとに曲を切り替える BGM）。描画は `kit_long.js`（ピクトグラム・アイコン・矢印・3D の問いかけ）＋`renderer.html`（場面）。声は阿井田 茂 Calm 話速 1.15・抑揚 0.9（行間 0.22）。書き出しは `python production_script.py audio textcheck render mux docs qc`（rv.py は縦長用なので使わない）。1 コマ約 0.2 秒、2 本同時（映像 約 20 分）。音声のミックスは 8 分の長さで約 30 分かかる（pipeline のダッキングの畳み込みが長さに比例して重い）。
 - **完成（2026-11-05）**：`production/long_001/reverse_long_001_replication.mp4`（8 分 38 秒、113 MB）。GitHub の 1 ファイル 100 MB の上限を超えるので **mp4 は git に入れない**（.gitignore。PC の作業フォルダにだけある）。サムネイル `thumbnail.png`、タイトル・説明文（チャプター付き）`youtube_metadata.md`。video_qa の NG は「解像度」（横長なので想定どおり）・「最初のコマ」（thumbnail.png を使う）・「冒頭 3 秒の動き」（3D の判子がゆっくり迫る）。ユーザーの感想待ち。YouTube へのアップロードはユーザーの指示まで行わない。
 
+## もしも設計の 1 本目 pilot_045「東京にゾンビが一体現れたら？」（2026-11-06〜）
+
+- 設計は `templates/DESIGN_MODES.md` の「もしも設計」（ユーザーが命名）。条件はユーザーが決めた（都庁の真ん前・ボルト並み・3 発・10 秒・籠城 1 週間／3 週間・突破 5%／日・泳げない）。
+- **計算は済み、動画はまだ（ユーザー「動画にはまだしなくていい」）**：`scripts/pilot_045/sim/`（`python run_all.py` で約 5 分。データは `fetch_mesh.py`・`build_grid.py` で `sim/data/` に、git に入れない）。最初の 2 日は細かく、3 日目からざっくり（ユーザーの指示「全部で 30 分以内」）。結果は `sim/results.md`・地図の一覧 `sim/maps/sheet_*.png`、仮定と要点は `scripts/pilot_045/fact_check.md`。
+- 一番効く仮定は自衛隊の弾（5,000 万発、出典なし）。ユーザーの感想待ち → 台本へ。
+
 ## 次の動画でやること（ガイドライン v2.4）
 
 1. 題材を決める（候補：伊能忠敬、ジョン・スノウ、ジョン・ハリソン、リービット、八木秀次など。前の会話のリスト）。
