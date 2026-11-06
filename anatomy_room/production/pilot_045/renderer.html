@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_045 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
+<script>
+// pilot_045 のレンダラー（もしも設計、templates/DESIGN_MODES.md）。東京にゾンビが一体現れたら？
+// 3D は Blender（blender/scene.py）。数字は計算の結果（scripts/pilot_045/sim/results.md）。ステータスはポップアウトの札、右にカメラの高さの目盛り。
+Object.assign(KIT, { design: "intel", scenes: ["open", "ground", "city", "kanto", "japan", "space", "loop"], images: [], ci: {}, hits: [],
+  opening: { img: null, bg: blShot("l00"), title: ["東京にゾンビが", "一体現れたら？"], size1: 78, size2: 104, credit: [] } });
+
+SHOTS = ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13", "l14", "l15", "l16"].map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
+
+// ---------------------------------------------------------------- ステータス（計算の結果。z はゾンビの数）
+const STAT = {
+  l01: { t: "0秒", z: 1, s: "都庁前" },
+  l02: { t: "1分", z: 22, s: "かまれて10秒でゾンビに" },
+  l03: { t: "3分", z: 7300, s: "新宿駅まで1.1km" },
+  l04: { t: "5分", z: 35000, s: "警察官55人　倒せたのは6体" },
+  l05: { t: "10分", z: 160000, s: "都庁から5km　東京駅" },
+  l06: { t: "30分", z: 510000, s: "人々は建物の中へ" },
+  l07: { t: "1時間", z: 710000, s: "横浜・さいたま・立川" },
+  l08: { t: "12時間", z: 1140000, s: "自衛隊が武器を使える" },
+  l09: { t: "1〜7日", z: 1000000, s: "自衛隊が倒した 約250万体" },
+  l10: { t: "7日", z: 960000, s: "家の籠城が限界に" },
+  l11: { t: "8日", z: 11600000, s: "外に出た人がかまれる" },
+  l12: { t: "12日", z: 29700000, s: "名古屋10日　大阪12日" },
+  l13: { t: "22日", z: 72800000, s: "大きな建物の籠城も限界に" },
+  l14: { t: "57日", z: 103000000, s: "明石13日　関門19日　青函57日" },
+  l15: { t: "90日", z: 103400000, s: "生き残り 約1,760万人" },
+  l16: { t: "0秒", z: 1, s: "都庁前" },
+};
+// カメラの高さ（m、scene.py のカメラと同じ）：[始め, 終わり]
+const ALT = { l00: [1.55, 1.5], l01: [1.5, 6], l02: [6, 26], l03: [380, 650], l04: [2.8, 9], l05: [900, 5200], l06: [26, 22], l07: [50000, 120000], l08: [2.2, 3.4],
+  l09: [125000, 135000], l10: [300000, 360000], l11: [360000, 520000], l12: [520000, 560000], l13: [560000, 900000], l14: [900000, 1500000], l15: [1500000, 2800000], l16: [2.4, 1.55] };
+const zfmt = z => z < 10000 ? Math.round(z).toLocaleString("ja-JP") + "体" : z < 1e8 ? "約" + (z / 1e4 >= 100 ? Math.round(z / 1e4).toLocaleString("ja-JP") : (Math.round(z / 1e3) / 10).toLocaleString("ja-JP")) + "万体" : "約" + (Math.round(z / 1e6) / 100) + "億体";
+const afmt = h => h < 1000 ? (h < 10 ? h.toFixed(1) : Math.round(h)) + " m" : (h < 1e4 ? (h / 1000).toFixed(1) : Math.round(h / 1000).toLocaleString("ja-JP")) + " km";
+
+function curShot(t) { let cur = null; for (const k in STAT) if (CUE[k] !== undefined && t >= CUE[k]) cur = (!cur || CUE[k] >= CUE[cur]) ? k : cur; return cur; }
+function statusUI(t) {
+  const k = curShot(t); if (!k) return;
+  const keys = Object.keys(STAT), i = keys.indexOf(k), prev = i > 0 && k !== "l16" ? STAT[keys[i - 1]] : STAT[k], st = STAT[k], a = CUE[k], u = t - a;
+  const pop = 1 + .22 * Math.pow(1 - clamp(u / .22), 2), cnt = easeOut(clamp((u - .1) / .9));
+  const z = Math.exp(Math.log(Math.max(1, prev.z)) + (Math.log(Math.max(1, st.z)) - Math.log(Math.max(1, prev.z))) * cnt);
+  const x0 = 54, y0 = 196, w = 720, h = 222;
+  ui.save(); ui.translate(x0 + 20, y0 + h / 2); ui.scale(pop, pop); ui.translate(-x0 - 20, -y0 - h / 2);
+  ui.fillStyle = "rgba(6,10,16,.78)"; rrect(ui, x0, y0, w, h, 16); ui.fill();
+  ui.strokeStyle = "rgba(255,70,60,.75)"; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 16); ui.stroke();
+  ui.fillStyle = "#ff3b30"; ui.fillRect(x0, y0 + 18, 7, h - 36);
+  S.group(() => {
+    text(ui, "経過", x0 + 78, y0 + 52, 34, "#9FB2C4", { weight: 700 }); text(ui, st.t, x0 + 250, y0 + 52, 52, "#FFFFFF", { weight: 900 });
+    text(ui, "ゾンビ", x0 + 90, y0 + 124, 34, "#FF9A90", { weight: 700 }); text(ui, zfmt(z), x0 + 400, y0 + 124, 68, "#FF5A4E", { weight: 900, stroke: "#1a0404", sw: 6 });
+    text(ui, st.s, x0 + w / 2, y0 + 188, Math.min(36, Math.floor((w - 60) / st.s.length)), "#EAF2F8", { weight: 700 });
+  }, [x0, y0, x0 + w, y0 + h]);
+  ui.restore();
+}
+function altUI(t) {   // 右端：カメラの高さ（log の目盛り 1 m〜10,000 km）
+  let k = "l00"; for (const s in ALT) if (CUE[s] !== undefined && t >= CUE[s]) k = (CUE[s] >= CUE[k]) ? s : k; if (t < (CUE.l01 || 0)) k = "l00";
+  const { u } = k === "l00" ? { u: clamp(t / Math.max(.3, CUE.l01)) } : shotAt(t), [h0, h1] = ALT[k], h = Math.exp(Math.log(h0) + (Math.log(h1) - Math.log(h0)) * easeInOut(u));
+  const X = 1016, Y0 = 1300, Y1 = 330, ly = v => Y0 + (Y1 - Y0) * (Math.log10(v) / 7);
+  ui.save(); ui.globalAlpha = .9; ui.strokeStyle = "rgba(200,220,240,.55)"; ui.lineWidth = 3; ui.beginPath(); ui.moveTo(X, Y0); ui.lineTo(X, Y1); ui.stroke();
+  for (const [v, s] of [[1, "1m"], [10, "10m"], [100, "100m"], [1000, "1km"], [1e4, "10km"], [1e5, "100km"], [1e6, "1000km"], [1e7, ""]]) { const y = ly(v); ui.fillStyle = "rgba(200,220,240,.7)"; ui.fillRect(X - 12, y - 1.5, 24, 3); if (s) label(ui, s, X - 22, y, 22, "#B8C8D8", { align: "right", sw: .14 }); }
+  const y = ly(h); ui.fillStyle = "#FFD58A"; ui.beginPath(); ui.moveTo(X + 6, y); ui.lineTo(X + 30, y - 14); ui.lineTo(X + 30, y + 14); ui.closePath(); ui.fill();
+  ui.restore();
+  label(ui, "高さ " + afmt(h), X - 26, ly(h) - 40, 30, "#FFE2A8", { align: "right", sw: .16 });
+}
+function noteUI(t) { const a = CUE.l01; uiNote("※条件を決めて計算したシミュレーションです（CG）", 540, 1300, win(t, a + .3, a + 3.2, .3, .3)); }
+{ const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (name !== "open") { statusUI(t); noteUI(t); } altUI(t); }; }
+
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .25, sat: .9, vig: .45 }], [c.ground, { cool: .22, sat: .92, vig: .5 }], [c.city, { cool: .3, sat: .9, vig: .55 }],
+  [c.l08, { cool: .5, sat: .85, vig: .7 }], [c.l09, { cool: .4, sat: .9, vig: .6 }], [c.japan, { cool: .35, sat: .95, vig: .6 }], [c.space, { cool: .45, sat: .9, vig: .75 }], [c.loop, { cool: .25, sat: .9, vig: .5 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#05070c"; bg.fillRect(0, 0, W, H); label(ui, "東京にゾンビが", 540, 470, 96, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "一体現れたら？", 540, 620, 110, "#FF5A4E", { stroke: "#05080c", sw: .14 }); }
+
+kitStart(() => {}); BL.install();
+</script>
+</body></html>
