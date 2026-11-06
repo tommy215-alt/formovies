@@ -24,6 +24,8 @@ def args():
     o = {"shots": [x for x in a if not x.startswith("--") and not x[0].isdigit()], "still": "--still" in a, "samples": 32}
     if "--samples" in a:
         o["samples"] = int(a[a.index("--samples") + 1])
+    o["every"] = int(a[a.index("--every") + 1]) if "--every" in a else 1   # 確認用：N コマおきに描く（完成版は 1）
+    o["resume"] = "--resume" in a   # 描き終わったコマ（ファイルがある）は飛ばす（Blender が途中で止まったときの続き）
     return o
 
 
@@ -242,7 +244,7 @@ def render_shots(here, shots, order, opts, objs_anim):
         for o in objs_anim:
             o.animation_data_clear()
         setup_fn()
-        frames = [n // 2] if opts["still"] else range(n)
+        frames = [n // 2] if opts["still"] else range(0, n, opts.get("every", 1))
         for f in range(n):
             u = f / max(1, n - 3); anim(u, f / FPS, f)
             for o in objs_anim:
@@ -253,8 +255,11 @@ def render_shots(here, shots, order, opts, objs_anim):
         out = os.path.join(here, "..", "work", "blender", name)
         os.makedirs(out, exist_ok=True)
         for f in frames:
+            fp = os.path.join(out, "still.png" if opts["still"] else "f_%04d.png" % (f + 1))
+            if opts.get("resume") and not opts["still"] and os.path.exists(fp) and os.path.getsize(fp) > 0:
+                continue
             sc.frame_set(f + 1)
-            sc.render.filepath = os.path.join(out, "still.png" if opts["still"] else "f_%04d.png" % (f + 1))
+            sc.render.filepath = fp
             bpy.ops.render.render(write_still=True)
         json.dump({"start": a, "end": b, "frames": n, "fps": FPS}, open(os.path.join(out, "meta.json"), "w"))
         print(f"BLSHOT {name} {n} frames", flush=True)

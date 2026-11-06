@@ -28,77 +28,149 @@ html,body{margin:0;background:#000}
 <script src="../common/cine.js"></script>
 <script src="../ext/hud_ext.js"></script>
 <script src="assets/assets.js"></script>
+<script src="assets/plan.js"></script>
 <script src="../ext/kit/scene_assets.js"></script>
 <script src="../ext/kit/kit.js"></script>
 <script src="../ext/kit/shots.js"></script>
 <script src="work/blender/index.js"></script>
 <script src="../ext/blender/blframes.js"></script>
 <script>
-// pilot_045 のレンダラー（もしも設計、templates/DESIGN_MODES.md）。東京にゾンビが一体現れたら？
-// 3D は Blender（blender/scene.py）。数字は計算の結果（scripts/pilot_045/sim/results.md）。ステータスはポップアウトの札、右にカメラの高さの目盛り。
-Object.assign(KIT, { design: "intel", scenes: ["open", "ground", "city", "kanto", "japan", "space", "loop"], images: [], ci: {}, hits: [],
+// pilot_045 のレンダラー（もしも設計、templates/DESIGN_MODES.md）。東京にゾンビが一体現れたら？ v2（2026-11-06）。
+// ナレーションなし：情報はすべてポップアップ（時計と数の札・出来事の札・スペックと警察の札）。ショットと出来事は plan.py（assets/plan.js）。
+// 3D は Blender（blender/scene.py）。数字は計算の結果（scripts/pilot_045/sim/results.md）。「想定」の札は計算に入っていない出来事（fact_check.md の 7.）。
+// 昼と夜は時計に合わせて背景の色で（地図のショット）。早送りで昼夜が速すぎる所は、色の揺れを弱めて「早送り」の印を出す。
+const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
+const IDS = PL.shots.map(s => s.id);
+Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
   opening: { img: null, bg: blShot("l00"), title: ["東京にゾンビが", "一体現れたら？"], size1: 78, size2: 104, credit: [] } });
+SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
+S.docSub = () => {};   // 字幕なし（ナレーションがない）
 
-SHOTS = ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "l09", "l10", "l11", "l12", "l13", "l14", "l15", "l16"].map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
-
-// ---------------------------------------------------------------- ステータス（計算の結果。z はゾンビの数）
-const STAT = {
-  l01: { t: "0秒", z: 1, s: "都庁前" },
-  l02: { t: "1分", z: 22, s: "かまれて10秒でゾンビに" },
-  l03: { t: "3分", z: 7300, s: "新宿駅まで1.1km" },
-  l04: { t: "5分", z: 35000, s: "警察官55人　倒せたのは6体" },
-  l05: { t: "10分", z: 160000, s: "都庁から5km　東京駅" },
-  l06: { t: "30分", z: 510000, s: "人々は建物の中へ" },
-  l07: { t: "1時間", z: 710000, s: "横浜・さいたま・立川" },
-  l08: { t: "12時間", z: 1140000, s: "自衛隊が武器を使える" },
-  l09: { t: "1〜7日", z: 1000000, s: "自衛隊が倒した 約250万体" },
-  l10: { t: "7日", z: 960000, s: "家の籠城が限界に" },
-  l11: { t: "8日", z: 11600000, s: "外に出た人がかまれる" },
-  l12: { t: "12日", z: 29700000, s: "名古屋10日　大阪12日" },
-  l13: { t: "22日", z: 72800000, s: "大きな建物の籠城も限界に" },
-  l14: { t: "57日", z: 103000000, s: "明石13日　関門19日　青函57日" },
-  l15: { t: "90日", z: 103400000, s: "生き残り 約1,760万人" },
-  l16: { t: "0秒", z: 1, s: "都庁前" },
-};
-// カメラの高さ（m、scene.py のカメラと同じ）：[始め, 終わり]
-const ALT = { l00: [1.55, 1.5], l01: [1.5, 6], l02: [6, 26], l03: [380, 650], l04: [2.8, 9], l05: [900, 5200], l06: [26, 22], l07: [50000, 120000], l08: [2.2, 3.4],
-  l09: [125000, 135000], l10: [300000, 360000], l11: [360000, 520000], l12: [520000, 560000], l13: [560000, 900000], l14: [900000, 1500000], l15: [1500000, 2800000], l16: [2.4, 1.55] };
+// ---------------------------------------------------------------- 時計（scene.py の clock と同じ式）
+function clockAt(k, t) {   // t：ショットの頭からの秒
+  const s = SH[k], u = clamp(t / s.dur), c = s.c;
+  for (let i = 0; i < c.length - 1; i++) { const [u0, c0] = c[i], [u1, c1] = c[i + 1];
+    if (u <= u1 || i === c.length - 2) { const v = clamp((u - u0) / Math.max(1e-9, u1 - u0));
+      return s.log && c0 > 0 && c1 > 0 ? Math.exp(Math.log(c0) + (Math.log(c1) - Math.log(c0)) * v) : c0 + (c1 - c0) * v; } }
+  return c[c.length - 1][1];
+}
+function curId(t) { let k = IDS[0]; for (const id of IDS) if (CUE[id] !== undefined && t >= CUE[id]) k = id; return k; }
+function clockNow(t) { const k = curId(t); return clockAt(k, t - CUE[k]); }
+function zombiesAt(c) {   // 計算の表を、時計と数の両方とも対数で補間
+  const Z = PL.zombies; if (c <= Z[0][0]) return 1;
+  for (let i = 0; i < Z.length - 1; i++) { const [a, za] = Z[i], [b, zb] = Z[i + 1]; if (c <= b) { const v = a > 0 ? (Math.log(c) - Math.log(a)) / (Math.log(b) - Math.log(a)) : c / b; return Math.exp(Math.log(za) + (Math.log(zb) - Math.log(za)) * clamp(v)); } }
+  return Z[Z.length - 1][1];
+}
+const pad = n => String(Math.floor(n)).padStart(2, "0");
+function tod(c) { const s = 12 * 3600 + c, d = Math.floor(s / 86400), r = s - d * 86400; return { day: d + 1, h: Math.floor(r / 3600), m: Math.floor(r / 60) % 60, s: Math.floor(r) % 60, hours: r / 3600 }; }
+function stamp(c) { const o = tod(c); if (c >= 86400 && Math.abs(c / 86400 - Math.round(c / 86400)) < 1e-6) return `${Math.round(c / 86400)}日後`;   // 日単位の出来事は計算の表と同じ「N日後」
+  return o.day > 1 ? `${o.day}日目 ${pad(o.h)}:${pad(o.m)}` : `${pad(o.h)}:${pad(o.m)}`; }
+function elapsed(c) { if (c < 60) return `${Math.floor(c)}秒`; if (c < 3600) return `${Math.floor(c / 60)}分`; if (c < 86400) return `${(Math.floor(c / 360) / 10).toFixed(c < 36000 ? 1 : 0)}時間`; return `${Math.floor(c / 86400)}日`; }
 const zfmt = z => z < 10000 ? Math.round(z).toLocaleString("ja-JP") + "体" : z < 1e8 ? "約" + (z / 1e4 >= 100 ? Math.round(z / 1e4).toLocaleString("ja-JP") : (Math.round(z / 1e3) / 10).toLocaleString("ja-JP")) + "万体" : "約" + (Math.round(z / 1e6) / 100) + "億体";
-const afmt = h => h < 1000 ? (h < 10 ? h.toFixed(1) : Math.round(h)) + " m" : (h < 1e4 ? (h / 1000).toFixed(1) : Math.round(h / 1000).toLocaleString("ja-JP")) + " km";
+function rate(t) { const k = curId(t), a = t - CUE[k]; return (clockAt(k, a + .05) - clockAt(k, a)) / .05; }   // 時計の秒 / 動画の秒
+function daylight(c) { const h = tod(c).hours; return clamp((Math.cos((h - 12.5) / 24 * 2 * Math.PI) + .15) / .9); }   // 0＝夜、1＝昼
+function dayAmp(t) { const d = rate(t) / 86400; return d < .4 ? 1 : clamp(.4 / d); }   // 早送りで昼夜が速すぎる所は揺れを弱める（明滅させない）
 
-function curShot(t) { let cur = null; for (const k in STAT) if (CUE[k] !== undefined && t >= CUE[k]) cur = (!cur || CUE[k] >= CUE[cur]) ? k : cur; return cur; }
+// ---------------------------------------------------------------- 左上：時計・経過・ゾンビの数
+function sunMoon(x, y, dl, r = 22) {
+  ui.save(); ui.translate(x, y);
+  if (dl > .5) { ui.fillStyle = "#FFC84A"; ui.beginPath(); ui.arc(0, 0, r * .55, 0, 7); ui.fill(); ui.strokeStyle = "#FFC84A"; ui.lineWidth = 4;
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ui.beginPath(); ui.moveTo(Math.cos(a) * r * .8, Math.sin(a) * r * .8); ui.lineTo(Math.cos(a) * r * 1.1, Math.sin(a) * r * 1.1); ui.stroke(); } }
+  else { ui.fillStyle = "#CFE0FF"; ui.beginPath(); ui.arc(0, 0, r * .8, 0, 7); ui.fill(); ui.globalCompositeOperation = "destination-out"; ui.beginPath(); ui.arc(r * .38, -r * .25, r * .7, 0, 7); ui.fill(); }
+  ui.restore();
+}
+function ffMark(x, y, k) { if (k <= 0) return; ui.save(); ui.globalAlpha *= k; ui.fillStyle = "#8FDCFF";
+  for (const dx of [0, 22]) { ui.beginPath(); ui.moveTo(x + dx, y - 13); ui.lineTo(x + dx + 20, y); ui.lineTo(x + dx, y + 13); ui.closePath(); ui.fill(); }
+  text(ui, "早送り", x + 104, y + 1, 30, "#8FDCFF", { weight: 800, align: "center" }); ui.restore(); }
 function statusUI(t) {
-  const k = curShot(t); if (!k) return;
-  const keys = Object.keys(STAT), i = keys.indexOf(k), prev = i > 0 && k !== "l16" ? STAT[keys[i - 1]] : STAT[k], st = STAT[k], a = CUE[k], u = t - a;
-  const pop = 1 + .22 * Math.pow(1 - clamp(u / .22), 2), cnt = easeOut(clamp((u - .1) / .9));
-  const z = Math.exp(Math.log(Math.max(1, prev.z)) + (Math.log(Math.max(1, st.z)) - Math.log(Math.max(1, prev.z))) * cnt);
-  const x0 = 54, y0 = 196, w = 720, h = 222;
-  ui.save(); ui.translate(x0 + 20, y0 + h / 2); ui.scale(pop, pop); ui.translate(-x0 - 20, -y0 - h / 2);
-  ui.fillStyle = "rgba(6,10,16,.78)"; rrect(ui, x0, y0, w, h, 16); ui.fill();
-  ui.strokeStyle = "rgba(255,70,60,.75)"; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 16); ui.stroke();
-  ui.fillStyle = "#ff3b30"; ui.fillRect(x0, y0 + 18, 7, h - 36);
+  const k = curId(t); if (k === "l00" || k === "l01" || t < CUE.l02) return;
+  const loop = k === "l18", c = loop ? 0 : clockNow(t), o = tod(c), z = loop ? 1 : zombiesAt(c), a = CUE[k], u = t - a;
+  const pop = 1 + .14 * Math.pow(1 - clamp(u / .2), 2) * (k === "l02" ? 0 : 1);
+  const x0 = 40, y0 = 176, w = 640, h = 250, dl = daylight(c) * dayAmp(t) + .45 * (1 - dayAmp(t));
+  ui.save(); ui.translate(x0, y0); ui.scale(pop, pop);
+  ui.fillStyle = "rgba(6,10,16,.8)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,70,60,.7)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
+  ui.fillStyle = "#ff3b30"; ui.fillRect(0, 20, 8, h - 40);
   S.group(() => {
-    text(ui, "経過", x0 + 78, y0 + 52, 34, "#9FB2C4", { weight: 700 }); text(ui, st.t, x0 + 250, y0 + 52, 52, "#FFFFFF", { weight: 900 });
-    text(ui, "ゾンビ", x0 + 90, y0 + 124, 34, "#FF9A90", { weight: 700 }); text(ui, zfmt(z), x0 + 400, y0 + 124, 68, "#FF5A4E", { weight: 900, stroke: "#1a0404", sw: 6 });
-    text(ui, st.s, x0 + w / 2, y0 + 188, Math.min(36, Math.floor((w - 60) / st.s.length)), "#EAF2F8", { weight: 700 });
+    sunMoon(62, 64, dl);
+    const hm = c < 600 && !loop ? `${pad(o.h)}:${pad(o.m)}:${pad(o.s)}` : `${pad(o.h)}:${pad(o.m)}`;
+    text(ui, hm, 110, 66, 64, "#FFFFFF", { weight: 900, align: "left" });
+    text(ui, `${o.day}日目`, w - 34, 66, 40, "#FFD58A", { weight: 900, align: "right" });
+    text(ui, "経過", 40, 140, 32, "#9FB2C4", { weight: 700, align: "left" }); text(ui, loop ? "0秒" : elapsed(c), 122, 140, 40, "#EAF2F8", { weight: 800, align: "left" });
+    text(ui, "ゾンビ", 40, 206, 34, "#FF9A90", { weight: 800, align: "left" }); text(ui, zfmt(z), w - 34, 204, 66, "#FF5A4E", { weight: 900, align: "right", stroke: "#1a0404", sw: 6 });
+  }, [x0, y0, x0 + w, y0 + h]);
+  ui.restore();
+  const ff = rate(t) > 300 && !loop ? clamp((t - a - .2) / .3) : 0; if (ff) S.group(() => ffMark(x0 + 18, y0 + h + 44, ff));
+}
+
+// ---------------------------------------------------------------- 下：出来事の札（新しいものが下に積み上がる。古いものは消える）
+const TAGC = { C: ["計算", "#2AC8FF"], U: ["条件", "#B38CFF"], A: ["想定", "#FFB02E"] };
+const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], c: e[1], s: e[2], kind: e[3] })));
+function evTime(e) { return CUE[e.at] + e.off; }
+function eventsUI(t) {
+  if (t >= CUE.l18) return;
+  const live = EVS.filter(e => t >= evTime(e) && t < evTime(e) + 5.2).slice(-3), y1 = 1560, hh = 112, gap = 14;
+  live.forEach((e, i) => {
+    const u = t - evTime(e), k = easeOut(clamp(u / .25)) * (1 - clamp((u - 4.8) / .4)), y = y1 - (live.length - i) * (hh + gap) + hh / 2, x0 = 40 - 60 * (1 - k);
+    const c = e.c === null ? clockAt(e.at, e.off) : e.c, [tg, tc] = TAGC[e.kind];
+    ui.save(); ui.globalAlpha *= k; ui.font = `800 44px ${S.FONT}`; const tw = Math.min(700, ui.measureText(e.s).width), w = Math.max(560, tw + 120);
+    const pop = 1 + .12 * Math.pow(1 - clamp(u / .18), 2); ui.translate(x0, y); ui.scale(pop, pop); ui.translate(-x0, -y);
+    ui.fillStyle = "rgba(6,10,16,.84)"; rrect(ui, x0, y - hh / 2, w, hh, 14); ui.fill(); ui.fillStyle = tc; ui.fillRect(x0, y - hh / 2 + 12, 7, hh - 24);
+    S.group(() => {
+      text(ui, stamp(c), x0 + 30, y - 24, 30, "#FFD58A", { weight: 800, align: "left" });
+      ui.font = `800 26px ${S.FONT}`; const gw = ui.measureText(tg).width + 22; ui.fillStyle = tc; rrect(ui, x0 + w - gw - 18, y - 42, gw, 36, 18); ui.fill();
+      text(ui, tg, x0 + w - 18 - gw / 2, y - 23, 26, "#0A0E14", { weight: 900 });
+      const sz = tw > 660 ? Math.floor(44 * 660 / tw) : 44; text(ui, e.s, x0 + 30, y + 24, sz, "#FFFFFF", { weight: 800, align: "left" });
+    }, [x0, y - hh / 2, x0 + w, y + hh / 2]);
+    ui.restore();
+  });
+}
+
+// ---------------------------------------------------------------- 大きな札：ゾンビのスペック（条件）、警察と機動隊の動き、最後の一言
+const CARDS = {
+  spec: { title: "ゾンビのスペック", sub: "ユーザーが決めた条件", col: "#B38CFF", rows: [
+    ["走る速さ", "ボルト並み（秒速10.4m）"], ["かまれた人", "10秒でゾンビに"], ["倒すには", "銃弾 3発"], ["水", "泳げない（腰までは歩く）"], ["体力", "疲れない・食べ物いらない"]] },
+  police: { title: "警察と機動隊の動き", sub: "計算の前提と結果", col: "#2AC8FF", rows: [
+    ["12:02", "新宿署の警察官が到着", "A"], ["毎分", "15人ずつ増える（機動隊も）", "A"], ["拳銃", "5発 当たるのは4発に1発", "A"],
+    ["盾の列", "跳び越えられる", "A"], ["12:05", "55人で 倒せたのは約6体", "C"]] },
+};
+function bigCard(t, id) {
+  const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
+  const sm = id === "police", x0 = 60, w = 960, rh = sm ? 74 : 92, y0 = sm ? 450 : 300, h = (sm ? 128 : 150) + cd.rows.length * rh;
+  ui.save(); ui.globalAlpha *= k * ko; const pop = 1 + .1 * Math.pow(1 - clamp(u / .22), 2); ui.translate(540, y0 + h / 2); ui.scale(pop, pop); ui.translate(-540, -y0 - h / 2);
+  ui.fillStyle = "rgba(6,10,18,.86)"; rrect(ui, x0, y0, w, h, 20); ui.fill(); ui.strokeStyle = cd.col; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 20); ui.stroke();
+  S.group(() => {
+    text(ui, cd.title, x0 + 40, y0 + (sm ? 54 : 62), sm ? 52 : 60, "#FFFFFF", { weight: 900, align: "left" });
+    text(ui, cd.sub, x0 + w - 36, y0 + (sm ? 58 : 66), 28, cd.col, { weight: 800, align: "right" });
+    cd.rows.forEach(([l, r, kd], i) => { const ru = u - .35 - i * .38, rk = easeOut(clamp(ru / .22)); if (rk <= 0) return; const y = y0 + (sm ? 128 : 150) + i * rh, dx = 30 * (1 - rk);
+      ui.save(); ui.globalAlpha *= rk; ui.fillStyle = "rgba(255,255,255,.06)"; rrect(ui, x0 + 26 + dx, y - rh * .42, w - 52, rh * .85, 12); ui.fill();
+      text(ui, l, x0 + 54 + dx, y + 1, sm ? 32 : 36, cd.col, { weight: 900, align: "left" }); text(ui, r, x0 + 250 + dx, y + 1, sm ? 38 : 42, "#FFFFFF", { weight: 800, align: "left" });
+      if (kd) { const [tg, tc] = TAGC[kd]; text(ui, tg, x0 + w - 60, y + 1, 26, tc, { weight: 900, align: "center" }); }
+      ui.restore(); });
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();
 }
-function altUI(t) {   // 右端：カメラの高さ（log の目盛り 1 m〜10,000 km）
-  let k = "l00"; for (const s in ALT) if (CUE[s] !== undefined && t >= CUE[s]) k = (CUE[s] >= CUE[k]) ? s : k; if (t < (CUE.l01 || 0)) k = "l00";
-  const { u } = k === "l00" ? { u: clamp(t / Math.max(.3, CUE.l01)) } : shotAt(t), [h0, h1] = ALT[k], h = Math.exp(Math.log(h0) + (Math.log(h1) - Math.log(h0)) * easeInOut(u));
-  const X = 1016, Y0 = 1300, Y1 = 330, ly = v => Y0 + (Y1 - Y0) * (Math.log10(v) / 7);
-  ui.save(); ui.globalAlpha = .9; ui.strokeStyle = "rgba(200,220,240,.55)"; ui.lineWidth = 3; ui.beginPath(); ui.moveTo(X, Y0); ui.lineTo(X, Y1); ui.stroke();
-  for (const [v, s] of [[1, "1m"], [10, "10m"], [100, "100m"], [1000, "1km"], [1e4, "10km"], [1e5, "100km"], [1e6, "1000km"], [1e7, ""]]) { const y = ly(v); ui.fillStyle = "rgba(200,220,240,.7)"; ui.fillRect(X - 12, y - 1.5, 24, 3); if (s) label(ui, s, X - 22, y, 22, "#B8C8D8", { align: "right", sw: .14 }); }
-  const y = ly(h); ui.fillStyle = "#FFD58A"; ui.beginPath(); ui.moveTo(X + 6, y); ui.lineTo(X + 30, y - 14); ui.lineTo(X + 30, y + 14); ui.closePath(); ui.fill();
-  ui.restore();
-  label(ui, "高さ " + afmt(h), X - 26, ly(h) - 40, 30, "#FFE2A8", { align: "right", sw: .16 });
+function loopCard(t) {
+  const a = CUE.l18, u = t - a - .5; if (u < 0) return; const k = easeOut(clamp(u / .5));
+  ui.save(); ui.globalAlpha *= k; S.group(() => { label(ui, "始まりは", 540, 700, 80, "#EAF2F8", { stroke: "#05080c", sw: .16 }); label(ui, "たった一体だった", 540, 830, 96, "#FF5A4E", { stroke: "#05080c", sw: .16 }); }); ui.restore();
 }
-function noteUI(t) { const a = CUE.l01; uiNote("※条件を決めて計算したシミュレーションです（CG）", 540, 1300, win(t, a + .3, a + 3.2, .3, .3)); }
-{ const _du = drawUI; drawUI = function (t, name) { _du(t, name); if (name !== "open") { statusUI(t); noteUI(t); } altUI(t); }; }
+function noteUI(t) { const a = CUE.l02; uiNote("※条件を決めて計算したシミュレーションです（CG）", 540, 1110, win(t, a + .2, a + 3.4, .3, .3)); }
+{ const _du = drawUI; drawUI = function (t, name) { if (name === "open") { _du(t, name); return; }
+  const k = curId(t); statusUI(t); eventsUI(t); noteUI(t);
+  if (k === "l01") bigCard(t, "spec"); if (k === "l06") bigCard(t, "police"); if (k === "l18") loopCard(t); }; }
 
-function buildMood() { const c = CUE; MOOD = [[0, { cool: .25, sat: .9, vig: .45 }], [c.ground, { cool: .22, sat: .92, vig: .5 }], [c.city, { cool: .3, sat: .9, vig: .55 }],
-  [c.l08, { cool: .5, sat: .85, vig: .7 }], [c.l09, { cool: .4, sat: .9, vig: .6 }], [c.japan, { cool: .35, sat: .95, vig: .6 }], [c.space, { cool: .45, sat: .9, vig: .75 }], [c.loop, { cool: .25, sat: .9, vig: .5 }]]; }
+// ---------------------------------------------------------------- 昼と夜（地図のショットの背景の色）
+const MAPSHOTS = ["l09", "l12", "l13", "l15", "l16", "l17"];
+function fxEp(t, name) {
+  const k = curId(t); if (!MAPSHOTS.includes(k)) return; const amp = dayAmp(t), dl = daylight(clockNow(t)) * amp + .4 * (1 - amp);
+  bg.save(); bg.globalCompositeOperation = "screen"; const g = bg.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, `rgba(${lerp(10, 80, dl)},${lerp(14, 125, dl)},${lerp(40, 190, dl)},${lerp(.22, .42, dl)})`); g.addColorStop(1, `rgba(${lerp(6, 36, dl)},${lerp(8, 62, dl)},${lerp(24, 100, dl)},${lerp(.18, .32, dl)})`);
+  bg.fillStyle = g; bg.fillRect(0, 0, W, H);
+  if (dl < .5) { bg.globalCompositeOperation = "multiply"; bg.fillStyle = `rgba(${lerp(120, 255, dl * 2)},${lerp(130, 255, dl * 2)},${lerp(170, 255, dl * 2)},1)`; bg.fillRect(0, 0, W, H); }
+  bg.restore();
+}
+
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .25, sat: .9, vig: .45 }], [c.l02, { cool: .22, sat: .95, vig: .55 }], [c.l05, { cool: .3, sat: .9, vig: .55 }],
+  [c.l11, { cool: .5, sat: .85, vig: .7 }], [c.l12, { cool: .35, sat: .95, vig: .6 }], [c.l14, { cool: .45, sat: .9, vig: .7 }], [c.l15, { cool: .35, sat: .95, vig: .6 }], [c.l18, { cool: .25, sat: .9, vig: .5 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#05070c"; bg.fillRect(0, 0, W, H); label(ui, "東京にゾンビが", 540, 470, 96, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "一体現れたら？", 540, 620, 110, "#FF5A4E", { stroke: "#05080c", sw: .14 }); }
 
 kitStart(() => {}); BL.install();

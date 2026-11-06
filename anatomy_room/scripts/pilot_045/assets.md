@@ -12,8 +12,18 @@
 
 ## 音楽
 
-- **Cyborg Ninja**（Kevin MacLeod、incompetech、CC BY 4.0）。pilot_035 と同じ曲。権利の確認は `scripts/pilot_035/assets.md`。
-- クレジット："Cyborg Ninja" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/
+- v2（2026-11-06〜）は BGM なし（ユーザーの指示「BGMを消して、環境音を強く」）。曲のファイルは制作の土台の都合で読み込むが、全区間の音量 0（f_mute）。
+- v1 で使った曲：**Cyborg Ninja**（Kevin MacLeod、incompetech、CC BY 4.0）。権利の確認は `scripts/pilot_035/assets.md`。
+
+## v2 で加えた効果音（OpenGameArt、すべて CC0。2026-11-06 に各ページの License(s) 欄が CC0 であることを確かめた）
+
+- ゾンビのうめき声（`assets/sfx/groan/grunt_1〜24.mp3`）：Zombies Sound Pack by artisticdude https://opengameart.org/content/zombies-sound-pack （zombies.zip の zombie-1〜24.wav を mp3 に）
+- ゾンビのうめき声（`groan/undead_1〜4.mp3`）：Undead Moans by AntumDeluge https://opengameart.org/content/undead-moans （同梱の LICENSE.txt も CC0 1.0）
+- うめき声（`groan/moans.mp3`）：zombie moans by Darsycho https://opengameart.org/content/zombie-moans
+- 悲鳴（`scream/scream_a.mp3`）：Female Scream 1 by Nocturnal_Vanguard https://opengameart.org/content/female-scream-1
+- 悲鳴（`scream/scream_b.mp3`）：Female High Pitched Scream SFX by WuxiaScrub https://opengameart.org/content/female-high-pitched-scream-sfx
+- 悲鳴（`scream/scream_c.mp3`）：Horror Scream1 by Vinrax https://opengameart.org/content/horror-scream1
+- 悲鳴は音程を変えて（低め＝男性の声に近く）別の人の声として散らす。時計の音は自前の合成（production_script.py の `_tick`）。
 
 ## 効果音（Freesound、CC0。前の回で各ページのライセンスを確かめたもの）
 

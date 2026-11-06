@@ -105,7 +105,8 @@ everse_yt_profile`）。切れたら、もう一度ユーザーに頼む。認�
 - 設計は `templates/DESIGN_MODES.md` の「もしも設計」（ユーザーが命名）。条件はユーザーが決めた（都庁の真ん前・ボルト並み・3 発・10 秒・籠城 1 週間／3 週間・突破 5%／日・泳げない）。
 - **計算は済み、動画はまだ（ユーザー「動画にはまだしなくていい」）**：`scripts/pilot_045/sim/`（`python run_all.py` で約 5 分。データは `fetch_mesh.py`・`build_grid.py` で `sim/data/` に、git に入れない）。最初の 2 日は細かく、3 日目からざっくり（ユーザーの指示「全部で 30 分以内」）。結果は `sim/results.md`・地図の一覧 `sim/maps/sheet_*.png`、仮定と要点は `scripts/pilot_045/fact_check.md`。
 - 一番効く仮定は自衛隊の弾（5,000 万発、出典なし）。ユーザーの感想待ち → 台本へ。
-- **完成（2026-11-06）**：`production/pilot_045/reverse_045_zombie_tokyo.mp4`（58.1 秒）。Blender（全 17 ショット）→ `bl_pack.py 045` → `rv.py 045 render all`。サムネイル `thumbnail.png`、タイトル・説明文 `youtube_metadata.md`。video_qa の NG：最初のコマ（thumbnail.png を使う）・共通エンディング（もしも設計はエンディングなし、想定どおり）・文字の自動検査（右の高さの目盛りが YouTube のボタンの範囲にかかる、「高さ」の札が目盛りの文字に重なる。直すかはユーザー次第）。ユーザーの感想待ち。YouTube へのアップロードはユーザーの指示まで行わない。
+- **完成（2026-11-06）**：`production/pilot_045/reverse_045_zombie_tokyo.mp4`（58.1 秒）。Blender（全 17 ショット）→ `bl_pack.py 045` → `rv.py 045 render all`。サムネイル `thumbnail.png`、タイトル・説明文 `youtube_metadata.md`。video_qa の NG：最初のコマ（thumbnail.png を使う）・共通エンディング（もしも設計はエンディングなし、想定どおり）・文字の自動検査（右の高さの目盛りが YouTube のボタンの範囲にかかる、「高さ」の札が目盛りの文字に重なる。直すかはユーザー次第）。
+- **v2（2026-11-06〜、ユーザーの指示で作り直し）**：ナレーションなし（`ext/silent_ext.py`）・情報はポップアップ・BGM なしで環境音（時計・雑踏・悲鳴・うめき声、OpenGameArt の CC0）・インフラのカット（電車・道路・停電、「想定」の札）・ゾンビはジタバタ・最初の一人はスロー・昼夜は背景の色・右の目盛りは削除。ショットとポップアップは `plan.py`（`python plan.py` で lines.json などを作る）。v1 の版は `versions/v1/`。手順：`python plan.py` → `python production_script.py voice` → Blender（`blender -b -P blender/scene.py`、確認は `--still` か `--every N`）→ `bl_pack.py 045` → `rv.py 045 render all`。YouTube へのアップロードはユーザーの指示まで行わない。
 
 ## 次の動画でやること（ガイドライン v2.4）
 
