@@ -613,6 +613,86 @@ for k in range(40):   # 遠くのビル（夕方の空に影）
     o = bpy.context.object; o.scale = (1, 1, hr.uniform(40, 180)); o.location.z = o.scale.z / 2
 HW.location = (0, 0, -900)
 
+# ---------------------------------------------------------------- v2.3：ご当地の名所（ユーザー「仙台、大阪、北海道で、その観光名所でかまれる人のカットを」）。模式（実際の形を簡略に）
+LMK = {}
+bronze = emat("bronze", (.09, .085, .06), .45, .7); gold = emat("gold", (.95, .68, .22), .3, 1.0); white = emat("lm_white", (.82, .82, .8), .7)
+roofg = emat("roof_green", (.12, .3, .26), .5, .3); roofr = emat("roof_red", (.42, .1, .07), .6); stone = emat("lm_stone", (.36, .35, .33), .9)
+gravel = emat("gravel", (.42, .4, .36), .95); dkwin = emat("lm_win", (.03, .04, .04), .2); dial = emat("dial", (.9, .9, .86), .5)
+
+
+def lm_group(name, ground):
+    g = group("lm_" + name); K.box(f"{name}_ground", (900, 900, .2), (0, 0, -.1), ground, bevel=0, parent=g)
+    for k in range(18):   # 周りの木
+        a = k / 18 * 2 * math.pi; x, y = 60 * math.cos(a) + RND.uniform(-6, 6), 60 * math.sin(a) + 40 + RND.uniform(-6, 6)
+        K.tube((x, y, 0), (x, y, 4), .3, trunk_m, g, 8); bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=4, location=(x, y, 7)); o = bpy.context.object; o.data.materials.append(tree_m); o.parent = g
+    LMK[name] = g; return g
+
+
+def pyramid(name, w, h, z, m, parent, d=None, x=0., y=0.):
+    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=w / math.sqrt(2), radius2=0, depth=h, location=(x, y, z + h / 2), rotation=(0, 0, math.pi / 4))
+    o = bpy.context.object; o.name = name; o.data.materials.append(m)
+    if d:
+        o.scale = (1, d / w, 1)
+    o.parent = parent; return o
+
+
+# 仙台：青葉城跡の伊達政宗の騎馬像（三日月の前立ての兜）
+g = lm_group("sendai", gravel); SX, SY = 3.0, 17.0
+K.box("sd_base", (10, 10, 2.5), (SX, SY, 1.25), stone, bevel=.1, parent=g); K.box("sd_ped", (3.6, 6.0, 6.5), (SX, SY, 5.75), granite, bevel=.08, parent=g)
+hz = 9.0
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(SX, SY, hz + 2.1)); o = bpy.context.object; o.scale = (.62, 1.45, .7); o.data.materials.append(bronze); o.parent = g   # 馬の胴
+K.tube((SX, SY - 1.2, hz + 2.3), (SX, SY - 1.9, hz + 3.6), .38, bronze, g, 12); K.box("sd_head", (.45, 1.0, .5), (SX, SY - 2.3, hz + 3.7), bronze, bevel=.12, parent=g)
+for (lx, ly, up) in [(-.35, -.9, 1), (.35, -.9, 0), (-.35, .9, 0), (.35, .9, 0)]:
+    if up:   # 前足を上げる
+        K.tube((SX + lx, SY + ly, hz + 1.8), (SX + lx, SY + ly - .8, hz + 1.2), .15, bronze, g, 8)
+    else:
+        K.tube((SX + lx, SY + ly, hz + 1.8), (SX + lx, SY + ly, hz), .15, bronze, g, 8)
+K.tube((SX, SY + 1.4, hz + 2.4), (SX, SY + 2.2, hz + 1.2), .12, bronze, g, 8)   # しっぽ
+K.tube((SX, SY + .1, hz + 2.7), (SX, SY - .1, hz + 3.9), .38, bronze, g, 12)   # 政宗の胴
+bpy.ops.mesh.primitive_uv_sphere_add(radius=.3, location=(SX, SY - .15, hz + 4.2)); o = bpy.context.object; o.data.materials.append(bronze); o.parent = g
+for i in range(16):   # 三日月の前立て（金）
+    a0, a1 = math.radians(200 + i * 140 / 16), math.radians(200 + (i + 1) * 140 / 16); R0 = .95
+    K.tube((SX + R0 * math.cos(a0), SY - .45, hz + 5.25 + R0 * math.sin(a0)), (SX + R0 * math.cos(a1), SY - .45, hz + 5.25 + R0 * math.sin(a1)), .07 * (1 - abs(i - 7.5) / 9), gold, g, 6)
+for k in range(10):   # 石垣の上の手すり
+    K.box(f"sd_rail{k}", (2.0, .15, .9), (SX - 10 + k * 2.2, SY - 9, .45), stone, bevel=.03, parent=g)
+# 大阪：大阪城の天守（白い壁・緑の屋根・金の飾り）
+g = lm_group("osaka", gravel); OX, OY = 10.0, 150.0
+K.box("os_base", (60, 60, 14), (OX, OY, 7), stone, bevel=.5, parent=g)
+z = 14.0
+for i, w in enumerate([40, 34, 28, 22, 17]):
+    hgt = 8.5 if i < 4 else 9.5
+    K.box(f"os_wall{i}", (w, w * .85, hgt), (OX, OY, z + hgt / 2), white, bevel=.1, parent=g)
+    K.box(f"os_band{i}", (w + .2, w * .85 + .2, .8), (OX, OY, z + hgt - 1.2), gold if i == 4 else roofg, bevel=.05, parent=g)
+    nw = max(2, w // 6)
+    for j in range(nw):   # 窓
+        K.box(f"os_win{i}_{j}", (1.6, w * .85 + .3, 1.4), (OX - w / 2 + 3 + j * (w - 6) / max(1, nw - 1), OY, z + hgt * .5), dkwin, bevel=0, parent=g)
+    pyramid(f"os_roof{i}", w + 7, 4.2 if i < 4 else 7, z + hgt - .4, roofg, g, d=(w + 7) * .85, x=OX, y=OY)
+    z += hgt + (2.4 if i < 4 else 0)
+for sx in (-3.5, 3.5):
+    K.box(f"os_shachi{sx}", (1.0, .8, 2.2), (OX + sx, OY, z + 4.5), gold, bevel=.2, parent=g)
+# 札幌：時計台（白い木造の 2 階建て・赤い屋根・時計の塔）。周りはビル
+g = lm_group("sapporo", gravel); PX, PY = 3.0, 34.0
+K.box("sp_body", (20, 12, 8), (PX, PY, 4), white, bevel=.05, parent=g)
+for k in range(9):
+    K.box(f"sp_win{k}", (1.2, 12.2, 1.9), (PX - 8 + k * 2, PY, 2.2 + 3.6 * (k % 2)), dkwin, bevel=0, parent=g)
+me = bpy.data.meshes.new("sp_roof"); bm = bmesh.new(); hw, hd, rh = 10.8, 6.8, 4.2
+vs = [bm.verts.new(v) for v in [(-hw, -hd, 0), (hw, -hd, 0), (hw, hd, 0), (-hw, hd, 0), (-hw, 0, rh), (hw, 0, rh)]]
+for f_ in [(0, 1, 5, 4), (2, 3, 4, 5), (0, 4, 3), (1, 2, 5), (0, 3, 2, 1)]:
+    bm.faces.new([vs[i] for i in f_])
+bm.to_mesh(me); bm.free(); o = bpy.data.objects.new("sp_roof", me); sc.collection.objects.link(o); me.materials.append(roofr); o.location = (PX, PY, 8); o.parent = g
+K.box("sp_tower", (3.8, 3.8, 6.5), (PX, PY - 4, 11.5), white, bevel=.04, parent=g)
+for (dx, dy, rz) in [(0, -1.95, 0), (0, 1.95, 0), (-1.95, 0, math.pi / 2), (1.95, 0, math.pi / 2)]:   # 4 面の時計
+    K.box(f"sp_clock{dx}{dy}", (2.6, .08, 2.6), (PX + dx, PY - 4 + dy, 13.0), dial, rot=(0, 0, rz), bevel=0, parent=g)
+    K.box(f"sp_h1{dx}{dy}", (.12, .1, 1.0), (PX + dx * 1.03, PY - 4 + dy * 1.03, 13.35), dkwin, rot=(0, 0, rz), bevel=0, parent=g)
+    K.box(f"sp_h2{dx}{dy}", (.8, .1, .12), (PX + dx * 1.03 + (.3 if rz == 0 else 0), PY - 4 + dy * 1.03 + (.3 if rz else 0), 13.0), dkwin, rot=(0, 0, rz), bevel=0, parent=g)
+pyramid("sp_troof", 4.6, 3.0, 14.75, roofr, g, x=PX, y=PY - 4)
+K.tube((PX, PY - 4, 17.6), (PX, PY - 4, 20), .08, dkwin, g, 6)
+for k, (bx, by, bh) in enumerate([(-40, 70, 60), (-10, 80, 90), (30, 75, 70), (55, 60, 50), (-60, 40, 45)]):   # 周りのビル
+    K.box(f"sp_bld{k}", (26, 22, bh), (bx, by, bh / 2), glass, bevel=0, parent=g)
+for gg in LMK.values():
+    gg.location = (0, 0, -900)
+A_CUT = Actors(["man", "woman", "child", "elder", "man", "woman", "man", "woman", "man", "elder", "zombie", "zombie", "zombie", "zombie", "zombie"], "cu")
+
 # ---------------------------------------------------------------- 表示の切り替え
 def hide_tree(o, h):
     o.hide_render = h
@@ -621,8 +701,11 @@ def hide_tree(o, h):
 
 
 def show(city=False, plaza=False, maps=None, emit=0., windows=0., tod="day"):
-    for a in (A_PLAZA, A_POL, A_SDF, A_MISC):
-        a.hide()
+    for a in (A_PLAZA, A_POL, A_SDF, A_MISC, A_CUT):
+        if a:
+            a.hide()
+    for gg in LMK.values():
+        gg.location = (0, 0, -900)
     hide_tree(CITY, not city); hide_tree(PLAZA, not plaza); TRAIN.location = HW.location = (0, 0, -900)
     for M_ in (MAPK, MAPJ):
         M_["obj"].hide_render = maps != M_["name"]
@@ -799,24 +882,75 @@ def a_l14(u, t, f):   # インフラ：夜の街の明かりが地区ごとに�
     key_fac(BLACK_T, -.2 + .95 * K.ease(clamp(u * 1.15)), f)
     cam.look(mix((1500, -2700, 950), (1250, -2350, 820), K.ease(u)), (250, 150, 0), 32)
 
+# 地図の上の都市（make_maps.py と同じ投影：都庁が原点、東へ x、北へ y、m）
+def lonlat(lat, lon):
+    return ((lon - 139.6920) * 111320 * math.cos(math.radians(35.6893)), (lat - 35.6893) * 110950)
+SENDAI, OSAKA, SAPPORO = lonlat(38.268, 140.872), lonlat(34.686, 135.520), lonlat(43.062, 141.354)
+
 def s_l15():
-    show(maps="japan"); map_textures(MAPJ, ["8d", "10d", "14d"])
-def a_l15(u, t, f):   # 名古屋、大阪へ（西へ振る）
-    key_map(MAPJ, clock("l15", t), f); cam.look(mix((0, -360000, 360000), (-260000, -500000, 560000), K.ease(u)), mix((-40000, 0, 0), (-300000, -60000, 0), K.ease(u)), 30)
+    show(maps="japan"); map_textures(MAPJ, ["8d", "10d"])
+def a_l15(u, t, f):   # 名古屋・仙台へ。最後は仙台に寄る
+    key_map(MAPJ, clock("l15", t), f); e = K.ease(u)
+    cam.look(mix((0, -360000, 360000), (SENDAI[0], SENDAI[1] - 70000, 120000), e), mix((-40000, 0, 0), (SENDAI[0], SENDAI[1], 0), e), 30)
 
 def s_l16():
-    show(maps="japan"); map_textures(MAPJ, ["14d", "21d", "22d", "30d", "45d", "60d"])
-def a_l16(u, t, f):   # 3 週間 → 2 か月：九州・北海道へ
-    key_map(MAPJ, clock("l16", t), f); cam.look(mix((-260000, -500000, 560000), (-60000, -1000000, 1500000), K.ease(u)), mix((-300000, -60000, 0), (-80000, 220000, 0), K.ease(u)), 30)
+    show(maps="japan"); map_textures(MAPJ, ["10d", "14d"])
+def a_l16(u, t, f):   # 大阪へ。仙台から引いて、大阪に寄る
+    key_map(MAPJ, clock("l16", t), f); e = K.ease(u)
+    cam.look(mix((SENDAI[0] - 60000, SENDAI[1] - 300000, 420000), (OSAKA[0], OSAKA[1] - 70000, 120000), e), mix((SENDAI[0] - 120000, SENDAI[1] - 100000, 0), (OSAKA[0], OSAKA[1], 0), e), 30)
 
 def s_l17():
+    show(maps="japan"); map_textures(MAPJ, ["14d", "21d", "22d", "30d", "45d", "60d"])
+def a_l17(u, t, f):   # 3 週間 → 2 か月：四国・九州・北海道へ
+    key_map(MAPJ, clock("l17", t), f); e = K.ease(u)
+    cam.look(mix((OSAKA[0], OSAKA[1] - 250000, 420000), (-60000, -1000000, 1500000), e), mix((OSAKA[0], OSAKA[1], 0), (-80000, 220000, 0), e), 30)
+
+def s_l19():
     show(maps="japan"); map_textures(MAPJ, ["60d", "90d"])
-def a_l17(u, t, f):   # 90 日：宇宙から
-    key_map(MAPJ, clock("l17", t), f); cam.look(mix((-60000, -1000000, 1500000), (-60000, -1500000, 2800000), K.ease(u)), (-60000, 250000, 0), 30)
+def a_l19(u, t, f):   # 宇宙から、札幌に寄る
+    key_map(MAPJ, clock("l19", t), f); e = K.ease(u)
+    cam.look(mix((-60000, -1000000, 1500000), (SAPPORO[0], SAPPORO[1] - 70000, 120000), e), mix((-80000, 220000, 0), (SAPPORO[0], SAPPORO[1], 0), e), 30)
+
+# 名所のカット：名所を背に写真を撮っていた人へ、ゾンビがジタバタ走ってきてかむ。周りの人は逃げる
+def cut_action(t, f, cam_from, cam_to, look, lens=26, seed=1):
+    rr = random.Random(seed); N = 15; P = np.zeros((N, 2)); S = np.zeros(N, int); Hd = np.full(N, math.pi / 2); V = np.zeros(N); TB = np.full(N, 1e9)
+    tb = .5 + 9.3 / 10.4   # 先頭のゾンビが最初の人に着く時刻
+    zt = clamp((t - .5) / (tb - .5)); P[10] = (9.0 - 8.6 * zt, 3.0 - 2.85 * zt); Hd[10] = math.atan2(-2.85, -8.6); V[10] = 10 if zt < 1 else 0
+    P[0] = (0, 0); Hd[0] = math.pi / 2 if t < 1.0 else math.atan2(P[10][1], P[10][0])   # 名所を向いて写真 → 振り向く
+    if t >= tb:
+        S[0] = 1; TB[0] = tb
+    for k in range(1, 10):   # 周りの人：気づいたら逃げる
+        x0, y0 = rr.uniform(-12, 12), rr.uniform(-4, 14)
+        if abs(x0) < 2.5 and abs(y0) < 2.5:
+            x0 += 5
+        run = max(0, t - .9 - .15 * k); d = Vector((x0 - 9, y0 - 3)).normalized(); hd0 = rr.uniform(0, 6.28)
+        P[k] = (x0 + d.x * 3.2 * run, y0 + d.y * 3.2 * run); Hd[k] = math.atan2(d.y, d.x) if run > 0 else hd0; V[k] = 3.2 if run > 0 else 0
+    for k in range(11, 15):   # 後ろから走ってくるゾンビ
+        x0, y0 = rr.uniform(16, 30), rr.uniform(-6, 16); run = max(0, t - .3 - .2 * (k - 11)); tx, ty = rr.uniform(-6, 6), rr.uniform(0, 10)
+        d = Vector((tx - x0, ty - y0)); L_ = d.length; s_ = min(L_, 10.4 * run); d.normalize(); P[k] = (x0 + d.x * s_, y0 + d.y * s_); Hd[k] = math.atan2(d.y, d.x); S[k] = 2; V[k] = 10
+    S[10] = 2
+    A_CUT.pose(P, S, Hd, f, V=V, t=t, TB=TB)
+    hit = clamp(1 - (t - tb) / .8) if t > tb else 0.
+    pos = Vector(mix(cam_from, cam_to, K.ease(clamp(t / 2.6)))) + shake(f, .06 * hit); cam.look(pos, look, lens)
+
+def s_m01():
+    show(tod="day"); sc.view_settings.exposure = -.55; LMK["sendai"].location = (0, 0, 0)
+def a_m01(u, t, f):   # 仙台：青葉城跡の騎馬像を背に
+    cut_action(t, f, (-1.5, -9.0, 1.3), (-1.2, -7.8, 1.2), (2.5, 12.0, 4.6), 26, 11)
+
+def s_m02():
+    show(tod="day"); sc.view_settings.exposure = -.55; LMK["osaka"].location = (0, 0, 0)
+def a_m02(u, t, f):   # 大阪：大阪城を背に
+    cut_action(t, f, (-1.5, -9.5, 1.2), (-1.2, -8.2, 1.15), (4.0, 60.0, 16.0), 22, 12)
+
+def s_m03():
+    show(tod="day"); sc.view_settings.exposure = -.55; LMK["sapporo"].location = (0, 0, 0)
+def a_m03(u, t, f):   # 札幌：時計台を背に
+    cut_action(t, f, (-1.5, -9.0, 1.3), (-1.2, -7.8, 1.2), (2.5, 20.0, 5.5), 24, 13)
 
 def s_l18():
     show(plaza=True, city=True)
-def a_l18(u, t, f):   # 始まりは、たった一体：冒頭の少し前の広場（最後のコマが冒頭の最初のコマにつながる）
+def a_l18(u, t, f):   # 90 日後の数を出す。画は冒頭の少し前の広場（最後のコマが冒頭の最初のコマにつながる）
     T = SHOT_T["l18"]; crowd_pose(T[0] + t, f)
     cam.look(mix((10.5, 2.2, 2.4), EYE0[0], K.ease(u)), EYE0[1], EYE0[2] - 4 * (1 - u))
 
@@ -826,8 +960,11 @@ cues, END = K.shot_lengths(HERE)
 D = {k: SPLAN[k]["dur"] for k in NAMES}
 # 広場の時刻：l02 の始まりが t=0。冒頭（l00・l01）は t<0、最後のショット（l18）はさらにその前（冒頭につながる）
 SHOT_T = {"l01": (-D["l01"], 0.0), "l00": (-D["l01"] - D["l00"], -D["l01"]), "l18": (-D["l01"] - D["l00"] - D["l18"], -D["l01"] - D["l00"])}
-CROWD = Crowd(t0=SHOT_T["l18"][0] - 2, t1=62.0)
-A_PLAZA = Actors(CROWD.kind, "pl")
+CROWD_SHOTS = {"l00", "l01", "l02", "l03", "l04", "l18"}   # 広場の人の動きの計算（約 7 分）は、これらを描くときだけ
+if not O["shots"] or CROWD_SHOTS & set(O["shots"]):
+    CROWD = Crowd(t0=SHOT_T["l18"][0] - 2, t1=62.0); A_PLAZA = Actors(CROWD.kind, "pl")
+else:
+    CROWD = A_PLAZA = None
 SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in NAMES}
 anim = [cam.o, car, LIGHTBAR, heli]   # 人とゾンビは Actors.pose が自分でキーを打つ
 K.render_shots(HERE, SHOTS, NAMES, O, anim)

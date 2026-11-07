@@ -5,7 +5,7 @@
  "voices": "v7",
  "silent": true,
  "gap": 0.0,
- "max_duration": 75.0,
+ "max_duration": 90.0,
  "meta": {},
  "lines": [
   {
@@ -180,9 +180,20 @@
    "speech": "",
    "sub": "",
    "silent": true,
-   "hold": 4.5,
+   "hold": 2.4,
    "fact": "画面のポップアップ（plan.py）",
-   "what": "日本の地図：名古屋・大阪"
+   "what": "日本の地図：名古屋・仙台へ"
+  },
+  {
+   "id": "M01",
+   "who": "M",
+   "scene": "m01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "仙台：青葉城跡の伊達政宗の騎馬像の前でかまれる人"
   },
   {
    "id": "L16",
@@ -191,9 +202,20 @@
    "speech": "",
    "sub": "",
    "silent": true,
-   "hold": 4.5,
+   "hold": 2.2,
    "fact": "画面のポップアップ（plan.py）",
-   "what": "日本の地図：九州・北海道へ"
+   "what": "日本の地図：大阪へ"
+  },
+  {
+   "id": "M02",
+   "who": "M",
+   "scene": "m02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "大阪：大阪城の前でかまれる人"
   },
   {
    "id": "L17",
@@ -202,9 +224,31 @@
    "speech": "",
    "sub": "",
    "silent": true,
-   "hold": 3.2,
+   "hold": 4.5,
    "fact": "画面のポップアップ（plan.py）",
-   "what": "宇宙から：90 日"
+   "what": "日本の地図：四国・九州・北海道へ"
+  },
+  {
+   "id": "L19",
+   "who": "M",
+   "scene": "l19",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "宇宙から：札幌へ"
+  },
+  {
+   "id": "M03",
+   "who": "M",
+   "scene": "m03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "札幌：時計台の前でかまれる人"
   },
   {
    "id": "L18",
@@ -215,7 +259,7 @@
    "silent": true,
    "hold": 3.4,
    "fact": "画面のポップアップ（plan.py）",
-   "what": "最初の一体に戻る（ループ）"
+   "what": "90日後：生き残った人の数（画は最初の広場に戻る）"
   }
  ]
 }

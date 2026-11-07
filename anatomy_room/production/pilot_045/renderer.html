@@ -76,7 +76,7 @@ function digitPop(t) {
 }
 function rate(t) { const k = curId(t), a = t - CUE[k]; return (clockAt(k, a + .05) - clockAt(k, a)) / .05; }   // 時計の秒 / 動画の秒
 function daylight(c) { const h = tod(c).hours; return clamp((Math.cos((h - 12.5) / 24 * 2 * Math.PI) + .15) / .9); }   // 0＝夜、1＝昼
-function dayAmp(t) { return t < CUE.l14 ? 1 : 0; }   // v2.2：停電までは昼夜を交互に（ユーザー「パニック感」）。そのあとは暗いまま
+function dayAmp(t) { return t < CUE.l12 ? 1 : 0; }   // v2.3：自衛隊の出動まで昼夜を交互に。そのあとの早送りは切り替えない（チカチカしないように）
 
 // ---------------------------------------------------------------- 左上：時計・経過・ゾンビの数
 function sunMoon(x, y, dl, r = 22) {
@@ -90,7 +90,7 @@ function ffMark(x, y, k) { if (k <= 0) return; ui.save(); ui.globalAlpha *= k; u
   for (const dx of [0, 22]) { ui.beginPath(); ui.moveTo(x + dx, y - 13); ui.lineTo(x + dx + 20, y); ui.lineTo(x + dx, y + 13); ui.closePath(); ui.fill(); }
   text(ui, "早送り", x + 104, y + 1, 30, "#8FDCFF", { weight: 800, align: "center" }); ui.restore(); }
 function statusUI(t) {
-  const k = curId(t); if (k === "l00" || k === "l01" || t < CUE.l02) return;
+  const k = curId(t); if (k === "l00" || k === "l01" || k === "l18" || t < CUE.l02) return;   // 最後の札の間は時計を出さない
   const loop = k === "l18", c = loop ? 0 : clockNow(t), o = tod(c), z = loop ? 1 : zombiesAt(c), a = CUE[k], u = t - a;
   const pop = 1 + .14 * Math.pow(1 - clamp(u / .2), 2) * (k === "l02" ? 0 : 1);
   const x0 = 40, y0 = 176, w = 640, h = 250, dl = daylight(c) * dayAmp(t) + .45 * (1 - dayAmp(t));
@@ -157,22 +157,23 @@ function bigCard(t, id) {
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();
 }
-function loopCard(t) {
-  const a = CUE.l18, u = t - a - .5; if (u < 0) return; const k = easeOut(clamp(u / .5));
-  ui.save(); ui.globalAlpha *= k; S.group(() => { text(ui, "始まりは", 540, 700, 80, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 12 }); text(ui, "たった一匹だった", 540, 830, 96, "#FF5A4E", { weight: 700, stroke: "#05080c", sw: 14 }); }); ui.restore();
+function loopCard(t) {   // v2.3：最後は 90 日後に生き残った人の数（計算結果、sim/results.md の base）
+  const a = CUE.l18, u = t - a - .3; if (u < 0) return; const k = easeOut(clamp(u / .5)), k2 = easeOut(clamp((u - .5) / .5));
+  ui.save(); ui.globalAlpha *= k; S.group(() => { text(ui, "90日後", 540, 640, 90, "#FFD58A", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "生き残ったのは", 540, 770, 80, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 12 }); }); ui.restore();
+  ui.save(); ui.globalAlpha *= k2; ui.translate(540, 920); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, "約1,760万人", 0, 0, 120, "#7FE0A0", { weight: 700, stroke: "#05080c", sw: 16 })); ui.restore();
 }
 { const _du = drawUI; drawUI = function (t, name) { if (name === "open") { _du(t, name); return; }
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec"); if (k === "l06") bigCard(t, "police"); if (k === "l18") loopCard(t); }; }
 
 // ---------------------------------------------------------------- 昼と夜（地図のショットの背景の色）
-const MAPSHOTS = ["l09", "l12", "l13", "l15", "l16", "l17"], DAY3D = ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08"];
+const MAPSHOTS = ["l09", "l12", "l13", "l15", "l16", "l17", "l19"], DAY3D = ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08", "m01", "m02", "m03"];
 function fxEp(t, name) {   // v2.2：昼は空と海を明るく、夜は暗い背景に街の明かり（地図の人の光）が残る。停電のあとは暗いまま
   const k = curId(t);
   if (DAY3D.includes(k) || name === "open") { bg.save(); bg.globalCompositeOperation = "screen"; bg.fillStyle = "rgba(70,90,120,.22)"; bg.fillRect(0, 0, W, H); bg.restore(); return; }   // 正午の街：少し明るく
   if (k === "l10") { bg.save(); bg.globalCompositeOperation = "screen"; bg.fillStyle = "rgba(90,60,40,.25)"; bg.fillRect(0, 0, W, H); bg.restore(); return; }   // 夕方の道路
   if (!MAPSHOTS.includes(k)) return;
-  const after = t >= CUE.l14, dl = after ? 0 : daylight(clockNow(t));
+  const after = t >= CUE.l14, dl = t >= CUE.l12 ? (after ? 0 : .35) : daylight(clockNow(t));   // 1 日目からは落ち着いた明るさのまま、停電のあとは暗く
   bg.save(); bg.globalCompositeOperation = "screen"; const g = bg.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, `rgba(${lerp(14, 120, dl)},${lerp(20, 170, dl)},${lerp(48, 230, dl)},${lerp(.25, .62, dl)})`); g.addColorStop(1, `rgba(${lerp(8, 60, dl)},${lerp(12, 100, dl)},${lerp(30, 150, dl)},${lerp(.2, .5, dl)})`);
   bg.fillStyle = g; bg.fillRect(0, 0, W, H);
