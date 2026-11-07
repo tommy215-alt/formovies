@@ -195,6 +195,14 @@
    "uploaded": "2026-11-05T13:53:29.885Z",
    "url": "https://youtu.be/Au9pv7HmUks",
    "thumbnail_status": "設定済み（2026-11-05、チャンネルの確認のあと編集画面から）"
+  },
+  {
+   "id": "pilot_045",
+   "video": "anatomy_room/production/pilot_045/reverse_045_zombie_tokyo.mp4",
+   "meta": "anatomy_room/production/pilot_045/youtube_metadata.md",
+   "publish_at": null,
+   "status": "queued",
+   "note": "2026-11-07 もしも設計の 1 本目。ユーザーが次のショートの枠で予約を指示"
   }
  ]
 }

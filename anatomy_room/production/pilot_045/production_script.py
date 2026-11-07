@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "ext" / "kit"))
 import epkit  # noqa: E402
 
-pipeline, standard = epkit.setup(HERE, "intel", bgm=("Cyborg Ninja.mp3", 160))   # 曲は全区間 f_mute（BGM なし）
+pipeline, standard = epkit.setup(HERE, "intel", bgm=("Cyborg Ninja.mp3", 160), ending_gain=0.0)   # 曲は全区間 f_mute、最後（ending）も 0（BGM なし。v2.3 で最後に流れていたのを消した）
 import noend_ext  # noqa: E402
 noend_ext.apply(pipeline, black=1.0)   # もしも設計は共通エンディングなし。最後は短く暗転して冒頭へ（ループ）
 import silent_ext  # noqa: E402

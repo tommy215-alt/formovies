@@ -763,15 +763,13 @@ def s_l03():
     show(plaza=True, city=True)
 def a_l03(u, t, f):   # 地上：逃げまどう人と、かみに行くゾンビ（3 倍速）。広場の東から都庁を背に、群れがこちらへ
     ts = clock("l03", t); crowd_pose(ts, f)
-    c = sum((CROWD.centroid(ts + d) for d in np.linspace(-1.2, 1.2, 7)), np.zeros(2)) / 7; c = c * .7 + np.array([5, -2]) * .3
-    e = K.ease(u); cam.look(mix((34, -16, 1.5), (27, -5, 2.4), e), (c[0], c[1], 1.1), 22)
+    e = K.ease(u); cam.look(mix((34, -16, 1.5), (27, -5, 2.4), e), mix((6, -3, 1.1), (2, -1, 1.1), e), 22)   # v2.3：群れの中心は追わない（ユーザー「カメラのブレを無くして」）
 
 def s_l04():
     show(plaza=True, city=True)
 def a_l04(u, t, f):   # 広場の上へ：最初の 20 人ほど（10 倍速）。議事堂の壁を越える前に高くなる
     ts = clock("l04", t); crowd_pose(ts, f)
-    c = sum((CROWD.centroid(ts + d) for d in (-3, -1.5, 0, 1.5, 3)), np.zeros(2)) / 5; c = c * .5 + np.array([-15, 0]) * .5
-    e = K.ease(u); cam.look(mix((30, -8, 4), (44, -4, 4), e)[:2] + (4 + 48 * K.ease(min(1, u * 1.7)),), (c[0], c[1], 0), 24)
+    e = K.ease(u); cam.look(mix((30, -8, 4), (44, -4, 4), e)[:2] + (4 + 48 * K.ease(min(1, u * 1.7)),), mix((-2, -2, 0), (-12, 0, 0), e), 24)   # 決めた道すじで滑らかに
 
 def s_l05():
     show(plaza=True, city=True, emit=8.0); city_tex(["2", "3"])
