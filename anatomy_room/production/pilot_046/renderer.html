@@ -41,7 +41,7 @@ html,body{margin:0;background:#000}
 const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
 const IDS = PL.shots.map(s => s.id);
 Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
-  opening: { img: null, bg: blShot("l00"), title: ["全人類の体重が", "1日10%ずつ増えたら？"], size1: 72, size2: 88, credit: [] } });
+  opening: { img: null, bg: blShot("l00"), title: ["全人類の体重が", "1日10%ずつ増えたら？"], size1: 66, size2: 64, credit: [] } });
 SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
 S.docSub = () => {};   // 字幕なし（ナレーションがない）
 
@@ -73,7 +73,7 @@ function digitPop(t) {
 }
 function rate(t) { const k = curId(t), a = t - CUE[k]; return (clockAt(k, a + .05) - clockAt(k, a)) / .05; }   // 時計の秒 / 動画の秒
 function daylight(c) { const h = tod(c).hours; return clamp((Math.cos((h - 12.5) / 24 * 2 * Math.PI) + .15) / .9); }   // 0＝夜、1＝昼
-function dayAmp(t) { return t < CUE.l12 ? 1 : 0; }   // v2.3：自衛隊の出動まで昼夜を交互に。そのあとの早送りは切り替えない（チカチカしないように）
+function dayAmp(t) { return rate(t) / 86400 < .3 ? 1 : 0; }   // 早送り（1 秒に 0.3 日より速い）の間は太陽と月の印を切り替えない
 
 // ---------------------------------------------------------------- 左上：時計・経過・ゾンビの数
 function sunMoon(x, y, dl, r = 22) {
@@ -90,7 +90,7 @@ function statusUI(t) {
   const k = curId(t); if (k === "l00" || k === "l01" || k === "l17" || t < CUE.l02) return;   // 最後の札の間は時計を出さない
   const loop = false, c = clockNow(t), o = tod(c), z = KG(c), a = CUE[k], u = t - a;
   const pop = 1 + .14 * Math.pow(1 - clamp(u / .2), 2) * (k === "l02" ? 0 : 1);
-  const x0 = 40, y0 = 176, w = 640, h = 250, dl = daylight(c) * dayAmp(t) + .45 * (1 - dayAmp(t));
+  const x0 = 40, y0 = 176, w = 640, h = 250, dl = dayAmp(t) ? daylight(c) : 1;
   ui.save(); ui.translate(x0, y0); ui.scale(pop, pop);
   ui.fillStyle = "rgba(6,10,16,.8)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,182,72,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
   ui.fillStyle = "#FFB648"; ui.fillRect(0, 20, 8, h - 40);
@@ -157,14 +157,17 @@ function bigCard(t, id) {
 function loopCard(t) {   // 最後は結果（計算：451 日で人類の重さが太陽をこえる）。画は朝の体重計に戻る
   const a = CUE.l17, u = t - a - .3; if (u < 0) return; const k = easeOut(clamp(u / .5)), k2 = easeOut(clamp((u - .5) / .5));
   ui.save(); ui.globalAlpha *= k; S.group(() => { text(ui, "451日後", 540, 620, 90, "#FFD58A", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "人類は", 540, 750, 80, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 12 }); }); ui.restore();
-  ui.save(); ui.globalAlpha *= k2; ui.translate(540, 900); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, "太陽より重くなった", 0, 0, 96, "#FFB648", { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
+  ui.save(); ui.globalAlpha *= k2; ui.translate(540, 900); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, "太陽より重くなった", 0, 0, 78, "#FFB648", { weight: 700, stroke: "#05080c", sw: 12 })); ui.restore();
 }
 { const _du = drawUI; drawUI = function (t, name) { if (name === "open") { _du(t, name); return; }
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec"); if (k === "l17") loopCard(t); }; }
 
 // ---------------------------------------------------------------- 昼と夜（地図のショットの背景の色）
-function fxEp(t, name) {}   // 昼夜は Blender の空（時計に合わせた太陽）で描く
+function fxEp(t, name) {   // 昼夜は Blender の空。昼の場面は少し暗く落ち着かせる（ユーザー「朝昼がちょっと明るすぎる」）
+  const k = curId(t); if (["l14", "l15", "l16"].includes(k)) return;
+  bg.save(); bg.globalCompositeOperation = "multiply"; bg.fillStyle = "rgb(196,196,200)"; bg.fillRect(0, 0, W, H); bg.restore();
+}
 
 function buildMood() { const c = CUE; MOOD = [[0, { cool: .05, sat: 1.0, vig: .25 }], [c.l12, { cool: .1, sat: .95, vig: .35 }], [c.l14, { cool: .2, sat: .95, vig: .45 }], [c.l17, { cool: .05, sat: 1.0, vig: .25 }]]; }   // 明るい日常の色調
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "全人類の体重が", 540, 450, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "1日10%ずつ", 540, 600, 120, "#FFB648", { weight: 700, stroke: "#05080c", sw: 16 }); text(ui, "増えたら？", 540, 750, 120, "#FFB648", { weight: 700, stroke: "#05080c", sw: 16 }); }); }

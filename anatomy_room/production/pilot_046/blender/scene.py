@@ -238,6 +238,48 @@ DUST = []
 for i in range(40):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=.12, location=(0, 0, 0)); o = bpy.context.object; o.data.materials.append(emat(f"dust{i}", (.7, .65, .58), 1)); o.parent = home; DUST.append(o)
 
+
+# ---- 一軒家（外から。ユーザー「一軒家で椅子に座ってるところ…は建物が派手に崩れるように」）
+house = group("house", (0, 0, 0)); GROUPS["house"] = house
+box("hs_ground", (120, 120, .1), (0, 0, -.05), grass, house); box("hs_road", (8, 120, .06), (0, -8, 0), asphalt, house, rot=(0, 0, math.pi / 2))
+plaster = emat("plaster", (.8, .74, .62), .85); roofm = emat("roofm", (.22, .2, .24), .6); hdark = emat("hdark", (.05, .06, .08), .2, .3)
+HX, HY = 0.0, 10.0
+HP = {}   # 名前 → (物, 最初の位置, 高さ)
+
+
+def hpiece(name, s_, loc, m, rot=(0, 0, 0)):
+    o = box(name, s_, loc, m, house, rot=rot); HP[name] = (o, Vector(loc), s_[2]); return o
+
+
+for nm, (sx, sy, x, y) in {"f": (8.4, .25, 0, -3.5), "b": (8.4, .25, 0, 3.5), "l": (.25, 7, -4.2, 0), "r": (.25, 7, 4.2, 0)}.items():
+    w1 = hpiece("w1" + nm, (sx, sy, 2.8), (HX + x, HY + y, 1.4), plaster); w2 = hpiece("w2" + nm, (sx, sy, 2.6), (HX + x, HY + y, 4.2), plaster)
+    if nm == "f":
+        for wx in (-2.3, 2.3):
+            o = box("hw1" + str(wx), (1.6, .05, 1.1), (wx, -.15, .2), hdark, w1); o = box("hw2" + str(wx), (1.6, .05, 1.1), (wx, -.15, .1), hdark, w2)
+        box("hdoor", (1.0, .05, 2.0), (0, -.15, -.35), wood, w1)
+hpiece("fl2", (8.6, 7.2, .25), (HX, HY, 2.9), wood2)
+hpiece("roofL", (8.9, 4.6, .22), (HX, HY - 1.9, 6.45), roofm, rot=(math.radians(35), 0, 0)); hpiece("roofR", (8.9, 4.6, .22), (HX, HY + 1.9, 6.45), roofm, rot=(math.radians(-35), 0, 0))
+for k, (nx, ny) in enumerate([(-14, 12), (14, 11), (-14, 28), (14, 27)]):   # となりの家
+    box(f"nb{k}", (8, 7, 5.2), (nx, ny, 2.6), emat(f"nbm{k}", (.7 + .05 * k, .66, .58), .85), house); box(f"nbr{k}", (8.6, 7.6, .3), (nx, ny, 5.35), roofm, house)
+for k in range(8):
+    tree(-24 + k * 7, 34, house, .9)
+box("fence", (18, .1, 1.0), (0, 4.5, .5), wood, house)
+H_DEB = [box(f"hdeb{i}", (RND.uniform(.2, .9), RND.uniform(.1, .5), RND.uniform(.05, .3)), (0, 0, -50), RND.choice([plaster, wood, roofm]), house) for i in range(90)]
+SMOKE_M = emat("smoke", (.6, .55, .48), 1.0, alpha=.4)   # 土煙：半透明（体積の材質は Cycles が落ちるので使わない）
+_sn = SMOKE_M.node_tree.nodes; _sl = SMOKE_M.node_tree.links; _sb = _sn["Principled BSDF"]; _stc = _sn.new("ShaderNodeTexCoord"); _snz = _sn.new("ShaderNodeTexNoise"); _snz.inputs["Scale"].default_value = 1.8
+_sl.new(_stc.outputs["Object"], _snz.inputs["Vector"]); _smr = _sn.new("ShaderNodeMapRange"); _smr.inputs[1].default_value = .35; _smr.inputs[2].default_value = .7; _smr.inputs[4].default_value = .55
+_sl.new(_snz.outputs["Fac"], _smr.inputs[0]); _sl.new(_smr.outputs[0], _sb.inputs["Alpha"])
+
+
+def smoke_balls(parent, n_, name):
+    out = []
+    for i in range(n_):
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1, location=(0, 0, -50)); o = bpy.context.object; o.name = f"{name}{i}"; o.data.materials.append(SMOKE_M); o.parent = parent; out.append(o)
+    return out
+
+
+H_SMOKE = smoke_balls(house, 10, "hsm")
+
 # ---- 朝の街
 street = group("street", (0, 0, 0)); GROUPS["street"] = street
 box("road", (14, 400, .05), (0, 0, 0), asphalt, street); box("walkL", (5, 400, .15), (-9.5, 0, .07), tile, street); box("walkR", (5, 400, .15), (9.5, 0, .07), tile, street)
@@ -354,6 +396,19 @@ HOLES = []
 for p_ in CT_P:
     bpy.ops.mesh.primitive_cylinder_add(radius=.5, depth=.02, location=(p_.location.x, p_.location.y, .17)); o = bpy.context.object; o.data.materials.append(dark); o.parent = city; o.scale = (0, 0, 1); HOLES.append(o)
 
+
+# ---- マンション（ユーザー「マンションのシーンは建物が派手に崩れるように」）：10 階建て。下から押しつぶされ、傾きながら崩れる
+MAN = bpy.data.objects.new("mansion", None); sc.collection.objects.link(MAN); MAN.parent = city; MAN.location = (-15, 8, 0)
+mansion_m = emat("mansion_m", (.78, .74, .68), .8); balcony = emat("balcony", (.6, .62, .65), .5, .3)
+MAN_F = []
+for i in range(10):
+    fo = box(f"mf{i}", (22, 11, 2.4), (0, 0, i * 3.0 + 1.5), mansion_m, MAN); box(f"mfw{i}", (22.05, 11.05, 1.1), (0, 0, .1), window_day, fo)
+    box(f"mfb{i}", (21, 1.4, .25), (0, -6.0, -1.05), balcony, fo); box(f"mfr{i}", (21, .1, .9), (0, -6.6, -.6), balcony, fo)
+    MAN_F.append(fo)
+M_DEB = [box(f"mdeb{i}", (RND.uniform(.3, 1.4), RND.uniform(.2, .8), RND.uniform(.15, .5)), (0, 0, -50), RND.choice([mansion_m, concrete, balcony]), city) for i in range(110)]
+M_GLASS = [box(f"mgl{i}", (.12, .12, .02), (0, 0, -50), carglass, city) for i in range(60)]
+M_SMOKE = smoke_balls(city, 14, "msm")
+
 # ---- 宇宙（地球・月・ブラックホール・太陽・金星）
 space = group("space", (0, 0, 0)); GROUPS["space"] = space
 em_ = bpy.data.materials.new("earth46"); em_.use_nodes = True; n = em_.node_tree.nodes; L = em_.node_tree.links; b = n["Principled BSDF"]
@@ -361,6 +416,15 @@ tc = n.new("ShaderNodeTexCoord"); nz = n.new("ShaderNodeTexNoise"); nz.inputs["S
 cr = n.new("ShaderNodeValToRGB"); L.new(nz.outputs["Fac"], cr.inputs[0]); e = cr.color_ramp.elements
 e[0].position, e[0].color = .52, (.01, .05, .2, 1); e[1].position, e[1].color = .54, (.12, .25, .08, 1); el = e.new(.66); el.color = (.42, .36, .22, 1)
 L.new(cr.outputs[0], b.inputs["Base Color"]); b.inputs["Roughness"].default_value = .6
+# ひび（ユーザー「人が空気や水よりも重くなったシーンも、少しずつ地球にひびが入っていく描写」）：ボロノイの境目が光るひび。GROW で広がり、CRK で光の強さ
+vor = n.new("ShaderNodeTexVoronoi"); vor.feature = "DISTANCE_TO_EDGE"; vor.inputs["Scale"].default_value = .55; L.new(tc.outputs["Object"], vor.inputs["Vector"])
+vmr = n.new("ShaderNodeMapRange"); vmr.inputs[1].default_value = 0; vmr.inputs[2].default_value = .035; vmr.inputs[3].default_value = 1; vmr.inputs[4].default_value = 0; L.new(vor.outputs["Distance"], vmr.inputs[0])
+gn = n.new("ShaderNodeTexNoise"); gn.inputs["Scale"].default_value = .12; L.new(tc.outputs["Object"], gn.inputs["Vector"])
+glt = n.new("ShaderNodeMath"); glt.operation = "LESS_THAN"; glt.inputs[1].default_value = 0.0; L.new(gn.outputs["Fac"], glt.inputs[0]); GROW = glt.inputs[1]
+ck = n.new("ShaderNodeMath"); ck.operation = "MULTIPLY"; L.new(vmr.outputs[0], ck.inputs[0]); L.new(glt.outputs[0], ck.inputs[1])
+cmix = n.new("ShaderNodeMix"); cmix.data_type = "RGBA"; L.new(ck.outputs[0], cmix.inputs[0]); L.new(cr.outputs[0], cmix.inputs[6]); cmix.inputs[7].default_value = (.02, .008, 0, 1); L.new(cmix.outputs[2], b.inputs["Base Color"])
+cke = n.new("ShaderNodeMath"); cke.operation = "MULTIPLY"; cke.inputs[1].default_value = 0.0; L.new(ck.outputs[0], cke.inputs[0]); CRK = cke.inputs[1]
+b.inputs["Emission Color"].default_value = (1, .35, .06, 1); L.new(cke.outputs[0], b.inputs["Emission Strength"])
 bpy.ops.mesh.primitive_uv_sphere_add(segments=96, ring_count=48, radius=6.4, location=(0, 0, 0)); EARTH = bpy.context.object; EARTH.data.materials.append(em_); EARTH.parent = space; bpy.ops.object.shade_smooth()
 cm_ = emat("cloud46", (1, 1, 1), 1, alpha=.0); cn = cm_.node_tree.nodes; cl = cm_.node_tree.links; cb = cn["Principled BSDF"]
 ctc = cn.new("ShaderNodeTexCoord"); cnz = cn.new("ShaderNodeTexNoise"); cnz.inputs["Scale"].default_value = .9; cnz.inputs["Detail"].default_value = 10; cl.new(ctc.outputs["Object"], cnz.inputs["Vector"])
@@ -382,7 +446,7 @@ for i in range(400):
 # ================================================================ 表示の切り替え
 # 前のショットの動き（抜けた床・沈んだ電車など）を残さないよう、場面を切り替えるたびに全部を最初の姿に戻す
 INIT = {o.name: (o.location.copy(), o.rotation_euler.copy(), o.scale.copy()) for o in bpy.data.objects}
-ANIM_DATA = [sky.node.id_data, sky.sun, sky.sun.data, sc.world.node_tree, CEIL.data, EV_LAMP_M.node_tree, SIGNAL_M.node_tree]
+ANIM_DATA = [sky.node.id_data, sky.sun, sky.sun.data, sc.world.node_tree, CEIL.data, EV_LAMP_M.node_tree, SIGNAL_M.node_tree, em_.node_tree]
 
 
 def reset_all():
@@ -391,7 +455,7 @@ def reset_all():
             o.animation_data_clear(); l_, r_, s_ = INIT[o.name]; o.location = l_; o.rotation_euler = r_; o.scale = s_
     for d in ANIM_DATA:
         d.animation_data_clear()
-    CEIL.data.energy = 0; L_LOBBY.data.energy = 0; EV_LAMP_K.default_value = 0; SIGNAL_K.default_value = 0
+    CEIL.data.energy = 0; L_LOBBY.data.energy = 0; EV_LAMP_K.default_value = 0; SIGNAL_K.default_value = 0; GROW.default_value = 0; CRK.default_value = 0
 
 
 def show(name, hour=12.0):
@@ -514,21 +578,46 @@ def a_l08(u, t, f):   # 立ち見のスタンドが崩れる（スロー）。�
     cam.look(pos, (4, 8, 4.5), 22)
 
 def s_l09():
-    show("home", 13.0); CEIL.data.energy = 250
-def a_l09(u, t, f):   # 2 階の床が抜ける（スロー）。立っている人の下の板が割れて落ち、人は 1 階へ
-    e = t - ev_t("l09", 0)
-    for i, pk in enumerate(PLANKS):
-        x = -2.9 + i * .45; near = abs(x - (-.4)) < 1.3
-        tt = max(0, e - abs(x + .4) * .15) if near else 0; drop = 4.9 * (tt * .6) ** 2
-        keyp(pk, f, loc=(x, 0, FLOORZ - .06 - min(drop, FLOORZ - .1)), rot=(0, .9 * clamp(tt * 1.5) * (1 if x > -.4 else -1), 0))
-    tt = max(0, e - .1); drop = 4.9 * (tt * .6) ** 2
-    keyp(H_SCALE, f, loc=(-.4, -.6, FLOORZ + .05 - min(drop, FLOORZ + .05)), rot=(.3 * clamp(tt), 0, 0))
-    keyp(SCALE, f, loc=(-.4, -.6, FLOORZ + .025 - min(drop * 1.05, FLOORZ)))
-    for j, o in enumerate(DUST):
-        r = random.Random(j); tt2 = max(0, e - .05); s_ = .1 + .9 * clamp(tt2 / 1.2) * r.uniform(.5, 1.5)
-        keyp(o, f, loc=(-.4 + r.uniform(-1.5, 1.5), -.6 + r.uniform(-1.5, 1.5), FLOORZ - .3 + r.uniform(-.8, .8) - 1.2 * clamp(tt2)) if e > 0 else (0, 0, -50), scale=(s_, s_, s_))
-    pos = Vector(mix((2.8, -3.6, FLOORZ + 1.6), (2.6, -3.3, FLOORZ + 1.2), ease(u))) + shake(f, .12 * clamp(1 - abs(e - .2) / .8) if e > 0 else 0)
-    cam.look(pos, (-.4, -.6, FLOORZ + .2 - .8 * clamp(e)), 26)
+    show("house", 13.0)
+
+
+def topple(o, base, h, ang, axis="x"):
+    """下の辺を軸に倒す（base＝下の辺の中心、h＝高さ）"""
+    if axis == "x":
+        o.rotation_euler = (ang, 0, 0); o.location = base + Vector((0, -math.sin(ang) * h / 2, math.cos(ang) * h / 2))
+    else:
+        o.rotation_euler = (0, ang, 0); o.location = base + Vector((math.sin(ang) * h / 2, 0, math.cos(ang) * h / 2))
+
+
+def a_l09(u, t, f):   # 一軒家が崩れる（スロー）：1 階がつぶれ、2 階の床と壁が落ち、屋根が滑り落ちる。破片と土煙
+    e = t - ev_t("l09", 0); k1 = ease(clamp(e / .9)); fall = 2.5 * k1
+    for nm in "fblr":   # 1 階の壁：外へ倒れながらつぶれる
+        o, p0, h = HP["w1" + nm]; ang = 1.35 * ease(clamp((e - .05) / 1.1))
+        if nm in "fb":
+            topple(o, Vector((p0.x, p0.y, 0)), h, -ang if nm == "f" else ang, "x")
+        else:
+            topple(o, Vector((p0.x, p0.y, 0)), h, -ang if nm == "l" else ang, "y")
+        keyp(o, f, loc=tuple(o.location), rot=tuple(o.rotation_euler))
+    o, p0, h = HP["fl2"]; keyp(o, f, loc=(p0.x, p0.y, p0.z - fall), rot=(.06 * k1, -.05 * k1, 0))
+    for nm in "fblr":   # 2 階の壁：落ちてから外へ倒れる
+        o, p0, h = HP["w2" + nm]; ang = 1.4 * ease(clamp((e - .5) / 1.0)); base = Vector((p0.x, p0.y, 2.9 - fall + .1))
+        if nm in "fb":
+            topple(o, base, h, -ang if nm == "f" else ang, "x")
+        else:
+            topple(o, base, h, -ang if nm == "l" else ang, "y")
+        keyp(o, f, loc=tuple(o.location), rot=tuple(o.rotation_euler))
+    for nm, sg in (("roofL", -1), ("roofR", 1)):   # 屋根：落ちて、外へ滑り落ちる
+        o, p0, h = HP[nm]; k2 = ease(clamp((e - .35) / 1.2))
+        keyp(o, f, loc=(p0.x, p0.y + sg * 2.5 * k2, p0.z - fall - 2.0 * k2), rot=(math.radians(-35 * sg) * (1 - .6 * k2) + sg * .4 * k2, .1 * k2, 0))
+    for j, o in enumerate(H_DEB):
+        r = random.Random(j); tt = max(0, e - r.uniform(0, .5)); v = Vector((r.uniform(-7, 7), r.uniform(-9, 2), r.uniform(2, 9)))
+        p_ = Vector((HX + r.uniform(-4, 4), HY + r.uniform(-3.5, 3.5), r.uniform(1, 5))) + v * tt * .8 + Vector((0, 0, -4.9 * tt * tt))
+        keyp(o, f, loc=(p_.x, p_.y, max(.05, p_.z)) if e > 0 else (0, 0, -50), rot=(tt * r.uniform(3, 9), tt * r.uniform(3, 9), 0))
+    for j, o in enumerate(H_SMOKE):
+        r = random.Random(50 + j); tt = max(0, e - .15 - .05 * j); s_ = (1.5 + 5.5 * ease(clamp(tt / 2.2))) * r.uniform(.7, 1.2)
+        keyp(o, f, loc=(HX + r.uniform(-6, 6), HY + r.uniform(-5, 3), 1 + 2.5 * clamp(tt / 2)) if e > .15 else (0, 0, -50), scale=(s_, s_, s_ * .7))
+    pos = Vector(mix((8, -2.5, 1.7), (7, -1.5, 1.6), ease(u))) + shake(f, .22 * clamp(1 - abs(e - .25) / 1.4) if e > 0 else 0)
+    cam.look(pos, (HX, HY, 3.0 - 1.2 * k1), 24)
 
 def s_l10():
     show("road", 14.0)
@@ -556,19 +645,35 @@ def a_l11(u, t, f):   # 街：歩くたびに舗道にひび（早送り）
 
 def s_l12():
     show("city", 12.0)
-def a_l12(u, t, f):   # 足もとのコンクリートが砕け、ビルの床が次々に落ちる（スロー）
+def a_l12(u, t, f):   # 足もとのコンクリートが砕け、マンションが傾きながら押しつぶされる（スロー）。破片・ガラス・土煙
     e = t - ev_t("l12", 0); e2 = t - ev_t("l12", 1)
     for o in CRACKS:
         keyp(o, f, scale=(1.6, 1, 1))
     for i, (p_, h_) in enumerate(zip(CT_P, HOLES)):
         k = ease(clamp((e + .2 - .03 * i) / .8)); keyp(p_, f, loc=(p_.location.x, p_.location.y, .15 - .6 * k)); keyp(h_, f, scale=(k, k, 1))
-    for bi, slabs in enumerate(CITY_B):
+    for bi, slabs in enumerate(CITY_B):   # 奥のビルも順に沈む
         st = e2 - .25 * (bi % 6)
         for fi, s_ in enumerate(slabs):
             z0 = fi * 3.4 + 1.95; tt = max(0, st - .05 * fi); drop = 4.9 * (tt * .55) ** 2
             keyp(s_, f, loc=(s_.location.x, s_.location.y, max(.6 + fi * .55, z0 - drop)))
-    pos = Vector(mix((-6, -50, 1.8), (-5.5, -44, 2.6), ease(u))) + shake(f, .2 * clamp(1 - abs(e2 - .3) / 1.5) if e2 > 0 else 0)
-    cam.look(pos, (0, 10, 8), 24)
+    tt = max(0, e2 + .3); d = 4.9 * (tt * .75) ** 2   # マンション：全体が下がり、下の階から順につぶれる（つぶれた階は 0.5 m に）
+    for i, fo in enumerate(MAN_F):
+        z0 = i * 3.0 + 1.5; keyp(fo, f, loc=(0, 0, max(.3 + i * .5, z0 - d)), rot=(0, 0, 0))
+    keyp(MAN, f, rot=(.12 * ease(clamp(tt / 1.6)), -.05 * ease(clamp(tt / 1.6)), 0))
+    for j, o in enumerate(M_DEB):
+        r = random.Random(j); tt2 = max(0, e2 - r.uniform(0, 1.0)); v = Vector((r.uniform(-4, 10), r.uniform(-12, -2), r.uniform(1, 7)))
+        p0 = Vector((-15 + r.uniform(-11, 11), 8 - 5.6, r.uniform(1, 20))); p_ = p0 + v * tt2 * .7 + Vector((0, 0, -4.9 * tt2 * tt2))
+        keyp(o, f, loc=(p_.x, p_.y, max(.1, p_.z)) if e2 > -.1 else (0, 0, -50), rot=(tt2 * r.uniform(2, 7), tt2 * r.uniform(2, 7), 0))
+    for j, o in enumerate(M_GLASS):
+        r = random.Random(500 + j); tt2 = max(0, e2 - r.uniform(0, .8)); v = Vector((r.uniform(-3, 6), r.uniform(-10, -3), r.uniform(0, 5)))
+        p_ = Vector((-15 + r.uniform(-10, 10), 2.4, r.uniform(2, 24))) + v * tt2 + Vector((0, 0, -4.9 * tt2 * tt2))
+        keyp(o, f, loc=(p_.x, p_.y, max(.05, p_.z)) if e2 > 0 else (0, 0, -50), rot=(tt2 * 11, tt2 * 8, 0))
+    for j, o in enumerate(M_SMOKE):
+        r = random.Random(900 + j); tt2 = max(0, e2 - .1 - .06 * j); s_ = (2 + 7 * ease(clamp(tt2 / 2.2))) * r.uniform(.7, 1.2)
+        keyp(o, f, loc=(-15 + r.uniform(-12, 12), 8 + r.uniform(-9, 2), 1.5 + 3 * clamp(tt2 / 2)) if e2 > .1 else (0, 0, -50), scale=(s_, s_, s_ * .7))
+    pos = Vector(mix((8, -26, 1.9), (7, -22, 2.4), ease(u))) + shake(f, .3 * clamp(1 - abs(e2 - .3) / 1.6) if e2 > -.2 else 0)
+    cam.look(pos, (-13, 6, 11 - 4 * ease(clamp(e2 / 2))), 22)
+
 
 def s_l13():
     show("city", 12.0)
@@ -589,6 +694,7 @@ def s_l14():
         o.hide_render = True
 def a_l14(u, t, f):   # 宇宙：地球と月（現象と日付だけ）
     keyp(CLOUDS, f, rot=(0, 0, t * .05)); keyp(EARTH, f, rot=(0, 0, t * .03))
+    key_fac(GROW, .26 + .2 * ease(u), f); key_fac(CRK, 3 + 6 * u, f)   # 大気・海・月より重く：ひびが少しずつ
     cam.look(mix((0, -30, 5), (6, -26, 7), ease(u)), (3, 2, 0), 35)
 
 def s_l15():
@@ -599,7 +705,7 @@ def a_l15(u, t, f):   # 月が近づきすぎて砕け、輪になる
     for o, ang, rad, zz in FRAG:
         a = ang + t * .5 / (rad / 12); p_ = mix((14, 6, 1), (rad * math.cos(a), rad * math.sin(a), zz), k)
         keyp(o, f, loc=p_ if e > 0 else (0, 0, -50))
-    keyp(CLOUDS, f, rot=(0, 0, t * .05))
+    keyp(CLOUDS, f, rot=(0, 0, t * .05)); key_fac(GROW, .46 + .16 * ease(u), f); key_fac(CRK, 9 + 6 * u, f)
     cam.look(mix((8, -36, 9), (5, -38, 12), ease(u)), (2, 2, 0), 30)
 
 def s_l16():
@@ -609,6 +715,7 @@ def s_l16():
 def a_l16(u, t, f):   # 地球の中心がブラックホールに。金星がはじき飛ばされる
     e = t - ev_t("l16", 1); k = ease(clamp(e / .8))
     keyp(EARTH, f, scale=(1 - .9 * k,) * 3); keyp(CLOUDS, f, scale=(1 - .9 * k,) * 3)
+    key_fac(GROW, .62 + .3 * clamp(u * 1.5), f); key_fac(CRK, 15 + 10 * clamp(u * 1.5), f)
     keyp(BH, f, scale=(k,) * 3); keyp(DISK, f, scale=(k, k, .08 * k), rot=(.25, 0, t * .8))
     e2 = t - ev_t("l16", 2); vp = mix((-30, 40, 4), (-30, 40, 4), 0) if e2 < 0 else (-30 - 60 * e2, 40 + 50 * e2, 4)
     keyp(VENUS, f, loc=vp)

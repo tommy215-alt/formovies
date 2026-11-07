@@ -131,6 +131,11 @@ def beds():
                 put(_pitch(pick("break_")[r.integers(3)], r.uniform(.6, .9)), t + .1 + .18 * j, .7 * g); put(pick("hit_")[r.integers(7)], t + .2 + .22 * j, .5 * g)
         elif kind == "space":   # 宇宙：音のない世界だが、演出として低い衝撃だけ
             put(_boom(3.5, 32, int(t)), t, g); put(_pitch(B["explosion_dull"], .6), t, .6 * g)
+    # ズシン（ユーザー「背景で一定リズムで『ズシン』と鳴るように、少しずつ大きく」）：1.2 秒ごと、最初はかすか → 宇宙の終わりで最大。最後の札では止まる
+    thud = _boom(.7, 52, 7) * .8 + .5 * _env(_pitch(B["slam_01"], .45), .002, .3)
+    t, end = .6, cues["l17"]
+    while t < end:
+        g = .06 + .94 * (t / end) ** 1.6; put(thud, t, .9 * g); t += 1.2
     # 地鳴り：低く唸る音を、後半に向けて大きく
     qk = _load(SFX / "break" / "quake.mp3"); qk = np.tile(_pitch(qk, .7), n // len(qk) + 2)[:n]; qk = music._lp(qk, 500)
     ks = [k for k in order if k in QUAKE]; ts = [cues[k] for k in ks] + [total]; vs = [QUAKE[k] for k in ks] + [0]
