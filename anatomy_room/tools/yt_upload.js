@@ -144,7 +144,15 @@ async function upload(item) {
     // アップロードと処理の完了を待って「スケジュールを設定」を押す
     const done = page.locator("#done-button").first(); const t0 = Date.now();
     while (Date.now() - t0 < 30 * 60000) { if (await done.isEnabled().catch(() => false)) break; await page.waitForTimeout(5000); }
-    await shot("before_done"); await done.click(); await page.waitForTimeout(5000); await shot("after_done");
+    await shot("before_done"); await done.click(); await page.waitForTimeout(3000);
+    // 「コンテンツはまだ確認中です」の窓が出たら OK を押す（押さないと予約が確定せず下書きのまま残る。2026-11-07 pilot_045）
+    for (let i = 0; i < 5; i++) {
+      const ok = page.locator("ytcp-dialog, tp-yt-paper-dialog, ytcp-confirmation-dialog").locator("ytcp-button:has-text('OK'), button:has-text('OK')").filter({ visible: true }).first();
+      if (await ok.count().catch(() => 0)) { await ok.click().catch(() => {}); say("確認の窓の OK を押した"); await page.waitForTimeout(3000); break; }
+      await page.waitForTimeout(1000);
+    }
+    await page.waitForTimeout(2000); await shot("after_done");
+    if (await page.locator("text=コンテンツはまだ確認中です").first().isVisible().catch(() => false)) throw new Error("確認の窓が閉じない（予約が確定していない）");
     const link = await page.locator("a.style-scope.ytcp-video-info, #share-url").first().innerText().catch(() => "");
     await clickFirst(["#close-button", "ytcp-button#close-button", "tp-yt-paper-dialog #close-button"], 20000).catch(() => {});
     return link.trim();
