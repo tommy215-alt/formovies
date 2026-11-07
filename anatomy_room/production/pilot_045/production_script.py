@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """pilot_045「もしも東京にゾンビが一体現れたら？」（チャンネル「リバース」もしも設計）の制作スクリプト。v2（2026-11-06）。
 
 条件はユーザーが決め、Claude が計算した（scripts/pilot_045/sim/、結果 sim/results.md、仮定 fact_check.md）。
@@ -41,11 +41,15 @@ ambience.register("heart", HERE / "assets/sfx/heartbeat.mp3", start=0, dur=4, no
 SFX = HERE / "assets" / "sfx"
 GROANS = sorted((SFX / "groan").glob("grunt_*.mp3")) + sorted((SFX / "groan").glob("undead_*.mp3"))
 SCREAMS = sorted((SFX / "scream").glob("*.mp3"))
-# ショットごと：[悲鳴/秒, うめき/秒, 遠さ（0＝近い・1＝遠い地図）, 時計の間隔（秒）]。だんだん増える（ユーザー「徐々に悲鳴やうめき声を増やす」）
-DENS = {"l00": [0, .5, 0, .5], "l01": [0, .9, 0, .5], "l02": [0, 1.0, 0, .5], "l03": [1.0, 1.6, 0, .5], "l04": [1.6, 2.2, .2, .25],
-        "l05": [2.0, 2.6, .5, .5], "l06": [2.2, 3.0, .1, .5], "l07": [2.6, 3.4, .6, .25], "l08": [2.4, 3.6, .3, .25], "l09": [3.0, 4.0, .9, .125],
-        "l10": [2.6, 4.4, .3, .25], "l11": [2.0, 5.0, .2, .5], "l12": [3.2, 5.2, .9, .125], "l13": [3.6, 5.6, .9, .25], "l14": [3.4, 6.0, .5, .25],
-        "l15": [4.0, 6.4, .95, .125], "l16": [4.4, 6.8, .95, .125], "l17": [4.6, 7.2, 1.0, .125], "l18": [0, 0, 0, .5]}
+# ショットごと：[悲鳴/秒, うめき/秒, 遠さ（0＝近い・1＝遠い地図）, 時計の間隔（秒）]
+# v2.1（ユーザー「序盤の悲鳴は最初は単発で、少しずつザワザワや喧騒が大きく」「最後にかけてゾンビのうめき声を大群のように」）
+DENS = {"l00": [0, .15, 0, 1.0], "l01": [0, .25, 0, 1.0], "l02": [0, 0, 0, 1.0], "l03": [.4, .5, 0, .5], "l04": [1.0, 1.0, .2, .25],
+        "l05": [2.0, 1.6, .5, .5], "l06": [3.0, 2.5, .1, .5], "l07": [3.5, 3.0, .6, .25], "l08": [3.0, 4.0, .3, .25], "l09": [2.5, 6.0, .9, .125],
+        "l10": [2.0, 7.0, .3, .25], "l11": [1.5, 9.0, .2, .5], "l12": [1.5, 10.0, .9, .125], "l13": [2.0, 12.0, .9, .25], "l14": [1.5, 14.0, .5, .25],
+        "l15": [1.0, 18.0, .95, .125], "l16": [.8, 24.0, .95, .125], "l17": [.5, 30.0, 1.0, .125], "l18": [0, 0, 0, 1.0]}
+# 背景の層の大きさ（ショットの頭での値。間は直線）：ざわめき（雑踏を重ねた喧騒）と、うめき声の大群
+COMMOTION = {"l00": .25, "l01": .25, "l02": .2, "l03": .45, "l04": .7, "l05": .85, "l06": 1.0, "l07": 1.0, "l08": .9, "l09": .55, "l10": .4, "l11": .25, "l12": .15, "l13": .1, "l14": .05, "l15": 0, "l18": 0}
+HORDE = {"l00": 0, "l06": 0, "l07": .15, "l09": .3, "l11": .45, "l12": .55, "l14": .7, "l15": .8, "l16": .95, "l17": 1.1, "l18": 0}
 
 
 def _load(p):
@@ -65,18 +69,30 @@ def _env(x, a=.01, b=.25):
     x[:ia] *= np.linspace(0, 1, ia); x[n - ib:] *= np.linspace(1, 0, ib); return x
 
 
-def _tick(hi):
-    n = int(.05 * SR); t = np.arange(n) / SR; r = np.random.default_rng(3)
-    nz = r.standard_normal(n); nz = nz - music._lp(nz, 1800)
-    f = 3400 if hi else 2700
-    x = .55 * nz * np.exp(-t / .0012) + np.sin(2 * np.pi * f * t) * np.exp(-t / .004) + .35 * np.sin(2 * np.pi * f * .5 * t) * np.exp(-t / .007)
-    return x / np.max(np.abs(x))
+def _ticks():
+    """本物の時計の録音（assets/sfx/clock.mp3、CC0）から 1 打ずつ切り出す（音の立ち上がりで区切る）"""
+    x = _load(SFX / "clock.mp3"); env = np.convolve(np.abs(x), np.ones(96) / 96, mode="same")
+    th = .35 * env.max(); on, i, out = [], 0, []
+    while i < len(env):
+        if env[i] > th:
+            on.append(i); i += int(.25 * SR)
+        else:
+            i += 1
+    for j in on[:12]:
+        a = max(0, j - int(.004 * SR)); y = x[a:a + int(.16 * SR)].copy(); out.append(_env(y, .002, .06))
+    return out
+
+
+def _layer(cues, order, end, table, n):
+    """表（ショット → 大きさ）を時刻の曲線にする"""
+    ks = [k for k in order if k in table]; ts = [cues[k] for k in ks] + [end]; vs = [table[k] for k in ks] + [table[ks[-1]]]
+    return np.interp(np.arange(n) / SR, ts, vs)
 
 
 def beds():
     tl = json.loads(TLP.read_text(encoding="utf-8")); cues = tl["cues"]; total = tl["duration"]; n = int(total * SR) + SR
     near, far, tick = np.zeros(n), np.zeros(n), np.zeros(n)
-    G = [_load(p) for p in GROANS]; Sc = [_load(p) for p in SCREAMS]
+    G = [_load(p) for p in GROANS]; Sc = [_load(p) for p in SCREAMS]; TK = _ticks()
     r = np.random.default_rng(45)
     order = [s["id"] for s in SHOTS]
     for i, k in enumerate(order):
@@ -100,10 +116,25 @@ def beds():
                     else:
                         near[j:j + m] += x[:m]
                 t += r.exponential(1 / rate)
-        # 時計：チッ・チッ（早送りの所は速く）
-        t, hi = a, True
+        # 時計：本物の時計の音を 1 打ずつ（早送りの所は速く）
+        t, q = a, 0
         while t < b:
-            j = int(t * SR); x = _tick(hi) * (.5 if iv < .3 else .65); m = min(len(x), n - j); tick[j:j + m] += x[:m]; t += iv; hi = not hi
+            j = int(t * SR); x = TK[q % len(TK)] * (.55 if iv < .3 else .7); m = min(len(x), n - j); tick[j:j + m] += x[:m]; t += iv; q += 1
+    # ざわめき：雑踏を 3 重にずらして重ね、だんだん大きく（喧騒）
+    cr = _load(SFX / "crowd.mp3"); cr = cr / (np.sqrt(np.mean(cr ** 2)) + 1e-9) * .1
+    com = np.zeros(n)
+    for off, k in ((0, 1.0), (7.3, .97), (15.1, 1.04)):
+        y = _pitch(np.roll(cr, int(off * SR)), k); y = np.tile(y, n // len(y) + 1)[:n]; com += y
+    com *= _layer(cues, order, tl["ending_start"], COMMOTION, n) * 1.8
+    # うめき声の大群：うめき声を密に（毎秒 40 個）重ね、低く・遠くして、終盤に向けて大きく
+    hd = np.zeros(n); t = 0.
+    while t < total:
+        x = _env(_pitch(G[r.integers(len(G))], r.uniform(.6, 1.05)), .03, .3) * r.uniform(.3, 1.0); j = int(t * SR); m = min(len(x), n - j); hd[j:j + m] += x[:m]; t += r.exponential(1 / 40)
+    mo = _load(SFX / "groan" / "moans.mp3"); mo = np.tile(mo, n // len(mo) + 1)[:n]; hd += .8 * mo + .6 * np.roll(_pitch(mo, .8)[:n] if len(_pitch(mo, .8)) >= n else np.tile(_pitch(mo, .8), 2)[:n], int(3 * SR))
+    hd = music._lp(hd, 2200); hd = hd / (np.sqrt(np.mean(hd ** 2)) + 1e-9) * .1
+    hd *= _layer(cues, order, tl["ending_start"], HORDE, n) * 5.5
+    near += com
+    far += hd
     far = music._lp(music._lp(far, 1400), 1400)   # 遠く：高い音を落とし、短い響き
     far = far + .45 * np.r_[np.zeros(int(.11 * SR)), far[:-int(.11 * SR)]] + .25 * np.r_[np.zeros(int(.23 * SR)), far[:-int(.23 * SR)]]
     # 最初の一人が気づいた瞬間：近くの大きな悲鳴（l02 の 0.7 秒。かまれるのは 1.6 秒）
@@ -138,7 +169,7 @@ EP = standard.config({
     "out": "reverse_045_zombie_tokyo.mp4",
     "lead_in": 0.0,
     "cues": CUES,
-    "sfx": [["bed_near", "t0", 1.0, 0], ["bed_far", "t0", 1.0, 0], ["bed_tick", "t0", .55, 0], ["crowd", "l00", .42, 0], ["crowd_end", "l18", .55, 0],
+    "sfx": [["bed_near", "t0", 1.0, 0], ["bed_far", "t0", 1.0, 0], ["bed_tick", "t0", .55, 0], ["crowd", "l00", .3, 0], ["crowd_end", "l18", .55, 0],
             ["heart", "l02", .7, 0], ["radio", "l06", .45, 0], ["heli", "l11", .6, 0]] + [["click", c, .8, 0] for c in POPS],
     "final_hold": 0.0,
     "music": {"style": "file_045", "sections": [["t0", 0.0, "f_mute"]]},

@@ -38,3 +38,8 @@
 ## 3D
 
 - すべて Blender で自前に作った模式（人物は顔のないピクトグラム）。
+
+## フォント（v2.1）
+
+- **BIZ UDPゴシック Bold**（Morisawa、SIL Open Font License 1.1）。Google Fonts のリポジトリ https://github.com/google/fonts/tree/main/ofl/bizudpgothic から取得（OFL.txt で確認）。画面に出る文字だけに絞って動画に埋め込む（assets/make_assets.py）。
+- 時計の音：Clock ticking by Mortifreshman https://freesound.org/s/237210/ （CC0、pilot_041 で確認済み。1 打ずつ切り出して使う）

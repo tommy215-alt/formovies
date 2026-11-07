@@ -103,7 +103,8 @@ function statusUI(t) {
 }
 
 // ---------------------------------------------------------------- 下：出来事の札（新しいものが下に積み上がる。古いものは消える）
-const TAGC = { C: ["計算", "#2AC8FF"], U: ["条件", "#B38CFF"], A: ["想定", "#FFB02E"] };
+// 札の種類（v2.1、ユーザー「条件、計算、想定あたりの書き方が分かりにくい」）：何に基づく情報かを、そのまま言葉で
+const TAGC = { C: ["計算結果", "#2AC8FF"], U: ["設定", "#B38CFF"], P: ["計算の前提", "#7FE0A0"], A: ["予想（計算外）", "#FFB02E"] };
 const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], c: e[1], s: e[2], kind: e[3] })));
 function evTime(e) { return CUE[e.at] + e.off; }
 function eventsUI(t) {
@@ -116,9 +117,9 @@ function eventsUI(t) {
     const pop = 1 + .12 * Math.pow(1 - clamp(u / .18), 2); ui.translate(x0, y); ui.scale(pop, pop); ui.translate(-x0, -y);
     ui.fillStyle = "rgba(6,10,16,.84)"; rrect(ui, x0, y - hh / 2, w, hh, 14); ui.fill(); ui.fillStyle = tc; ui.fillRect(x0, y - hh / 2 + 12, 7, hh - 24);
     S.group(() => {
-      text(ui, stamp(c), x0 + 30, y - 24, 30, "#FFD58A", { weight: 800, align: "left" });
-      ui.font = `800 26px ${S.FONT}`; const gw = ui.measureText(tg).width + 22; ui.fillStyle = tc; rrect(ui, x0 + w - gw - 18, y - 42, gw, 36, 18); ui.fill();
-      text(ui, tg, x0 + w - 18 - gw / 2, y - 23, 26, "#0A0E14", { weight: 900 });
+      const st = stamp(c); text(ui, st, x0 + 30, y - 24, 30, "#FFD58A", { weight: 700, align: "left" });
+      ui.font = `700 30px ${S.FONT}`; const sw_ = ui.measureText(st).width, gw = (ui.font = `700 26px ${S.FONT}`, ui.measureText(tg).width) + 24;
+      ui.fillStyle = tc; rrect(ui, x0 + 48 + sw_, y - 42, gw, 36, 6); ui.fill(); text(ui, tg, x0 + 48 + sw_ + gw / 2, y - 23, 26, "#0A0E14", { weight: 700 });
       const sz = tw > 660 ? Math.floor(44 * 660 / tw) : 44; text(ui, e.s, x0 + 30, y + 24, sz, "#FFFFFF", { weight: 800, align: "left" });
     }, [x0, y - hh / 2, x0 + w, y + hh / 2]);
     ui.restore();
@@ -126,36 +127,32 @@ function eventsUI(t) {
 }
 
 // ---------------------------------------------------------------- 大きな札：ゾンビのスペック（条件）、警察と機動隊の動き、最後の一言
-const CARDS = {
-  spec: { title: "ゾンビのスペック", sub: "ユーザーが決めた条件", col: "#B38CFF", rows: [
-    ["走る速さ", "ボルト並み（秒速10.4m）"], ["かまれた人", "10秒でゾンビに"], ["倒すには", "銃弾 3発"], ["水", "泳げない（腰までは歩く）"], ["体力", "疲れない・食べ物いらない"]] },
-  police: { title: "警察と機動隊の動き", sub: "計算の前提と結果", col: "#2AC8FF", rows: [
-    ["12:02", "新宿署の警察官が到着", "A"], ["毎分", "15人ずつ増える（機動隊も）", "A"], ["拳銃", "5発 当たるのは4発に1発", "A"],
-    ["盾の列", "跳び越えられる", "A"], ["12:05", "55人で 倒せたのは約6体", "C"]] },
+const CARDS = {   // v2.1：情報を 3 行に絞って大きく
+  spec: { title: "ゾンビの設定", col: "#B38CFF", rows: [["速さ", "ボルト並み"], ["かまれたら", "10秒でゾンビに"], ["弱点", "銃弾3発・泳げない"]] },
+  police: { title: "警察の動き", col: "#2AC8FF", rows: [["12:02", "警察官が到着", "P"], ["拳銃", "当たるのは4発に1発", "P"], ["5分後", "55人で倒せたのは約6体", "C"]] },
 };
 function bigCard(t, id) {
   const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
-  const sm = id === "police", x0 = 60, w = 960, rh = sm ? 74 : 92, y0 = sm ? 450 : 300, h = (sm ? 128 : 150) + cd.rows.length * rh;
+  const pol = id === "police", x0 = 60, w = 960, rh = 104, y0 = pol ? 440 : 300, h = 140 + cd.rows.length * rh;
   ui.save(); ui.globalAlpha *= k * ko; const pop = 1 + .1 * Math.pow(1 - clamp(u / .22), 2); ui.translate(540, y0 + h / 2); ui.scale(pop, pop); ui.translate(-540, -y0 - h / 2);
-  ui.fillStyle = "rgba(6,10,18,.86)"; rrect(ui, x0, y0, w, h, 20); ui.fill(); ui.strokeStyle = cd.col; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 20); ui.stroke();
+  ui.fillStyle = "rgba(6,10,18,.88)"; rrect(ui, x0, y0, w, h, 16); ui.fill(); ui.strokeStyle = cd.col; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 16); ui.stroke();
+  ui.fillStyle = cd.col; ui.fillRect(x0, y0 + 18, 10, 76);
   S.group(() => {
-    text(ui, cd.title, x0 + 40, y0 + (sm ? 54 : 62), sm ? 52 : 60, "#FFFFFF", { weight: 900, align: "left" });
-    text(ui, cd.sub, x0 + w - 36, y0 + (sm ? 58 : 66), 28, cd.col, { weight: 800, align: "right" });
-    cd.rows.forEach(([l, r, kd], i) => { const ru = u - .35 - i * .38, rk = easeOut(clamp(ru / .22)); if (rk <= 0) return; const y = y0 + (sm ? 128 : 150) + i * rh, dx = 30 * (1 - rk);
-      ui.save(); ui.globalAlpha *= rk; ui.fillStyle = "rgba(255,255,255,.06)"; rrect(ui, x0 + 26 + dx, y - rh * .42, w - 52, rh * .85, 12); ui.fill();
-      text(ui, l, x0 + 54 + dx, y + 1, sm ? 32 : 36, cd.col, { weight: 900, align: "left" }); text(ui, r, x0 + 250 + dx, y + 1, sm ? 38 : 42, "#FFFFFF", { weight: 800, align: "left" });
-      if (kd) { const [tg, tc] = TAGC[kd]; text(ui, tg, x0 + w - 60, y + 1, 26, tc, { weight: 900, align: "center" }); }
+    text(ui, cd.title, x0 + 44, y0 + 58, 60, "#FFFFFF", { weight: 700, align: "left" });
+    cd.rows.forEach(([l, r, kd], i) => { const ru = u - .35 - i * .45, rk = easeOut(clamp(ru / .22)); if (rk <= 0) return; const y = y0 + 150 + i * rh, dx = 30 * (1 - rk);
+      ui.save(); ui.globalAlpha *= rk; ui.fillStyle = "rgba(255,255,255,.07)"; rrect(ui, x0 + 26 + dx, y - 44, w - 52, 88, 10); ui.fill();
+      text(ui, l, x0 + 56 + dx, y + 2, 40, cd.col, { weight: 700, align: "left" }); text(ui, r, x0 + 290 + dx, y + 2, 52, "#FFFFFF", { weight: 700, align: "left" });
+      if (kd) { const [tg, tc] = TAGC[kd]; text(ui, tg, x0 + w - 50, y - 24, 30, tc, { weight: 700, align: "right" }); }
       ui.restore(); });
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();
 }
 function loopCard(t) {
   const a = CUE.l18, u = t - a - .5; if (u < 0) return; const k = easeOut(clamp(u / .5));
-  ui.save(); ui.globalAlpha *= k; S.group(() => { label(ui, "始まりは", 540, 700, 80, "#EAF2F8", { stroke: "#05080c", sw: .16 }); label(ui, "たった一体だった", 540, 830, 96, "#FF5A4E", { stroke: "#05080c", sw: .16 }); }); ui.restore();
+  ui.save(); ui.globalAlpha *= k; S.group(() => { text(ui, "始まりは", 540, 700, 80, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 12 }); text(ui, "たった一体だった", 540, 830, 96, "#FF5A4E", { weight: 700, stroke: "#05080c", sw: 14 }); }); ui.restore();
 }
-function noteUI(t) { const a = CUE.l02; uiNote("※条件を決めて計算したシミュレーションです（CG）", 540, 1110, win(t, a + .2, a + 3.4, .3, .3)); }
 { const _du = drawUI; drawUI = function (t, name) { if (name === "open") { _du(t, name); return; }
-  const k = curId(t); statusUI(t); eventsUI(t); noteUI(t);
+  const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec"); if (k === "l06") bigCard(t, "police"); if (k === "l18") loopCard(t); }; }
 
 // ---------------------------------------------------------------- 昼と夜（地図のショットの背景の色）
@@ -173,6 +170,8 @@ function buildMood() { const c = CUE; MOOD = [[0, { cool: .25, sat: .9, vig: .45
   [c.l11, { cool: .5, sat: .85, vig: .7 }], [c.l12, { cool: .35, sat: .95, vig: .6 }], [c.l14, { cool: .45, sat: .9, vig: .7 }], [c.l15, { cool: .35, sat: .95, vig: .6 }], [c.l18, { cool: .25, sat: .9, vig: .5 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#05070c"; bg.fillRect(0, 0, W, H); label(ui, "東京にゾンビが", 540, 470, 96, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "一体現れたら？", 540, 620, 110, "#FF5A4E", { stroke: "#05080c", sw: .14 }); }
 
-kitStart(() => {}); BL.install();
+// 書体（v2.1、ユーザー「ゴシック風でもっと堅めのフォントで、真面目感」）：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
+const bizReady = window.ASSETS.font_biz ? new FontFace("Noto Sans CJK JP", b64buf(window.ASSETS.font_biz), { weight: "100 900" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
+kitStart(() => {}); window.READY = Promise.all([window.READY, bizReady]); BL.install();
 </script>
 </body></html>
