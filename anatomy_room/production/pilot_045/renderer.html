@@ -42,7 +42,7 @@ html,body{margin:0;background:#000}
 const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
 const IDS = PL.shots.map(s => s.id);
 Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
-  opening: { img: null, bg: blShot("l00"), title: ["東京にゾンビが", "一体現れたら？"], size1: 78, size2: 104, credit: [] } });
+  opening: { img: null, bg: blShot("l00"), title: ["東京に突然ゾンビが一匹。", "どうなる？"], size1: 62, size2: 120, credit: [] } });
 SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
 S.docSub = () => {};   // 字幕なし（ナレーションがない）
 
@@ -67,9 +67,16 @@ function stamp(c) { const o = tod(c); if (c >= 86400 && Math.abs(c / 86400 - Mat
   return o.day > 1 ? `${o.day}日目 ${pad(o.h)}:${pad(o.m)}` : `${pad(o.h)}:${pad(o.m)}`; }
 function elapsed(c) { if (c < 60) return `${Math.floor(c)}秒`; if (c < 3600) return `${Math.floor(c / 60)}分`; if (c < 86400) return `${(Math.floor(c / 360) / 10).toFixed(c < 36000 ? 1 : 0)}時間`; return `${Math.floor(c / 86400)}日`; }
 const zfmt = z => z < 10000 ? Math.round(z).toLocaleString("ja-JP") + "体" : z < 1e8 ? "約" + (z / 1e4 >= 100 ? Math.round(z / 1e4).toLocaleString("ja-JP") : (Math.round(z / 1e3) / 10).toLocaleString("ja-JP")) + "万体" : "約" + (Math.round(z / 1e6) / 100) + "億体";
+// 桁が上がった瞬間（ゾンビの数が 10・100・1,000…を超えた時）から 0.7 秒：1→0 の強さ（大きくなって光り、元に戻る）
+function zAt(t) { return zombiesAt(clockNow(t)); }
+function digitPop(t) {
+  const d = n => Math.floor(Math.log10(Math.max(1, n)) + 1e-9), now = d(zAt(t));
+  for (let k = 1; k <= 21; k++) { const tp = t - k / 30; if (tp < CUE.l02) break; if (d(zAt(tp)) < now) { const u = (k - 1) / 30; return u < .12 ? easeOut(u / .12) : 1 - easeInOut(clamp((u - .12) / .58)); } }
+  return 0;
+}
 function rate(t) { const k = curId(t), a = t - CUE[k]; return (clockAt(k, a + .05) - clockAt(k, a)) / .05; }   // 時計の秒 / 動画の秒
 function daylight(c) { const h = tod(c).hours; return clamp((Math.cos((h - 12.5) / 24 * 2 * Math.PI) + .15) / .9); }   // 0＝夜、1＝昼
-function dayAmp(t) { const d = rate(t) / 86400; return d < .4 ? 1 : clamp(.4 / d); }   // 早送りで昼夜が速すぎる所は揺れを弱める（明滅させない）
+function dayAmp(t) { return t < CUE.l14 ? 1 : 0; }   // v2.2：停電までは昼夜を交互に（ユーザー「パニック感」）。そのあとは暗いまま
 
 // ---------------------------------------------------------------- 左上：時計・経過・ゾンビの数
 function sunMoon(x, y, dl, r = 22) {
@@ -96,15 +103,18 @@ function statusUI(t) {
     text(ui, hm, 110, 66, 64, "#FFFFFF", { weight: 900, align: "left" });
     text(ui, `${o.day}日目`, w - 34, 66, 40, "#FFD58A", { weight: 900, align: "right" });
     text(ui, "経過", 40, 140, 32, "#9FB2C4", { weight: 700, align: "left" }); text(ui, loop ? "0秒" : elapsed(c), 122, 140, 40, "#EAF2F8", { weight: 800, align: "left" });
-    text(ui, "ゾンビ", 40, 206, 34, "#FF9A90", { weight: 800, align: "left" }); text(ui, zfmt(z), w - 34, 204, 66, "#FF5A4E", { weight: 900, align: "right", stroke: "#1a0404", sw: 6 });
+    text(ui, "ゾンビ", 40, 206, 34, "#FF9A90", { weight: 800, align: "left" });
+    { const g = loop ? 0 : digitPop(t); ui.save(); ui.translate(w - 34, 204); ui.scale(1 + .55 * g, 1 + .55 * g);
+      if (g > 0) { ui.shadowColor = `rgba(255,90,60,${.95 * g})`; ui.shadowBlur = 50 * g; }
+      text(ui, zfmt(z), 0, 0, 66, g > .05 ? `rgb(255,${Math.round(90 + 150 * g)},${Math.round(78 + 140 * g)})` : "#FF5A4E", { weight: 900, align: "right", stroke: "#1a0404", sw: 6 }); ui.restore(); }
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();
   const ff = rate(t) > 300 && !loop ? clamp((t - a - .2) / .3) : 0; if (ff) S.group(() => ffMark(x0 + 18, y0 + h + 44, ff));
 }
 
 // ---------------------------------------------------------------- 下：出来事の札（新しいものが下に積み上がる。古いものは消える）
-// 札の種類（v2.1、ユーザー「条件、計算、想定あたりの書き方が分かりにくい」）：何に基づく情報かを、そのまま言葉で
-const TAGC = { C: ["計算結果", "#2AC8FF"], U: ["設定", "#B38CFF"], P: ["計算の前提", "#7FE0A0"], A: ["予想（計算外）", "#FFB02E"] };
+// 札の種類（v2.2、ユーザー「範囲、インフラ、対応みたいなアクションで分けて」）：何が起きたかで分ける。インフラは計算に入っていない予想なので「予想」と添える
+const TAGC = { S: ["広がり", "#FF5A4E"], Z: ["ゾンビ", "#B38CFF"], R: ["対応", "#2AC8FF"], H: ["人々", "#7FE0A0"], I: ["インフラ（予想）", "#FFB02E"] };
 const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], c: e[1], s: e[2], kind: e[3] })));
 function evTime(e) { return CUE[e.at] + e.off; }
 function eventsUI(t) {
@@ -129,7 +139,7 @@ function eventsUI(t) {
 // ---------------------------------------------------------------- 大きな札：ゾンビのスペック（条件）、警察と機動隊の動き、最後の一言
 const CARDS = {   // v2.1：情報を 3 行に絞って大きく
   spec: { title: "ゾンビの設定", col: "#B38CFF", rows: [["速さ", "ボルト並み"], ["かまれたら", "10秒でゾンビに"], ["弱点", "銃弾3発・泳げない"]] },
-  police: { title: "警察の動き", col: "#2AC8FF", rows: [["12:02", "警察官が到着", "P"], ["拳銃", "当たるのは4発に1発", "P"], ["5分後", "55人で倒せたのは約6体", "C"]] },
+  police: { title: "警察の対応", col: "#2AC8FF", rows: [["12:02", "警察官が到着"], ["拳銃", "当たるのは4発に1発"], ["5分後", "55人で倒せたのは約6体"]] },
 };
 function bigCard(t, id) {
   const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
@@ -149,26 +159,30 @@ function bigCard(t, id) {
 }
 function loopCard(t) {
   const a = CUE.l18, u = t - a - .5; if (u < 0) return; const k = easeOut(clamp(u / .5));
-  ui.save(); ui.globalAlpha *= k; S.group(() => { text(ui, "始まりは", 540, 700, 80, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 12 }); text(ui, "たった一体だった", 540, 830, 96, "#FF5A4E", { weight: 700, stroke: "#05080c", sw: 14 }); }); ui.restore();
+  ui.save(); ui.globalAlpha *= k; S.group(() => { text(ui, "始まりは", 540, 700, 80, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 12 }); text(ui, "たった一匹だった", 540, 830, 96, "#FF5A4E", { weight: 700, stroke: "#05080c", sw: 14 }); }); ui.restore();
 }
 { const _du = drawUI; drawUI = function (t, name) { if (name === "open") { _du(t, name); return; }
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec"); if (k === "l06") bigCard(t, "police"); if (k === "l18") loopCard(t); }; }
 
 // ---------------------------------------------------------------- 昼と夜（地図のショットの背景の色）
-const MAPSHOTS = ["l09", "l12", "l13", "l15", "l16", "l17"];
-function fxEp(t, name) {
-  const k = curId(t); if (!MAPSHOTS.includes(k)) return; const amp = dayAmp(t), dl = daylight(clockNow(t)) * amp + .4 * (1 - amp);
+const MAPSHOTS = ["l09", "l12", "l13", "l15", "l16", "l17"], DAY3D = ["l01", "l02", "l03", "l04", "l05", "l06", "l07", "l08"];
+function fxEp(t, name) {   // v2.2：昼は空と海を明るく、夜は暗い背景に街の明かり（地図の人の光）が残る。停電のあとは暗いまま
+  const k = curId(t);
+  if (DAY3D.includes(k) || name === "open") { bg.save(); bg.globalCompositeOperation = "screen"; bg.fillStyle = "rgba(70,90,120,.22)"; bg.fillRect(0, 0, W, H); bg.restore(); return; }   // 正午の街：少し明るく
+  if (k === "l10") { bg.save(); bg.globalCompositeOperation = "screen"; bg.fillStyle = "rgba(90,60,40,.25)"; bg.fillRect(0, 0, W, H); bg.restore(); return; }   // 夕方の道路
+  if (!MAPSHOTS.includes(k)) return;
+  const after = t >= CUE.l14, dl = after ? 0 : daylight(clockNow(t));
   bg.save(); bg.globalCompositeOperation = "screen"; const g = bg.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, `rgba(${lerp(10, 80, dl)},${lerp(14, 125, dl)},${lerp(40, 190, dl)},${lerp(.22, .42, dl)})`); g.addColorStop(1, `rgba(${lerp(6, 36, dl)},${lerp(8, 62, dl)},${lerp(24, 100, dl)},${lerp(.18, .32, dl)})`);
+  g.addColorStop(0, `rgba(${lerp(14, 120, dl)},${lerp(20, 170, dl)},${lerp(48, 230, dl)},${lerp(.25, .62, dl)})`); g.addColorStop(1, `rgba(${lerp(8, 60, dl)},${lerp(12, 100, dl)},${lerp(30, 150, dl)},${lerp(.2, .5, dl)})`);
   bg.fillStyle = g; bg.fillRect(0, 0, W, H);
-  if (dl < .5) { bg.globalCompositeOperation = "multiply"; bg.fillStyle = `rgba(${lerp(120, 255, dl * 2)},${lerp(130, 255, dl * 2)},${lerp(170, 255, dl * 2)},1)`; bg.fillRect(0, 0, W, H); }
+  if (after) { bg.globalCompositeOperation = "multiply"; bg.fillStyle = "rgb(150,140,150)"; bg.fillRect(0, 0, W, H); }   // 停電のあと：灯りの消えた暗さ
   bg.restore();
 }
 
 function buildMood() { const c = CUE; MOOD = [[0, { cool: .25, sat: .9, vig: .45 }], [c.l02, { cool: .22, sat: .95, vig: .55 }], [c.l05, { cool: .3, sat: .9, vig: .55 }],
   [c.l11, { cool: .5, sat: .85, vig: .7 }], [c.l12, { cool: .35, sat: .95, vig: .6 }], [c.l14, { cool: .45, sat: .9, vig: .7 }], [c.l15, { cool: .35, sat: .95, vig: .6 }], [c.l18, { cool: .25, sat: .9, vig: .5 }]]; }
-function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#05070c"; bg.fillRect(0, 0, W, H); label(ui, "東京にゾンビが", 540, 470, 96, "#EAF2F8", { stroke: "#05080c", sw: .14 }); label(ui, "一体現れたら？", 540, 620, 110, "#FF5A4E", { stroke: "#05080c", sw: .14 }); }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#05070c"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "東京に突然", 540, 430, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "ゾンビが一匹。", 540, 570, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "どうなる？", 540, 740, 140, "#FF5A4E", { weight: 700, stroke: "#05080c", sw: 18 }); }); }
 
 // 書体（v2.1、ユーザー「ゴシック風でもっと堅めのフォントで、真面目感」）：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
 const bizReady = window.ASSETS.font_biz ? new FontFace("Noto Sans CJK JP", b64buf(window.ASSETS.font_biz), { weight: "100 900" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
