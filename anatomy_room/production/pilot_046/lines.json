@@ -1,0 +1,210 @@
+{
+ "title": "全人類の体重が1日10%ずつ増えたら？",
+ "theme": "全人類の体重が1日10%ずつ増えたら？（もしも設計）",
+ "note": "もしも設計の既定（pilot_045 v2.3）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 90.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オープニング：朝、体重計に乗る 1 人"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "設定の札。体重計の 1 人"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "朝の通勤の街"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "プール：泳いでいた人が沈み、底に立つ"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "夜のビル：満員のエレベーターがブザーで動かない"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "家：夜から朝、椅子がきしむ"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "駅：満員電車が止まる"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "公園：関東ローム層の地面に足がめり込む"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "スタジアム：立ち見のスタンドが崩れる（スロー）"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "l09",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "家：2 階の床が抜ける（スロー）"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "l10",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "道路：車に乗ると車がつぶれる"
+  },
+  {
+   "id": "L11",
+   "who": "M",
+   "scene": "l11",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "街：舗道にひび"
+  },
+  {
+   "id": "L12",
+   "who": "M",
+   "scene": "l12",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "街：足もとのコンクリートが砕け、ビルの床が落ちる（スロー）"
+  },
+  {
+   "id": "L13",
+   "who": "M",
+   "scene": "l13",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "街：人が地面に沈んでいく"
+  },
+  {
+   "id": "L14",
+   "who": "M",
+   "scene": "l14",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "宇宙：地球"
+  },
+  {
+   "id": "L15",
+   "who": "M",
+   "scene": "l15",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "宇宙：月が砕けて輪に"
+  },
+  {
+   "id": "L16",
+   "who": "M",
+   "scene": "l16",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "宇宙：ブラックホール、金星がはじき飛ばされる"
+  },
+  {
+   "id": "L17",
+   "who": "M",
+   "scene": "l17",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "最後の札。画は朝の体重計に戻る（ループ）"
+  }
+ ]
+}
