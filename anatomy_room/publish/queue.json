@@ -211,8 +211,10 @@
    "video": "anatomy_room/production/pilot_046/reverse_046_weight.mp4",
    "meta": "anatomy_room/production/pilot_046/youtube_metadata.md",
    "publish_at": "2026-11-09 08:00",
-   "status": "queued",
-   "note": "2026-11-08 もしも設計の 2 本目。ユーザーが明日の朝の枠で予約を指示"
+   "status": "scheduled",
+   "note": "2026-11-08 もしも設計の 2 本目。ユーザーが明日の朝の枠で予約を指示",
+   "uploaded": "2026-11-08T11:47:16.426Z",
+   "url": "https://youtube.com/shorts/M_kvmGDpS3M?feature=share"
   }
  ]
 }
