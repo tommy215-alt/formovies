@@ -1,131 +1,164 @@
-﻿# pilot_047：毎日正午、都庁の真上に隕石。1 日目 10 cm、毎日 2 倍。
-# 式は Collins, Melosh, Marcus (2005) "Earth Impact Effects Program"（MAPS 40）。
-# 係数は論文の本文でまだ確かめていない（fact_check.md に記録する）。
-# python impact.py → results_days.md
-import math
+﻿# pilot_047：毎日正午、都庁の真上に隕石。1 日目 直径 10 cm、毎日 2 倍。28 日目に地球が砕ける。
+# 式は Collins, Melosh, Marcus (2005) "Earth Impact Effects Program"（MAPS 40, 817-840）。
+# 実装は、その Web 版の計算プログラム crater.cgi（PyPI の ImpactEffect 1.0.0 の test/cgi-bin に同梱）を
+# そのまま Python に移した（大気中の壊れ方・空中爆発・爆風・被害の基準・クレーター・熱・揺れ）。
+# python impact.py → results_days.md と days.json
+import json, math
 from pathlib import Path
 
-RHO_I, V0, THETA = 3000.0, 20000.0, 45.0      # 岩石・秒速 20 km・45 度
-RHO_T, G, RE = 2500.0, 9.81, 6.371e6          # 地面は堆積岩
-H, CD, FP = 8000.0, 2.0, 7.0                  # 大気のスケールハイト・抗力係数・パンケーキの広がり
-KT = 4.184e12
-HIROSHIMA = 15 * KT                           # 広島型 約 15 kt
+RHO_I, V_IN, THETA = 3000.0, 20.0, 45.0      # 岩石 kg/m³・秒速 km・角度（度）
+RHO_T = 2500.0                                # 地面：堆積岩
+G, R_EARTH, PO = 9.8, 6370.0, 1e5             # crater.cgi の定数（R_EARTH は km）
+RHO_SURF, H, CD, FP = 1.0, 8000.0, 2.0, 7.0
+KT = 4.186e12                                 # crater.cgi の換算
+HIROSHIMA_KT = 15.0                           # 広島型 約 15 kt
 SIN = math.sin(math.radians(THETA))
 
-# 他の目安（概算。fact_check.md で出典を確かめる）
-OCEAN_BOIL_J = 5e27      # 海 1.4e21 kg を温めて蒸発させる熱（約 2.6 MJ/kg）
-EARTH_BIND_J = 2.24e32   # 地球の重力による結合エネルギー
-EARTH_D = 12742e3
+# 目安（fact_check.md で出典を確かめる）
+OCEAN_BOIL_J = 5e27      # 海 1.4e21 kg を 15℃ から蒸発させる熱（約 2.6 MJ/kg × 1.4e21 kg ≒ 3.6e27 J、切り上げ）
+EARTH_BIND_J = 2.49e32   # 地球の重力による結合エネルギー（密度の分布を考えた値。一様なら 2.24×10^32 J）
+EARTH_D_KM = 12742.0
 
-def rho_air(z): return math.exp(-z / H)
 
 def entry(L):
-    """大気に入ってからの壊れ方。(着地速度 m/s, 空中爆発の高さ m or None, 壊れ始めの高さ)"""
-    Y = 10 ** (2.107 + 0.0624 * math.sqrt(RHO_I))
-    If = 4.07 * CD * H * Y / (RHO_I * L * V0**2 * SIN)
-    if If >= 1:
-        return V0 * math.exp(-3 * CD * H / (4 * RHO_I * L * SIN)), None, None
-    zs = -H * (math.log(Y / V0**2) + 1.308 - 0.314 * If - 1.303 * math.sqrt(1 - If))
-    vs = V0 * math.exp(-3 * rho_air(zs) * CD * H / (4 * RHO_I * L * SIN))
-    l = L * SIN * math.sqrt(RHO_I / (CD * rho_air(zs)))
-    zb = zs - 2 * H * math.log(1 + l / (2 * H) * math.sqrt(FP**2 - 1))
-    zend = max(zb, 0.0)
-    # 壊れ始めから zend までの減速（式の積分を数値で）
-    n, acc = 2000, 0.0
-    for i in range(n):
-        z = zs - (zs - zend) * (i + 0.5) / n
-        Lz = L * math.sqrt(1 + (2 * H / l) ** 2 * (math.exp((zs - z) / (2 * H)) - 1) ** 2)
-        acc += math.exp((zs - z) / H) * Lz**2 * (zs - zend) / n
-    v = vs * math.exp(-0.75 * CD * rho_air(zs) / (RHO_I * L**3 * SIN) * acc)
-    return v, (zb if zb > 0 else None), zs
+    """crater.cgi の atmospheric_entry。(速度 km/s, 空中爆発の高さ m, 壊れ始めの高さ m, 地面での破片の広がり m)"""
+    Y = 10 ** (2.107 + 0.0624 * RHO_I ** 0.5)
+    rS = Y / (RHO_SURF * (V_IN * 1000) ** 2)
+    av = 3 * RHO_SURF * CD * H / (4 * RHO_I * L * SIN)
+    iF = 2.7185 * av * rS
+    if iF >= 1:                                   # 壊れずに地面へ
+        vT = min(V_IN * 1000, (4 * RHO_I * L * G / (3 * RHO_SURF * CD)) ** 0.5)
+        return max(vT, V_IN * 1000 * math.exp(-av)) / 1000, 0.0, None, 0.0
+    omega = 1.308 - 0.314 * iF - 1.303 * (1 - iF) ** 0.5
+    zBU = -H * math.log(rS) - omega * H
+    vBU = V_IN * 1000 * math.exp(-av * math.exp(-zBU / H))
+    vFac = 0.75 * (CD * RHO_SURF / RHO_I) ** 0.5 * math.exp(-zBU / (2 * H))
+    lD = L * SIN * (RHO_I / (CD * RHO_SURF)) ** 0.5 * math.exp(zBU / (2 * H))
+    a2 = (FP ** 2 - 1) ** 0.5
+    zB = zBU - 2 * H * math.log(1 + a2 * lD / (2 * H))
+    if zB > 0:                                    # 空中爆発
+        ex = 1 / 24 * a2 * (24 + 8 * a2 ** 2 + 6 * a2 * lD / H + 3 * a2 ** 3 * lD / H)
+        return vBU * math.exp(-ex * vFac) / 1000, zB, zBU, 0.0
+    s = H / lD                                    # 広がりながら地面へ
+    integ = s ** 3 / 3 * (3 * (4 + 1 / s ** 2) * math.exp(zBU / H) + 6 * math.exp(2 * zBU / H)
+                          - 16 * math.exp(1.5 * zBU / H) - 3 / s ** 2 - 2)
+    disp = L * (1 + 4 * s ** 2 * (math.exp(zBU / (2 * H)) - 1) ** 2) ** 0.5
+    return vBU * math.exp(-vFac * integ) / 1000, 0.0, zBU, disp
 
-def overpressure(r, Ekt, zb):
-    """地面の最大の過圧 Pa（空中爆発は高さを考える）"""
-    r1 = r / Ekt ** (1 / 3)
-    surf = 75000 * 290 / (4 * r1) * (1 + 3 * (290 / r1) ** 1.3)
-    if not zb:
-        return surf
-    zb1 = zb / Ekt ** (1 / 3)
-    if zb1 >= 550:
-        # 式の範囲より高い爆発：地表の爆発の式を、爆発点からの斜めの距離で使う（この回の近似）
-        rs1 = math.hypot(r, zb) / Ekt ** (1 / 3)
-        return 75000 * 290 / (4 * rs1) * (1 + 3 * (290 / rs1) ** 1.3)
-    rm1 = 550 * zb1 / (1.2 * (550 - zb1))
-    if r1 < rm1:
-        return 3.14e11 * zb1 ** -2.6 * math.exp(-34.87 * zb1 ** -1.73 * r1)
-    return surf
 
-def reach(fn, lim, lo=10.0, hi=2.0e7):
-    """fn(r) >= lim となる一番遠い距離（m）。届かなければ 0"""
+def overpressure(dist_km, E_kt, zB):
+    """crater.cgi の air_blast。地面の最大の過圧 Pa"""
+    sf = E_kt ** (1 / 3)
+    d = dist_km * 1000 / sf
+    z = zB / sf
+    rc = 290 + 0.65 * z
+    rm = 1e30 if z >= 550 else 550 * z / (1.2 * (550 - z))
+    mach = lambda x: rc * 75000 / 4 / x * (1 + 3 * (rc / x) ** 1.3)
+    reg = lambda x: 3.14e11 * (x ** 2 + z ** 2) ** -1.3 + 1.8e7 * (x ** 2 + z ** 2) ** -0.565
+    if zB > 0:
+        ds = z ** 2 * 0.00328
+        pM, pR = mach(rm + ds), reg(rm - ds)
+    else:
+        ds = 0.0
+    if d >= rm + ds:
+        return mach(d)
+    if d <= rm - ds:
+        return reg(d)
+    return pR - (d - rm + ds) * 0.5 * (pR - pM) / ds
+
+
+def thermal(dist_km, E_surf):
+    """crater.cgi の find_thermal。熱の量 J/m²（火の玉が地平線の下なら 0）"""
+    Rf = 2e-6 * E_surf ** (1 / 3)                 # km
+    h = (1 - math.cos(dist_km / R_EARTH)) * R_EARTH
+    if h > Rf:
+        return 0.0
+    de = math.acos(h / Rf)
+    f = (2 / math.pi) * (de - (h / Rf) * math.sin(de))
+    return 3e-3 * E_surf / (2 * math.pi * (dist_km * 1000) ** 2) * f
+
+
+def reach(fn, lim, lo=0.01, hi=20000.0):
+    """fn(km) >= lim となる一番遠い距離（km、地球の半周 20,000 km まで）。届かなければ 0"""
     if fn(lo) < lim:
         return 0.0
+    if fn(hi) >= lim:
+        return hi
     for _ in range(80):
         mid = math.sqrt(lo * hi)
         lo, hi = (mid, hi) if fn(mid) >= lim else (lo, mid)
     return lo
 
+
 def day(n):
     L = 0.1 * 2 ** (n - 1)
-    m = RHO_I * math.pi * L**3 / 6
-    E0 = 0.5 * m * V0**2
-    v, zb, zs = entry(L)
-    E = 0.5 * m * v**2                      # 地面に衝突したときの運動エネルギー
-    # 空気に渡った分も地面の近くで爆風になる → 爆風は最初のエネルギーで（この回の仮定）
-    Ekt = E0 / KT
-    d = dict(n=n, L=L, E0=E0, E=E, v=v, zb=zb, zs=zs)
-    d["hiro"] = E0 / HIROSHIMA
+    m = RHO_I * math.pi * L ** 3 / 6
+    E0 = 0.5 * m * (V_IN * 1000) ** 2
+    v, zB, zBU, disp = entry(L)
+    E_atm = 0.5 * m * ((V_IN * 1000) ** 2 - (v * 1000) ** 2)
+    if zB > 0:
+        E_blast, E_surf = E_atm / KT, E_atm
+    else:
+        E_surf = 0.5 * m * (v * 1000) ** 2
+        E_blast = max(E_atm, E_surf) / KT
+    d = dict(day=n, L_m=L, E0_J=E0, hiroshima=E0 / KT / HIROSHIMA_KT, v_kms=v, burst_m=zB, breakup_m=zBU)
+    # 爆風：crater.cgi の基準（Pa）
+    for key, pa in (("glass_may", 690), ("glass", 6900), ("wood", 26800), ("bldg", 42600),
+                    ("steel", 273000)):
+        d[key + "_km"] = reach(lambda r: overpressure(r, E_blast, zB), pa)
+    if zB == 0:
+        mt = E_surf / (KT * 1000)
+        mf = mt ** (1 / 6)
+        d["cloth_km"] = reach(lambda r: thermal(r, E_surf), 1e6 * mf)
+        d["burn3_km"] = reach(lambda r: thermal(r, E_surf), 4.2e5 * mf)
+        d["fireball_km"] = 2e-6 * E_surf ** (1 / 3)
+        Dtr = 1.6 * (m / RHO_T) ** (1 / 3) * (1.61 * G * L / (v * 1000) ** 2) ** -0.22 * SIN ** (1 / 3)
+        if disp >= Dtr:                           # 破片の雨：一番大きな破片（直径の半分）のクレーター
+            Dtr /= 2
+        Dfr = 1.17 * Dtr ** 1.13 / 3200 ** 0.13 if Dtr * 1.25 >= 3200 else 1.25 * Dtr
+        d["crater_km"] = Dfr / 1000
+        d["M"] = 0.67 * math.log10(E_surf) - 5.87
     if E0 > EARTH_BIND_J:
-        d["note"] = "地球の結合エネルギーを超える（地球が砕ける）"
+        d["global"] = "earth_breaks"
     elif E0 > OCEAN_BOIL_J:
-        d["note"] = "海をすべて蒸発させるエネルギーを超える"
-    # 地上の被害（爆風）：ガラス 6.9 kPa、木造 26.8 kPa、鉄筋のビル 42.6 kPa（Collins の表）
-    # 一部の窓が割れる 1 kPa（チェリャビンスクの目安。出典を確かめる）
-    for key, kpa in (("crack", 1.0), ("glass", 6.9), ("wood", 26.8), ("bldg", 42.6)):
-        d[key] = reach(lambda r: overpressure(r, Ekt, zb), kpa * 1000) / 1000
-    # クレーター（地面に届いたとき）
-    if zb is None:
-        Dtc = 1.161 * (RHO_I / RHO_T) ** (1 / 3) * L**0.78 * v**0.44 * G**-0.22 * SIN ** (1 / 3)
-        Dfr = 1.25 * Dtc if Dtc < 3200 else 1.17 * Dtc**1.13 / 3200**0.13
-        d["crater"] = Dfr / 1000
-        d["M"] = 0.67 * math.log10(E) - 5.87
-        # 火の玉の熱：服が燃える（1 Mt で 1.0 MJ/m²、E^(1/6) で増える）
-        Rf = 0.002 * E ** (1 / 3)
-        s = (E / 4.184e15) ** (1 / 6)
-        def phi(r):
-            dd = r / RE; h = (1 - math.cos(dd)) * RE
-            if h >= Rf: return 0.0
-            de = math.acos(h / Rf)
-            f = (2 / math.pi) * (de - (h / Rf) * math.sin(de))
-            return 3e-3 * E / (2 * math.pi * r**2) * f
-        d["cloth"] = reach(phi, 1.0e6 * s) / 1000
-        d["fireball"] = Rf / 1000
+        d["global"] = "oceans_boil"
+    # 式の範囲：被害の距離が地球の半周を超えたら、距離は意味を持たない
+    d["beyond_model"] = d["glass_km"] >= 20000 or d.get("crater_km", 0) > EARTH_D_KM / 4
     return d
+
 
 def fmt_len(L):
     return f"{L*100:.0f} cm" if L < 1 else (f"{L:,.1f} m" if L < 1000 else f"{L/1000:,.1f} km")
 
+
 def main():
+    days = [day(n) for n in range(1, 29)]
+    here = Path(__file__).parent
+    (here / "days.json").write_text(json.dumps(days, ensure_ascii=False, indent=1), encoding="utf-8")
+    km = lambda x: "—" if not x else ("地球全体" if x >= 20000 else f"{x:,.1f}")
     rows = ["# pilot_047 日ごとの結果（impact.py が作る）", "",
-            "条件：毎日正午、都庁の真上。1 日目 直径 10 cm、毎日 2 倍。岩石 3,000 kg/m³・秒速 20 km・45 度。式は Collins ほか（2005）。",
-            "距離は爆心（都庁）から。空中爆発は「上空 ○ km で爆発」。", "",
-            "| 日 | 直径 | エネルギー（広島型の何発分） | 何が起きるか | 一部の窓が割れる | ガラスが割れる | 木造が倒れる | ビルが崩れる | 服が燃える | クレーター | 揺れ（M） |",
+            "条件：毎日正午、都庁の真上。1 日目 直径 10 cm、毎日 2 倍。岩石 3,000 kg/m³・秒速 20 km・45 度・地面は堆積岩 2,500 kg/m³。",
+            "式は Collins ほか（2005）、実装は Earth Impact Effects Program の crater.cgi を移したもの。距離は都庁から km。", "",
+            "| 日 | 直径 | 広島型の何発分 | 何が起きるか | 窓が割れるかも（690 Pa） | 窓が割れる（6.9 kPa） | 木造が倒れる | ビルが崩れる | 服が燃える | クレーター | 揺れ（M） |",
             "|---|---|---|---|---|---|---|---|---|---|---|"]
-    for n in range(1, 29):
-        d = day(n)
-        if d.get("note"):
-            what = d["note"]
-        elif d["zb"]:
-            what = f"上空 {d['zb']/1000:.1f} km で爆発"
+    for d in days:
+        if d.get("global") == "earth_breaks":
+            what = "地球の結合エネルギーを超える（地球が砕ける）"
+        elif d.get("global") == "oceans_boil":
+            what = "海をすべて蒸発させるエネルギーを超える"
+        elif d["burst_m"] > 0:
+            what = f"上空 {d['burst_m']/1000:.1f} km で爆発"
         else:
-            what = f"地面に衝突（秒速 {d['v']/1000:.1f} km）"
-        km = lambda x: f"{x:,.1f} km" if x else "—"
-        rows.append(f"| {n} | {fmt_len(d['L'])} | {d['hiro']:.3g} | {what} | {km(d['crack'])} | {km(d['glass'])} | {km(d['wood'])} | {km(d['bldg'])} | "
-                    f"{km(d.get('cloth', 0))} | {km(d.get('crater', 0))} | {d['M']:.1f} |" if "M" in d else
-                    f"| {n} | {fmt_len(d['L'])} | {d['hiro']:.3g} | {what} | {km(d['crack'])} | {km(d['glass'])} | {km(d['wood'])} | {km(d['bldg'])} | — | — | — |")
-    out = Path(__file__).with_name("results_days.md")
-    out.write_text("\n".join(rows) + "\n", encoding="utf-8")
-    print("\n".join(rows))
+            what = f"地面に衝突（秒速 {d['v_kms']:.1f} km）"
+        rows.append(f"| {d['day']} | {fmt_len(d['L_m'])} | {d['hiroshima']:.3g} | {what} | {km(d['glass_may_km'])} | "
+                    f"{km(d['glass_km'])} | {km(d['wood_km'])} | {km(d['bldg_km'])} | {km(d.get('cloth_km'))} | "
+                    f"{km(d.get('crater_km'))} | {d['M']:.1f} |" if "M" in d else
+                    f"| {d['day']} | {fmt_len(d['L_m'])} | {d['hiroshima']:.3g} | {what} | {km(d['glass_may_km'])} | "
+                    f"{km(d['glass_km'])} | {km(d['wood_km'])} | {km(d['bldg_km'])} | — | — | — |")
+    rows += ["", "- 「地球全体」は地球の半周（20,000 km）を超えるもの。17 日目ごろから先は式をあてはめる範囲を超えるので、画面では文献の目安で見せる。"]
+    (here / "results_days.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    print("\n".join(rows[5:]))
+
 
 if __name__ == "__main__":
     main()
-
