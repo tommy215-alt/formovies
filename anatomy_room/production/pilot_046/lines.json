@@ -141,6 +141,39 @@
    "what": "街：舗道にひび"
   },
   {
+   "id": "W01",
+   "who": "M",
+   "scene": "w01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "ニューヨーク：自由の女神の腕が折れて海へ"
+  },
+  {
+   "id": "W02",
+   "who": "M",
+   "scene": "w02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "パリ：エッフェル塔が開脚する"
+  },
+  {
+   "id": "W03",
+   "who": "M",
+   "scene": "w03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "ピサ：斜塔がまっすぐになって沈む"
+  },
+  {
    "id": "L12",
    "who": "M",
    "scene": "l12",

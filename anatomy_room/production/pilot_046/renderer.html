@@ -95,9 +95,8 @@ function statusUI(t) {
   ui.fillStyle = "rgba(6,10,16,.8)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,182,72,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
   ui.fillStyle = "#FFB648"; ui.fillRect(0, 20, 8, h - 40);
   S.group(() => {
-    sunMoon(62, 64, dl);
     const hm = c < 600 && !loop ? `${pad(o.h)}:${pad(o.m)}:${pad(o.s)}` : `${pad(o.h)}:${pad(o.m)}`;
-    text(ui, hm, 110, 66, 64, "#FFFFFF", { weight: 900, align: "left" });
+    text(ui, hm, 40, 66, 64, "#FFFFFF", { weight: 900, align: "left" });
     text(ui, `${o.day}日目`, w - 34, 66, 40, "#FFD58A", { weight: 900, align: "right" });
     text(ui, "人類の合計", 40, 140, 30, "#9FB2C4", { weight: 700, align: "left" }); text(ui, hfmt(HUM(c)), w - 34, 140, 36, "#EAF2F8", { weight: 800, align: "right" });
     text(ui, "1人の体重", 40, 206, 32, "#FFD08A", { weight: 800, align: "left" });
@@ -111,7 +110,7 @@ function statusUI(t) {
 
 // ---------------------------------------------------------------- 下：出来事の札（新しいものが下に積み上がる。古いものは消える）
 // 札の種類（もしも設計の既定）：出来事の種類で分ける。末尾が ? の種類は計算に入っていない予想（札に「（予想）」）
-const TAGC0 = { P: ["人々", "#7FE0A0"], I: ["インフラ", "#FFB02E"], B: ["建物", "#FF7A50"], G: ["地面", "#D2A46E"], C: ["比べると", "#2AC8FF"], U: ["宇宙", "#B38CFF"] };
+const TAGC0 = { W: ["世界", "#FF8FC8"], P: ["人々", "#7FE0A0"], I: ["インフラ", "#FFB02E"], B: ["建物", "#FF7A50"], G: ["地面", "#D2A46E"], C: ["比べると", "#2AC8FF"], U: ["宇宙", "#B38CFF"] };
 const TAGC = new Proxy({}, { get: (_, k) => { const [n, c] = TAGC0[k[0]]; return [k.endsWith("?") ? n + "（予想）" : n, c]; } });
 const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], c: e[1], s: e[2], kind: e[3] })));
 function evTime(e) { return CUE[e.at] + e.off; }

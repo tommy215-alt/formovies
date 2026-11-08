@@ -409,6 +409,54 @@ M_DEB = [box(f"mdeb{i}", (RND.uniform(.3, 1.4), RND.uniform(.2, .8), RND.uniform
 M_GLASS = [box(f"mgl{i}", (.12, .12, .02), (0, 0, -50), carglass, city) for i in range(60)]
 M_SMOKE = smoke_balls(city, 14, "msm")
 
+
+# ---- 世界の名所（ユーザー「崩れる自由の女神、エッフェル塔みたいなのを挟み込んで。なるべく笑えるやつ」）。どれも簡略な模式
+copper = emat("copper", (.3, .55, .47), .6, .3); flame = emat("flame", (1, .7, .2), .4, emit=(1, .65, .15), k=12); sea = glassm("sea", (.2, .45, .6), .6, .05)
+iron = emat("iron", (.3, .22, .15), .5, .6); marble = emat("marble2", (.86, .84, .78), .5)
+# 自由の女神
+liberty = group("liberty", (0, 0, 0)); GROUPS["liberty"] = liberty
+box("lb_sea", (900, 900, .1), (0, 0, -1), sea, liberty); box("lb_island", (70, 70, 4), (0, 0, 1), concrete, liberty)
+box("lb_ped", (22, 22, 27), (0, 0, 17.5), emat("ped", (.62, .58, .5), .8), liberty)
+LB = bpy.data.objects.new("lb_statue", None); sc.collection.objects.link(LB); LB.parent = liberty; LB.location = (0, 0, 31)
+bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=6.5, radius2=3.0, depth=34, location=(0, 0, 17)); o = bpy.context.object; o.data.materials.append(copper); o.parent = LB
+bpy.ops.mesh.primitive_uv_sphere_add(radius=2.6, location=(0, -.4, 36.5)); o = bpy.context.object; o.data.materials.append(copper); o.parent = LB
+LB_SPIKES = []
+for i in range(7):
+    a = math.radians(-60 + i * 20); bpy.ops.mesh.primitive_cone_add(vertices=6, radius1=.45, radius2=0, depth=3.2, location=(2.4 * math.sin(a), -.4 - 2.4 * math.cos(a) * .3, 39.2), rotation=(-.35 * math.cos(a), a * .6, 0))
+    o = bpy.context.object; o.data.materials.append(copper); o.parent = LB; LB_SPIKES.append(o)
+box("lb_tab", (3, 1, 5), (-4.5, -1.5, 26), copper, LB, rot=(0, .3, 0))
+LB_ARM = bpy.data.objects.new("lb_arm", None); sc.collection.objects.link(LB_ARM); LB_ARM.parent = LB; LB_ARM.location = (3.2, 0, 32)
+K.tube((0, 0, 0), (1.5, 0, 13), .9, copper, LB_ARM, 12); bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=.6, radius2=1.4, depth=2, location=(1.6, 0, 14)); o = bpy.context.object; o.data.materials.append(gold if False else copper); o.parent = LB_ARM
+bpy.ops.mesh.primitive_uv_sphere_add(radius=1.2, location=(1.6, 0, 15.8)); o = bpy.context.object; o.scale = (1, 1, 1.6); o.data.materials.append(flame); o.parent = LB_ARM
+LB_TOUR = [person(KINDS[i % 8], (-9 + (i % 6) * 3.4, -10 + (i // 6) * 1.5, 31), math.pi, liberty) for i in range(12)]
+LB_SPLASH = []
+for i in range(40):
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=RND.uniform(.4, 1.2), location=(0, 0, -50)); o = bpy.context.object; o.data.materials.append(emat(f"spl{i}", (.85, .92, .95), .2)); o.parent = liberty; LB_SPLASH.append(o)
+# エッフェル塔：脚が外へ開いて、開脚するようにしゃがみ込む
+eiffel = group("eiffel", (0, 0, 0)); GROUPS["eiffel"] = eiffel
+box("ef_ground", (600, 600, .1), (0, 0, -.05), grass, eiffel); box("ef_path", (30, 600, .06), (0, -150, 0), tile, eiffel)
+EF = bpy.data.objects.new("ef_tower", None); sc.collection.objects.link(EF); EF.parent = eiffel
+for sx in (-1, 1):
+    for sy in (-1, 1):
+        K.tube((sx * 31, sy * 31, 0), (sx * 11, sy * 11, 57), 3.2, iron, EF, 8); K.tube((sx * 11, sy * 11, 57), (sx * 5, sy * 5, 115), 2.0, iron, EF, 8)
+        K.tube((sx * 25, sy * 25, 12), (sx * 25, -sy * 25, 12), .8, iron, EF, 6) if sx > 0 else None
+box("ef_p1", (52, 52, 4), (0, 0, 57), iron, EF); box("ef_p2", (22, 22, 3), (0, 0, 115), iron, EF)
+bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=7, radius2=1.2, depth=160, location=(0, 0, 196), rotation=(0, 0, math.pi / 4)); EF_TOP = bpy.context.object; EF_TOP.data.materials.append(iron); EF_TOP.parent = EF
+EF_TOUR = [person(KINDS[i % 8], (-21 + (i % 8) * 6, -24 + (i // 8) * 3, 59), RND.uniform(0, 6.28), eiffel) for i in range(16)]
+for k in range(10):
+    tree(-60 + k * 13, -40, eiffel, 1.4)
+# ピサの斜塔：観光客が寄りかかると、まっすぐになって沈む
+pisa = group("pisa", (0, 0, 0)); GROUPS["pisa"] = pisa
+box("ps_ground", (400, 400, .1), (0, 0, -.05), grass, pisa); box("ps_plaza", (80, 120, .06), (0, -20, 0), tile, pisa)
+PS = bpy.data.objects.new("ps_tower", None); sc.collection.objects.link(PS); PS.parent = pisa; PS.rotation_euler = (0, math.radians(-4), 0)
+bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=8, depth=50, location=(0, 0, 25)); o = bpy.context.object; o.data.materials.append(marble); o.parent = PS
+bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=6, depth=7, location=(0, 0, 53.5)); o = bpy.context.object; o.data.materials.append(marble); o.parent = PS
+for k in range(7):
+    bpy.ops.mesh.primitive_torus_add(major_radius=8.3, minor_radius=.45, location=(0, 0, 7 + k * 6.5)); o = bpy.context.object; o.data.materials.append(marble); o.parent = PS
+PS_TOUR = []
+for i in range(9):
+    x = -16 + i * 4; o = person(KINDS[i % 8], (x, -14 - (i % 2) * 2, 0), math.atan2(14, -x) + math.pi / 2, pisa); PS_TOUR.append(o)
+
 # ---- 宇宙（地球・月・ブラックホール・太陽・金星）
 space = group("space", (0, 0, 0)); GROUPS["space"] = space
 em_ = bpy.data.materials.new("earth46"); em_.use_nodes = True; n = em_.node_tree.nodes; L = em_.node_tree.links; b = n["Principled BSDF"]
@@ -727,6 +775,37 @@ def a_l17(u, t, f):   # 最後の札。画は朝の体重計に戻る（冒頭�
     keyp(H_SCALE, f, loc=(-.4, -.6, FLOORZ + .05))
     cam.look(mix((1.2, -3.4, FLOORZ + 1.0), (.6, -2.6, FLOORZ + .35), ease(u)), (-.4, -.6, FLOORZ + .9 - .45 * u), 30)
 
+
+def s_w01():
+    show("liberty", 13.0)
+def a_w01(u, t, f):   # 自由の女神：展望台の観光客の重さで、たいまつの腕が折れて海へ。女神はのけぞって沈む
+    e = t - ev_t("w01", 0); k = ease(clamp(e / 1.3))
+    tt = max(0, e); keyp(LB_ARM, f, loc=(3.2 + 6 * clamp(tt), -2 * clamp(tt), 32 - 4.9 * (tt * 1.6) ** 2 if tt > 0 else 32), rot=(0, .3 + 2.2 * clamp(tt / 1.2), 0))
+    keyp(LB, f, loc=(0, 0, 31 - 6 * k), rot=(-.22 * k, .05 * k, 0))
+    for j, o in enumerate(LB_SPLASH):
+        r = random.Random(j); te = max(0, e - .9); v = Vector((r.uniform(-6, 6), r.uniform(-6, 6), r.uniform(8, 18)))
+        p_ = Vector((22, -6, 0)) + v * te + Vector((0, 0, -4.9 * te * te)); keyp(o, f, loc=(p_.x, p_.y, max(-1, p_.z)) if te > 0 else (0, 0, -50))
+    for p_ in LB_TOUR:
+        keyp(p_, f, loc=(p_.location.x, p_.location.y, 31 - 6 * k))
+    cam.look(mix((48, -78, 6), (44, -70, 7), ease(u)), (6, 0, 52 - 12 * k), 30)
+
+def s_w02():
+    show("eiffel", 13.0)
+def a_w02(u, t, f):   # エッフェル塔：展望台の観光客の重さで、4 本の脚が外へ開き、開脚するようにしゃがむ
+    e = t - ev_t("w02", 0); k = ease(clamp(e / 1.2)); wob = .04 * math.sin(e * 12) * clamp(1 - e / 2) if e > 0 else 0
+    keyp(EF, f, scale=(1 + .9 * k, 1 + .9 * k, 1 - .62 * k)); keyp(EF_TOP, f, rot=(wob + .12 * k, 0, math.pi / 4))
+    for p_ in EF_TOUR:
+        keyp(p_, f, loc=(p_.location.x * (1 + .9 * k), p_.location.y * (1 + .9 * k), 59 * (1 - .62 * k)))
+    cam.look(mix((14, -230, 2.0), (12, -210, 2.0), ease(u)), (0, 0, 80 - 35 * k), 28)
+
+def s_w03():
+    show("pisa", 13.0)
+def a_w03(u, t, f):   # ピサの斜塔：観光客が「支えるポーズ」で寄りかかると、まっすぐになり、それから沈む
+    e = t - ev_t("w03", 0); k1 = ease(clamp(e / .8)); k2 = ease(clamp((e - 1.0) / 1.0))
+    keyp(PS, f, loc=(0, 0, -9 * k2), rot=(0, math.radians(-4) * (1 - k1), 0))
+    for p_ in PS_TOUR:
+        keyp(p_, f, loc=tuple(p_.location))
+    cam.look(mix((22, -62, 1.6), (20, -56, 1.6), ease(u)), (0, 0, 24 - 6 * k2), 26)
 
 NAMES = [s["id"] for s in PLAN["shots"]]
 SHOTS = {k: (globals()["s_" + k], globals()["a_" + k]) for k in NAMES}
