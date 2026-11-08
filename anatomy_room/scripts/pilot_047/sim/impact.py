@@ -11,8 +11,43 @@ RHO_T = 2500.0                                # 地面：堆積岩
 G, R_EARTH, PO = 9.8, 6370.0, 1e5             # crater.cgi の定数（R_EARTH は km）
 RHO_SURF, H, CD, FP = 1.0, 8000.0, 2.0, 7.0
 KT = 4.186e12                                 # crater.cgi の換算
-HIROSHIMA_KT = 15.0                           # 広島型 約 15 kt
+HIROSHIMA_KT = 16.0                           # 広島の原爆 約 16 kt（放射線影響研究所）
 SIN = math.sin(math.radians(THETA))
+
+# 画面のエネルギーは身近なものに言い換える（日で切り替え。出典は fact_check.md）
+CAR_J = 0.5 * 1500 * (100 / 3.6) ** 2         # 1.5 t の車が時速 100 km でぶつかる（約 58 万 J）
+JP_ELEC_J = 8496.3e8 * 3.6e6                  # 日本で 1 年に使う電気（2023 年度の需要電力量 8,496.3 億 kWh）
+WORLD_J = 620e18                              # 人類が 1 年に使うエネルギー（2023 年、620 EJ）
+SUN_W = 3.828e26                              # 太陽が 1 秒に出す光（IAU の公称値）
+LADDER = [(6, "car"), (12, "hiroshima"), (17, "jp_elec"), (21, "world"), (99, "sun")]
+
+
+def familiar(n, E):
+    """n 日目のエネルギー E (J) を身近なもので。(種類, 数, 画面の文)"""
+    kind = next(k for last, k in LADDER if n <= last)
+    num = lambda x: f"{x:,.0f}" if x < 1e4 else (f"{x/1e4:,.0f}万" if x < 1e8 else f"{x/1e8:,.0f}億")
+    if kind == "car":
+        x = E / CAR_J
+        return kind, x, f"時速100kmの車 {num(x)}台の衝突"
+    if kind == "hiroshima":
+        x = E / (HIROSHIMA_KT * KT)
+        return kind, x, f"広島の原爆 {x:,.1f}発" if x < 10 else f"広島の原爆 {num(x)}発"
+    if kind == "jp_elec":
+        x = E / JP_ELEC_J
+        return kind, x, f"日本で使う電気 {num(x)}年分"
+    if kind == "world":
+        x = E / WORLD_J
+        return kind, x, f"人類が使うエネルギー {num(x)}年分"
+    s = E / SUN_W
+    if s < 60:
+        t = f"{s:,.0f}秒間"
+    elif s < 3600:
+        t = f"{s/60:,.0f}分間"
+    elif s < 86400:
+        t = f"{s/3600:,.0f}時間"
+    else:
+        t = f"{s/86400:,.0f}日間"
+    return kind, s, f"太陽が{t}に出す光"
 
 # 目安（fact_check.md で出典を確かめる）
 OCEAN_BOIL_J = 5e27      # 海 1.4e21 kg を 15℃ から蒸発させる熱（約 2.6 MJ/kg × 1.4e21 kg ≒ 3.6e27 J、切り上げ）
@@ -102,6 +137,7 @@ def day(n):
         E_surf = 0.5 * m * (v * 1000) ** 2
         E_blast = max(E_atm, E_surf) / KT
     d = dict(day=n, L_m=L, E0_J=E0, hiroshima=E0 / KT / HIROSHIMA_KT, v_kms=v, burst_m=zB, breakup_m=zBU)
+    d['energy_kind'], d['energy_x'], d['energy_text'] = familiar(n, E0)
     # 爆風：crater.cgi の基準（Pa）
     for key, pa in (("glass_may", 690), ("glass", 6900), ("wood", 26800), ("bldg", 42600),
                     ("steel", 273000)):
@@ -139,7 +175,7 @@ def main():
     rows = ["# pilot_047 日ごとの結果（impact.py が作る）", "",
             "条件：毎日正午、都庁の真上。1 日目 直径 10 cm、毎日 2 倍。岩石 3,000 kg/m³・秒速 20 km・45 度・地面は堆積岩 2,500 kg/m³。",
             "式は Collins ほか（2005）、実装は Earth Impact Effects Program の crater.cgi を移したもの。距離は都庁から km。", "",
-            "| 日 | 直径 | 広島型の何発分 | 何が起きるか | 窓が割れるかも（690 Pa） | 窓が割れる（6.9 kPa） | 木造が倒れる | ビルが崩れる | 服が燃える | クレーター | 揺れ（M） |",
+            "| 日 | 直径 | エネルギー（画面の言い換え） | 何が起きるか | 窓が割れるかも（690 Pa） | 窓が割れる（6.9 kPa） | 木造が倒れる | ビルが崩れる | 服が燃える | クレーター | 揺れ（M） |",
             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for d in days:
         if d.get("global") == "earth_breaks":
@@ -150,10 +186,10 @@ def main():
             what = f"上空 {d['burst_m']/1000:.1f} km で爆発"
         else:
             what = f"地面に衝突（秒速 {d['v_kms']:.1f} km）"
-        rows.append(f"| {d['day']} | {fmt_len(d['L_m'])} | {d['hiroshima']:.3g} | {what} | {km(d['glass_may_km'])} | "
+        rows.append(f"| {d['day']} | {fmt_len(d['L_m'])} | {d['energy_text']} | {what} | {km(d['glass_may_km'])} | "
                     f"{km(d['glass_km'])} | {km(d['wood_km'])} | {km(d['bldg_km'])} | {km(d.get('cloth_km'))} | "
                     f"{km(d.get('crater_km'))} | {d['M']:.1f} |" if "M" in d else
-                    f"| {d['day']} | {fmt_len(d['L_m'])} | {d['hiroshima']:.3g} | {what} | {km(d['glass_may_km'])} | "
+                    f"| {d['day']} | {fmt_len(d['L_m'])} | {d['energy_text']} | {what} | {km(d['glass_may_km'])} | "
                     f"{km(d['glass_km'])} | {km(d['wood_km'])} | {km(d['bldg_km'])} | — | — | — |")
     rows += ["", "- 「地球全体」は地球の半周（20,000 km）を超えるもの。17 日目ごろから先は式をあてはめる範囲を超えるので、画面では文献の目安で見せる。"]
     (here / "results_days.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
