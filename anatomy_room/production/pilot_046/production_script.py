@@ -34,13 +34,13 @@ ambience.click("click", 2600, gain=.7)   # ポップアップが出る音
 ambience.register("crowd", SFX / "crowd.mp3", start=5, span=("l02", "l06", 0), norm="rms", fade_out=1.5)
 
 # ショットごとの時計の間隔（秒）。最初の 2 日はゆっくり、早送りは速く
-TICK = {"w01": .5, "w02": .5, "w03": .5, "l00": 1.0, "l01": 1.0, "l02": .5, "l03": .5, "l04": .5, "l05": .25, "l06": .125, "l07": .5, "l08": 1.0, "l09": .5, "l10": .5,
+TICK = {"w02": .5, "w03": .5, "l00": 1.0, "l01": 1.0, "l02": .5, "l03": .5, "l04": .5, "l05": .25, "l06": .125, "l07": .5, "l08": 1.0, "l09": .5, "l10": .5,
         "l11": .125, "l12": 1.0, "l13": .25, "l14": .125, "l15": .125, "l16": .125, "l17": 1.0}
 # 壊れる瞬間（ショット, 秒, 大きさ, 種類）。種類 wood＝木、glass＝ガラス、metal＝金属、big＝コンクリート・建物（爆発の低音を重ねる）、space＝宇宙（低い衝撃）
 CRASH = [("l03", 1.5, .5, "splash"), ("l05", 1.0, .35, "creak"), ("l05", 2.0, .35, "creak"), ("l07", 1.1, .7, "ground"), ("l08", 1.0, 1.0, "big"), ("l08", 1.6, .7, "metal"),
          ("l08", 2.4, .6, "glass"), ("l09", 1.1, 1.0, "wood"), ("l09", 1.5, .6, "big"), ("l10", 1.9, 1.0, "metal"), ("l10", 2.0, .8, "glass"), ("l11", .5, .5, "ground"),
          ("l12", 1.1, 1.0, "big"), ("l12", 1.8, .9, "big"), ("l12", 2.5, 1.0, "big"), ("l12", 3.2, .8, "glass"), ("l13", 1.5, .9, "ground"),
-         ("w01", 1.1, .9, "metal"), ("w01", 1.6, .8, "splash"), ("w02", 1.1, 1.0, "metal"), ("w02", 1.5, .7, "big"), ("w03", 1.1, .6, "creak"), ("w03", 1.8, .9, "big"),
+         ("w02", 1.1, 1.0, "metal"), ("w02", 1.5, .7, "big"), ("w03", 1.1, .6, "creak"), ("w03", 1.8, .9, "big"),
          ("l15", 1.3, 1.0, "space"), ("l16", 1.0, 1.0, "space"), ("l16", 2.0, .8, "space")]
 # 地鳴り（ショットの頭での大きさ、間は直線）：コンクリートが砕けるころから大きく、宇宙は低い唸り
 QUAKE = {"l00": 0, "l10": 0, "l11": .25, "l12": .7, "l13": 1.0, "l14": .5, "l15": .7, "l16": 1.0, "l17": 0}
@@ -76,8 +76,8 @@ def _ticks():
     return out
 
 
-def _beep(f=2400, d=.09):
-    t = np.arange(int(d * SR)) / SR; return np.sin(2 * np.pi * f * t) * np.minimum(1, t / .003) * np.minimum(1, (d - t) / .01) * .6
+def _beep(f=880, d=.45):   # 体重計の音：やわらかい丸い音（ユーザー「ピピっという音が不快」）
+    t = np.arange(int(d * SR)) / SR; return (np.sin(2 * np.pi * f * t) + .3 * np.sin(2 * np.pi * 2 * f * t)) * np.exp(-t / .12) * np.minimum(1, t / .015) * .35
 
 
 def _buzzer(d=1.6):   # エレベーターの重量超過のブザー（合成）
@@ -107,8 +107,8 @@ def beds():
         while t < b:
             x = TK[q % len(TK)] * (.5 if iv < .3 else .7); j = int(t * SR); m = min(len(x), n - j); tick[j:j + m] += x[:m]; t += iv; q += 1
     # 体重計の電子音（冒頭と最後）、エレベーターのブザー
-    for c, off in (("l00", .4), ("l00", .55), ("l17", .4), ("l17", .55)):
-        put(_beep(), cues[c] + off, .5)
+    for c, off, f0 in (("l00", .4, 784), ("l00", .62, 1046), ("l17", .4, 784), ("l17", .62, 1046)):
+        put(_beep(f0), cues[c] + off, .5)
     put(_buzzer(), cues["l04"] + 1.0, .5)
     for shot, off, g, kind in CRASH:
         t = cues[shot] + off
@@ -139,9 +139,9 @@ def beds():
     for x in parts:
         thud[:len(x)] += x
     thud = music._lp(thud, 900); thud /= np.max(np.abs(thud)) + 1e-9
-    t, end = .5, cues["l17"]
+    t, end = cues["l02"] + .5, cues["l17"]   # 冒頭（タイトル・設定）では鳴らさない
     while t < end:
-        g = .1 + 2.4 * (t / end) ** 1.8; put(thud, t, g); t += 1.0
+        g = .03 + 2.4 * (t / end) ** 2.0; put(thud, t, g); t += 2.0
     # 地鳴り：低く唸る音を、後半に向けて大きく
     qk = _load(SFX / "break" / "quake.mp3"); qk = np.tile(_pitch(qk, .7), n // len(qk) + 2)[:n]; qk = music._lp(qk, 500)
     ks = [k for k in order if k in QUAKE]; ts = [cues[k] for k in ks] + [total]; vs = [QUAKE[k] for k in ks] + [0]
@@ -174,7 +174,7 @@ EP = standard.config({
     "out": "reverse_046_weight.mp4",
     "lead_in": 0.0,
     "cues": CUES,
-    "sfx": [["bed_near", "t0", 1.0, 0], ["bed_tick", "t0", .55, 0], ["crowd", "l02", .35, 0]] + [["click", c, .7, 0] for c in POPS],
+    "sfx": [["bed_near", "t0", 1.0, 0], ["crowd", "l02", .35, 0]] + [["click", c, .7, 0] for c in POPS],
     "final_hold": 0.0,
     "music": {"style": "file_046", "sections": [["t0", 0.0, "f_mute"]]},
     "segments": ["open"] + [s["id"] for s in SHOTS[1:]],
