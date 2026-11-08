@@ -1,0 +1,199 @@
+{
+ "title": "毎日2倍になる隕石。地球は何日もつ？",
+ "theme": "毎日2倍になる隕石。地球は何日もつ？（もしも設計）",
+ "note": "もしも設計の既定（pilot_045 v2.3）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オープニング：28 日目、新宿の空を覆う岩の底。タイトル 2 行"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "1 日目：都庁前の広場、正午。昼の空に小さな光の筋。誰も気づかない"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "2〜6 日目（早送り）：毎日の正午、光の筋が太くなる。スマホを向ける人"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "7 日目：上空で爆発。少し遅れてドーン。人々が見上げる"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "8〜9 日目：窓が震えて割れる → 人々が荷物を持って駅へ"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "10 日目：人のいない新宿。上空 7 km の爆発でビルが崩れる"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "11 日目：初めて地面に届く。都庁があった所にクレーター"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "12〜13 日目：カメラが上がる。関東の街に被害の円"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "14 日目：関東の地図。円が関東を覆い、街の光が消える"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "l09",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "15 日目：名所のカット。名古屋城に爆風が届く"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "l10",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "16 日目：日本の地図。円が石垣島まで覆う"
+  },
+  {
+   "id": "L11",
+   "who": "M",
+   "scene": "l11",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "17〜18 日目：宇宙から日本。恐竜の隕石と並ぶ大きさ"
+  },
+  {
+   "id": "L12",
+   "who": "M",
+   "scene": "l12",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "19〜20 日目：爆風の輪が地球を一周"
+  },
+  {
+   "id": "L13",
+   "who": "M",
+   "scene": "l13",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "21〜23 日目：海が白い湯気になっていく地球"
+  },
+  {
+   "id": "L14",
+   "who": "M",
+   "scene": "l14",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "24〜27 日目：月 → 火星と同じ大きさの岩"
+  },
+  {
+   "id": "L15",
+   "who": "M",
+   "scene": "l15",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "28 日目：地球より大きな岩が迫り、地球が砕ける"
+  },
+  {
+   "id": "L16",
+   "who": "M",
+   "scene": "l16",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 1.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "砕けたかけらが流れ星のように散る → 暗転（冒頭の岩につながる）"
+  }
+ ]
+}

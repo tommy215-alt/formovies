@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_047 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="assets/plan.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
+<script>
+// pilot_047 のレンダラー（もしも設計の既定、templates/DESIGN_MODES.md。土台は pilot_045・046）。毎日2倍になる隕石。地球は何日もつ？
+// ナレーションなし：情報はすべてポップアップ（左上の札・出来事の札・大きな札）。ショットと出来事は plan.py（assets/plan.js）。
+// 3D は Blender（blender/scene.py）。数字は計算の結果（scripts/pilot_047/sim/days.json）。
+const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
+const IDS = PL.shots.map(s => s.id), DAYS = {}; PL.days.forEach(d => DAYS[d.day] = d);
+Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
+  opening: { img: null, bg: blShot("l00"), title: ["毎日2倍になる隕石。", "地球は何日もつ？"], size1: 70, size2: 74, credit: [] } });
+SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
+S.docSub = () => {};   // 字幕なし（ナレーションがない）
+
+// ---------------------------------------------------------------- 時計（scene.py の clock と同じ式）。c：1 日目 0:00 からの秒
+function clockAt(k, t) {
+  const s = SH[k], u = clamp(t / s.dur), c = s.c;
+  for (let i = 0; i < c.length - 1; i++) { const [u0, c0] = c[i], [u1, c1] = c[i + 1];
+    if (u <= u1 || i === c.length - 2) { const v = clamp((u - u0) / Math.max(1e-9, u1 - u0)); return c0 + (c1 - c0) * v; } }
+  return c[c.length - 1][1];
+}
+function curId(t) { let k = IDS[0]; for (const id of IDS) if (CUE[id] !== undefined && t >= CUE[id]) k = id; return k; }
+function clockNow(t) { const k = curId(t); return clockAt(k, t - CUE[k]); }
+const pad = n => String(Math.floor(n)).padStart(2, "0");
+function tod(c) { const d = Math.floor(c / 86400), r = c - d * 86400; return { day: d + 1, h: Math.floor(r / 3600), m: Math.floor(r / 60) % 60, s: Math.floor(r) % 60 }; }
+// その時刻の「今日の隕石」：正午をこえたら、その日の隕石（落ちたあと）
+function dayAt(c) { return Math.max(1, Math.min(28, tod(c).day)); }
+function hitDay(c) { const o = tod(c), d = o.h >= 12 ? o.day : o.day - 1; return Math.max(0, Math.min(28, d)); }   // 最後に落ちた日（0＝まだ）
+const fmtL = L => L < 1 ? `${Math.round(L * 100)}cm` : L < 100 ? `${L.toFixed(1)}m` : L < 1000 ? `${Math.round(L)}m` : L < 1e4 ? `${(L / 1000).toFixed(1)}km` : `${Math.round(L / 1000).toLocaleString("ja-JP")}km`;
+const fmtP = n => n >= 1e8 ? `${(n / 1e8).toFixed(n >= 1e9 ? 0 : 2).replace(/\.?0+$/, "")}億人` : `${Math.round(n / 1e4).toLocaleString("ja-JP")}万人`;
+function fmtCount(cn) { if (!cn) return ""; const [lab, n] = cn; return n >= 8e9 ? "全人類 約82億人" : n >= 1.26e8 ? "日本全体 1億2,615万人" : fmtP(n); }
+function stamp(c) { const o = tod(c); return `${o.day}日目 ${pad(o.h)}:${pad(o.m)}`; }
+// 日が変わった（隕石が 2 倍になった）瞬間から 0.7 秒：1→0 の強さ（大きくなって光り、元に戻る）
+function digitPop(t) {
+  const now = dayAt(clockNow(t));
+  for (let k = 1; k <= 21; k++) { const tp = t - k / 30; if (tp < CUE.l02) break; if (dayAt(clockNow(tp)) < now) { const u = (k - 1) / 30; return u < .12 ? easeOut(u / .12) : 1 - easeInOut(clamp((u - .12) / .58)); } }
+  return 0;
+}
+function rate(t) { const k = curId(t), a = t - CUE[k]; return (clockAt(k, a + .05) - clockAt(k, a)) / .05; }   // 時計の秒 / 動画の秒
+
+// ---------------------------------------------------------------- 左上：時計・何日目・隕石の直径・たとえ・人数
+function ffMark(x, y, k) { if (k <= 0) return; ui.save(); ui.globalAlpha *= k; ui.fillStyle = "#8FDCFF";
+  for (const dx of [0, 22]) { ui.beginPath(); ui.moveTo(x + dx, y - 13); ui.lineTo(x + dx + 20, y); ui.lineTo(x + dx, y + 13); ui.closePath(); ui.fill(); }
+  text(ui, "早送り", x + 104, y + 1, 30, "#8FDCFF", { weight: 800, align: "center" }); ui.restore(); }
+function statusUI(t) {
+  const k = curId(t); if (k === "l00" || k === "l01" || k === "l16" || t < CUE.l02) return;
+  const c = clockNow(t), o = tod(c), d = dayAt(c), D = DAYS[d], hd = hitDay(c), HD = DAYS[hd], a = CUE[k], u = t - a;
+  const tlines = D.energy_text.split("\n"), cnt = HD ? HD.counter : null;
+  const x0 = 40, y0 = 150, w = 700, h = 236 + tlines.length * 44 + (cnt ? 70 : 0);
+  ui.save(); ui.translate(x0, y0);
+  ui.fillStyle = "rgba(6,10,16,.82)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,120,60,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
+  ui.fillStyle = "#FF7A3C"; ui.fillRect(0, 20, 8, h - 40);
+  S.group(() => {
+    text(ui, `${pad(o.h)}:${pad(o.m)}:${pad(o.s)}`, 36, 62, 58, "#FFFFFF", { weight: 900, align: "left" });
+    text(ui, `${d}日目`, w - 32, 62, 52, "#FFD58A", { weight: 900, align: "right" });
+    text(ui, "隕石の直径", 36, 150, 34, "#FFB48A", { weight: 800, align: "left" });
+    { const g = digitPop(t); ui.save(); ui.translate(w - 32, 148); ui.scale(1 + .5 * g, 1 + .5 * g);
+      if (g > 0) { ui.shadowColor = `rgba(255,90,40,${.95 * g})`; ui.shadowBlur = 50 * g; }
+      text(ui, fmtL(D.L_m), 0, 0, 72, g > .05 ? `rgb(255,${Math.round(170 + 85 * g)},${Math.round(90 + 140 * g)})` : "#FF8A4C", { weight: 900, align: "right", stroke: "#1a0804", sw: 6 }); ui.restore(); }
+    ui.fillStyle = "rgba(255,255,255,.08)"; ui.fillRect(28, 196, w - 56, 2);
+    tlines.forEach((s, i) => { const sz = s.length > 18 ? Math.floor(38 * 18 / s.length) : 38; text(ui, s, 36, 236 + i * 44, sz, i ? "#C9D6E2" : "#FFFFFF", { weight: 800, align: "left" }); });
+    if (cnt) { const yc = 236 + tlines.length * 44 + 26; ui.fillStyle = "rgba(255,255,255,.08)"; ui.fillRect(28, yc - 34, w - 56, 2);
+      const col = cnt[0] === "逃げ場のない人" ? "#FF6A6A" : "#7FE0A0";
+      text(ui, cnt[0], 36, yc + 6, 32, col, { weight: 800, align: "left" }); text(ui, fmtCount(cnt), w - 32, yc + 6, 40, "#FFFFFF", { weight: 900, align: "right" }); }
+  }, [x0, y0, x0 + w, y0 + h]);
+  ui.restore();
+  const ff = rate(t) > 3000 ? clamp((u - .2) / .3) : 0; if (ff) S.group(() => ffMark(x0 + 18, y0 + h + 44, ff));
+}
+
+// ---------------------------------------------------------------- 下：出来事の札（新しいものが下に積み上がる。古いものは消える）
+const TAGC0 = { R: ["隕石", "#FF6A3D"], B: ["被害", "#FFB02E"], P: ["人々", "#7FE0A0"], C: ["比べると", "#B38CFF"], U: ["地球", "#5FB8FF"] };
+const TAGC = new Proxy({}, { get: (_, k) => { const [n, c] = TAGC0[k[0]]; return [k.endsWith("?") ? n + "（予想）" : n, c]; } });
+const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], c: e[1], s: e[2], kind: e[3] })));
+function evTime(e) { return CUE[e.at] + e.off; }
+function eventsUI(t) {
+  if (t >= CUE.l15) return;
+  const live = EVS.filter(e => t >= evTime(e) && t < evTime(e) + 4.6).slice(-3), y1 = 1560, hh = 112, gap = 14;
+  live.forEach((e, i) => {
+    const u = t - evTime(e), k = easeOut(clamp(u / .25)) * (1 - clamp((u - 4.2) / .4)), y = y1 - (live.length - i) * (hh + gap) + hh / 2, x0 = 40 - 60 * (1 - k);
+    const [tg, tc] = TAGC[e.kind];
+    ui.save(); ui.globalAlpha *= k; ui.font = `800 44px ${S.FONT}`; const tw = Math.min(700, ui.measureText(e.s).width), w = Math.max(560, tw + 120);
+    const pop = 1 + .12 * Math.pow(1 - clamp(u / .18), 2); ui.translate(x0, y); ui.scale(pop, pop); ui.translate(-x0, -y);
+    ui.fillStyle = "rgba(6,10,16,.84)"; rrect(ui, x0, y - hh / 2, w, hh, 14); ui.fill(); ui.fillStyle = tc; ui.fillRect(x0, y - hh / 2 + 12, 7, hh - 24);
+    S.group(() => {
+      const st = stamp(e.c); text(ui, st, x0 + 30, y - 24, 30, "#FFD58A", { weight: 700, align: "left" });
+      ui.font = `700 30px ${S.FONT}`; const sw_ = ui.measureText(st).width, gw = (ui.font = `700 26px ${S.FONT}`, ui.measureText(tg).width) + 24;
+      ui.fillStyle = tc; rrect(ui, x0 + 48 + sw_, y - 42, gw, 36, 6); ui.fill(); text(ui, tg, x0 + 48 + sw_ + gw / 2, y - 23, 26, "#0A0E14", { weight: 700 });
+      const sz = tw > 660 ? Math.floor(44 * 660 / tw) : 44; text(ui, e.s, x0 + 30, y + 24, sz, "#FFFFFF", { weight: 800, align: "left" });
+    }, [x0, y - hh / 2, x0 + w, y + hh / 2]);
+    ui.restore();
+  });
+}
+
+// ---------------------------------------------------------------- 大きな札：設定・日本に逃げ場がない・最後の一言
+const CARDS = { spec: { title: "設定", col: "#FF7A3C", rows: [["時刻", "毎日 正午"], ["場所", "東京都庁の真上"], ["大きさ", "10cmから 毎日2倍"]] } };
+function bigCard(t, id) {
+  const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
+  const x0 = 60, w = 960, rh = 104, y0 = 300, h = 140 + cd.rows.length * rh;
+  ui.save(); ui.globalAlpha *= k * ko; const pop = 1 + .1 * Math.pow(1 - clamp(u / .22), 2); ui.translate(540, y0 + h / 2); ui.scale(pop, pop); ui.translate(-540, -y0 - h / 2);
+  ui.fillStyle = "rgba(6,10,18,.88)"; rrect(ui, x0, y0, w, h, 16); ui.fill(); ui.strokeStyle = cd.col; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 16); ui.stroke();
+  ui.fillStyle = cd.col; ui.fillRect(x0, y0 + 18, 10, 76);
+  S.group(() => {
+    text(ui, cd.title, x0 + 44, y0 + 58, 60, "#FFFFFF", { weight: 700, align: "left" });
+    cd.rows.forEach(([l, r], i) => { const ru = u - .35 - i * .45, rk = easeOut(clamp(ru / .22)); if (rk <= 0) return; const y = y0 + 150 + i * rh, dx = 30 * (1 - rk);
+      ui.save(); ui.globalAlpha *= rk; ui.fillStyle = "rgba(255,255,255,.07)"; rrect(ui, x0 + 26 + dx, y - 44, w - 52, 88, 10); ui.fill();
+      text(ui, l, x0 + 56 + dx, y + 2, 40, cd.col, { weight: 700, align: "left" }); text(ui, r, x0 + 260 + dx, y + 2, 52, "#FFFFFF", { weight: 700, align: "left" });
+      ui.restore(); });
+  }, [x0, y0, x0 + w, y0 + h]);
+  ui.restore();
+}
+function shoutCard(t, a, l1, l2, c1, c2) {   // 画面の中央に 2 行の大きな文字（少し遅れて 2 行目）
+  const u = t - a; if (u < 0) return; const k = easeOut(clamp(u / .45)), k2 = easeOut(clamp((u - .45) / .45));
+  ui.save(); ui.globalAlpha *= k; S.group(() => text(ui, l1, 540, 760, 92, c1, { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
+  ui.save(); ui.globalAlpha *= k2; ui.translate(540, 900); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, l2, 0, 0, 96, c2, { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
+}
+{ const _du = drawUI; drawUI = function (t, name) { if (name === "open") { _du(t, name); return; }
+  const k = curId(t); statusUI(t); eventsUI(t);
+  if (k === "l01") bigCard(t, "spec");
+  if (k === "l10") shoutCard(t, CUE.l10 + 1.2, "日本に", "逃げ場がない", "#EAF2F8", "#FF6A6A");
+  if (k === "l15" || k === "l16") shoutCard(t, CUE.l15 + 2.6, "28日目", "地球が砕ける", "#FFD58A", "#FF8A4C"); }; }
+
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .1, sat: 1.0, vig: .35 }], [c.l05, { cool: .0, sat: .95, vig: .4 }], [c.l11, { cool: .2, sat: .95, vig: .45 }], [c.l15, { cool: .1, sat: 1.0, vig: .5 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "毎日2倍になる隕石。", 540, 450, 96, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "地球は", 540, 610, 130, "#FF8A4C", { weight: 700, stroke: "#05080c", sw: 16 }); text(ui, "何日もつ？", 540, 770, 130, "#FF8A4C", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
+
+// 書体：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
+const bizReady = window.ASSETS.font_biz ? new FontFace("Noto Sans CJK JP", b64buf(window.ASSETS.font_biz), { weight: "100 900" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
+kitStart(() => {}); window.READY = Promise.all([window.READY, bizReady]); BL.install();
+</script>
+</body></html>

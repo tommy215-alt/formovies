@@ -1,4 +1,4 @@
-﻿# pilot_047 事実確認（もしも設計「毎日2倍の隕石」）
+# pilot_047 事実確認（もしも設計「毎日2倍の隕石」）
 
 > 2026-11-09。判定ラベルは FACT_CHECK_POLICY.md。数字は `sim/impact.py`・`sim/population.py`（結果は `sim/results_days.md`・`sim/results_pop.md`・`sim/days.json`）。
 

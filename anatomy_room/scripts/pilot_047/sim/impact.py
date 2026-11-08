@@ -1,4 +1,4 @@
-﻿# pilot_047：毎日正午、都庁の真上に隕石。1 日目 直径 10 cm、毎日 2 倍。28 日目に地球が砕ける。
+# pilot_047：毎日正午、都庁の真上に隕石。1 日目 直径 10 cm、毎日 2 倍。28 日目に地球が砕ける。
 # 式は Collins, Melosh, Marcus (2005) "Earth Impact Effects Program"（MAPS 40, 817-840）。
 # 実装は、その Web 版の計算プログラム crater.cgi（PyPI の ImpactEffect 1.0.0 の test/cgi-bin に同梱）を
 # そのまま Python に移した（大気中の壊れ方・空中爆発・爆風・被害の基準・クレーター・熱・揺れ）。
