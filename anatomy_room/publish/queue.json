@@ -219,6 +219,15 @@
    },
    "reupload": true,
    "uploaded": "2026-11-08T13:48:37.359Z"
+  },
+  {
+   "id": "pilot_047",
+   "video": "anatomy_room/production/pilot_047/reverse_047_meteor.mp4",
+   "meta": "anatomy_room/production/pilot_047/youtube_metadata.md",
+   "publish_at": "2026-11-10 19:00",
+   "status": "scheduled",
+   "note": "2026-11-09 もしも設計の 3 本目（v3：タイトル帯・BGM なし・重い墜落音）。ユーザーが明日の 19 時の枠で予約を指示",
+   "uploaded": "2026-11-09T13:21:55.370Z"
   }
  ]
 }
