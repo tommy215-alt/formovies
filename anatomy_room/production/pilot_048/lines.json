@@ -1,0 +1,199 @@
+{
+ "title": "東京に体長500mのポメラニアンが現れたら？",
+ "theme": "東京に体長500mのポメラニアンが現れたら？（もしも設計）",
+ "note": "もしも設計の既定（pilot_045 v2.3＋pilot_047 のタイトルの帯）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オープニング：新宿の高層ビルの向こうに座る巨大なポメラニアン。目の高さがスカイツリーと同じ。タイトル 2 行"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "6:00 夜明けの代々木公園。霧の中に、ふわふわの巨大な影"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "6:02 渋谷のスクランブル交差点：真上から肉球が下りてきて、地面がめり込む"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "6:05 くんくん：濡れた鼻がビルの屋上の高さに。鼻息で車と街路樹が吹き飛ぶ"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "6:08 「ワン」：口が開く。窓が震え、人々が走り出す"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "6:20 散歩：明治通りを歩く（空から、横に並んで追う）"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "6:40 うんち：東京ドームのとなりで、しっぽを上げてしゃがむ → 湯気の立つ山"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "7:00 マーキング：スカイツリーに片足を上げる → 足もとの川があふれる"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "7:10 ブルブル：体を振るたびに毛が飛び、吹雪のように街に降る"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "l09",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "7:15 ハァハァ：舌を出す。熱く湿った風"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "l10",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "7:20 遊びのおじぎ（前足を伏せてお尻を上げる）。しっぽが揺れる"
+  },
+  {
+   "id": "L11",
+   "who": "M",
+   "scene": "l11",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "7:21 走り出す：低い位置から。衝撃波で窓が一斉に割れる"
+  },
+  {
+   "id": "L12",
+   "who": "M",
+   "scene": "l12",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "7:26〜 空から：23 区に走った跡がぐるぐる増えていく"
+  },
+  {
+   "id": "L13",
+   "who": "M",
+   "scene": "l13",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "8:21 名所：走り抜けるポメラニアンに東京タワーがなぎ倒される"
+  },
+  {
+   "id": "L14",
+   "who": "M",
+   "scene": "l14",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "8:59 走り終えてゴロン（へそ天）。平らになった新宿の上で"
+  },
+  {
+   "id": "L15",
+   "who": "M",
+   "scene": "l15",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "9:00 真上から：平らになった東京"
+  },
+  {
+   "id": "L16",
+   "who": "M",
+   "scene": "l16",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "がれきの上でおすわり、首をかしげる → 冒頭の座った姿につながる（ループ）"
+  }
+ ]
+}
