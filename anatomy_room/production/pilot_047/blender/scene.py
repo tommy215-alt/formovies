@@ -818,7 +818,7 @@ def sp_meteor(L_m, k, f, dist=4.0, hot=4.):
     """宇宙の場面の隕石：直径 L_m（m）、k（0→1 で東京へ）。1 単位＝1,000 km"""
     side = TOKYO.cross(Vector((0, 0, 1))).normalized(); d = (-TOKYO * .6 - side).normalized(); tgt = TOKYO * RE_U   # 横から斜めに入る
     head = tgt - d * dist * (1 - k) - d * (L_m / 2e6); r = L_m / 1e6
-    place_meteor(head, d, max(r, .004) * 1.0, max(r, .004) * 30 * (.3 + .7 * (1 - k)), hot, 6., f)
+    place_meteor(head, d, max(r, .004) * 1.0, max(r, .004) * 6 * (.3 + .7 * (1 - k)), hot, 2.5, f)   # 尾は細く短く（太い棒に見えないよう）
 
 
 def s_l11():
@@ -826,9 +826,9 @@ def s_l11():
 def a_l11(u, t, f):   # 17〜18 日目：宇宙から日本。小さな岩（6.6 km → 13 km）が東京へ。衝突の跡が赤く光る
     e1, e2 = t - .5, t - 1.9
     if e2 > -.9 and e2 < 0:
-        sp_meteor(DAYS[18]["L_m"] * 40, clamp((e2 + .9) / .9), f, 2.5)
+        sp_meteor(DAYS[18]["L_m"] * 15, clamp((e2 + .9) / .9), f, 2.5)
     elif e1 > -.5 and e1 < 0:
-        sp_meteor(DAYS[17]["L_m"] * 40, clamp((e1 + .5) / .5), f, 2.0)
+        sp_meteor(DAYS[17]["L_m"] * 15, clamp((e1 + .5) / .5), f, 2.0)
     else:
         hide_meteor(f)
     a = (DAYS[18]["cloth_km"] if e2 > 0 else DAYS[17]["cloth_km"] if e1 > 0 else 0) / 6371
@@ -843,7 +843,7 @@ def a_l12(u, t, f):   # 19〜20 日目：爆風の輪が地球を一周
     key_fac(BURN_A, (DAYS[19]["cloth_km"] / 6371) + .3 * clamp(e / 1.5), f)
     key_fac(RING_A, math.pi * ease(clamp(e / 1.6)) if e > 0 else 0., f); key_fac(RING_K, 5.0 * (1 - .5 * clamp(e / 1.6)) if e > 0 else 0., f)
     if -.6 < e < 0:
-        sp_meteor(DAYS[20]["L_m"] * 10, clamp((e + .6) / .6), f, 3.0)
+        sp_meteor(DAYS[20]["L_m"] * 5, clamp((e + .6) / .6), f, 3.0)
     else:
         hide_meteor(f)
     keyp(CLOUDS, f, rot=(0, 0, t * .01))

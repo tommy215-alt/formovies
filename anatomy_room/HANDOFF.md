@@ -4,6 +4,8 @@
 
 ## いまの状態
 
+- **pilot_047「毎日2倍になる隕石。地球は何日もつ？」（もしも設計、2026-11-09）は完成**：`production/pilot_047/reverse_047_meteor.mp4`（52.9 秒）、サムネイル `thumbnail.png`、タイトル・説明文 `youtube_metadata.md`、自己レビュー `reviews/internal_review/pilot_047_review.md`。ゾンビ（pilot_045）の「視聴を継続 55.1%」への対策（0 秒目に一番強い画・60 秒以内）を入れた最初の回。条件（ユーザー）：毎日正午・都庁の真上・10 cm から毎日 2 倍・人は逃げる・28 日目に地球が砕ける・たとえは分かりやすく。計算は `scripts/pilot_047/sim/`（`impact.py`＝Earth Impact Effects Program の crater.cgi を移した式、`population.py`＝国勢調査＋沖縄の島で避難と逃げ場）。地図は都庁中心の正距方位図法（`blender/make_maps.py`）。Blender は 1 コマ約 5 秒で全体 約 3 時間。ユーザーの感想待ち。queue.json には未登録（ユーザーが選んだら載せる）。
+
 - **ナレーション収録スタジオ（2026-11-05、途中で一旦止めた。続きはユーザーがまたやる）**：`tools/narration_studio/`（起動：`python anatomy_room/tools/narration_studio/narration_studio.py long_001`）。
   - いまの加工は v4：AI（Resemble Enhance）で反響と雑音を取る → な行の詰まりを取る（`denasal`）→ 薄い仕上げ。ピッチは 0.25 半音きざみ＋「この行で試し聞き」。
   - ユーザーの感想の流れ：v1「加工が弱い・お風呂みたい」→ v2（手作りの残響抑制＋強い加工）「加工感が強くて違和感。生のアナウンサーのように」→ v3（AI）「かなりいい」→ な行が鼻詰まり・ピッチ調整 → v4（感想待ち）。
