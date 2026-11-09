@@ -41,7 +41,7 @@ html,body{margin:0;background:#000}
 const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
 const IDS = PL.shots.map(s => s.id), DAYS = {}; PL.days.forEach(d => DAYS[d.day] = d);
 Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
-  opening: { img: null, bg: blShot("l00"), title: ["毎日2倍になる隕石。", "地球は何日もつ？"], size1: 70, size2: 74, credit: [] } });
+  opening: { img: null, bg: blShot("l00"), title: ["毎日2倍になる隕石。", "地球は何日もつ？"], size1: 84, size2: 104, credit: [] } });
 SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
 S.docSub = () => {};   // 字幕なし（ナレーションがない）
 
