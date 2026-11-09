@@ -4,8 +4,8 @@
 計算は scripts/pilot_047/sim/（days.json、条件と仮定 fact_check.md）。ショットとポップアップは plan.py。3D は Blender（blender/scene.py）。
 ナレーションなし（silent_ext）、BGM なし（曲は全区間 f_mute・ending も 0）。音は環境音だけ：
 本物の時計の音（毎日の正午に向けて刻む、早送りの所は速く）・広場の雑踏（避難が始まるまで）・隕石が空を切る音・
-爆発と衝突は「一瞬音が消える → 低い衝撃 → 地鳴り」（閃光は使わない分、音で）・窓ガラス・崩れるビル、宇宙は低い衝撃、
-地鳴りは 11 日目（初めて地面に届く）から最後に向けて大きく。地球が砕けたあとは無音。
+爆発と衝突は「一瞬音が消える → 重い一撃（_heavy：割れる音＋沈む低音＋分厚い爆発）→ 破片 → 地鳴りの余韻」（閃光は使わない分、音で）・
+窓ガラス・崩れるビル、宇宙も重い一撃。続けて鳴らす地鳴りのループはやめた（曲に聞こえた）。地球が砕けたあとは無音。
 共通エンディングなし（もしも設計）。最後は暗転して冒頭の岩につながる（ループ）。
 """
 import json
@@ -48,8 +48,6 @@ HIT = [("l01", 2.0, .25, "streak"), ("l02", .5, .3, "streak"), ("l02", 1.5, .4, 
        ("l08", .8, 1.0, "impact"), ("l09", .6, 1.0, "impact"), ("l09", .9, .9, "tiles"), ("l10", .4, 1.0, "impact"),
        ("l11", 1.1, .6, "streak"), ("l11", 1.8, 1.0, "space"), ("l12", .5, .5, "streak"), ("l12", .9, 1.0, "space"), ("l13", .6, .5, "streak"), ("l13", 1.0, 1.0, "space"), ("l13", 1.2, .6, "steam"),
        ("l14", .3, .6, "space"), ("l15", 2.4, 1.0, "shatter")]
-# 地鳴り（ショットの頭での大きさ、間は直線）：初めて地面に届く 11 日目から大きく、地球が砕けたら止める
-QUAKE = {"l00": .5, "l01": 0, "l05": 0, "l06": .3, "l08": .6, "l10": .8, "l11": .6, "l13": .8, "l15": 1.0, "l16": 0}
 
 
 def _load(p):
@@ -88,6 +86,24 @@ def _boom(d=2.5, f0=48, seed=3):   # 低い衝撃
     return x / (np.max(np.abs(x)) + 1e-9) * np.minimum(1, t / .005)
 
 
+def _rumble(d=5.0, seed=7, fc=140):   # 地鳴りの余韻：ループしない低いノイズ（ゆっくり揺らぐ）。曲に聞こえないように 1 回ずつ
+    t = np.arange(int(d * SR)) / SR; r = np.random.default_rng(seed)
+    x = music._lp(np.cumsum(r.standard_normal(len(t))) * .02, fc); x -= music._lp(x, 20)
+    w = music._lp(r.standard_normal(len(t)), 3); wob = 1 + .35 * w / (np.max(np.abs(w)) + 1e-9)
+    x = x * wob / (np.max(np.abs(x * wob)) + 1e-9)
+    return x * np.minimum(1, t / .08) * np.exp(-t / (d / 3))
+
+
+def _heavy(d=5.0, f0=55, seed=11, crack=1.0):   # 重い墜落：割れる一撃＋沈む低音（55→22 Hz）＋分厚い爆発＋余韻。tanh で押し出す
+    t = np.arange(int(d * SR)) / SR; r = np.random.default_rng(seed)
+    f = f0 * np.exp(-t / 1.2) + 22; sub = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 1.6)
+    body = music._lp(r.standard_normal(len(t)), 400) * 5 * np.exp(-t / 1.1)
+    hi = r.standard_normal(len(t)) - music._lp(r.standard_normal(len(t)), 1500); cr = hi * np.exp(-t / .045) * crack
+    x = 1.0 * sub + .7 * body / (np.max(np.abs(body)) + 1e-9) + .8 * cr / (np.max(np.abs(cr)) + 1e-9)
+    x = np.tanh(1.8 * x) / np.tanh(1.8)
+    return x * np.minimum(1, t / .002)
+
+
 def _streak(d=1.1, seed=5):   # 空を切る音：帯域を下げていく風切りのノイズ（近づいて遠ざかる）
     t = np.arange(int(d * SR)) / SR; r = np.random.default_rng(seed); x = r.standard_normal(len(t))
     hi = music._lp(x, 2400); lo = music._lp(x, 500); k = t / d
@@ -124,10 +140,11 @@ def beds():
             x = TK[q % len(TK)] * (.5 if iv < .3 else .7); j = int(t * SR); m = min(len(x), n - j); tick[j:j + m] += x[:m]; t += iv; q += 1
     for shot, off, g, kind in HIT:
         t = cues[shot] + off
-        if kind == "streak":
-            put(_streak(1.1, int(t * 10)), t - .8, .55 * g)
-        elif kind == "air":   # 空中の爆発：遠いドーン（低く、少し遅れて重なる）
-            put(_boom(2.6, 40, int(t)), t, .9 * g); put(_pitch(B["explosion_dull"], .55), t + .12, .7 * g)
+        if kind == "streak":   # 空を切る音（大きい隕石ほど低く重い唸りを重ねる）
+            put(_streak(1.1, int(t * 10)), t - .8, .7 * g); put(_rumble(1.2, int(t * 10) + 1, 90), t - .9, .5 * g * g)
+        elif kind == "air":   # 空中の爆発：重い一撃（割れは弱め）＋遠いドーン＋余韻
+            put(_heavy(4.0, 50, int(t * 7), .5), t, .95 * g); put(_pitch(B["explosion_dull"], .55), t + .12, .7 * g)
+            put(_pitch(B["explosion_chunky"], .7), t + .05, .5 * g); put(_rumble(4.0, int(t * 7) + 2), t + .2, .45 * g)
         elif kind == "glass":
             put(B["glass_big"], t, g)
             for j in range(5):
@@ -139,23 +156,26 @@ def beds():
         elif kind == "impact":   # 地面に衝突：直前 0.35 秒は静かに → いちばん低い衝撃
             a = int((t - .4) * SR); b_ = int(t * SR); duck[max(0, a):b_] = np.minimum(duck[max(0, a):b_], np.linspace(1, .12, b_ - max(0, a)))
             c_ = int((t + .5) * SR); duck[b_:c_] = np.minimum(duck[b_:c_], np.linspace(.12, 1, c_ - b_))
-            put(_boom(3.5, 34, int(t)), t, 1.1 * g); put(B["explosion_chunky"], t + .02, .7 * g); put(_pitch(B["quake"], .6)[:int(3 * SR)], t + .1, .5 * g)
+            put(_heavy(5.5, 60, int(t * 7)), t, 1.25 * g); put(_pitch(B["explosion_chunky"], .65), t + .02, .9 * g); put(B["explosion"], t, .6 * g)
+            put(_pitch(B["quake"], .6)[:int(3 * SR)], t + .1, .5 * g); put(_rumble(5.0, int(t * 7) + 3), t + .15, .7 * g)
+            for j in range(6):   # 降ってくる破片
+                put(_pitch(pick("break_")[r.integers(3)], r.uniform(.5, .8)), t + .5 + .22 * j, .35 * g); put(pick("hit_")[r.integers(7)], t + .6 + .25 * j, .25 * g)
         elif kind == "tiles":   # 瓦と木が飛ぶ
             for j in range(6):
                 put(_pitch(pick("wood_")[r.integers(3)], r.uniform(.8, 1.2)), t + .12 * j, .5 * g); put(pick("hit_")[r.integers(7)], t + .05 + .14 * j, .4 * g)
         elif kind == "space":   # 宇宙：音のない世界だが、演出として低い衝撃だけ
-            put(_boom(3.5, 30, int(t)), t, g); put(_pitch(B["explosion_dull"], .5), t, .6 * g)
+            put(_heavy(5.5, 45, int(t * 7), .7), t, 1.2 * g); put(_pitch(B["explosion_chunky"], .55), t, .8 * g)
+            put(_pitch(B["explosion_dull"], .5), t, .6 * g); put(_rumble(5.0, int(t * 7) + 4, 110), t + .2, .7 * g)
         elif kind == "steam":
             put(_steam(2.4, int(t)), t, .25 * g)
         elif kind == "shatter":   # 地球が砕ける：いちばん大きな低音と崩れる音 → そのあとは無音
             a = int((t - .6) * SR); b_ = int(t * SR); duck[max(0, a):b_] = np.minimum(duck[max(0, a):b_], np.linspace(1, .05, b_ - max(0, a)))
-            put(_boom(4.5, 24, 99), t, 1.3 * g); put(_boom(4.0, 38, 98), t + .15, .8 * g); put(B["explosion_chunky"], t, .8 * g)
+            put(_heavy(6.0, 40, 99), t, 1.4 * g); put(_boom(4.0, 38, 98), t + .15, .8 * g); put(_pitch(B["explosion_chunky"], .5), t, 1.0 * g)
+            put(_rumble(6.0, 97, 120), t + .1, .8 * g)
             for j in range(6):
                 put(_pitch(pick("break_")[r.integers(3)], r.uniform(.4, .6)), t + .1 + .25 * j, .6 * g)
-    # 地鳴り：低く唸る音
-    qk = _load(SFX / "break" / "quake.mp3"); qk = np.tile(_pitch(qk, .7), n // len(qk) + 2)[:n]; qk = music._lp(qk, 500)
-    ks = [k for k in order if k in QUAKE]; ts = [cues[k] for k in ks] + [total]; vs = [QUAKE[k] for k in ks] + [0]
-    near += qk / (np.sqrt(np.mean(qk ** 2)) + 1e-9) * .09 * np.interp(np.arange(n) / SR, ts, vs) * duck
+    # 続けて鳴らす地鳴りはやめた（ループが曲に聞こえた、ユーザー「BGM は不要」）。地鳴りは衝突ごとの余韻（_rumble）だけ。冒頭は 1 回だけ低く
+    put(_rumble(2.6, 1, 120), 0, .35)
     # 地球が砕けたあと（l16）は、余韻の低音だけを残して静かに
     end_a = int((cues["l15"] + 2.4) * SR)
     tick[end_a:] = 0

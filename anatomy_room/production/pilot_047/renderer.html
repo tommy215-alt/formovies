@@ -151,7 +151,7 @@ function shoutCard(t, a, l1, l2, c1, c2) {   // 画面の中央に 2 行の大�
 // ---------------------------------------------------------------- 上：タイトルの帯（もしも設計の既定、2026-11-09〜：黒地に赤文字で最初から最後まで）
 const TBAR = 340;
 function titleBar() {
-  ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR); ui.fillStyle = "#C8141E"; ui.fillRect(0, TBAR - 6, W, 6);
+  ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR);
   S.group(() => { text(ui, KIT.opening.title[0], 540, 118, 86, "#FF2A2A", { weight: 900 }); text(ui, KIT.opening.title[1], 540, 236, 112, "#FF2A2A", { weight: 900 }); }, [0, 0, W, TBAR]);
   ui.restore();
 }
