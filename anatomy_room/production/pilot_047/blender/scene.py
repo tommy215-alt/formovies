@@ -356,7 +356,7 @@ def rock(name, seed):
 ROCK = rock("rock", 3)
 trail_m = emat("trail", (1, .5, .2), 1, emit=(1, .5, .2), k=0., alpha=.0)
 TRAIL_K = esock(trail_m); TRAIL_A = asock(trail_m)
-bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=1.0, radius2=0.0, depth=1.0); TRAIL = bpy.context.object; TRAIL.data.materials.append(trail_m)
+bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=1.0, radius2=0.0, depth=1.0); TRAIL = bpy.context.object; TRAIL.data.materials.append(trail_m); TRAIL.visible_shadow = False   # 尾は影を落とさない
 # 尾の形：先が原点、+Z（後ろ）へ伸びる
 for v in TRAIL.data.vertices:
     v.co.z += .5
@@ -603,7 +603,7 @@ def show(where, tod="day"):
     SPACE.location = (0, 0, 0) if where == "space" else (0, 0, -1e5); hide_tree(SPACE, where != "space")
     for o in (MOON, MARS, CORE):
         o.location = (0, 0, -900)
-    cam.o.data.dof.use_dof = False
+    cam.o.data.dof.use_dof = False; cam.o.data.clip_start = .0005 if where == "space" else .05
     sc.view_settings.view_transform = "AgX"; sc.view_settings.look = "AgX - Punchy"
     if where in ("kanto", "japan"):
         sc.view_settings.view_transform = "Standard"; sc.view_settings.look = "None"; sky.set(0, -12, 160, 0.0); set_haze((0, 0, 0), 0.); sc.view_settings.exposure = -.4
@@ -632,7 +632,7 @@ def sky_point(alt, aim=TARGET):
 def sky_path(k, alt0, alt1):
     """1〜7 日目の流れ星（上空で燃え尽きる）：広場のカメラから見て、右上から左下へ空を横切る道。k：0→1。戻り値（頭の位置, 進む向き）"""
     a = AZ.normalized(); side = Vector((a.y, -a.x, 0))
-    p0 = CAMP + a * 50000 + side * 26000 + Vector((0, 0, alt0)); p1 = CAMP + a * 52000 - side * 4000 + Vector((0, 0, alt1))
+    p0 = CAMP + a * 90000 + side * 35000 + Vector((0, 0, alt0)); p1 = CAMP + a * 95000 + side * 8000 + Vector((0, 0, alt1))
     return p0 + (p1 - p0) * k, (p1 - p0).normalized()
 
 
@@ -662,27 +662,27 @@ def s_l01():
 def a_l01(u, t, f):   # 1 日目：正午の広場。昼の空に小さな光の筋（10 cm、上空 56 km で燃え尽きる）。誰も気づかない
     for (p0, p1, (x, y), hd) in PEOPLE:
         keyp(p0, f, loc=(x + .3 * math.sin(t + x), y, 0), rot=(0, 0, hd)); keyp(p1, f, loc=(x, y, -60))
-    e = t - 1.6; k = clamp((e + .8) / 1.2)
-    if -.8 < e < .5:
-        head, dv = sky_path(k, 80000, 56000); place_meteor(head, dv, 700, 14000 * (.3 + k), 0., 5.0 * math.sin(math.pi * clamp(k)), f)
+    e = t - 2.0; k = clamp((e + 1.0) / 1.4)
+    if -1.0 < e < .4:
+        head, dv = sky_path(k, 80000, 56000); place_meteor(head, dv, 800, 16000 * (.3 + k), 0., 5.0 * math.sin(math.pi * clamp(k)), f)
     else:
         hide_meteor(f)
-    look_dir(CAMP + Vector((0, 0, .1 * u)), AZ, 24 + 3 * ease(u), 24)
+    look_dir(CAMP + Vector((0, 0, .1 * u)), AZ, 21 + 2 * ease(u), 30)
 
 def s_l02():
     show("plaza")
-def a_l02(u, t, f):   # 2〜6 日目（早送り）：毎日の正午、光の筋が太くなる。人々は空を見上げる
-    days = [(.45, 2), (1.05, 3), (1.65, 4), (2.25, 5), (2.8, 6)]
-    on = [(tt, d) for tt, d in days if -.7 < t - tt < .5]
-    look = clamp((t - .9) / 1.2); H2 = face(-.66, .26)
+def a_l02(u, t, f):   # 2〜6 日目：毎日の正午に 1 本ずつ（1 日 1 秒）、光の筋が太くなる。人々は空を見上げる
+    days = [(.5 + i, d) for i, d in enumerate(range(2, 7))]
+    on = [(tt, d) for tt, d in days if -.45 < t - tt < .45]
+    look = clamp((t - 1.5) / 1.5); H2 = face(-.66, .26)
     for (p0, p1, (x, y), hd) in PEOPLE:
         keyp(p0, f, loc=(x, y, 0), rot=(0, 0, hd + (H2 - hd) * look)); keyp(p1, f, loc=(x, y, -60))
     if on:
-        tt, d = on[-1]; k = clamp((t - tt + .7) / 1.2); L_ = DAYS[d]["L_m"]
-        head, dv = sky_path(k, 80000, DAYS[d]["burst_m"]); place_meteor(head, dv, 700 * (L_ / .1) ** .3, 14000 * (.4 + k) * (L_ / .1) ** .15, 2. * (d >= 4), 4.0 + 1.0 * d, f)
+        tt, d = on[-1]; k = clamp((t - tt + .45) / .9); L_ = DAYS[d]["L_m"]
+        head, dv = sky_path(k, 80000, DAYS[d]["burst_m"]); place_meteor(head, dv, 800 * (L_ / .1) ** .3, 16000 * (.4 + k) * (L_ / .1) ** .15, 2. * (d >= 4), 4.0 + 1.0 * d, f)
     else:
         hide_meteor(f)
-    look_dir(CAMP + Vector((-6 * ease(u), 4 * ease(u), 0)), AZ, 27, 24)
+    look_dir(CAMP + Vector((-6 * ease(u), 4 * ease(u), 0)), AZ, 22, 30)
 
 def s_l03():
     show("plaza")
@@ -695,7 +695,7 @@ def a_l03(u, t, f):   # 7 日目：上空 36 km で爆発。煙の玉がゆっ�
         k = clamp((e + .7) / .7); head, dv = sky_path(k, 80000, DAYS[7]["burst_m"]); place_meteor(head, dv, 2500, 30000, 3., 6., f); hide_burst(f)
     else:
         hide_meteor(f); burst(sky_path(1, 80000, DAYS[7]["burst_m"])[0], 9000, clamp(e / 2.0), f, rise=1500, fire=2.5)
-    look_dir(CAMP + Vector((-4, 3, 0)) + shake(f, .05 * clamp(1 - abs(e - .5)), 1), AZ, 30, 22)
+    look_dir(CAMP + Vector((-4, 3, 0)) + shake(f, .05 * clamp(1 - abs(e - .5)), 1), AZ, 21, 28)
 
 def s_l04():
     show("plaza")
@@ -717,23 +717,48 @@ def a_l04(u, t, f):   # 8〜9 日目：目の前のビルの窓が震えて割�
     cam.look(tuple(Vector(mix((112, -49, 2.0), (108, -53, 2.4), ease(u))) + shake(f, .12 * hit, 2)), (90, -15, 14 - 6 * ease(u)), 24)
 
 def s_l05():
-    show("plaza", "dust"); hide_tree(PLAZA, False)
+    show("plaza", "dust"); hide_tree(PLAZA, False); sc.view_settings.exposure = -.45
     for (p0, p1, *_ ) in PEOPLE:
         p0.location = p1.location = (0, 0, -60)
-def a_l05(u, t, f):   # 10 日目：人のいない新宿。上空 7 km で爆発し、8 km の内側のビルが崩れる（崩れる部品だけを動かす）
-    e = t - ev_t("l05", 0); e2 = t - ev_t("l05", 1)
+GZ = Vector((-112, 0, 0))   # 爆心（都庁の真下）
+ZAX = Vector((0, 0, 1))
+
+
+def topple(o, h, theta, sink=0.):
+    """ビルを、爆心と反対の側の根もとを軸に倒す（theta：倒れる角度）"""
+    x0, y0, _ = INIT[o.name][0]; d = Vector((x0 - GZ.x, y0 - GZ.y, 0)); d = d.normalized() if d.length > 1 else Vector((1, 0, 0))
+    w = min(o.dimensions.x, o.dimensions.y) / 2; R = Matrix.Rotation(theta, 3, ZAX.cross(d))
+    pivot = Vector((x0, y0, -sink)) + d * w; c = pivot + R @ (-d * w + ZAX * h / 2)
+    keyp(o, f_now[0], loc=tuple(c), rot=tuple(R.to_euler()))
+
+
+f_now = [0]
+
+
+def a_l05(u, t, f):   # 10 日目：人のいない新宿。上空 7 km の爆発 → 衝撃波が地面を走り、ビルが爆心と反対へ次々に倒れる
+    f_now[0] = f
+    e = t - ev_t("l05", 0); c = GZ + Vector((0, 0, DAYS[10]["burst_m"]))
     if e < 0:
-        k = clamp((e + .6) / .6); head = sky_point(26000 - 19000 * k); place_meteor(head, ENTRY, 4000, 26000, 4., 7., f); hide_burst(f)
+        k = clamp((e + .7) / .7); place_meteor(c - ENTRY * 20000 * (1 - k), ENTRY, 3000, 24000, 4., 7., f); hide_burst(f)
     else:
-        hide_meteor(f); burst(sky_point(7200), 5000, clamp(e / 2.6), f, rise=2500, fire=2.0)
-    k = ease(clamp(e2 / 1.6))
+        hide_meteor(f); burst(c, 3500, clamp(e / 2.6), f, rise=2000, fire=2.0)
+    R = 1300 * ease(clamp((e - .7) / 1.4))   # 衝撃波の前線（地面）
     for j, (o, h, tilt) in enumerate(TOWERS):
-        x0, y0, _ = INIT[o.name][0]; d = Vector((x0 + 112, y0, 0)).normalized(); kk = ease(clamp((e2 - .002 * math.hypot(x0, y0) * .3) / 1.4))
-        keyp(o, f, loc=(x0 + d.x * h * .3 * kk, y0 + d.y * h * .3 * kk, h / 2 - h * .75 * kk), rot=(d.y * -.9 * kk + tilt * .2 * kk, d.x * .9 * kk, 0))
-    keyp(TOCHO, f, loc=(0, 0, -150 * k), rot=(0, .15 * k, 0))
-    dust_dome((-112, 0, 0), 900, 380, clamp(e2 / 2.0), f)
-    hit = clamp(1 - abs(e2) / .6)
-    cam.look(tuple(Vector(mix((1500, -1700, 240), (1400, -1600, 260), ease(u))) + shake(f, 3.0 * hit, 4)), (-80, 60, 900 - 300 * ease(u)), 28)
+        x0, y0, _ = INIT[o.name][0]; r = math.hypot(x0 - GZ.x, y0 - GZ.y); th = .7 + 1.4 * (r / 1300) ** .8
+        topple(o, h, 1.45 * ease(clamp((e - th) / .7)) + tilt * .05, sink=.06 * h * ease(clamp((e - th - .4) / .6)))
+    k = ease(clamp((e - .7) / 1.0)); keyp(TOCHO, f, loc=(0, 0, -160 * k), rot=(0, .12 * k, 0))
+    for j, (o, dv, rr, ss) in enumerate(DUST):   # 地面を走る土煙の輪
+        a_ = j / len(DUST) * 6.283; rad = R * (.85 + .15 * rr)
+        keyp(o, f, loc=(GZ.x + rad * math.cos(a_), GZ.y + rad * math.sin(a_), 25 * ss) if R > 30 else (0, 0, -5000), scale=45 * ss + R * .02)
+    for i, o in enumerate(DEBRIS):   # ビルの上から飛ぶ破片
+        rr = random.Random(i); tw, h, _ = TOWERS[rr.randrange(len(TOWERS))]; x0, y0, _ = INIT[tw.name][0]
+        r = math.hypot(x0 - GZ.x, y0 - GZ.y); th = .7 + 1.4 * (r / 1300) ** .8 + rr.uniform(0, .3); te = e - th
+        d = Vector((x0 - GZ.x, y0 - GZ.y, 0)).normalized(); v = d * rr.uniform(60, 140) + Vector((0, 0, rr.uniform(20, 60)))
+        p_ = Vector((x0, y0, h * rr.uniform(.6, 1.0))) + v * te + Vector((0, 0, -40 * te * te))
+        keyp(o, f, loc=(p_.x, p_.y, max(2, p_.z)) if te > 0 else (0, 0, -5000), rot=(te * 5 + i, te * 3, i))
+    tgt = Vector(mix(tuple(c), (-112, 0, 140), ease(clamp((e - .4) / .7))))
+    hit = clamp(1 - abs(R - 1250) / 200) if R > 1000 else 0.
+    cam.look(tuple(Vector((1100, -900, 140)) + shake(f, 2.0 * hit, 4)), tuple(tgt), 24)
 
 def s_l06():
     show("city", "dust"); hide_tree(TOCHO, True)
@@ -823,58 +848,62 @@ def sp_meteor(L_m, k, f, dist=4.0, hot=4.):
 
 def s_l11():
     show("space")
-def a_l11(u, t, f):   # 17〜18 日目：宇宙から日本。小さな岩（6.6 km → 13 km）が東京へ。衝突の跡が赤く光る
-    e1, e2 = t - .5, t - 1.9
-    if e2 > -.9 and e2 < 0:
-        sp_meteor(DAYS[18]["L_m"] * 15, clamp((e2 + .9) / .9), f, 2.5)
-    elif e1 > -.5 and e1 < 0:
-        sp_meteor(DAYS[17]["L_m"] * 15, clamp((e1 + .5) / .5), f, 2.0)
+def sp_dirs():
+    side = TOKYO.cross(Vector((0, 0, 1))).normalized(); up_ = side.cross(TOKYO).normalized()
+    return side, up_, (-TOKYO * .7 - side * .5 + up_ * .2).normalized()
+
+
+def a_l11(u, t, f):   # 18 日目（直径 13 km）：岩を後ろから追い、東京へ。衝突のあと、カメラが引いて焼けた円を見せる
+    side, up_, d = sp_dirs(); tgt = TOKYO * RE_U; r = DAYS[18]["L_m"] / 2e6; TI = 1.8
+    s_ = 1.5 * (1 - ease(clamp(t / TI)) * .8 - .2 * clamp(t / TI)); head = tgt - d * (s_ + r)
+    chase = head - d * .11 + side * .07 + up_ * .05
+    if t < TI:
+        place_meteor(head, d, 2 * r, .03, 4., 6., f); keyp(TRAIL, f, scale=(r * .7, r * .7, .03 + .04 * clamp(t / TI)))
+        key_fac(ROCK_DIR, tuple(-d), f)   # 追いかけるカメラから見える側（後ろ）のひびを光らせる（見やすさのため）
+        cam.look(tuple(chase), tuple(head + d * .03), 32)
     else:
-        hide_meteor(f)
-    a = (DAYS[18]["cloth_km"] if e2 > 0 else DAYS[17]["cloth_km"] if e1 > 0 else 0) / 6371
-    key_fac(BURN_A, a * ease(clamp((max(e1, e2) if e2 > 0 else e1) / .8)), f); key_fac(SPOT_K, 6 * clamp(1 - max(0, e2 if e2 > 0 else e1) / 1.5) if e1 > 0 else 0, f); SPOT_A.default_value = .02
+        hide_meteor(f); k = ease(clamp((t - TI) / 1.3)); c0 = tgt - d * (.11 + r) + side * .07 + up_ * .05
+        cam.look(tuple(Vector(c0).lerp(TOKYO * (RE_U + 2.4) + side * .6 - up_ * 1.1, k)), tuple(tgt), 32)
+    e = t - TI
+    key_fac(BURN_A, DAYS[18]["cloth_km"] / 6371 * ease(clamp(e / 1.0)) if e > 0 else 0., f)
+    key_fac(SPOT_K, 3 * clamp(1 - e / 1.6) if e > 0 else 0., f); SPOT_A.default_value = .008
     keyp(CLOUDS, f, rot=(0, 0, t * .01))
-    tokyo_cam(mix((1.6,), (2.4,), ease(u))[0], .1, .55, 32)
 
 def s_l12():
     show("space")
-def a_l12(u, t, f):   # 19〜20 日目：爆風の輪が地球を一周
-    e = t - ev_t("l12", 0) + .6
-    key_fac(BURN_A, (DAYS[19]["cloth_km"] / 6371) + .3 * clamp(e / 1.5), f)
-    key_fac(RING_A, math.pi * ease(clamp(e / 1.6)) if e > 0 else 0., f); key_fac(RING_K, 5.0 * (1 - .5 * clamp(e / 1.6)) if e > 0 else 0., f)
-    if -.6 < e < 0:
-        sp_meteor(DAYS[20]["L_m"] * 5, clamp((e + .6) / .6), f, 3.0)
+def a_l12(u, t, f):   # 20 日目（52 km）：光る尾を引いて東京へ → 爆風の輪が地球を一周
+    side, up_, d = sp_dirs(); tgt = TOKYO * RE_U; r = DAYS[20]["L_m"] / 2e6; TI = .9; e = t - TI
+    key_fac(BURN_A, DAYS[18]["cloth_km"] / 6371 + .3 * clamp(e / 1.5) if e > 0 else DAYS[18]["cloth_km"] / 6371, f)
+    key_fac(RING_A, math.pi * ease(clamp(e / 1.7)) if e > 0 else 0., f); key_fac(RING_K, 5.0 * (1 - .5 * clamp(e / 1.7)) if e > 0 else 0., f)
+    if e < 0:
+        place_meteor(tgt - d * (3.5 * (1 - t / TI) + r), d, 2 * r, 1.4, 4., 8., f)
     else:
         hide_meteor(f)
     keyp(CLOUDS, f, rot=(0, 0, t * .01))
-    tokyo_cam(9 + 4 * ease(u), .25, .2, 35)
+    cam.look(tuple(TOKYO * (RE_U + 9 + 2 * ease(u)) + side * 4.0 + up_ * 1.0), tuple(TOKYO * RE_U * .6), 35)
 
 def s_l13():
     show("space")
-def a_l13(u, t, f):   # 21〜23 日目：海が白い湯気になり、干上がっていく
-    e = t - ev_t("l13", 0)
-    key_fac(BURN_A, .9 + .6 * clamp(u), f); key_fac(DRY, clamp(e / 1.6) if e > 0 else 0., f)
-    key_fac(CLOUD_LO, .5 - .45 * clamp((e + .4) / 1.6), f)
-    if -.6 < e < 0:
-        sp_meteor(DAYS[23]["L_m"], clamp((e + .6) / .6), f, 6.0)
+def a_l13(u, t, f):   # 23 日目（419 km）：光る尾を引いて東京へ → 海が白い湯気になり、干上がっていく
+    side, up_, d = sp_dirs(); tgt = TOKYO * RE_U; r = DAYS[23]["L_m"] / 2e6; TI = 1.0; e = t - TI
+    key_fac(BURN_A, .9 + .7 * clamp(e / 1.5) if e > 0 else .9, f); key_fac(DRY, clamp(e / 1.6) if e > 0 else 0., f)
+    key_fac(CLOUD_LO, .5 - .45 * clamp(e / 1.6) if e > 0 else .5, f)
+    if e < 0:
+        place_meteor(tgt - d * (6.0 * (1 - t / TI) + r), d, 2 * r, 3.0, 3., 7., f)
     else:
         hide_meteor(f)
     keyp(CLOUDS, f, rot=(0, 0, t * .02))
-    tokyo_cam(16 + 3 * ease(u), .4, .1, 35)
+    cam.look(tuple(TOKYO * (RE_U + 15 + 2 * ease(u)) + side * 6.0 + up_ * 1.5), tuple(TOKYO * RE_U * .4), 35)
 
 def s_l14():
     show("space")
-def a_l14(u, t, f):   # 24〜27 日目：地球の横に、その日の岩（月の大きさ → 火星の大きさ）。月と火星を並べて比べる
-    c = clock("l14", t); d = min(27, max(24, day_of(c) if since_noon(c) >= -60 else day_of(c) - 1)); L_ = DAYS[d]["L_m"]
+def a_l14(u, t, f):   # 26 日目（3,355 km）：月とほぼ同じ大きさの岩が、月と並んで地球へ迫る
+    side, up_, d = sp_dirs(); L_ = DAYS[26]["L_m"]; r = L_ / 2e6
     key_fac(DRY, 1.0, f); key_fac(BURN_A, 1.6, f); key_fac(CLOUD_LO, .05, f)
-    side = TOKYO.cross(Vector((0, 0, 1))).normalized()
-    head = TOKYO * (RE_U * 1.0) + side * (RE_U * 2.3) + TOKYO * 6.0
-    keyp(ROCK, f, loc=tuple(head), rot=(t * .2, .3, t * .1), scale=L_ / 2e6); key_fac(ROCK_HOT, 1.5, f); key_fac(ROCK_DIR, tuple(-side), f)
-    keyp(TRAIL, f, loc=(0, 0, -1e6))
-    cmp_ = MOON if d <= 26 else MARS
-    keyp(MOON, f, loc=tuple(head + side * (L_ / 2e6 + 2.6) + TOKYO * 1.5) if d == 26 else (0, 0, -900))
-    keyp(MARS, f, loc=tuple(head + side * (L_ / 2e6 + 4.2) + TOKYO * 2.0) if d == 27 else (0, 0, -900))
-    tokyo_cam(30 + 6 * ease(u), .9, -.05, 35, side * 3.0)
+    head = TOKYO * RE_U - d * (RE_U * 2.6 - 2.0 * ease(u) + r)
+    place_meteor(head, d, 2 * r, 4.0, 2.5, 3., f); keyp(TRAIL, f, loc=(0, 0, -1e6))
+    keyp(MOON, f, loc=tuple(head + up_ * (r + 1.737 + 1.0)))
+    cam.look(tuple(TOKYO * 12 - side * 26 + up_ * 6), tuple(head * .5), 35)
 
 def s_l15():
     show("space")

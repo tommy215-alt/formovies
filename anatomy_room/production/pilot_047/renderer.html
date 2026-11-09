@@ -5,6 +5,8 @@
 html,body{margin:0;background:#000}
 #stage{position:relative;width:1080px;height:1920px;overflow:hidden}
 #stage canvas{position:absolute;left:0;top:0}
+/* もしも設計：上にタイトルの帯（黒地に赤、TBAR）。3D の画は帯の半分だけ下げる（空の隕石が帯に隠れないように、下は地面が少し切れる） */
+#stage canvas:not(#ui){top:170px}
 </style>
 </head><body>
 <div id="stage">
@@ -79,7 +81,7 @@ function statusUI(t) {
   const k = curId(t); if (k === "l00" || k === "l01" || k === "l16" || t < CUE.l02) return;
   const c = clockNow(t), o = tod(c), d = dayAt(c), D = DAYS[d], hd = hitDay(c), HD = DAYS[hd], a = CUE[k], u = t - a;
   const tlines = D.energy_text.split("\n"), cnt = HD ? HD.counter : null;
-  const x0 = 40, y0 = 150, w = 700, h = 236 + tlines.length * 44 + (cnt ? 70 : 0);
+  const x0 = 40, y0 = TBAR + 24, w = 700, h = 236 + tlines.length * 44 + (cnt ? 70 : 0);
   ui.save(); ui.translate(x0, y0);
   ui.fillStyle = "rgba(6,10,16,.82)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,120,60,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
   ui.fillStyle = "#FF7A3C"; ui.fillRect(0, 20, 8, h - 40);
@@ -97,7 +99,7 @@ function statusUI(t) {
       text(ui, cnt[0], 36, yc + 6, 32, col, { weight: 800, align: "left" }); text(ui, fmtCount(cnt), w - 32, yc + 6, 40, "#FFFFFF", { weight: 900, align: "right" }); }
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();
-  const ff = rate(t) > 3000 ? clamp((u - .2) / .3) : 0; if (ff) S.group(() => ffMark(x0 + 18, y0 + h + 44, ff));
+  const ff = rate(t) > 3000 && k !== "l02" ? clamp((u - .2) / .3) : 0; if (ff) S.group(() => ffMark(x0 + 18, y0 + h + 44, ff));
 }
 
 // ---------------------------------------------------------------- 下：出来事の札（新しいものが下に積み上がる。古いものは消える）
@@ -128,7 +130,7 @@ function eventsUI(t) {
 const CARDS = { spec: { title: "設定", col: "#FF7A3C", rows: [["時刻", "毎日 正午"], ["場所", "東京都庁の真上"], ["大きさ", "10cmから 毎日2倍"]] } };
 function bigCard(t, id) {
   const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
-  const x0 = 60, w = 960, rh = 104, y0 = 300, h = 140 + cd.rows.length * rh;
+  const x0 = 60, w = 960, rh = 104, y0 = TBAR + 60, h = 140 + cd.rows.length * rh;
   ui.save(); ui.globalAlpha *= k * ko; const pop = 1 + .1 * Math.pow(1 - clamp(u / .22), 2); ui.translate(540, y0 + h / 2); ui.scale(pop, pop); ui.translate(-540, -y0 - h / 2);
   ui.fillStyle = "rgba(6,10,18,.88)"; rrect(ui, x0, y0, w, h, 16); ui.fill(); ui.strokeStyle = cd.col; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 16); ui.stroke();
   ui.fillStyle = cd.col; ui.fillRect(x0, y0 + 18, 10, 76);
@@ -143,10 +145,17 @@ function bigCard(t, id) {
 }
 function shoutCard(t, a, l1, l2, c1, c2) {   // 画面の中央に 2 行の大きな文字（少し遅れて 2 行目）
   const u = t - a; if (u < 0) return; const k = easeOut(clamp(u / .45)), k2 = easeOut(clamp((u - .45) / .45));
-  ui.save(); ui.globalAlpha *= k; S.group(() => text(ui, l1, 540, 760, 92, c1, { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
-  ui.save(); ui.globalAlpha *= k2; ui.translate(540, 900); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, l2, 0, 0, 96, c2, { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
+  ui.save(); ui.globalAlpha *= k; S.group(() => text(ui, l1, 540, 860, 92, c1, { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
+  ui.save(); ui.globalAlpha *= k2; ui.translate(540, 1000); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, l2, 0, 0, 96, c2, { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
 }
-{ const _du = drawUI; drawUI = function (t, name) { if (name === "open") { _du(t, name); return; }
+// ---------------------------------------------------------------- 上：タイトルの帯（もしも設計の既定、2026-11-09〜：黒地に赤文字で最初から最後まで）
+const TBAR = 340;
+function titleBar() {
+  ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR); ui.fillStyle = "#C8141E"; ui.fillRect(0, TBAR - 6, W, 6);
+  S.group(() => { text(ui, KIT.opening.title[0], 540, 118, 86, "#FF2A2A", { weight: 900 }); text(ui, KIT.opening.title[1], 540, 236, 112, "#FF2A2A", { weight: 900 }); }, [0, 0, W, TBAR]);
+  ui.restore();
+}
+{ const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;   // オープニングの大きなタイトルは帯と重なるので出さない
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec");
   if (k === "l10") shoutCard(t, CUE.l10 + 1.2, "日本に", "逃げ場がない", "#EAF2F8", "#FF6A6A");
