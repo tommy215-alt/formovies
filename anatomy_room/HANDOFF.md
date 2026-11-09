@@ -4,6 +4,7 @@
 
 ## いまの状態
 
+- **pilot_048「東京に体長500mのポメラニアンが現れたら？」（もしも設計、2026-11-10）は制作中**：ユーザーが流れを OK（構想 `scripts/pilot_048/concept.md`、計算 `sim/pom.py`、事実確認 `fact_check.md`）。ポメラニアンは Blender の部品（胴・頭・あご・舌・足・しっぽ）ごとのメタボール＋パーティクルの毛で、**実寸（500 m）で作る**（物の拡大では毛の長さが伸びない）。メタボールは部品ごとに作るので threshold .05（.6 だと半径の 4 割に縮む）。建物は numpy でまとめて作る（bmesh で 1 つずつ足すと遅い）。Blender は `python work/bl_watch.py l00 … l16`（20 サンプル）。次：全ショットを描いたら `python ../ext/blender/bl_pack.py 048` → `rv.py 048 render all` → 確認 → ユーザーに見せる。犬の音は Freesound の CC0（`assets/sfx/dog/`）。
 - **pilot_047「毎日2倍になる隕石。地球は何日もつ？」（もしも設計、2026-11-09）は完成（v2、同日：2〜6 日目を 1 日 1 秒にゆっくり、10 日目にビルが倒れる、17 日目より後は要所だけ、上に黒地赤文字のタイトルの帯を常に＝もしも設計の新しい既定）**：`production/pilot_047/reverse_047_meteor.mp4`（55.5 秒）、サムネイル `thumbnail.png`、タイトル・説明文 `youtube_metadata.md`、自己レビュー `reviews/internal_review/pilot_047_review.md`。ゾンビ（pilot_045）の「視聴を継続 55.1%」への対策（0 秒目に一番強い画・60 秒以内）を入れた最初の回。条件（ユーザー）：毎日正午・都庁の真上・10 cm から毎日 2 倍・人は逃げる・28 日目に地球が砕ける・たとえは分かりやすく。計算は `scripts/pilot_047/sim/`（`impact.py`＝Earth Impact Effects Program の crater.cgi を移した式、`population.py`＝国勢調査＋沖縄の島で避難と逃げ場）。地図は都庁中心の正距方位図法（`blender/make_maps.py`）。Blender は 1 コマ約 5 秒で全体 約 3 時間。ユーザーの感想待ち。queue.json には未登録（ユーザーが選んだら載せる）。
 
 - **ナレーション収録スタジオ（2026-11-05、途中で一旦止めた。続きはユーザーがまたやる）**：`tools/narration_studio/`（起動：`python anatomy_room/tools/narration_studio/narration_studio.py long_001`）。
