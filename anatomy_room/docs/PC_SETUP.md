@@ -98,5 +98,5 @@ python production_script.py all
 - 症状：書き出し中に電源が切れる（イベント ID 41、BugcheckCode 0、ブルースクリーンなし）。2 週間で 6 回。ハードウェア側で電源が切れている＝**熱か電源の瞬間的な電力の跳ね上がり**が疑わしい。
 - 対策（画質は変わらない。描く中身は設定で決まるので、電力を下げても遅くなるだけ）：
   1. **CPU のブーストを止める**（実施済み）：電源プラン「バランス」の最大のプロセッサの状態を 99%（`powercfg /setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX 99`）。戻すときは 100。
-  2. **GPU の電力の上限 220 W → 180 W**：管理者の PowerShell で `anatomy_room/tools/gpu_power_limit.ps1` を実行（ログオン時に自動で設定するタスク「Reverse-GPU-PowerLimit」も作る）。戻すときは `nvidia-smi -pl 220` とタスクの削除。
+  2. **GPU の電力の上限 220 W → 180 W**（2026-11-10 実施済み）：管理者の PowerShell で `anatomy_room/tools/gpu_power_limit.ps1` を実行（ログオン時に自動で設定するタスク「Reverse-GPU-PowerLimit」も作る）。戻すときは `nvidia-smi -pl 220` とタスクの削除。
   3. 本体の中のほこり・ファンの確認（ユーザーが行う）。
