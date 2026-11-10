@@ -75,7 +75,7 @@ function ffMark(x, y, k) { if (k <= 0) return; ui.save(); ui.globalAlpha *= k; u
 function statusUI(t) {
   const k = curId(t); if (["l00", "l01", "l05", "l13", "l14"].includes(k) || t < CUE.l02) return;
   const c = clockNow(t), a = CUE[k], u = t - a, n = remain(c), charging = c >= 150 && c < PL.fire[1] && k !== "l12";
-  const x0 = 40, y0 = TBAR + 24, w = 640, h = 150 + (charging ? 66 : 0);
+  const x0 = 40, y0 = TBAR + 24, w = 640, h = 150 + (charging ? 84 : 0);
   ui.save(); ui.translate(x0, y0);
   ui.fillStyle = "rgba(6,10,16,.82)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,150,70,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
   ui.fillStyle = "#FF9A3D"; ui.fillRect(0, 20, 8, h - 40);
@@ -86,7 +86,7 @@ function statusUI(t) {
       if (g > 0) { ui.shadowColor = `rgba(255,90,40,${.95 * g})`; ui.shadowBlur = 50 * g; }
       text(ui, `${(n / 10000).toFixed(0)}万人`, 0, 0, 46, g > .05 ? `rgb(255,${Math.round(170 + 85 * g)},${Math.round(90 + 140 * g)})` : "#FFD58A", { weight: 900, align: "right" }); ui.restore(); }
     if (charging) { ui.fillStyle = "rgba(255,255,255,.08)"; ui.fillRect(28, 160, w - 56, 2);
-      text(ui, "次の炎まで", 36, 192, 32, "#FF6A4C", { weight: 800, align: "left" }); text(ui, `${Math.max(0, Math.ceil(PL.fire[1] - c))}秒`, w - 32, 192, 44, "#FF6A4C", { weight: 900, align: "right" }); }
+      text(ui, "次の炎まで", 36, 194, 32, "#FF6A4C", { weight: 800, align: "left" }); text(ui, `${Math.max(0, Math.ceil(PL.fire[1] - c))}秒`, w - 32, 194, 42, "#FF6A4C", { weight: 900, align: "right" }); }
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();
   const ff = rate(t) > 8 ? clamp((u - .2) / .3) : 0; if (ff) S.group(() => ffMark(x0 + 18, y0 + h + 44, ff));

@@ -501,6 +501,8 @@ def scorch():
 
 def world(people="plain", n=50000):
     env_clear(); terrain()
+    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=200000); bmesh.ops.translate(bm, vec=(0, 0, -25), verts=bm.verts)
+    mesh_obj("farground", bm, [ground_grass()])   # 地形の外（遠く）も地面に（高いカメラで地平線の下が黒く見えないように）
     if people == "plain":
         crowd(plain_points(n))
     if people in ("hill", "both"):
@@ -567,7 +569,7 @@ def a_l04(u, t, f):
     d = (Matrix.Rotation(sweep, 3, "Z") @ d).normalized()
     aim_fire(FIRE4, org, d, f, on=fire > 0 and u < .9, scale=.4 + .6 * min(1, fire * 4)); key_v(FIRE4K, 6.0, f)
     gp = org + d * 150; keyp(SMOKE4, f, loc=tuple(Vector((gp.x, gp.y, 25))) if fire > .1 else (0, 0, -1e5), scale=60 + 60 * fire); key_v(SMOKE4K, .012 * (fire > .1), f)
-    cam.look(tuple(Vector((150, -30, 30)) + Vector((-10 * u, 0, 0)) + shake(f, .8 * (fire > 0), 4)), (-40, -70, 18), 26)
+    cam.look(tuple(Vector((150, -10, 30)) + Vector((-10 * u, 0, 0)) + shake(f, .8 * (fire > 0), 4)), (-15, -40, 24), 22)   # 怪獣と炎の両方が入るように
 
 
 def s_l05():
