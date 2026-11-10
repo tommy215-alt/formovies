@@ -620,7 +620,7 @@ DAWN = (.95, .72, .55); MORN = (.78, .82, .9)
 
 # ---------------------------------------------------------------- l00 / l16：新宿の高層ビルの向こうに座る（冒頭と最後が同じ構図）
 SIT_POS = YOYOGI + Vector((0, 600, 0))
-SIT_CAM = SIT_POS + Vector((-900, 2900, 230)); SIT_AT = SIT_POS + Vector((0, 0, 330))
+SIT_CAM = SIT_POS + Vector((-900, 2900, 260)); SIT_AT = SIT_POS + Vector((0, 0, 420))
 
 
 def sit_pose(tilt=0.0, ear=0.0):
@@ -628,21 +628,21 @@ def sit_pose(tilt=0.0, ear=0.0):
 
 
 def s_l00():
-    env_clear(); dog_hide(False); base(6, 105, DAWN, 1.0, 1500, 22000)
+    env_clear(); dog_hide(False); base(14, 343, DAWN, 1.0, 1500, 22000)   # 顔がはっきり見えるよう、光はカメラの側から（ユーザー）
     ground(); city(SHINJUKU.x, SHINJUKU.y, 6500, 3, downtown([(SHINJUKU.x - 600, SHINJUKU.y, 900, 240), (SHIBUYA.x, SHIBUYA.y, 600, 180)]), hole=[(SIT_POS.x, SIT_POS.y, 700)])
     trees(YOYOGI.x, YOYOGI.y, 900, 1100, 2500)
 def a_l00(u, t, f):
     p = sit_pose(.08 * math.sin(t * .8)); pose(SIT_POS, face(SIT_POS, SIT_CAM), **p)
-    cam.look(tuple(SIT_CAM + Vector((40 * u, -150 * u, 0))), tuple(SIT_AT), 32)
+    cam.look(tuple(SIT_CAM + Vector((40 * u, -150 * u, 0))), tuple(SIT_AT), 55)
 
 
 def s_l16():
-    env_clear(); dog_hide(False); base(28, 140, MORN, .9, 1500, 22000)
+    env_clear(); dog_hide(False); base(28, 343, MORN, .9, 1500, 22000)   # 冒頭と同じく、光はカメラの側から
     ground(ruin=True); city(SHINJUKU.x, SHINJUKU.y, 6500, 3, ruin=True, dens=.7)
     puff("dust16", tuple(SIT_POS + Vector((0, 0, -300))), 1400, (.6, .55, .5), .00012)
 def a_l16(u, t, f):
     tilt = .35 * ease(cut(.15, .55, u)); p = sit_pose(tilt); pose(SIT_POS, face(SIT_POS, SIT_CAM), **p)
-    cam.look(tuple(SIT_CAM + Vector((40, -150, 0)) * (1 - u)), tuple(SIT_AT), 32)
+    cam.look(tuple(SIT_CAM + Vector((40, -150, 0)) * (1 - u)), tuple(SIT_AT), 55)
 
 
 # ---------------------------------------------------------------- l01：夜明けの代々木公園、霧の中の影

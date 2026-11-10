@@ -153,7 +153,8 @@ function fitText(s, size, maxw) { ui.font = `900 ${size}px ${S.FONT}`; const w =
 function titleBar() {
   ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR);
   const [l1, l2] = KIT.opening.title, s1 = fitText(l1, 92, 1000), s2 = fitText(l2, 104, 1000);
-  S.group(() => { text(ui, l1, 540, 118, s1, "#FF2A2A", { weight: 900 }); text(ui, l2, 540, 236, s2, "#FF2A2A", { weight: 900 }); }, [0, 0, W, TBAR]);
+  // 太く見せるため、同じ赤の縁取りを重ねる（2026-11-10 ユーザー「赤文字をもう少し太く」）
+  S.group(() => { text(ui, l1, 540, 118, s1, "#FF2A2A", { weight: 900, stroke: "#FF2A2A", sw: 7 }); text(ui, l2, 540, 236, s2, "#FF2A2A", { weight: 900, stroke: "#FF2A2A", sw: 7 }); }, [0, 0, W, TBAR]);
   ui.restore();
 }
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;   // オープニングの大きなタイトルは帯と重なるので出さない
