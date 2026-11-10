@@ -148,7 +148,7 @@ function titleBar() {
   ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR);
   const [l1, l2] = KIT.opening.title, s1 = fitText(l1, 92, 1000), s2 = fitText(l2, 104, 1000);
   S.group(() => { ui.fillStyle = "#FF2A2A"; ui.textAlign = "center"; ui.textBaseline = "middle";
-    ui.font = `400 ${s1}px TitleBlack`; ui.fillText(l1, 540, 118); ui.font = `400 ${s2}px TitleBlack`; ui.fillText(l2, 540, 236); }, [0, 0, W, TBAR]);
+    ui.font = `400 ${s1}px TitleBlack`; ui.fillText(l1, 540, 140); ui.font = `400 ${s2}px TitleBlack`; ui.fillText(l2, 540, 258); }, [0, 0, W, TBAR]);   // 2026-11-10 全画面で上が少し見切れる → 22px 下げた
   ui.restore();
 }
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
