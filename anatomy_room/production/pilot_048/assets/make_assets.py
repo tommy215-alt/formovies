@@ -21,5 +21,8 @@ if __name__ == "__main__":
     chars = "".join(sorted(set(c for c in text if c.strip())))
     p = HERE / "assets.js"; out = json.loads(p.read_text(encoding="utf-8")[len("window.ASSETS = "):].rstrip().rstrip(";"))
     out["font_biz"] = base64.b64encode(kit.font_subset(HERE / "fonts" / "BIZUDPGothic-Bold.ttf", chars)).decode()
+    # タイトルの帯は Dela Gothic One（SIL OFL 1.1）。縁取りで太くすると字がつぶれるので、太い書体そのものを使う（2026-11-10 ユーザー）
+    tt = "".join(sorted(set("東京に体長500mのポメラニアンが現れたら？")))
+    out["font_title"] = base64.b64encode(kit.font_subset(HERE / "fonts" / "DelaGothicOne-Regular.ttf", tt)).decode()
     p.write_text("window.ASSETS = " + json.dumps(out) + ";\n", encoding="utf-8")
     print("font_biz", len(chars), "文字", len(out["font_biz"]) // 1024, "KB")

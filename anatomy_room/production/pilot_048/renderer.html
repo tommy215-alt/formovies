@@ -149,12 +149,13 @@ function shoutCard(t, a, l1, l2, c1, c2) {   // 画面の中央に 2 行の大�
 }
 // ---------------------------------------------------------------- 上：タイトルの帯（もしも設計の既定、2026-11-09〜：黒地に赤文字で最初から最後まで。縁の線なし）
 const TBAR = 340;
-function fitText(s, size, maxw) { ui.font = `900 ${size}px ${S.FONT}`; const w = ui.measureText(s).width; return w > maxw ? Math.floor(size * maxw / w) : size; }
+function fitText(s, size, maxw) { ui.font = `400 ${size}px TitleBlack`; const w = ui.measureText(s).width; return w > maxw ? Math.floor(size * maxw / w) : size; }
 function titleBar() {
   ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR);
   const [l1, l2] = KIT.opening.title, s1 = fitText(l1, 92, 1000), s2 = fitText(l2, 104, 1000);
-  // 太く見せるため、同じ赤の縁取りを重ねる（2026-11-10 ユーザー「赤文字をもう少し太く」）
-  S.group(() => { text(ui, l1, 540, 118, s1, "#FF2A2A", { weight: 900, stroke: "#FF2A2A", sw: 7 }); text(ui, l2, 540, 236, s2, "#FF2A2A", { weight: 900, stroke: "#FF2A2A", sw: 7 }); }, [0, 0, W, TBAR]);
+  // 太い書体 Dela Gothic One（縁取りで太くすると字の中がつぶれた、2026-11-10 ユーザー）
+  S.group(() => { ui.fillStyle = "#FF2A2A"; ui.textAlign = "center"; ui.textBaseline = "middle";
+    ui.font = `400 ${s1}px TitleBlack`; ui.fillText(l1, 540, 118); ui.font = `400 ${s2}px TitleBlack`; ui.fillText(l2, 540, 236); }, [0, 0, W, TBAR]);
   ui.restore();
 }
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;   // オープニングの大きなタイトルは帯と重なるので出さない
@@ -168,6 +169,7 @@ function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fil
 
 // 書体：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
 const bizReady = window.ASSETS.font_biz ? new FontFace("Noto Sans CJK JP", b64buf(window.ASSETS.font_biz), { weight: "100 900" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
-kitStart(() => {}); window.READY = Promise.all([window.READY, bizReady]); BL.install();
+const titleReady = window.ASSETS.font_title ? new FontFace("TitleBlack", b64buf(window.ASSETS.font_title), { weight: "400" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
+kitStart(() => {}); window.READY = Promise.all([window.READY, bizReady, titleReady]); BL.install();
 </script>
 </body></html>

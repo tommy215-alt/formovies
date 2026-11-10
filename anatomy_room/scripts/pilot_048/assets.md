@@ -23,6 +23,7 @@
 ## フォント
 
 - BIZ UDPゴシック Bold（Morisawa、SIL OFL 1.1、`assets/fonts/OFL.txt`）
+- タイトルの帯：Dela Gothic One（artakana、SIL OFL 1.1。pilot_018 と同じファイル）
 
 ## 3D
 
