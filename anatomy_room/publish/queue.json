@@ -235,12 +235,18 @@
    "meta": "anatomy_room/production/pilot_048/youtube_metadata.md",
    "publish_at": "2026-11-11 19:00",
    "status": "scheduled",
-   "note": "2026-11-10 もしも設計の 4 本目（ポメラニアン、タイトルの帯は Dela Gothic One）。ユーザーが明日の 19 時の枠で予約を指示。2026-11-10 タイトルの帯の文字を 22px 下げた版に差し替え（ユーザーの指示）。前の版は非公開",
+   "note": "2026-11-10 もしも設計の 4 本目（ポメラニアン、タイトルの帯は Dela Gothic One）。ユーザーが明日の 19 時の枠で予約を指示。2026-11-10 タイトルの帯の文字を 22px 下げた版に差し替え（ユーザーの指示）。前の版は非公開。2026-11-10 タイトルの帯をさらに 5% 下げた版に差し替え（前の版は非公開）",
    "old_private_upload": {
     "uploaded": "2026-11-10T02:33:02.732Z"
    },
    "reupload": true,
-   "uploaded": "2026-11-10T12:46:05.807Z"
+   "old_private_uploads": [
+    {
+     "uploaded": "2026-11-10T12:46:05.807Z",
+     "url": null
+    }
+   ],
+   "uploaded": "2026-11-10T13:29:15.522Z"
   },
   {
    "id": "pilot_049",
@@ -248,9 +254,15 @@
    "meta": "anatomy_room/production/pilot_049/youtube_metadata.md",
    "publish_at": "2026-11-12 19:00",
    "status": "scheduled",
-   "note": "2026-11-10 もしも設計の 5 本目（怪獣 vs ハンマー投げ5万人）。ユーザーが 11/12 19:00 の枠で予約を指示",
-   "uploaded": "2026-11-10T12:47:06.855Z",
-   "url": "https://youtube.com/shorts/kSs_aXfjpDg?feature=share"
+   "note": "2026-11-10 もしも設計の 5 本目（怪獣 vs ハンマー投げ5万人）。ユーザーが 11/12 19:00 の枠で予約を指示。2026-11-10 タイトルの帯をさらに 5% 下げた版に差し替え（前の版は非公開）",
+   "old_private_uploads": [
+    {
+     "uploaded": "2026-11-10T12:47:06.855Z",
+     "url": "https://youtube.com/shorts/kSs_aXfjpDg?feature=share"
+    }
+   ],
+   "reupload": true,
+   "uploaded": "2026-11-10T13:30:45.543Z"
   }
  ]
 }

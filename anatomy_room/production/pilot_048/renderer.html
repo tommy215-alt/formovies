@@ -6,7 +6,7 @@ html,body{margin:0;background:#000}
 #stage{position:relative;width:1080px;height:1920px;overflow:hidden}
 #stage canvas{position:absolute;left:0;top:0}
 /* もしも設計：上にタイトルの帯（黒地に赤、TBAR）。3D の画は帯の半分だけ下げる（空の隕石が帯に隠れないように、下は地面が少し切れる） */
-#stage canvas:not(#ui){top:170px}
+#stage canvas:not(#ui){top:218px}
 </style>
 </head><body>
 <div id="stage">
@@ -148,14 +148,14 @@ function shoutCard(t, a, l1, l2, c1, c2) {   // 画面の中央に 2 行の大�
   ui.save(); ui.globalAlpha *= k2; ui.translate(540, 1010); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, l2, 0, 0, 120, c2, { weight: 700, stroke: "#05080c", sw: 16 })); ui.restore();
 }
 // ---------------------------------------------------------------- 上：タイトルの帯（もしも設計の既定、2026-11-09〜：黒地に赤文字で最初から最後まで。縁の線なし）
-const TBAR = 340;
+const TBAR = 436;   // 2026-11-10 ユーザー「タイトル帯をあと 5% 下げて」→ 帯を 96px 高くして文字を 96px 下げた
 function fitText(s, size, maxw) { ui.font = `400 ${size}px TitleBlack`; const w = ui.measureText(s).width; return w > maxw ? Math.floor(size * maxw / w) : size; }
 function titleBar() {
   ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR);
   const [l1, l2] = KIT.opening.title, s1 = fitText(l1, 92, 1000), s2 = fitText(l2, 104, 1000);
   // 太い書体 Dela Gothic One（縁取りで太くすると字の中がつぶれた、2026-11-10 ユーザー）
   S.group(() => { ui.fillStyle = "#FF2A2A"; ui.textAlign = "center"; ui.textBaseline = "middle";
-    ui.font = `400 ${s1}px TitleBlack`; ui.fillText(l1, 540, 140); ui.font = `400 ${s2}px TitleBlack`; ui.fillText(l2, 540, 258); }, [0, 0, W, TBAR]);   // 2026-11-10 全画面で上が少し見切れる → 22px 下げた
+    ui.font = `400 ${s1}px TitleBlack`; ui.fillText(l1, 540, 236); ui.font = `400 ${s2}px TitleBlack`; ui.fillText(l2, 540, 354); }, [0, 0, W, TBAR]);   // 2026-11-10 全画面で上が少し見切れる → 22px 下げた
   ui.restore();
 }
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;   // オープニングの大きなタイトルは帯と重なるので出さない
