@@ -90,9 +90,20 @@ def mat(name, col, rough=.5, metal=0., haze=True):
 
 
 ENV = bpy.data.collections.new("env"); sc.collection.children.link(ENV)
+DYN = []   # コマごとに形を作り直す物（ハンマーの群れ・逃げる人）。描くときに frame_change_pre で呼ぶ（動きのぶれの途中の時刻にも呼ばれる）
+
+
+def _dyn_handler(scene, depsgraph=None):
+    t = (scene.frame_current - 1 + scene.frame_subframe) / K.FPS
+    for fn in DYN:
+        fn(t)
+
+
+bpy.app.handlers.frame_change_pre.append(_dyn_handler)
 
 
 def env_clear():
+    DYN.clear()
     for o in list(ENV.objects):
         bpy.data.objects.remove(o, do_unlink=True)
     for coll in (bpy.data.meshes, bpy.data.curves):
@@ -278,11 +289,17 @@ def plain_points(n, seed=1):
     return pts
 
 
+HOLES = []   # 群衆を置かない所（カメラのまわり）：[(x, y, 半径)]。ショットごとに決める
+
+
 def hill_points(n, seed=2):
     rnd = random.Random(seed); pts = []
     while len(pts) < n:
         a = rnd.uniform(0, 2 * math.pi); r = HILL_R * math.sqrt(rnd.random()) * .98
-        pts.append((HILL.x + math.cos(a) * r, HILL.y + math.sin(a) * r, HILL_H))
+        x, y = HILL.x + math.cos(a) * r, HILL.y + math.sin(a) * r
+        if any((x - hx) ** 2 + (y - hy) ** 2 < hr * hr for hx, hy, hr in HOLES):
+            continue
+        pts.append((x, y, HILL_H))
     return pts
 
 
@@ -425,37 +442,94 @@ def mouth_world():
 
 
 # ---------------------------------------------------------------- 炎：口から伸びる円すい（光る。閃光にしない）＋煙
-def fire_mat():
+def fire_mat(length, r1, r2):
+    """体積の炎：中心ほど濃く熱い（オレンジ〜黄色に光る）、外側は黒い煙。4D ノイズの W を毎コマ動かして揺らす"""
     m = bpy.data.materials.new("fire"); m.use_nodes = True; t = m.node_tree; L = t.links
     for nd in list(t.nodes):
         if nd.type != "OUTPUT_MATERIAL":
             t.nodes.remove(nd)
-    tc = t.nodes.new("ShaderNodeTexCoord"); nz = t.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 3.0; nz.inputs["Detail"].default_value = 6
+    tc = t.nodes.new("ShaderNodeTexCoord"); sep = t.nodes.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Object"], sep.inputs[0])
+    nz = t.nodes.new("ShaderNodeTexNoise"); nz.noise_dimensions = "4D"; nz.inputs["Scale"].default_value = .06; nz.inputs["Detail"].default_value = 8; nz.inputs["Roughness"].default_value = .62
     L.new(tc.outputs["Object"], nz.inputs["Vector"])
-    ramp = t.nodes.new("ShaderNodeValToRGB"); ramp.color_ramp.elements[0].color = (1.0, .25, .02, 1); ramp.color_ramp.elements[1].color = (1.0, .85, .4, 1)
-    L.new(nz.outputs["Fac"], ramp.inputs[0])
-    em = t.nodes.new("ShaderNodeEmission"); em.inputs["Strength"].default_value = 6.0; L.new(ramp.outputs[0], em.inputs["Color"])
-    tr = t.nodes.new("ShaderNodeBsdfTransparent"); mx = t.nodes.new("ShaderNodeMixShader")
-    alpha = t.nodes.new("ShaderNodeMapRange"); alpha.inputs[1].default_value = .35; alpha.inputs[2].default_value = .7; L.new(nz.outputs["Fac"], alpha.inputs[0])
-    L.new(alpha.outputs[0], mx.inputs[0]); L.new(tr.outputs[0], mx.inputs[1]); L.new(em.outputs[0], mx.inputs[2])
-    L.new(mx.outputs[0], t.nodes["Material Output"].inputs["Surface"])
-    return m, em.inputs["Strength"]
+    # 半径方向の割合 r / R(z)（R は根元 r1 → 先 r2）
+    ln = t.nodes.new("ShaderNodeVectorMath"); ln.operation = "LENGTH"
+    cxy = t.nodes.new("ShaderNodeCombineXYZ"); L.new(sep.outputs["X"], cxy.inputs["X"]); L.new(sep.outputs["Y"], cxy.inputs["Y"]); L.new(cxy.outputs[0], ln.inputs[0])
+    rz = t.nodes.new("ShaderNodeMapRange"); rz.inputs[1].default_value = 0; rz.inputs[2].default_value = length; rz.inputs[3].default_value = r1; rz.inputs[4].default_value = r2
+    L.new(sep.outputs["Z"], rz.inputs[0])
+    dv = t.nodes.new("ShaderNodeMath"); dv.operation = "DIVIDE"; L.new(ln.outputs["Value"], dv.inputs[0]); L.new(rz.outputs[0], dv.inputs[1])
+    core = t.nodes.new("ShaderNodeMapRange"); core.inputs[1].default_value = .15; core.inputs[2].default_value = 1.0; core.inputs[3].default_value = 1.0; core.inputs[4].default_value = 0.0
+    L.new(dv.outputs[0], core.inputs[0])
+    sh = t.nodes.new("ShaderNodeMapRange"); sh.inputs[1].default_value = .38; sh.inputs[2].default_value = .72; L.new(nz.outputs["Fac"], sh.inputs[0])   # ノイズで炎のかたまり
+    dens = t.nodes.new("ShaderNodeMath"); dens.operation = "MULTIPLY"; L.new(core.outputs[0], dens.inputs[0]); L.new(sh.outputs[0], dens.inputs[1])
+    pv = t.nodes.new("ShaderNodeVolumePrincipled")
+    pv.inputs["Color"].default_value = (.35, .25, .18, 1)
+    dsc = t.nodes.new("ShaderNodeMath"); dsc.operation = "MULTIPLY"; dsc.inputs[1].default_value = .035; L.new(dens.outputs[0], dsc.inputs[0]); L.new(dsc.outputs[0], pv.inputs["Density"])
+    hot = t.nodes.new("ShaderNodeMath"); hot.operation = "POWER"; hot.inputs[1].default_value = 1.6; L.new(dens.outputs[0], hot.inputs[0])
+    ramp = t.nodes.new("ShaderNodeValToRGB"); ramp.color_ramp.elements[0].color = (1.0, .18, .0, 1); ramp.color_ramp.elements[1].color = (1.0, .62, .08, 1)
+    L.new(hot.outputs[0], ramp.inputs[0]); L.new(ramp.outputs[0], pv.inputs["Emission Color"])
+    es = t.nodes.new("ShaderNodeMath"); es.operation = "MULTIPLY"; es.inputs[1].default_value = 90.0   # 濃いオレンジに強く光る（閃光にはしない）; L.new(hot.outputs[0], es.inputs[0]); L.new(es.outputs[0], pv.inputs["Emission Strength"])
+    L.new(pv.outputs[0], t.nodes["Material Output"].inputs["Volume"])
+    return m, es.inputs[1], nz.inputs["W"]
+
+
+CORE_W = {}
 
 
 def fire_cone(length=160., r1=1.5, r2=28.):
-    bm = bmesh.new(); r_ = bmesh.ops.create_cone(bm, cap_ends=False, segments=48, radius1=r1, radius2=r2, depth=length)
+    """炎の入れ物（閉じた円すい、+Z 向き）と、炎のまわりを照らすオレンジの光"""
+    bm = bmesh.new(); r_ = bmesh.ops.create_cone(bm, cap_ends=True, segments=48, radius1=r1 * 1.4, radius2=r2 * 1.4, depth=length)
     bmesh.ops.translate(bm, vec=(0, 0, length / 2), verts=r_["verts"])
-    bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=6, use_grid_fill=True)
     me = bpy.data.meshes.new("fire"); bm.to_mesh(me); bm.free()
-    m, k = fire_mat(); me.materials.append(m)
+    m, k, w = fire_mat(length, r1, r2); me.materials.append(m)
     o = link(bpy.data.objects.new("fire", me)); o.rotation_mode = "QUATERNION"
-    return o, k
+    lt = bpy.data.lights.new("firelight", "POINT"); lt.color = (1.0, .45, .12); lt.energy = 0; lt.shadow_soft_size = 20
+    lo = link(bpy.data.objects.new("firelight", lt))
+    # 明るい芯（光る面。ノイズで穴をあけて、炎のかたまりに見せる）
+    bm = bmesh.new(); r_ = bmesh.ops.create_cone(bm, cap_ends=False, segments=32, radius1=r1 * .6, radius2=r2 * .55, depth=length)
+    bmesh.ops.translate(bm, vec=(0, 0, length / 2), verts=r_["verts"]); bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=8, use_grid_fill=True)
+    me2 = bpy.data.meshes.new("firecore"); bm.to_mesh(me2); bm.free()
+    cm = bpy.data.materials.new("firecore"); cm.use_nodes = True; t = cm.node_tree; L = t.links
+    for nd in list(t.nodes):
+        if nd.type != "OUTPUT_MATERIAL":
+            t.nodes.remove(nd)
+    tc = t.nodes.new("ShaderNodeTexCoord"); nz = t.nodes.new("ShaderNodeTexNoise"); nz.noise_dimensions = "4D"; nz.inputs["Scale"].default_value = .12; nz.inputs["Detail"].default_value = 6
+    L.new(tc.outputs["Object"], nz.inputs["Vector"])
+    ramp = t.nodes.new("ShaderNodeValToRGB"); ramp.color_ramp.elements[0].color = (1.0, .22, .0, 1); ramp.color_ramp.elements[1].color = (1.0, .78, .25, 1); L.new(nz.outputs["Fac"], ramp.inputs[0])
+    em = t.nodes.new("ShaderNodeEmission"); em.inputs["Strength"].default_value = 7.0; L.new(ramp.outputs[0], em.inputs["Color"])
+    tr = t.nodes.new("ShaderNodeBsdfTransparent"); mx = t.nodes.new("ShaderNodeMixShader")
+    al = t.nodes.new("ShaderNodeMapRange"); al.inputs[1].default_value = .42; al.inputs[2].default_value = .62; L.new(nz.outputs["Fac"], al.inputs[0])
+    L.new(al.outputs[0], mx.inputs[0]); L.new(tr.outputs[0], mx.inputs[1]); L.new(em.outputs[0], mx.inputs[2]); L.new(mx.outputs[0], t.nodes["Material Output"].inputs["Surface"])
+    me2.materials.append(cm); co = link(bpy.data.objects.new("firecore", me2)); co.rotation_mode = "QUATERNION"
+    o["light"] = lo.name; o["len"] = length; o["core"] = co.name; o["corew"] = 0
+    CORE_W[co.name] = nz.inputs["W"]
+    return o, (k, w, lt)
 
 
-def aim_fire(o, origin, d, f, on=True, scale=1.0):
+def fire_puff(name, loc, r, k=6.0):
+    """地面で燃える炎（体積、光る）。puff と同じ形で、光る"""
+    o, dk = puff(name, loc, r, (.05, .04, .03), .02)
+    m = o.data.materials[0]; t = m.node_tree; pv = next(n for n in t.nodes if n.type == "PRINCIPLED_VOLUME")
+    pv.inputs["Emission Color"].default_value = (1.0, .35, .06, 1)
+    src = pv.inputs["Density"].links[0].from_socket
+    mm = t.nodes.new("ShaderNodeMath"); mm.operation = "MULTIPLY"; mm.inputs[1].default_value = k * 40
+    t.links.new(src, mm.inputs[0]); t.links.new(mm.outputs[0], pv.inputs["Emission Strength"])
+    return o, dk
+
+
+def aim_fire(o, origin, d, f, on=True, scale=1.0, ctl=None, length=None):
+    """炎を origin から d の向きへ。length を渡すとその長さまで伸ばす（地面に当たる所まで）"""
     o.location = origin; o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d)
-    o.scale = (scale, scale, scale) if on else (.001, .001, .001)
+    sz = (length / o["len"]) if length else 1.0
+    o.scale = (scale, scale, scale * sz) if on else (.001, .001, .001)
     o.keyframe_insert("location", frame=f + 1); o.keyframe_insert("rotation_quaternion", frame=f + 1); o.keyframe_insert("scale", frame=f + 1)
+    co = bpy.data.objects[o["core"]]
+    co.location = o.location; co.rotation_quaternion = o.rotation_quaternion; co.scale = o.scale
+    co.keyframe_insert("location", frame=f + 1); co.keyframe_insert("rotation_quaternion", frame=f + 1); co.keyframe_insert("scale", frame=f + 1)
+    key_v(CORE_W[co.name], f * .08, f)
+    if ctl:
+        k, w, lt = ctl; key_v(w, f * .06, f)   # 炎の揺れ
+        lo = bpy.data.objects[o["light"]]; keyp(lo, f, loc=tuple(Vector(origin) + d * (length or o["len"]) * .7))
+        lt.energy = 6e6 * scale if on else 0; lt.keyframe_insert("energy", frame=f + 1)
 
 
 # ---------------------------------------------------------------- ハンマー（代表の数百本。見えるように頭を大きめに）
@@ -484,9 +558,122 @@ def throw_set(objs, origins, target_fn, t0, t1, t, f, apex=20.0):
             keyp(o, f, loc=tuple(parabola(origins[i], target_fn(i), apex, u)))
 
 
+# ---------------------------------------------------------------- ハンマーの群れ（本物の形：鉄の球＋ワイヤー＋取っ手。1 つのメッシュをコマごとに作り直す）
+def hammer_template(s=1.0):
+    """+Z がワイヤーの向き（球は原点、ワイヤーは後ろに伸びる）。本物：球の直径 11 cm、全長 1.2 m"""
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=.06 * s)
+    r_ = bmesh.ops.create_cone(bm, cap_ends=False, segments=5, radius1=.006 * s * 2, radius2=.006 * s * 2, depth=1.05 * s); bmesh.ops.translate(bm, vec=(0, 0, .58 * s), verts=r_["verts"])
+    h_ = bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=.045 * s, radius2=.045 * s, depth=.012 * s); bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "X"), verts=h_["verts"]); bmesh.ops.translate(bm, vec=(0, 0, 1.13 * s), verts=h_["verts"])   # 取っ手（小さな輪）
+    v = np.array([tuple(x.co) for x in bm.verts], float); f = [tuple(x.index for x in fc.verts) for fc in bm.faces]; bm.free()
+    return v, f
+
+
+def _rot_to(d):
+    """+Z を d（N×3、正規化済み）へ向ける回転行列（N×3×3）"""
+    vx, vy, c = -d[:, 1], d[:, 0], d[:, 2]
+    K_ = np.zeros((len(d), 3, 3)); K_[:, 0, 2] = vy; K_[:, 1, 2] = -vx; K_[:, 2, 0] = -vy; K_[:, 2, 1] = vx
+    k = 1 / np.maximum(1 + c, 1e-4)
+    return np.eye(3)[None] + K_ + np.einsum("nij,njk->nik", K_, K_) * k[:, None, None]
+
+
+class Swarm:
+    """ハンマーの群れ。O（投げた所）→ T（当たる所）を、物語の時刻 s0+delay から tf 秒で放物線（頂点は高い方の端 + apex）。
+    当たったあとは跳ね返って落ちる（bounce=True）。clock(t)：ショットの中の秒 → 物語の時刻"""
+    def __init__(self, name, O, T, s0, tf, apex, clock, delay=None, scale=1.0, bounce=False, seed=1):
+        self.O = np.asarray(O, float); self.T = np.asarray(T, float); N = len(self.O)
+        self.s0, self.tf, self.apex, self.clock, self.bounce = s0, tf, np.full(N, apex) if np.isscalar(apex) else np.asarray(apex), clock, bounce
+        rnd = np.random.default_rng(seed); self.D = rnd.uniform(0, .04, N) if delay is None else np.asarray(delay)
+        self.BV = np.stack([rnd.uniform(-8, 8, N), rnd.uniform(-14, -4, N), rnd.uniform(2, 10, N)], 1)   # 跳ね返る速さ
+        self.spin = rnd.uniform(0, 6.28, N)
+        tv, tf_ = hammer_template(scale); self.tv = tv; nv = len(tv)
+        faces = (np.asarray([list(fc) + [-1] * (4 - len(fc)) if len(fc) < 4 else list(fc) for fc in tf_]))
+        allf = [tuple(i * nv + k for k in fc) for i in range(N) for fc in tf_]
+        me = bpy.data.meshes.new(name); me.from_pydata(np.zeros((N * nv, 3)).tolist(), [], allf); me.update()
+        me.materials.append(mat("steel", (.62, .62, .64), .22, .95))
+        self.me = me; self.obj = link(bpy.data.objects.new(name, me)); DYN.append(self.update)
+
+    def state(self, t):
+        s = self.clock(t); u = np.clip((s - self.s0 - self.D) / self.tf, 0, None)
+        z0, z1 = self.O[:, 2], self.T[:, 2]; zt = np.maximum(z0, z1) + self.apex
+        a = 2 * z1 + 2 * z0 - 4 * zt; b = 4 * zt - 3 * z0 - z1
+        uc = np.minimum(u, 1.0)
+        P = self.O + (self.T - self.O) * uc[:, None]; P[:, 2] = a * uc * uc + b * uc + z0
+        V = (self.T - self.O) / self.tf; V[:, 2] = (2 * a * uc + b) / self.tf
+        if self.bounce:
+            e = np.maximum(0, (u - 1) * self.tf)[:, None]; hit = (u > 1)[:, None]
+            Pb = self.T + self.BV * e + np.array([0, 0, -4.9]) * e * e; Pb[:, 2] = np.maximum(Pb[:, 2], .1)
+            Vb = self.BV + np.array([0, 0, -9.8]) * e
+            P = np.where(hit, Pb, P); V = np.where(hit, Vb, V)
+        else:
+            P = np.where((u > 1)[:, None], self.T, P)
+        P = np.where((u <= 0)[:, None], self.O, P)
+        return P, V, u
+
+    def update(self, t):
+        P, V, u = self.state(t)
+        d = -V / np.maximum(np.linalg.norm(V, axis=1, keepdims=True), 1e-6)   # ワイヤーは進む向きのうしろへ
+        R = _rot_to(d); v = np.einsum("nij,vj->nvi", R, self.tv) + P[:, None, :]
+        v[u <= 0] = -1e4   # まだ投げていない
+        self.me.vertices.foreach_set("co", v.reshape(-1).astype(np.float32)); self.me.update()
+
+
+class Runners:
+    """逃げる人（顔のないピクトグラム）。P0 から dir の向きへ、t0 から speed m/s で走る。上下に小さく弾む"""
+    def __init__(self, name, P0, dirs, t0, speed, seed=3):
+        self.P0 = np.asarray(P0, float); self.dirs = np.asarray(dirs, float); N = len(self.P0)
+        rnd = np.random.default_rng(seed); self.t0 = t0 + rnd.uniform(0, .5, N); self.sp = speed * rnd.uniform(.8, 1.2, N); self.ph = rnd.uniform(0, 6.28, N)
+        bv, bf = _template("cone"); hv, hf = _template("ico")
+        bv = bv * np.array([.24, .24, 1.35]) + np.array([0, 0, .68]); hv = hv * .13 + np.array([0, 0, 1.6])
+        self.tv = np.concatenate([bv, hv]); nb = len(bv); tf_ = list(bf) + [tuple(k + nb for k in fc) for fc in hf]; nv = len(self.tv)
+        allf = [tuple(i * nv + k for k in fc) for i in range(N) for fc in tf_]
+        me = bpy.data.meshes.new(name); me.from_pydata(np.zeros((N * nv, 3)).tolist(), [], allf); me.update()
+        cols = [mat(f"pp{i}", c, .7) for i, c in enumerate([(.85, .85, .82), (.7, .12, .1), (.12, .2, .5), (.9, .75, .15), (.15, .15, .17)])]
+        for c_ in cols:
+            me.materials.append(c_)
+        mi = np.repeat(rnd.integers(0, len(cols), N), len(tf_)); me.polygons.foreach_set("material_index", mi.astype(np.int32))
+        self.me = me; link(bpy.data.objects.new(name, me)); DYN.append(self.update)
+
+    def update(self, t):
+        e = np.maximum(0, t - self.t0)
+        P = self.P0 + self.dirs * (self.sp * e)[:, None]
+        P[:, 2] = self.P0[:, 2] + .12 * np.abs(np.sin(e * 9 + self.ph)) * (e > 0)
+        v = self.tv[None] + P[:, None, :]
+        self.me.vertices.foreach_set("co", v.reshape(-1).astype(np.float32)); self.me.update()
+
+
+def shot_clock(k):
+    """ショット k の中の秒 → 物語の時刻（plan.json の c）"""
+    s = SPLAN[k]; c = s["c"]; d = s["dur"]
+    def f(t):
+        u = clamp(t / d)
+        for (u0, c0), (u1, c1) in zip(c, c[1:]):
+            if u <= u1 or (u1, c1) == tuple(c[-1]):
+                return c0 + (c1 - c0) * clamp((u - u0) / max(1e-9, u1 - u0))
+        return c[-1][1]
+    return f
+
+
+THROW2, HIT2, FIRE2 = PLAN["throw2"], PLAN["hit2"], PLAN["fire"][1]
+
+
+def hill_swarm(name, k, n, seed, near=None, scale=2.0, bounce=False):
+    """丘の上から頭へ、4 万本の代表 n 本（同時に当たる：2 秒で頭に届く）。near：(点, 本数) その近くからも投げる（カメラのそば）"""
+    rnd = random.Random(seed); pts = hill_points(40000, 4); O, T = [], []
+    for i in range(n):
+        p = Vector(pts[rnd.randrange(len(pts))]); O.append((p.x, p.y, p.z + 1.6))
+        T.append(tuple(HEAD_POS + Vector((rnd.uniform(-3.5, 3.5), rnd.uniform(-2.5, 2.5), rnd.uniform(-2.5, 2.5)))))
+    if near:
+        c, m = near
+        for i in range(m):
+            O.append((c.x + rnd.uniform(-7, 7), c.y + rnd.uniform(-7, 7), c.z + rnd.uniform(-.5, 1.5)))
+            T.append(tuple(HEAD_POS + Vector((rnd.uniform(-3, 3), rnd.uniform(-2, 2), rnd.uniform(-2, 2)))))
+    return Swarm(name, O, T, THROW2, HIT2 - THROW2, 6.0, shot_clock(k), scale=scale, bounce=bounce, seed=seed)
+
+
 # ---------------------------------------------------------------- 場面の土台
 def base(sun_el=32, sun_rot=135, haze_col=(.78, .84, .9), haze_k=.9, d0=900., d1=14000., energy=9.0, blur=False):
-    sky.set(0, sun_el, sun_rot, energy); set_haze(haze_col, haze_k, d0, d1); sc.render.use_motion_blur = blur
+    sky.set(0, sun_el, sun_rot, energy); set_haze(haze_col, haze_k, d0, d1); sc.render.use_motion_blur = blur; sc.render.motion_blur_shutter = .5
 
 
 def scorch():
@@ -499,7 +686,8 @@ def scorch():
     instances("scorch", tv, tf, xf, [m])
 
 
-def world(people="plain", n=50000):
+def world(people="plain", n=50000, holes=()):
+    HOLES[:] = list(holes)
     env_clear(); terrain()
     bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=200000); bmesh.ops.translate(bm, vec=(0, 0, -25), verts=bm.verts)
     mesh_obj("farground", bm, [ground_grass()])   # 地形の外（遠く）も地面に（高いカメラで地平線の下が黒く見えないように）
@@ -559,17 +747,32 @@ def a_l03(u, t, f):
 
 
 def s_l04():
+    """炎 1 回目：低い位置から。頭上を炎が走り、草原に当たって燃え広がる。手前の選手が走って逃げる"""
     base(22, 140, (.92, .8, .7), .9); world("plain")
-    global FIRE4, FIRE4K, SMOKE4, SMOKE4K
-    FIRE4, FIRE4K = fire_cone(); SMOKE4, SMOKE4K = puff("smoke4", (0, 0, -1e5), 80, (.25, .22, .2), .01)
+    global FIRE4, FIRE4C, SMOKE4, SMOKE4K, GF4, RUN4
+    FIRE4, FIRE4C = fire_cone(170, 1.6, 24); SMOKE4, SMOKE4K = puff("smoke4", (0, 0, -1e5), 80, (.18, .16, .15), .01)
+    GF4 = [fire_puff(f"gf4_{i}", (0, 0, -1e5), 14) for i in range(7)]
+    rnd = np.random.default_rng(4); n = 900; P0 = []; D = []
+    for i in range(n):   # 炎の当たる所から、カメラの右手前へ逃げる
+        x, y = -40 + rnd.uniform(-50, 50), -55 + rnd.uniform(-25, 25)
+        if hill_z(x, y) > 1:
+            continue
+        P0.append((x, y, 0)); d = Vector((95 - x, -40 - y, 0)).normalized(); D.append((d.x, d.y, 0))
+    RUN4 = Runners("run4", P0, D, 1.4, 7.0)
+FIRE4_G = [Vector((-120, -40, 0)), Vector((-55, -115, 0))]   # 炎が地面をなめる道すじ（はじめ → おわり）
 def a_l04(u, t, f):
-    turn = ease(cut(0, .25, u)); fire = cut(.28, .85, u)
-    mpose(-.55 * turn, head=(.25 * turn, 0, -.15 * turn), jaw=-.5 * (fire > 0) * (1 - cut(.85, 1, u)), breathe=-.5 * fire, lid=1.0)
-    org, d = mouth_world(); sweep = -.35 + .7 * fire
-    d = (Matrix.Rotation(sweep, 3, "Z") @ d).normalized()
-    aim_fire(FIRE4, org, d, f, on=fire > 0 and u < .9, scale=.4 + .6 * min(1, fire * 4)); key_v(FIRE4K, 6.0, f)
-    gp = org + d * 150; keyp(SMOKE4, f, loc=tuple(Vector((gp.x, gp.y, 25))) if fire > .1 else (0, 0, -1e5), scale=60 + 60 * fire); key_v(SMOKE4K, .012 * (fire > .1), f)
-    cam.look(tuple(Vector((150, -10, 30)) + Vector((-10 * u, 0, 0)) + shake(f, .8 * (fire > 0), 4)), (-15, -40, 24), 22)   # 怪獣と炎の両方が入るように
+    turn = ease(cut(0, .2, u)); fire = cut(.25, .88, u)
+    mpose(-.6 * turn, head=(.3 * turn, 0, -.2 * turn), jaw=-.55 * (fire > 0) * (1 - cut(.88, 1, u)), breathe=-.6 * fire, lid=1.0)
+    org, d0 = mouth_world(); G = FIRE4_G[0].lerp(FIRE4_G[1], ease(fire)); G.z = hill_z(G.x, G.y)
+    d = (G - org).normalized(); L_ = (G - org).length
+    on = fire > 0 and u < .92
+    aim_fire(FIRE4, org, d, f, on=on, scale=min(1, .3 + fire * 3), ctl=FIRE4C, length=L_ * min(1, fire * 5))
+    for i, (o, k) in enumerate(GF4):   # 当たった所から燃え広がる
+        gi = FIRE4_G[0].lerp(FIRE4_G[1], i / 6); age = fire - i / 7
+        keyp(o, f, loc=(gi.x, gi.y, 6) if age > 0 else (0, 0, -1e5), scale=6 + 16 * min(1, age * 3)); key_v(k, .05 * (age > 0), f)
+    keyp(SMOKE4, f, loc=(G.x, G.y, 45) if fire > .15 else (0, 0, -1e5), scale=40 + 60 * fire); key_v(SMOKE4K, .01 * (fire > .15), f)
+    cx, cy = 92 - 6 * u, -58 + 3 * u
+    cam.look(tuple(Vector((cx, cy, hill_z(cx, cy) + 5.5)) + shake(f, .9 * (fire > 0), 4)), tuple(Vector((-22, -38, 24)) + Vector((0, 0, -6 * fire))), 20)   # 逃げる選手の中、低い所から（丘の斜面にもぐらない）
 
 
 def s_l05():
@@ -595,97 +798,145 @@ def a_l07(u, t, f):
     cam.look(tuple(Vector((38, -55, 30)) + Vector((-3 * u, 4 * u, 2 * u))), (0, -4, 36), 30)
 
 
+def spinner(i, x, y, z, s=1.0):
+    """回転する選手（ピクトグラム＋本物の形のハンマー）。root を Z まわりに回す"""
+    root = link(bpy.data.objects.new(f"sp{i}", None)); root.location = (x, y, z); root.rotation_mode = "XYZ"
+    bm = bmesh.new(); r_ = bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=.25, radius2=.2, depth=1.4); bmesh.ops.translate(bm, vec=(0, 0, .7), verts=r_["verts"])
+    s_ = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=.13); bmesh.ops.translate(bm, vec=(0, 0, 1.62), verts=s_["verts"])
+    a_ = bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=.06, radius2=.05, depth=.62); bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "Y"), verts=a_["verts"]); bmesh.ops.translate(bm, vec=(.3, 0, 1.25), verts=a_["verts"])
+    me = bpy.data.meshes.new(f"spm{i}"); bm.to_mesh(me); bm.free(); me.materials.append(mat(f"pp{i % 5}", [(.85, .85, .82), (.7, .12, .1), (.12, .2, .5), (.9, .75, .15), (.15, .15, .17)][i % 5], .7))
+    o = link(bpy.data.objects.new(f"spo{i}", me)); o.parent = root
+    tv, tf_ = hammer_template(s * 1.0)
+    R = np.array(Matrix.Rotation(-math.pi / 2, 3, "Y"))   # ワイヤーを体から外へ（+X）。球が外側
+    v = (tv[:, [0, 1, 2]] @ R.T)
+    v = v * np.array([-1, 1, 1]) + np.array([1.85, 0, 1.15])
+    me2 = bpy.data.meshes.new(f"sph{i}"); me2.from_pydata(v.tolist(), [], tf_); me2.materials.append(mat("steel", (.62, .62, .64), .22, .95))
+    h = link(bpy.data.objects.new(f"sph{i}", me2)); h.parent = root
+    for p in me2.polygons:
+        p.use_smooth = True
+    return root
+
+
 def s_l08():
-    base(26, 150, (.88, .84, .8), .9); world("hill"); scorch()
+    """丘の上で選手たちが回転する（スロー）。手前の選手は大きく、奥の怪獣ののどが光る"""
+    base(26, 150, (.88, .84, .8), .9, blur=True); world("hill", holes=[(HILL.x - 38, HILL.y + HILL_R - 30, 12)]); scorch()
     global SPIN
-    SPIN = []   # 手前の選手：回転して投げる
-    rnd = random.Random(8)
-    for i in range(36):
-        x = HILL.x + rnd.uniform(-60, 60); y = HILL.y + HILL_R - rnd.uniform(2, 30)
-        root = link(bpy.data.objects.new(f"sp{i}", None)); root.location = (x, y, HILL_H); root.rotation_mode = "XYZ"
-        bm = bmesh.new(); r_ = bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=.24, radius2=.2, depth=1.4); bmesh.ops.translate(bm, vec=(0, 0, .7), verts=r_["verts"])
-        s_ = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=.13); bmesh.ops.translate(bm, vec=(0, 0, 1.6), verts=s_["verts"])
-        a_ = bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=.012, radius2=.012, depth=1.2); bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "Y"), verts=a_["verts"]); bmesh.ops.translate(bm, vec=(.75, 0, 1.15), verts=a_["verts"])
-        h_ = bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=.11); bmesh.ops.translate(bm, vec=(1.45, 0, 1.1), verts=h_["verts"])
-        me = bpy.data.meshes.new(f"spm{i}"); bm.to_mesh(me); bm.free(); me.materials.append(mat(f"pp{i % 5}", (.85, .85, .82), .7))
-        o = link(bpy.data.objects.new(f"spo{i}", me)); o.parent = root; SPIN.append((root, rnd.uniform(0, 6.28)))
+    SPIN = []; rnd = random.Random(8)
+    for i in range(60):
+        x = HILL.x + rnd.uniform(-45, 45); y = HILL.y + HILL_R - rnd.uniform(3, 40)
+        SPIN.append((spinner(i, x, y, HILL_H), rnd.uniform(0, 6.28), rnd.uniform(.9, 1.1)))
 def a_l08(u, t, f):
-    mpose(0.0, head=(-.25, 0, 0), jaw=-.05, breathe=1.0, lid=1.0); key_v(esock(MON["glow"]), 25 + 10 * u, f)
-    for root, ph in SPIN:   # 3 回転して離す（スロー）
-        keyp(root, f, rot=(0, 0, ph + 2 * math.pi * 3 * ease(cut(0, .8, u))))
-    c = HILL + Vector((-14, HILL_R - 35, HILL_H + 6.5)); cam.look(tuple(c), tuple(HEAD_POS + Vector((0, 0, -4))), 30)   # 選手たちのうしろ上から、正面に怪獣の頭
+    mpose(0.0, head=(-.25, 0, 0), jaw=-.05, breathe=1.0, lid=1.0); key_v(esock(MON["glow"]), 25 + 15 * u, f)
+    for root, ph, sp in SPIN:   # だんだん速く 3 回転半（スロー）
+        keyp(root, f, rot=(0, 0, ph + 2 * math.pi * 3.5 * sp * cut(0, 1, u) ** 1.6))
+    c = HILL + Vector((-38, HILL_R - 30, HILL_H + 4.5)) + Vector((3 * u, 2 * u, 0))
+    cam.look(tuple(c), tuple(Vector((10, -40, 42))), 26)   # 回る選手の列を斜めうしろから、奥に怪獣
 
 
 def s_l09():
-    base(26, 150, (.88, .84, .8), .9, blur=True); world("hill"); scorch()
-    global HM9, ORG9
-    HM9 = hammer_objs(1500, 11); rnd = random.Random(9); pts = hill_points(40000, 4)
-    ORG9 = [Vector(pts[rnd.randrange(len(pts))]) + Vector((0, 0, 1.5)) for _ in HM9]
+    """一斉に放す：何千本ものハンマーがカメラの横を抜けて怪獣へ（丘の縁、低い位置）"""
+    base(26, 150, (.88, .84, .8), .9, blur=True); world("hill", holes=[(HILL.x + 12, HILL.y + HILL_R - 8, 16)]); scorch()
+    global SW9
+    camp = HILL + Vector((10, HILL_R - 6, HILL_H))
+    SW9 = hill_swarm("sw9", "l09", 3500, 9, near=(camp + Vector((0, 6, 0)), 600), scale=2.2)
 def a_l09(u, t, f):
-    mpose(0.0, head=(-.25, 0, 0), jaw=-.05, breathe=1.0, lid=1.0); key_v(esock(MON["glow"]), 35, f)
-    throw_set(HM9, ORG9, lambda i: HEAD_POS + Vector((random.Random(i).uniform(-3, 3), random.Random(i + 1).uniform(-2, 2), random.Random(i + 2).uniform(-2, 2))), 0, 1.0, u, f, 24.0)
-    cam.look(tuple(Vector((170, -55, 58)) + Vector((-8 * u, 0, 0))), tuple(Vector((0, -48, 44))), 30)   # 横から：丘と頭の間をハンマーが飛ぶ
+    mpose(0.0, head=(-.25, 0, 0), jaw=-.05, breathe=1.0, lid=1.0); key_v(esock(MON["glow"]), 40, f)
+    c = HILL + Vector((22, HILL_R - 22, HILL_H + 9)) + Vector((-4 * u, 10 * u, 1.5 * u))
+    cam.look(tuple(c + shake(f, .25, 9)), tuple(Vector((0, -45, 46)).lerp(HEAD_POS, u)), 24)
 
 
 def s_l10():
-    base(26, 150, (.88, .84, .8), .9, blur=True); world("hill"); scorch()
-    global HM10, DUST10, DUST10K
-    HM10 = hammer_objs(500, 12); DUST10, DUST10K = puff("hitdust", (0, 0, -1e5), 6, (.5, .45, .4), .02)
+    """ハンマーと一緒に飛ぶカメラ：群れの中から、迫る怪獣の頭（スロー）"""
+    base(26, 150, (.88, .84, .8), .9, blur=False); world("hill"); scorch()
+    global SW10, CAM10
+    CAM10 = (Vector((2, -110, 45.5)), HEAD_POS + Vector((1, -9, 1)))   # カメラの道すじ（投げた所の近く → 頭の手前）
+    SW10 = hill_swarm("sw10", "l10", 3500, 10, near=(CAM10[0] + Vector((0, 4, 0)), 350), scale=2.0)
 def a_l10(u, t, f):
-    hit = .12; e = max(0., t - hit)
-    jolt = (1 - math.exp(-e * 6)) * math.exp(-e * .8) if t > hit else 0
-    mpose(0.0, head=(-.25 - .45 * jolt, 0, .12 * jolt), torso=(-.08 * jolt, 0, 0), jaw=-.05 - .3 * jolt, breathe=1.0 - jolt, lid=1.0)
-    key_v(esock(MON["glow"]), 35 * (1 - min(1, e * 2)), f)
-    for i, o in enumerate(HM10):
-        r = random.Random(i); tgt = HEAD_POS + Vector((r.uniform(-3, 3), r.uniform(-2, 2), r.uniform(-2, 2)))
-        if t < hit:
-            p = tgt + Vector((0, -40 * (hit - t) / hit, 0))
-        else:
-            p = tgt + Vector((r.uniform(-6, 6) * e, -r.uniform(3, 9) * e, r.uniform(2, 6) * e - 4.9 * e * e))
-        keyp(o, f, loc=tuple(p))
-    keyp(DUST10, f, loc=tuple(HEAD_POS + Vector((0, -5, 0))) if t > hit else (0, 0, -1e5), scale=6 + 25 * min(1, e)); key_v(DUST10K, .02 * max(0, 1 - e), f)
-    cam.look(tuple(Vector((28, -32, 44)) + shake(f, 1.2 * max(0, 1 - e * 2), 5)), tuple(HEAD_POS), 34)
+    mpose(0.0, head=(-.25, 0, 0), jaw=-.05, breathe=1.0, lid=1.0); key_v(esock(MON["glow"]), 45, f)
+    s = shot_clock("l10")(t); k = clamp((s - THROW2) / (HIT2 - THROW2))
+    a, b = CAM10; p = a.lerp(b, k); p.z = a.z + 9 * math.sin(math.pi * k) * .8   # 群れと同じ放物線ぎみに
+    cam.look(tuple(p + shake(f, .15, 10)), tuple(HEAD_POS + Vector((0, 0, -1))), 24 + 6 * k)
 
 
 def s_l11():
-    base(26, 150, (.88, .84, .8), .9); world("hill"); scorch()
-    global FIRE11, FIRE11K
-    FIRE11, FIRE11K = fire_cone(120, 1.2, 18)
+    """頭に当たる。頭がはじかれ、ハンマーが跳ね返る"""
+    base(26, 150, (.88, .84, .8), .9, blur=True); world("hill"); scorch()
+    global SW11, DUST11, DUST11K
+    SW11 = hill_swarm("sw11", "l11", 2500, 11, scale=2.0, bounce=True)
+    DUST11, DUST11K = puff("hitdust", (0, 0, -1e5), 6, (.5, .45, .4), .02)
 def a_l11(u, t, f):
-    w = math.sin(t * 2.2) * (.06 + .05 * u)
-    mpose(0.0, torso=(-.05 + w * .5, w, 0), head=(-.55 + .3 * math.sin(t * 1.7), .2 * w, .3 * math.sin(t * 1.3)), jaw=-.45, breathe=.3, lid=.6 + .4 * math.cos(t * 3))
-    org, d = mouth_world(); up = (d + Vector((0, 0, 2.2))).normalized()
-    fire = cut(.35, .9, u)
-    aim_fire(FIRE11, org, up, f, on=fire > 0, scale=.5 + .5 * fire); key_v(FIRE11K, 4.0, f)
-    cam.look(tuple(Vector((140, -100, 30))), (0, -5, 28), 26)
+    s = shot_clock("l11")(t); e = max(0., s - HIT2) * 4   # スロー（物語の 0.6 秒を 2.8 秒で）
+    jolt = (1 - math.exp(-e * 6)) * math.exp(-e * .8) if e > 0 else 0
+    mpose(0.0, head=(-.25 - .5 * jolt, 0, .15 * jolt), torso=(-.08 * jolt, 0, 0), jaw=-.05 - .35 * jolt, breathe=1.0 - jolt, lid=1.0)
+    key_v(esock(MON["glow"]), 45 * (1 - min(1, e * 2)), f)
+    keyp(DUST11, f, loc=tuple(HEAD_POS + Vector((0, -5, 0))) if e > 0 else (0, 0, -1e5), scale=6 + 25 * min(1, e)); key_v(DUST11K, .02 * max(0, 1 - e), f)
+    cam.look(tuple(Vector((30, -34, 44)) + shake(f, 1.6 * max(0, 1 - e * 1.5), 5)), tuple(HEAD_POS), 32)
 
 
 def s_l12():
-    base(26, 150, (.88, .84, .8), .9, blur=True); world("hill"); scorch()
-    global DUST12, DUST12K
-    DUST12, DUST12K = puff("falldust", (0, 0, -1e5), 40, (.62, .57, .5), .0015)
+    """ふらつく怪獣が最後の炎を吐く。炎は丘に届き、選手が逃げる（丘の上の低い所から）"""
+    base(26, 150, (.88, .84, .8), .9); world("hill"); scorch()
+    global FIRE12, FIRE12C, GF12, RUN12, SMOKE12, SMOKE12K
+    FIRE12, FIRE12C = fire_cone(150, 1.4, 22); GF12 = [fire_puff(f"gf12_{i}", (0, 0, -1e5), 12) for i in range(6)]
+    SMOKE12, SMOKE12K = puff("smoke12", (0, 0, -1e5), 60, (.18, .16, .15), .01)
+    rnd = np.random.default_rng(12); n = 900; P0 = []; D = []
+    for i in range(n):
+        x, y = rnd.uniform(-50, 50), HILL.y + HILL_R - rnd.uniform(0, 45)
+        P0.append((x, y, HILL_H)); d = Vector((rnd.uniform(-.4, .4), -1, 0)).normalized(); D.append((d.x, d.y, 0))
+    RUN12 = Runners("run12", P0, D, 1.2, 6.5)
+FIRE12_G = [Vector((-35, -98, HILL_H)), Vector((30, -112, HILL_H))]
 def a_l12(u, t, f):
-    k = ease(cut(.05, .55, u)) ** 1.7; tip = (math.pi / 2 - .12) * k   # かかとを支点にあお向けに倒れる
-    mpose(root_rot=(-tip, 0, 0), root_loc=(0, 4 * k, 0), head=(-.4 + .3 * k, 0, .2), jaw=-.3, lid=.3)
-    e = cut(.5, 1, u)
-    keyp(DUST12, f, loc=(0, 25, 12) if e > 0 else (0, 0, -1e5), scale=30 + 90 * e); key_v(DUST12K, .006 * (e > 0) * (1 - .5 * e), f)
-    cam.look(tuple(Vector((-200, -60, 25)) + shake(f, 2.5 * clamp(1 - abs(u - .55) / .1), 7)), (0, 15, 15), 24)
+    w = math.sin(t * 2.2) * (.05 + .05 * u)
+    fire = cut(.22, .85, u)
+    mpose(0.0, torso=(-.05 + w * .5, w, 0), head=(.05 + .1 * math.sin(t * 1.7), .15 * w, .15 * math.sin(t * 1.3)), jaw=-.55 * (fire > 0), breathe=.3, lid=.6 + .4 * math.cos(t * 3))
+    org, d0 = mouth_world(); G = FIRE12_G[0].lerp(FIRE12_G[1], ease(fire)); d = (G - org).normalized(); L_ = (G - org).length
+    aim_fire(FIRE12, org, d, f, on=fire > 0 and u < .93, scale=min(1, .3 + fire * 3), ctl=FIRE12C, length=L_ * min(1, fire * 5))
+    for i, (o, k) in enumerate(GF12):
+        gi = FIRE12_G[0].lerp(FIRE12_G[1], i / 5); age = fire - i / 6
+        keyp(o, f, loc=(gi.x, gi.y, HILL_H + 5) if age > 0 else (0, 0, -1e5), scale=5 + 13 * min(1, age * 3)); key_v(k, .05 * (age > 0), f)
+    keyp(SMOKE12, f, loc=(G.x, G.y, HILL_H + 35) if fire > .15 else (0, 0, -1e5), scale=30 + 50 * fire); key_v(SMOKE12K, .01 * (fire > .15), f)
+    cx, cy = 150 - 8 * u, -95 + 4 * u
+    cam.look(tuple(Vector((cx, cy, hill_z(cx, cy) + 6)) + shake(f, .8 * (fire > 0), 12)), tuple(Vector((-5, -60, 36))), 22)   # 丘の横から：怪獣の炎が丘の上に届く
 
 
 def s_l13():
-    base(28, 150, (.86, .84, .82), .9); world("hill"); scorch()
+    """怪獣が倒れる（スロー）。地響き、土煙の輪、飛び散る土"""
+    base(26, 150, (.88, .84, .8), .9, blur=True); world("hill"); scorch()
+    global DUST13, RING13, ROCK13
+    DUST13 = [puff(f"fd{i}", (0, 0, -1e5), 30, (.62, .57, .5), .002) for i in range(10)]
+    RING13 = [puff(f"ring{i}", (0, 0, -1e5), 20, (.6, .55, .48), .0025) for i in range(16)]
+
+
+FALL0, FALL1 = .08, .55
 def a_l13(u, t, f):
-    mpose(root_rot=(-(math.pi / 2 - .12), 0, 0), root_loc=(0, 4, 0), head=(-.1, 0, .2), jaw=-.3, lid=.05)
-    cam.look(tuple(Vector((150, -330, 160)) + Vector((-20 * u, 0, -10 * u))), (0, -60, 10), 28)
+    k = ease(cut(FALL0, FALL1, u)) ** 1.8; tip = (math.pi / 2 - .12) * k   # かかとを支点にあお向けに倒れる（スロー）
+    mpose(root_rot=(-tip, 0, 0), root_loc=(0, 4 * k, 0), head=(-.4 + .3 * k, 0, .25), jaw=-.35, lid=.3)
+    e = cut(FALL1, 1, u)
+    for i, (o, kk) in enumerate(DUST13):   # 体の当たった所に土煙
+        y = 8 + i * 5; keyp(o, f, loc=(0, y, 8 + 10 * e) if e > 0 else (0, 0, -1e5), scale=18 + 40 * e); key_v(kk, .004 * (e > 0) * (1 - .4 * e), f)
+    for i, (o, kk) in enumerate(RING13):   # 地面を走る土煙の輪
+        a = i / 16 * 2 * math.pi; r = 30 + 260 * e
+        keyp(o, f, loc=(r * math.cos(a), 25 + r * math.sin(a), 6) if e > 0 else (0, 0, -1e5), scale=15 + 25 * e); key_v(kk, .003 * (e > 0) * (1 - .6 * e), f)
+    hit = clamp(1 - abs(u - FALL1) / .12)
+    c = Vector((-150, -55, 5)) + Vector((10 * u, 5 * u, 0))
+    cam.look(tuple(c + shake(f, 5.0 * hit + .6 * e, 7)), tuple(Vector((0, 12, 22 - 12 * k))), 24)
 
 
 def s_l14():
+    """結果：上空から、倒れた怪獣と丘の 3 万人"""
     base(28, 150, (.86, .84, .82), .9); world("hill"); scorch()
 def a_l14(u, t, f):
+    mpose(root_rot=(-(math.pi / 2 - .12), 0, 0), root_loc=(0, 4, 0), head=(-.1, 0, .2), jaw=-.3, lid=.05)
+    cam.look(tuple(Vector((180, -230, 190)) + Vector((-25 * u, 10 * u, -10 * u))), (0, -40, 5), 30)
+
+
+def s_l15():
+    base(28, 150, (.86, .84, .82), .9); world("hill"); scorch()
+def a_l15(u, t, f):
     op = ease(cut(.35, .7, u))
     mpose(root_rot=(-(math.pi / 2 - .12), 0, 0), root_loc=(0, 4, 0), head=(-.1, 0, .2), jaw=-.3, lid=.05 + .95 * op)
     bpy.context.view_layer.update(); eye = MON["lids"][1].matrix_world.translation
-    cam.look(tuple(eye + Vector((14, -2, 5))), tuple(eye), 45)
+    cam.look(tuple(eye + Vector((22, -10, 9))), tuple(eye + Vector((0, 0, -1))), 38)   # 顔の横から、目が開く
 
 
 NAMES = [s["id"] for s in PLAN["shots"]]

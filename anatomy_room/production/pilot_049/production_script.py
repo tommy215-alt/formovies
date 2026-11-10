@@ -33,20 +33,17 @@ ambience.timeline(TLP)
 ambience.click("click", 2600, gain=.7)   # ポップアップが出る音
 ambience.register("crowd", SFX / "crowd.mp3", start=5, span=("l00", "l04", 0), norm="rms", fade_out=1.0)
 
-# ショットごとの時計の間隔（秒）。早送りは速く。倒れたら止める
-TICK = {"l00": 1.0, "l01": 1.0, "l02": 1.0, "l03": 1.0, "l04": 1.0, "l05": 1.0, "l06": .2, "l07": 1.0, "l08": None, "l09": None,
-        "l10": None, "l11": 1.0, "l12": None, "l13": None, "l14": None}
-# 音のきっかけ（ショット, 秒, 大きさ, 種類）。
-# roar＝怪獣の咆哮（本物の動物の声を低く）、cheer＝5 万人の声、spin＝ハンマーを回す風切り、volley＝一斉に飛ぶ風切り、clank＝腰に当たって跳ね返る金属音、
-# fire＝炎（低いごう音とパチパチ）、panic＝逃げる人々、run＝丘を駆け上がる足音、inhale＝息を吸う低い音、whistle＝頭へ向かうハンマーの風切り、
-# headhit＝頭に当たる（一瞬静か → 金属と重い一撃）、groan＝ふらつくうめき、misfire＝炎が空へそれる、fall＝倒れる地響き、growl＝最後に目が開く低いうなり
+# 時計の音は使わない（2026-11-10 ユーザー「裏でドラムの音が鳴ってる。もしも設計から完全に消して」：一定の間隔の音がドラムに聞こえた）
+TICK = {}
+# 音のきっかけ（ショット, 秒, 大きさ, 種類）。リズムになる音（一定の間隔でくり返す音）は使わない
 HIT = [("l00", .1, 1.0, "roar"), ("l01", .4, .8, "cheer"),
-       ("l02", .3, .9, "spin"), ("l02", .7, 1.0, "volley"), ("l03", .55, 1.0, "clank"),
-       ("l04", .3, .7, "roar"), ("l04", 1.0, 1.0, "fire"), ("l04", 1.4, .8, "panic"),
-       ("l06", .0, .9, "run"), ("l07", .1, 1.0, "inhale"),
-       ("l08", .0, 1.0, "spin"), ("l09", .0, 1.0, "whistle"), ("l10", .34, 1.0, "headhit"),
-       ("l11", .2, .9, "groan"), ("l11", 1.05, .8, "misfire"), ("l12", 1.8, 1.0, "fall"),
-       ("l13", .1, 1.0, "cheer"), ("l14", 1.0, .7, "growl")]
+       ("l02", .3, .8, "spin"), ("l02", .7, 1.0, "volley"), ("l03", .55, 1.0, "clank"),
+       ("l04", .2, .8, "roar"), ("l04", 1.05, 1.0, "fire"), ("l04", 1.6, .9, "panic"),
+       ("l06", .0, .8, "run"), ("l07", .1, 1.0, "inhale"),
+       ("l08", .0, 1.0, "spin"), ("l09", .35, 1.0, "volley_big"), ("l10", .0, 1.0, "whistle"), ("l11", .1, 1.0, "headhit"),
+       ("l12", .1, .8, "groan"), ("l12", .8, 1.0, "fire"), ("l12", 1.3, .9, "panic"),
+       ("l13", .3, .8, "groan"), ("l13", 2.42, 1.0, "fall"),
+       ("l14", .1, 1.0, "cheer"), ("l15", 1.0, .7, "growl")]
 
 
 def _load(p):
@@ -129,8 +126,8 @@ def beds():
         duck[max(0, a):b_] = np.minimum(duck[max(0, a):b_], np.linspace(1, lo, b_ - max(0, a))); duck[b_:c_] = np.minimum(duck[b_:c_], np.linspace(lo, 1, c_ - b_))
 
     order = [s["id"] for s in SHOTS]
-    for i, k in enumerate(order):   # 時計（経過の秒）
-        iv = TICK[k]
+    for i, k in enumerate(order):   # 時計（使わない：TICK は空）
+        iv = TICK.get(k)
         if iv is None:
             continue
         a = cues[k]; b = cues[order[i + 1]] if i + 1 < len(order) else tl["ending_start"]; t, q = a, 0
@@ -146,23 +143,27 @@ def beds():
         elif kind == "spin":     # ハンマーを回す：だんだん速くなる風切り
             for j in range(6):
                 put(_noise_sweep(.45, 2200, 700, 70 + j, 1.0), t + .55 * j * (1 - .06 * j), .25 * g * (.6 + .1 * j))
+        elif kind == "volley_big":   # 4 万本を一斉に放す：大きな風の塊が遠ざかる＋金属のこすれ
+            put(_noise_sweep(3.2, 3500, 300, 151, .6), t, 1.0 * g); put(_rumble(3.0, 152, 180), t, .6 * g)
+            for j in range(20):
+                put(_pitch(pick("metal_")[r.integers(5)], r.uniform(1.2, 1.8)), t + r.uniform(-.1, .3), r.uniform(.05, .12) * g)
         elif kind == "volley":   # 5 万本が飛ぶ：大きな風の塊
             put(_noise_sweep(3.0, 3000, 500, 81, .8), t, .7 * g); put(_rumble(3.0, 82, 160), t, .3 * g)
         elif kind == "clank":    # 腰に当たって跳ね返る金属音（たくさん、小さく）
             for j in range(40):
                 put(_pitch(pick("metal_")[r.integers(5)], r.uniform(.7, 1.3)), t + r.uniform(0, 1.2), r.uniform(.08, .2) * g)
-        elif kind == "fire":     # 炎：低いごう音＋パチパチ
-            d_ = 2.4; tt = np.arange(int(d_ * SR)) / SR; x = music._lp(r.standard_normal(len(tt)), 700) * (1 + .4 * np.sin(2 * np.pi * 7 * tt))
-            x = x / (np.max(np.abs(x)) + 1e-9) * np.minimum(1, tt / .15) * np.minimum(1, (d_ - tt) / .6)
-            put(_reverb(x, 2.0, .3), t, .9 * g); put(_rumble(3.0, 91, 120), t, .5 * g)
-            for j in range(30):
-                put(_env(r.standard_normal(int(.02 * SR)), .001, .015), t + r.uniform(0, 2.3), r.uniform(.1, .3) * g)
+        elif kind == "fire":     # 炎：低いごう音（不規則に揺れる）＋パチパチ＋咆哮の重ね
+            d_ = 2.8; tt = np.arange(int(d_ * SR)) / SR; wob = music._lp(r.standard_normal(len(tt)), 4); wob = 1 + .5 * wob / (np.max(np.abs(wob)) + 1e-9)
+            x = music._lp(r.standard_normal(len(tt)), 900) * wob
+            x = x / (np.max(np.abs(x)) + 1e-9) * np.minimum(1, tt / .12) * np.minimum(1, (d_ - tt) / .6)
+            put(_reverb(x, 2.0, .3), t, 1.1 * g); put(_rumble(3.4, 91, 110), t, .8 * g); put(_heavy(3.0, 50, 92, .3), t, .5 * g)
+            put(_reverb(_pitch(roar3, .45), 2.5, .4), t - .1, .5 * g)
+            for j in range(45):
+                put(_env(r.standard_normal(int(.02 * SR)), .001, .015), t + r.uniform(0, 2.7), r.uniform(.1, .35) * g)
         elif kind == "panic":
             put(_env(crowd[int(6 * SR):int(10 * SR)], .2, 1.0), t, .8 * g)
-        elif kind == "run":      # 4 万人が丘を駆け上がる：地鳴りのような足音（不規則）
-            put(_env(crowd[:int(dur * SR)], .3, .8), t, .5 * g); tt = t
-            while tt < t + dur:
-                put(_rumble(.6, int(tt * 31), 200), tt, .25 * g * r.uniform(.6, 1)); tt += r.uniform(.08, .2)
+        elif kind == "run":      # 4 万人が丘へ：ざわめきと、途切れない低い地鳴り（くり返しの音にしない）
+            put(_env(crowd[:int(dur * SR)], .3, .8), t, .5 * g); put(_rumble(dur, 33, 200), t, .5 * g)
         elif kind == "inhale":   # 息を吸う：低いノイズが高くなっていく
             put(_noise_sweep(2.6, 300, 1400, 101, .7), t, .8 * g); put(_rumble(2.6, 102, 80), t, .5 * g)
         elif kind == "whistle":  # 4 万本の風切りが近づく
@@ -176,9 +177,12 @@ def beds():
             put(_reverb(_pitch(roar2, .45)[:int(2.6 * SR)], 3.0, .45), t, .8 * g)
         elif kind == "misfire":
             put(_noise_sweep(1.6, 600, 2400, 131, .8), t, .6 * g)
-        elif kind == "fall":     # 倒れる地響き
-            hush(t, .3, .4, .1)
-            put(_heavy(6.0, 40, 141, .6), t, 1.4 * g); put(_rumble(6.0, 142, 120), t + .1, .9 * g); put(_pitch(B["quake"], .6)[:int(4 * SR)], t + .1, .6 * g)
+        elif kind == "fall":     # 倒れる地響き：一瞬静か → いちばん重い一撃を 2 つ重ね（体と尾）→ 長い地鳴り → 土の落ちる音
+            hush(t, .5, .4, .06)
+            put(_heavy(7.0, 38, 141, .8), t, 1.6 * g); put(_heavy(6.0, 30, 143, .4), t + .18, 1.2 * g); put(_pitch(B["explosion_chunky"], .45), t, 1.0 * g)
+            put(_rumble(7.0, 142, 110), t + .1, 1.2 * g); put(_rumble(6.0, 144, 60), t + .3, 1.0 * g); put(_pitch(B["quake"], .5)[:int(5 * SR)], t + .1, .9 * g)
+            for j in range(16):
+                put(_pitch(pick("break_")[r.integers(3)], r.uniform(.4, .7)), t + .4 + r.uniform(0, 2.5), r.uniform(.15, .35) * g)
         elif kind == "growl":
             put(_reverb(_pitch(roar1, .4)[:int(2.0 * SR)], 2.5, .4), t, .7 * g)
     put(_rumble(2.6, 1, 120), 0, .3)
