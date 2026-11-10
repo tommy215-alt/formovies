@@ -1,0 +1,177 @@
+{
+ "title": "怪獣vsハンマー投げ5万人",
+ "theme": "身長50mの怪獣 vs 世界最強のハンマー投げ選手5万人（もしも設計）",
+ "note": "もしも設計の既定（タイトルの帯つき）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オープニング：草原にそびえる怪獣と、手前にずらりと並ぶ 5 万人。タイトル 2 行"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "対決の開始。両者の紹介"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "平地から 5 万本が一斉に弧を描いて飛ぶ（空から）"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "怪獣の腰に当たって跳ね返る。怪獣は気づかない"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "怪獣が振り向いて炎を吐く。草原が燃え、1 万人が走って逃げる（リタイア）"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "作戦：丘（高さ 43 m）から頭を狙う。脳しんとうのライン"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "4 万人が丘を駆け上がる（空から）"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "怪獣が息を吸う。のどが赤く光る（次の炎）"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "丘の上で 4 万人が回転して投げる（スロー）"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "l09",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "4 万本が怪獣の頭へ集まる（スロー）"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "l10",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.8,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "頭に当たる。頭がはじかれる"
+  },
+  {
+   "id": "L11",
+   "who": "M",
+   "scene": "l11",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "ふらつく怪獣。炎は空へそれる"
+  },
+  {
+   "id": "L12",
+   "who": "M",
+   "scene": "l12",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "怪獣が倒れる。土煙"
+  },
+  {
+   "id": "L13",
+   "who": "M",
+   "scene": "l13",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "結果：勝者 ハンマー投げ"
+  },
+  {
+   "id": "L14",
+   "who": "M",
+   "scene": "l14",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "倒れた怪獣の目が開く（冒頭につながる）"
+  }
+ ]
+}

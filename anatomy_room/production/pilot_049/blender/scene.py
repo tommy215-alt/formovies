@@ -389,8 +389,8 @@ def build_monster():
         l_ = mlink(bpy.data.objects.new(f"m_lid{sx}", me)); l_.parent = head; l_.location = Vector((sx * 2.55, -5.35, 44.0)) - Vector(head["pivot"]); l_.scale = (1, 1, .05); lids.append(l_)
     arms = []
     for sx in (-1, 1):
-        ar = mpart(f"m_arm{sx}", [((sx * 7.2, -2.5, 30.5), 2.0, E, (1, 1, 1.5)), ((sx * 7.6, -4.6, 26.8), 1.6, E, (1, 1.6, .9)), ((sx * 7.6, -6.6, 25.6), 1.1, E, (1.2, 1.2, .6))],
-                   (sx * 6.5, -1.5, 32), torso, .3)
+        ar = mpart(f"m_arm{sx}", [((sx * 5.6, -2.4, 31.0), 2.4, E, (1, 1, 1.4)), ((sx * 6.3, -4.4, 27.2), 1.7, E, (1, 1.5, 1.0)), ((sx * 6.5, -6.2, 25.9), 1.2, E, (1.2, 1.2, .6))],
+                   (sx * 5.2, -1.5, 32), torso, .3)   # 胸に食いこませて、離れて見えないように
         arms.append(ar)
     sp = mat("m_spike", (.05, .055, .05), .45)
     pts = []
@@ -399,8 +399,8 @@ def build_monster():
             pts.append((sx * 1.3, 6.5 + .9 * i, 37 - 2.4 * i, 4.6 - .22 * i, .55))
     pts += [(0, 9 + 2.4 * i, 17.5 - 1.05 * i ** 1.05, 3.6 - .2 * i, .9) for i in range(13)]
     spikes(torso, pts, sp)
-    gm = emat("m_glow", (.3, .08, .02), .5, (1.0, .35, .05), 0.0, haze=False)
-    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=12, radius=2.4); me = bpy.data.meshes.new("glow"); bm.to_mesh(me); bm.free(); me.materials.append(gm)
+    gm = emat("m_glow", (.02, .02, .018), .5, (1.0, .35, .05), 0.0, haze=False)   # ふだんは肌と同じ暗さ、炎の前だけ光る
+    bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=12, radius=2.2); me = bpy.data.meshes.new("glow"); bm.to_mesh(me); bm.free(); me.materials.append(gm)
     glow = mlink(bpy.data.objects.new("m_glow", me)); glow.parent = head; glow.location = Vector((0, -2.2, 38.0)) - Vector(head["pivot"]); glow.scale = (1, 1, 1.5)
     return dict(root=root, torso=torso, head=head, jaw=jaw, arms=arms, lids=lids, glow=gm)
 
@@ -495,7 +495,7 @@ def scorch():
     for i in range(140):
         a = rnd.uniform(math.radians(200), math.radians(250)); r = rnd.uniform(40, 170)
         x, y = math.cos(a) * r, math.sin(a) * r
-        xf.append((x, y, hill_z(x, y) - .5, rnd.uniform(6, 14), rnd.uniform(6, 14), .8, 0, 0, 0))
+        xf.append((x, y, hill_z(x, y) - .05, rnd.uniform(6, 14), rnd.uniform(6, 14), .12, 0, 0, 0))   # 焼けあと（平たく）
     instances("scorch", tv, tf, xf, [m])
 
 
@@ -517,7 +517,7 @@ def s_l00():
     base(14, 120, (.95, .8, .65), .9); world("plain")
 def a_l00(u, t, f):
     mpose(0.0, head=(.05 * math.sin(t), 0, 0), breathe=.3 * math.sin(t * 1.5), lid=1.0)
-    cam.look(tuple(Vector((-150, -150, 8)) + Vector((10 * u, 10 * u, 0))), (0, 0, 28), 26)
+    cam.look(tuple(Vector((-95, -40, 3.5)) + Vector((4 * u, 3 * u, 0))), (0, -3, 30), 22)   # 群衆のうしろから見上げる（丘にかからない西側）
 
 
 def s_l01():
@@ -567,7 +567,7 @@ def a_l04(u, t, f):
     d = (Matrix.Rotation(sweep, 3, "Z") @ d).normalized()
     aim_fire(FIRE4, org, d, f, on=fire > 0 and u < .9, scale=.4 + .6 * min(1, fire * 4)); key_v(FIRE4K, 6.0, f)
     gp = org + d * 150; keyp(SMOKE4, f, loc=tuple(Vector((gp.x, gp.y, 25))) if fire > .1 else (0, 0, -1e5), scale=60 + 60 * fire); key_v(SMOKE4K, .012 * (fire > .1), f)
-    cam.look(tuple(Vector((170, -110, 35)) + Vector((-10 * u, 0, 0)) + shake(f, .8 * (fire > 0), 4)), (-20, -60, 22), 24)
+    cam.look(tuple(Vector((150, -30, 30)) + Vector((-10 * u, 0, 0)) + shake(f, .8 * (fire > 0), 4)), (-40, -70, 18), 26)
 
 
 def s_l05():
@@ -611,7 +611,7 @@ def a_l08(u, t, f):
     mpose(0.0, head=(-.25, 0, 0), jaw=-.05, breathe=1.0, lid=1.0); key_v(esock(MON["glow"]), 25 + 10 * u, f)
     for root, ph in SPIN:   # 3 回転して離す（スロー）
         keyp(root, f, rot=(0, 0, ph + 2 * math.pi * 3 * ease(cut(0, .8, u))))
-    c = HILL + Vector((-20, HILL_R - 45, HILL_H + 3)); cam.look(tuple(c), tuple(HEAD_POS + Vector((0, 0, -2))), 24)
+    c = HILL + Vector((-14, HILL_R - 35, HILL_H + 6.5)); cam.look(tuple(c), tuple(HEAD_POS + Vector((0, 0, -4))), 30)   # 選手たちのうしろ上から、正面に怪獣の頭
 
 
 def s_l09():
@@ -622,7 +622,7 @@ def s_l09():
 def a_l09(u, t, f):
     mpose(0.0, head=(-.25, 0, 0), jaw=-.05, breathe=1.0, lid=1.0); key_v(esock(MON["glow"]), 35, f)
     throw_set(HM9, ORG9, lambda i: HEAD_POS + Vector((random.Random(i).uniform(-3, 3), random.Random(i + 1).uniform(-2, 2), random.Random(i + 2).uniform(-2, 2))), 0, 1.0, u, f, 24.0)
-    cam.look(tuple(Vector((90, -60, 55)) + Vector((-6 * u, 0, 0))), tuple(HEAD_POS.lerp(HILL + Vector((0, 0, HILL_H)), .45)), 30)
+    cam.look(tuple(Vector((170, -55, 58)) + Vector((-8 * u, 0, 0))), tuple(Vector((0, -48, 44))), 30)   # 横から：丘と頭の間をハンマーが飛ぶ
 
 
 def s_l10():
@@ -661,7 +661,7 @@ def a_l11(u, t, f):
 def s_l12():
     base(26, 150, (.88, .84, .8), .9, blur=True); world("hill"); scorch()
     global DUST12, DUST12K
-    DUST12, DUST12K = puff("falldust", (0, 0, -1e5), 40, (.55, .5, .45), .004)
+    DUST12, DUST12K = puff("falldust", (0, 0, -1e5), 40, (.62, .57, .5), .0015)
 def a_l12(u, t, f):
     k = ease(cut(.05, .55, u)) ** 1.7; tip = (math.pi / 2 - .12) * k   # かかとを支点にあお向けに倒れる
     mpose(root_rot=(-tip, 0, 0), root_loc=(0, 4 * k, 0), head=(-.4 + .3 * k, 0, .2), jaw=-.3, lid=.3)
@@ -683,7 +683,7 @@ def a_l14(u, t, f):
     op = ease(cut(.35, .7, u))
     mpose(root_rot=(-(math.pi / 2 - .12), 0, 0), root_loc=(0, 4, 0), head=(-.1, 0, .2), jaw=-.3, lid=.05 + .95 * op)
     bpy.context.view_layer.update(); eye = MON["lids"][1].matrix_world.translation
-    cam.look(tuple(eye + Vector((10, -14, 6))), tuple(eye), 40)
+    cam.look(tuple(eye + Vector((14, -2, 5))), tuple(eye), 45)
 
 
 NAMES = [s["id"] for s in PLAN["shots"]]
