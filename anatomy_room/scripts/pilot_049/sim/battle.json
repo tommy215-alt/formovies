@@ -1,0 +1,22 @@
+{
+ "hammer_v": 29.170522792709768,
+ "hammer_J": 3088.837422,
+ "hammer_total_MJ": 30.88837422,
+ "hammer_top_m": 23.685000000000006,
+ "hammer_reach": "腰",
+ "hammer_as_g": 0.023595,
+ "bullet_J": 1692.8,
+ "bullets": 300000,
+ "bullet_total_MJ": 507.84,
+ "bullet_pass": false,
+ "at_depth_m": 1.9612496016570657,
+ "at_wound_m3": 55.45302606379571,
+ "body_m3": 20000.0,
+ "at_wound_pct": 0.27726513031897854,
+ "at_vs_body": 0.13074997344380437,
+ "pull_total_MN": 10.0,
+ "pull_need_MN": 32.7,
+ "people_need": 32700,
+ "people_more": 22700,
+ "skin_cm": 50.0
+}
