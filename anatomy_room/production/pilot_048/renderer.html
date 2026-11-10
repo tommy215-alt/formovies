@@ -75,7 +75,7 @@ function ffMark(x, y, k) { if (k <= 0) return; ui.save(); ui.globalAlpha *= k; u
   for (const dx of [0, 22]) { ui.beginPath(); ui.moveTo(x + dx, y - 13); ui.lineTo(x + dx + 20, y); ui.lineTo(x + dx, y + 13); ui.closePath(); ui.fill(); }
   text(ui, "早送り", x + 104, y + 1, 30, "#8FDCFF", { weight: 800, align: "center" }); ui.restore(); }
 function statusUI(t) {
-  const k = curId(t); if (k === "l00" || k === "l01" || k === "l16" || t < CUE.l02) return;
+  const k = curId(t); if (k === "l00" || k === "l01" || k === "l10" || k === "l16" || t < CUE.l02) return;   // 大きな札の出るショットでは出さない
   const c = clockNow(t), o = tod(c), a = CUE[k], u = t - a, tr = trampled(c), on = c >= PL.zoom0;
   const x0 = 40, y0 = TBAR + 24, w = 640, h = 150 + (on ? 132 : 0);
   ui.save(); ui.translate(x0, y0);
@@ -89,9 +89,9 @@ function statusUI(t) {
       text(ui, "踏まれた範囲", 36, 204, 32, "#FF8A6A", { weight: 800, align: "left" });
       text(ui, `${Math.round(tr).toLocaleString("ja-JP")}km²`, w - 32, 204, 44, "#FFFFFF", { weight: 900, align: "right" });
       text(ui, "23区のうち", 36, 254, 32, "#FF8A6A", { weight: 800, align: "left" });
-      { const g = digitPop(t); ui.save(); ui.translate(w - 32, 252); ui.scale(1 + .45 * g, 1 + .45 * g);
+      { const g = digitPop(t); ui.save(); ui.translate(w - 32, 252); ui.scale(1 + .22 * g, 1 + .22 * g);
         if (g > 0) { ui.shadowColor = `rgba(255,90,40,${.95 * g})`; ui.shadowBlur = 50 * g; }
-        text(ui, `${Math.floor(pc)}%`, 0, 0, 52, g > .05 ? `rgb(255,${Math.round(170 + 85 * g)},${Math.round(90 + 140 * g)})` : "#FF6A4C", { weight: 900, align: "right", stroke: "#1a0804", sw: 6 }); ui.restore(); }
+        text(ui, `${Math.floor(pc)}%`, 0, 0, 44, g > .05 ? `rgb(255,${Math.round(170 + 85 * g)},${Math.round(90 + 140 * g)})` : "#FF6A4C", { weight: 900, align: "right", stroke: "#1a0804", sw: 6 }); ui.restore(); }
     }
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();

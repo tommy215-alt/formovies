@@ -25,6 +25,8 @@ def log(*a):
 
 O = K.args()
 sc = K.setup(O["samples"])
+sc.cycles_curves.shape = "RIBBONS"   # 毛は平たいリボンで描く（太さのある管より速い）
+sc.cycles.volume_step_rate = 12.0; sc.cycles.volume_max_steps = 64; sc.cycles.adaptive_threshold = .05   # 霧と土煙は粗い刻みで（1 コマ 60 秒 → 短縮）
 sky = K.Sky(); cam = K.Cam()
 PLAN = json.load(open(os.path.join(HERE, "plan.json"), encoding="utf-8"))
 SPLAN = {s["id"]: s for s in PLAN["shots"]}
@@ -446,7 +448,7 @@ def part(name, elems, pivot, parent=None, fur=.05, count=3000, lenfn=None, hmat=
         st.roughness_1 = fur * .24; st.roughness_1_size = 1.0; st.roughness_endpoint = fur * .16; st.roughness_2 = fur * .2
         st.kink = "CURL"; st.kink_amplitude = fur * .04; st.kink_frequency = 2.0
         st.radius_scale = .00009 * KS; st.tip_radius = 0.0; st.use_close_tip = True
-        st.display_step = 3; st.render_step = 4
+        st.display_step = 3; st.render_step = 3
         me_o.data.materials.append(hmat or HAIR); st.material_slot = (hmat or HAIR).name
         if lenfn:
             vg = me_o.vertex_groups.new(name="len")
@@ -456,6 +458,25 @@ def part(name, elems, pivot, parent=None, fur=.05, count=3000, lenfn=None, hmat=
             for v in me_o.data.vertices:
                 vd.add([v.index], max(.55, min(1., lenfn((v.co + pv) / KS) + .3)), "REPLACE")
             ps.vertex_group_length = "len"; ps.vertex_group_density = "dens"
+        # 毛を動かない曲線（Curves）に一度だけ変えて、部品に付ける。パーティクルのままだと毎コマ CPU で毛を作り直して遅い（1 コマ 60 秒）
+        st.child_percent = child   # 曲線に変えるときは表示の本数が使われるので、描画と同じ本数に
+        bpy.context.view_layer.update()
+        for o in list(bpy.context.selected_objects):
+            o.select_set(False)
+        bpy.context.view_layer.objects.active = me_o; me_o.select_set(True)
+        bpy.ops.curves.convert_from_particle_system()
+        cv = next(o for o in bpy.context.selected_objects if o.type == "CURVES")
+        for c_ in list(cv.users_collection):
+            c_.objects.unlink(cv)
+        dlink(cv); cv.name = name + "_fur"
+        cd = cv.data; cd.materials.append(hmat or HAIR)
+        n = len(cd.points); nc = len(cd.curves); ln = np.zeros(nc, np.int32); cd.curves.foreach_get("points_length", ln)
+        k = np.concatenate([np.linspace(1, .08, m) for m in np.unique(ln)]) if len(np.unique(ln)) == 1 else None
+        k = np.tile(k, nc) if k is not None else np.concatenate([np.linspace(1, .08, m) for m in ln])
+        ra = cd.attributes.get("radius") or cd.attributes.new("radius", "FLOAT", "POINT")
+        ra.data.foreach_set("value", (k[:n] * .00009 * KS * 1.2).astype(np.float32))
+        cv.parent = me_o; cv.matrix_parent_inverse = me_o.matrix_world.inverted()
+        me_o.modifiers.remove(md)
     return me_o
 
 
@@ -489,7 +510,7 @@ def build_dog():
         under = max(0., 1 - (p.z - .07) / .05)
         return 1.0 + .45 * ruff - .5 * under
     torso = part("torso", [((0, .025, .145), .078, E, (.95, 1.25, .9)), ((0, -.055, .155), .072, E, (1, .9, 1)), ((0, .08, .15), .06, E, (1, 1, .95))],
-                 (0, .01, .14), root, .052, 9000, body_len, child=70)
+                 (0, .01, .14), root, .052, 9000, body_len, child=45)
 
     def head_len(p):
         q = Vector(p)
@@ -501,7 +522,7 @@ def build_dog():
         return (1 - .95 * max(nose, eye, .8 * face) - .9 * ear) * (1 + .35 * cheek)
     head = part("head", [((0, -.09, .225), .058, B, None), ((0, -.142, .213), .025, E, (.9, 1.2, .8)),
                          ((.034, -.08, .305), .022, E, (.7, .42, 1.7)), ((-.034, -.08, .305), .022, E, (.7, .42, 1.7))],
-                (0, -.06, .19), torso, .04, 4500, head_len, child=70)
+                (0, -.06, .19), torso, .04, 4500, head_len, child=45)
     eye_m = wet_mat("eye", (.03, .014, .007), .25, .0, 900., .35)   # 濃い茶色の目、つやは控えめ
     for sx in (-1, 1):
         solid(f"eye{sx}", (sx * .027, -.139, .241), .0078, eye_m, (1.1, .7, .85), head)
@@ -518,13 +539,13 @@ def build_dog():
     for k, (sx, y) in enumerate(((-1, -.05), (1, -.05), (-1, .075), (1, .075))):
         fx = .03 if y < 0 else .033
         lg = part(f"leg{k}", [((sx * fx, y, .066), .02, E, (1, 1, 2.6)), ((sx * fx, y - .004, .016), .017, E, (1.1, 1.35, .8))],
-                  (sx * fx, y, .11), torso, .026, 1000, leg_len, child=50)
+                  (sx * fx, y, .11), torso, .026, 1000, leg_len, child=32)
         # 肉球：大きな肉球 1 つと指の肉球 4 つ（足の裏）
         solid(f"pad{k}", (sx * fx, y - .002, .0015), .006, pad_m, (1.1, .9, .35), lg)
         for i, (dx, dy) in enumerate(((-.008, -.009), (-.003, -.013), (.003, -.013), (.008, -.009))):
             solid(f"toe{k}{i}", (sx * fx + dx, y + dy, .002), .0032, pad_m, (1, 1, .4), lg)
         legs.append(lg)
-    tail = part("tail", [((0, .1, .225), .028, E, (1, 1.7, .75)), ((0, .06, .25), .022, E, (1, 1.3, .7))], (0, .12, .2), torso, .07, 2600, None, HAIR_L, child=70)
+    tail = part("tail", [((0, .1, .225), .028, E, (1, 1.7, .75)), ((0, .06, .25), .022, E, (1, 1.3, .7))], (0, .12, .2), torso, .07, 2600, None, HAIR_L, child=45)
     return dict(root=root, torso=torso, head=head, jaw=jaw, tongue=tongue, legs=legs, tail=tail)
 
 
@@ -576,8 +597,9 @@ def dogpt(local):
 
 
 # ---------------------------------------------------------------- 場面の土台
-def base(sun_el, sun_rot, haze_col, haze_k=1.0, d0=900., d1=18000., energy=9.0, alt=0):
+def base(sun_el, sun_rot, haze_col, haze_k=1.0, d0=900., d1=18000., energy=9.0, alt=0, blur=False):
     sky.set(alt, sun_el, sun_rot, energy); set_haze(haze_col, haze_k, d0, d1)
+    sc.render.use_motion_blur = blur   # 動きのぶれは速く走るショットだけ（毛のぶれは重い）
 
 
 def face(a, b):
@@ -636,15 +658,15 @@ def a_l01(u, t, f):
 # ---------------------------------------------------------------- l02：スクランブル交差点に前足が下りる（下から見上げる）
 def s_l02():
     env_clear(); dog_hide(False); base(10, 110, DAWN, 1.0, 800, 12000)
-    ground(); crossing(SHIBUYA); city(SHIBUYA.x, SHIBUYA.y, 3000, 5, downtown([(SHIBUYA.x, SHIBUYA.y, 500, 150)]), hole=[(SHIBUYA.x, SHIBUYA.y, 230), (SHIBUYA.x + 70, SHIBUYA.y - 600, 300)])
+    ground(); crossing(SHIBUYA); city(SHIBUYA.x, SHIBUYA.y, 3000, 5, downtown([(SHIBUYA.x, SHIBUYA.y, 500, 150)]), hole=[(SHIBUYA.x, SHIBUYA.y, 230), (SHIBUYA.x - 90, SHIBUYA.y - 500, 320), (SHIBUYA.x + 70, SHIBUYA.y + 130, 330)])
     global CARS2; CARS2 = cars(SHIBUYA.x, SHIBUYA.y, 40, 14)
     global DUST2, DUST2K; DUST2, DUST2K = puff("dust02", tuple(SHIBUYA), 60, (.6, .55, .48), .02)
 def a_l02(u, t, f):
-    # 北へ歩く犬の左前足（leg0）。うしろに振り上げた足の裏（肉球）がカメラを向き → 前へ振り下ろして交差点に着く
-    land = .58; up_ = ease(cut(0, .25, u)) * (1 - ease(cut(.36, land, u))); fwd = ease(cut(.36, land, u)) * (1 - ease(cut(land, .8, u)))
-    rot0 = 1.25 * up_ - .25 * fwd
-    root = SHIBUYA - Vector((.03 * KS, .054 * KS, 0))
-    pose(root, math.pi, legs=[(rot0, 0, 0), (-.08, 0, 0), (.1, 0, 0), (-.1, 0, 0)], torso=(.06 * up_, 0, 0), head=(.1, 0, 0))
+    # カメラのほう（南）へ歩いてくる犬の左前足（leg0）。前に振り上げた足の裏（肉球）が下からよく見え → 交差点に下りる
+    land = .58; up_ = ease(cut(0, .3, u)) * (1 - ease(cut(.38, land, u)))
+    rot0 = -1.15 * up_
+    root = SHIBUYA + Vector((.03 * KS, .054 * KS, 0))
+    pose(root, 0.0, legs=[(rot0, 0, 0), (.1, 0, 0), (-.1, 0, 0), (.1, 0, 0)], torso=(-.08 * up_, 0, 0), head=(.15, 0, 0))
     e = u - land
     sink = 6 * ease(clamp(e / .15)) if e > 0 else 0
     DOG["root"].location.z -= sink
@@ -659,7 +681,7 @@ def a_l02(u, t, f):
     sh = shake(f, 3.0 * clamp(1 - abs(e) / .12), 2) if e > -0.02 else Vector()
     bpy.context.view_layer.update(); pw = DOGC.objects["pad0"].matrix_world.translation
     tgt = pw.lerp(SHIBUYA + Vector((0, 0, 40)), ease(cut(.3, .6, u)))
-    cam.look(tuple(SHIBUYA + Vector((70, -720, 12)) + sh), tuple(tgt + Vector((0, 0, 25))), 22)
+    cam.look(tuple(SHIBUYA + Vector((-90, -560, 8)) + sh), tuple(tgt + Vector((0, 0, 20))), 20)
 
 
 # ---------------------------------------------------------------- l03：くんくん（ビルの屋上の高さの鼻）、鼻息で車と街路樹が飛ぶ
@@ -715,35 +737,38 @@ def s_l06():
     ground(); dome(DOME); city(DOME.x, DOME.y, 4500, 11, downtown([(DOME.x, DOME.y - 500, 500, 120)]), hole=[(DOME.x, DOME.y, 260), (DOME.x - 700, DOME.y + 150, 480)])
     global POOP, STEAM, STEAMK
     P = DOME + Vector((-700, 150, 0)); h = face(P, P + Vector((1, -.3, 0))); fw = Vector((math.sin(h), -math.cos(h), 0))
-    POOP = poop_pile(P - fw * (.15 * KS))
+    POOP = poop_pile(P - fw * (.22 * KS))   # お尻の毛の外に出る位置
     STEAM, STEAMK = puff("steam06", (0, 0, -1e5), 60, (.9, .9, .9), .004)
 
 
 def poop_pile(p):
-    """とぐろの山（メタボールの玉を重ねる。本物の 1 回分の形を k 倍：高さ 71 m）"""
-    mb = bpy.data.metaballs.new("mb_poop"); mb.resolution = 2.0; mb.render_resolution = 1.2; mb.threshold = .1
-    ob = bpy.data.objects.new("mb_poop", mb); sc.collection.objects.link(ob)
-    for i in range(26):
-        a = i * .9; r = 34 - i * 1.0; z = 8 + i * 2.5
-        e = mb.elements.new(); e.co = (math.cos(a) * r * .6, math.sin(a) * r * .6, z); e.radius = 26 - i * .55
-    for o in list(bpy.context.selected_objects):
-        o.select_set(False)
-    bpy.context.view_layer.objects.active = ob; ob.select_set(True); bpy.ops.object.convert(target="MESH")
-    o = bpy.context.active_object; o.name = "poop"; sc.collection.objects.unlink(o); link(o)
-    m = wet_mat("poop", (.16, .08, .035), .45, .5, .05); add_haze(m); o.data.materials.append(m)
+    """とぐろの山（つぶした球を少しずつずらして重ねる。本物の 1 回分の形を k 倍：高さ 71 m）"""
+    tv, tf = _template("ico"); xf = []
+    for i in range(14):
+        a = i * 1.1; r = 44 - i * 2.6; z = 6 + i * 4.6
+        xf.append((math.cos(a) * 12, math.sin(a) * 12, z, r, r * .9, r * .42, a, 0, 0))
+    o = instances("poop", tv, tf, xf, [wet_mat("poop", (.16, .08, .035), .45, .5, .05)])
     for pl in o.data.polygons:
         pl.use_smooth = True
+    sub = o.modifiers.new("smooth", "SUBSURF"); sub.levels = sub.render_levels = 2
     o.location = p; return o
+
+
 def a_l06(u, t, f):
     P = DOME + Vector((-700, 150, 0)); sq = ease(cut(.05, .3, u)); out = cut(.38, .78, u)
     pose(P, face(P, P + Vector((1, -.3, 0))), up=-.055 * sq, torso=(-.5 * sq, 0, 0), head=(.4 * sq, 0, 0),
          legs=[(.45 * sq, 0, 0), (.45 * sq, 0, 0), (-1.25 * sq, 0, 0), (-1.25 * sq, 0, 0)], tail=(-.5 * sq, 0, 0))
     keyp(POOP, f, scale=(1, 1, max(.02, ease(out))))
     if out > .6:
-        keyp(STEAM, f, loc=tuple(POOP.location + Vector((0, 0, 90 + 60 * u))), scale=70 + 60 * u); key_v(STEAMK, .006, f)
+        keyp(STEAM, f, loc=tuple(POOP.location + Vector((0, 0, 70 + 40 * u))), scale=40 + 30 * u); key_v(STEAMK, .004, f)
     else:
         keyp(STEAM, f, loc=(0, 0, -1e5)); key_v(STEAMK, 0., f)
-    cam.look(tuple(DOME + Vector((-200, -1900, 420))), tuple(DOME + Vector((-380, 120, 150))), 28)
+    fw = Vector((math.sin(DOG["root"].rotation_euler.z), -math.cos(DOG["root"].rotation_euler.z), 0))
+    pp = P - fw * (.22 * KS)   # 山の位置（お尻のうしろ）。カメラは山の側（南西）から、手前に山・奥に犬とドーム
+    zi = ease(cut(.5, .95, u))   # 後半は山に寄る（まわりの 20 階建てのビルと比べる）
+    c0 = pp + Vector((-1100, -1500, 260)); c1 = pp + Vector((-260, -330, 70))
+    a0 = pp.lerp(P, .45) + Vector((0, 0, 120)); a1 = pp + Vector((0, 0, 35))
+    cam.look(tuple(c0.lerp(c1, zi)), tuple(a0.lerp(a1, zi)), 26 + 6 * zi)
 
 
 # ---------------------------------------------------------------- l07：スカイツリーにマーキング → 川があふれる
@@ -812,8 +837,8 @@ def a_l10(u, t, f):
 
 # ---------------------------------------------------------------- l11：走り出す。衝撃波で窓が一斉に割れる
 def s_l11():
-    env_clear(); dog_hide(False); base(28, 135, MORN, .9, 1500, 20000)
-    ground(); city(4000, 0, 6000, 16, downtown([(4000, 600, 700, 140)]), hole=[(4000 + x, 0, 280) for x in range(-3000, 3001, 250)])
+    env_clear(); dog_hide(False); base(28, 135, MORN, .9, 1500, 20000, blur=True)
+    ground(); city(4000, 0, 6000, 16, downtown([(4000, 600, 700, 140)]), hole=[(4000 + x, 0, 280) for x in range(-3000, 3001, 250)] + [(4000, -900, 260)])
     global GLASS, CONE, CONEK
     rnd = random.Random(11); GLASS = []
     gm = K.mat("glass_sh", (.6, .7, .75), .05, .0); gm.node_tree.nodes["Principled BSDF"].inputs["Transmission Weight"].default_value = .7
@@ -876,15 +901,15 @@ def a_l12(u, t, f):
 
 # ---------------------------------------------------------------- l13：東京タワーがなぎ倒される
 def s_l13():
-    env_clear(); dog_hide(False); base(31, 142, MORN, .9, 1500, 20000)
-    ground(); global TT; TT = tokyo_tower(TOWER); city(TOWER.x, TOWER.y, 4500, 17, hole=[(TOWER.x, TOWER.y, 90), (TOWER.x - 500, TOWER.y - 1500, 300)] + [(TOWER.x - 2500 + 250 * i, TOWER.y + 260, 260) for i in range(21)])
+    env_clear(); dog_hide(False); base(31, 142, MORN, .9, 1500, 20000, blur=True)
+    ground(); global TT; TT = tokyo_tower(TOWER); city(TOWER.x, TOWER.y, 4500, 17, hole=[(TOWER.x, TOWER.y, 90), (TOWER.x - 300, TOWER.y - 1700, 320)] + [(TOWER.x - 2500 + 250 * i, TOWER.y + 260, 260) for i in range(21)])
     global DUST13, DUST13K; DUST13, DUST13K = puff("dust13", (0, 0, -1e5), 400, (.6, .55, .5), .002)
 def a_l13(u, t, f):
-    x = TOWER.x - 2600 + 5200 * cut(.0, .6, u); P = Vector((x, TOWER.y + 260, 0)); ph = t * 2 * math.pi * 2.6
+    x = TOWER.x - 2000 + 4000 * u; P = Vector((x, TOWER.y + 260, 0)); ph = t * 2 * math.pi * 2.6
     pose(P, math.pi / 2, legs=gallop_legs(ph), torso=(.12 * math.sin(ph), 0, 0), tz=.01 * abs(math.sin(ph)), head=(-.1, 0, 0), tail=(.5, 0, 0), jaw=.25, tongue=.6)
-    hit = cut(.28, .7, u); TT.rotation_euler = (0, 0, 0); keyp(TT, f, rot=(-1.45 * ease(hit) ** 1.6, 0, .2 * hit))
+    hit = cut(.44, .8, u); TT.rotation_euler = (0, 0, 0); keyp(TT, f, rot=(-1.5 * ease(hit) ** 1.4, 0, .25 * hit))
     keyp(DUST13, f, loc=tuple(TOWER + Vector((0, -150 * hit, 60))), scale=100 + 500 * hit); key_v(DUST13K, .003 * (hit > 0), f)
-    cam.look(tuple(TOWER + Vector((-500, -1500, 90))), tuple(TOWER + Vector((150, 250, 200))), 28)
+    cam.look(tuple(TOWER + Vector((-300, -1700, 90))), tuple(TOWER + Vector((0, 250, 230))), 22)
 
 
 # ---------------------------------------------------------------- l14：へそ天（平らになった新宿の上で）
@@ -916,6 +941,11 @@ def _wrap(a):
         if f % 20 == 0:
             log("anim frame", f)
         a(u, t, f); DOG["tongue"].keyframe_insert("scale", frame=f + 1)
+        if os.environ.get("DOGPROBE") and f in (0, 30, 60):
+            bpy.context.view_layer.update(); lg = DOG["legs"][0]
+            print("PROBE", f, "leg0 rot", tuple(round(x, 2) for x in lg.rotation_euler), "pad0", tuple(round(x) for x in DOGC.objects["pad0"].matrix_world.translation),
+                  "leg1pad", tuple(round(x) for x in DOGC.objects["pad1"].matrix_world.translation), "cam", tuple(round(x) for x in cam.o.location), flush=True)
+            sys.exit(0) if f == 60 else None
         if os.environ.get("DOGPOSE") == "stand":
             pose(tuple(DOG["root"].location), DOG["root"].rotation_euler.z)
         dc = os.environ.get("DOGCAM")   # 確認用：犬を横（side）・正面（front）から近くで見る
