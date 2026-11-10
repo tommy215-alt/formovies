@@ -587,7 +587,6 @@ class Swarm:
         self.BV = np.stack([rnd.uniform(-8, 8, N), rnd.uniform(-14, -4, N), rnd.uniform(2, 10, N)], 1)   # 跳ね返る速さ
         self.spin = rnd.uniform(0, 6.28, N)
         tv, tf_ = hammer_template(scale); self.tv = tv; nv = len(tv)
-        faces = (np.asarray([list(fc) + [-1] * (4 - len(fc)) if len(fc) < 4 else list(fc) for fc in tf_]))
         allf = [tuple(i * nv + k for k in fc) for i in range(N) for fc in tf_]
         me = bpy.data.meshes.new(name); me.from_pydata(np.zeros((N * nv, 3)).tolist(), [], allf); me.update()
         me.materials.append(mat("steel", (.62, .62, .64), .22, .95))
@@ -759,7 +758,7 @@ def s_l04():
             continue
         P0.append((x, y, 0)); d = Vector((95 - x, -40 - y, 0)).normalized(); D.append((d.x, d.y, 0))
     RUN4 = Runners("run4", P0, D, 1.4, 7.0)
-FIRE4_G = [Vector((-120, -40, 0)), Vector((-55, -115, 0))]   # 炎が地面をなめる道すじ（はじめ → おわり）
+FIRE4_G = [Vector((-75, -25, 0)), Vector((-25, -62, 0))]   # 炎が地面をなめる道すじ（はじめ → おわり。丘の陰にならない所）
 def a_l04(u, t, f):
     turn = ease(cut(0, .2, u)); fire = cut(.25, .88, u)
     mpose(-.6 * turn, head=(.3 * turn, 0, -.2 * turn), jaw=-.55 * (fire > 0) * (1 - cut(.88, 1, u)), breathe=-.6 * fire, lid=1.0)
@@ -903,8 +902,8 @@ def s_l13():
     """怪獣が倒れる（スロー）。地響き、土煙の輪、飛び散る土"""
     base(26, 150, (.88, .84, .8), .9, blur=True); world("hill"); scorch()
     global DUST13, RING13, ROCK13
-    DUST13 = [puff(f"fd{i}", (0, 0, -1e5), 30, (.62, .57, .5), .002) for i in range(10)]
-    RING13 = [puff(f"ring{i}", (0, 0, -1e5), 20, (.6, .55, .48), .0025) for i in range(16)]
+    DUST13 = [puff(f"fd{i}", (0, 0, -1e5), 30, (.62, .57, .5), .006) for i in range(10)]
+    RING13 = [puff(f"ring{i}", (0, 0, -1e5), 20, (.6, .55, .48), .007) for i in range(16)]
 
 
 FALL0, FALL1 = .08, .55
@@ -913,13 +912,13 @@ def a_l13(u, t, f):
     mpose(root_rot=(-tip, 0, 0), root_loc=(0, 4 * k, 0), head=(-.4 + .3 * k, 0, .25), jaw=-.35, lid=.3)
     e = cut(FALL1, 1, u)
     for i, (o, kk) in enumerate(DUST13):   # 体の当たった所に土煙
-        y = 8 + i * 5; keyp(o, f, loc=(0, y, 8 + 10 * e) if e > 0 else (0, 0, -1e5), scale=18 + 40 * e); key_v(kk, .004 * (e > 0) * (1 - .4 * e), f)
+        y = 8 + i * 5; keyp(o, f, loc=(0, y, 8 + 14 * e) if e > 0 else (0, 0, -1e5), scale=18 + 45 * e); key_v(kk, .009 * (e > 0) * (1 - .4 * e), f)
     for i, (o, kk) in enumerate(RING13):   # 地面を走る土煙の輪
         a = i / 16 * 2 * math.pi; r = 30 + 260 * e
-        keyp(o, f, loc=(r * math.cos(a), 25 + r * math.sin(a), 6) if e > 0 else (0, 0, -1e5), scale=15 + 25 * e); key_v(kk, .003 * (e > 0) * (1 - .6 * e), f)
+        keyp(o, f, loc=(r * math.cos(a), 25 + r * math.sin(a), 8) if e > 0 else (0, 0, -1e5), scale=18 + 30 * e); key_v(kk, .008 * (e > 0) * (1 - .6 * e), f)
     hit = clamp(1 - abs(u - FALL1) / .12)
-    c = Vector((-150, -55, 5)) + Vector((10 * u, 5 * u, 0))
-    cam.look(tuple(c + shake(f, 5.0 * hit + .6 * e, 7)), tuple(Vector((0, 12, 22 - 12 * k))), 24)
+    c = Vector((48, -14, 2.5)) + Vector((-4 * u, 2 * u, 0))   # 東の足もと近く、低い所から見上げる。倒れる体が画面いっぱいに
+    cam.look(tuple(c + shake(f, 6.0 * hit + .8 * e, 7)), tuple(Vector((0, 16, 26 - 18 * k))), 16)
 
 
 def s_l14():
@@ -936,7 +935,7 @@ def a_l15(u, t, f):
     op = ease(cut(.35, .7, u))
     mpose(root_rot=(-(math.pi / 2 - .12), 0, 0), root_loc=(0, 4, 0), head=(-.1, 0, .2), jaw=-.3, lid=.05 + .95 * op)
     bpy.context.view_layer.update(); eye = MON["lids"][1].matrix_world.translation
-    cam.look(tuple(eye + Vector((22, -10, 9))), tuple(eye + Vector((0, 0, -1))), 38)   # 顔の横から、目が開く
+    cam.look(tuple(eye + Vector((4.5, -4.5, 3.0))), tuple(eye), 70)   # 目だけに寄る（背中のとげが入らないように）
 
 
 NAMES = [s["id"] for s in PLAN["shots"]]

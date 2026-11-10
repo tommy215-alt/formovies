@@ -60,7 +60,7 @@ const pad = n => String(Math.floor(n)).padStart(2, "0");
 function mmss(c) { c = Math.max(0, c); return `${Math.floor(c / 60)}:${pad(c % 60)}`; }
 function stamp(c) { return mmss(c); }
 // 残りの人数：炎 1 回で 1 万人リタイア（2 回目の炎は吐く前に倒れた）
-function remain(c) { return c >= PL.fire[0] ? PL.n0 - PL.fire_n : PL.n0; }
+function remain(c) { return PL.n0 - PL.fire_n * PL.fire.filter(x => c >= x).length; }   // 2 回目の炎は一撃のあと（丘に届いた）
 function digitPop(t) {   // 人数が変わった瞬間から 0.7 秒光る
   const now = remain(clockNow(t));
   for (let k = 1; k <= 21; k++) { const tp = t - k / 30; if (tp < CUE.l02) break; if (remain(clockNow(tp)) !== now) { const u = (k - 1) / 30; return u < .12 ? easeOut(u / .12) : 1 - easeInOut(clamp((u - .12) / .58)); } }
@@ -73,8 +73,8 @@ function ffMark(x, y, k) { if (k <= 0) return; ui.save(); ui.globalAlpha *= k; u
   for (const dx of [0, 22]) { ui.beginPath(); ui.moveTo(x + dx, y - 13); ui.lineTo(x + dx + 20, y); ui.lineTo(x + dx, y + 13); ui.closePath(); ui.fill(); }
   text(ui, "早送り", x + 104, y + 1, 30, "#8FDCFF", { weight: 800, align: "center" }); ui.restore(); }
 function statusUI(t) {
-  const k = curId(t); if (["l00", "l01", "l05", "l13", "l14"].includes(k) || t < CUE.l02) return;
-  const c = clockNow(t), a = CUE[k], u = t - a, n = remain(c), charging = c >= 150 && c < PL.fire[1] && k !== "l12";
+  const k = curId(t); if (["l00", "l01", "l05", "l14", "l15"].includes(k) || t < CUE.l02) return;
+  const c = clockNow(t), a = CUE[k], u = t - a, n = remain(c), charging = c >= 150 && c < PL.fire[1];
   const x0 = 40, y0 = TBAR + 24, w = 640, h = 150 + (charging ? 84 : 0);
   ui.save(); ui.translate(x0, y0);
   ui.fillStyle = "rgba(6,10,16,.82)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,150,70,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
@@ -98,7 +98,7 @@ const TAGC = new Proxy({}, { get: (_, k) => { const [n, c] = TAGC0[k[0]]; return
 const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], c: e[1], s: e[2], kind: e[3] })));
 function evTime(e) { return CUE[e.at] + e.off; }
 function eventsUI(t) {
-  if (t >= CUE.l13) return;
+  if (t >= CUE.l14) return;
   const live = EVS.filter(e => t >= evTime(e) && t < evTime(e) + 4.6).slice(-3), y1 = 1560, hh = 112, gap = 14;
   live.forEach((e, i) => {
     const u = t - evTime(e), k = easeOut(clamp(u / .25)) * (1 - clamp((u - 4.2) / .4)), y = y1 - (live.length - i) * (hh + gap) + hh / 2, x0 = 40 - 60 * (1 - k);
@@ -155,9 +155,9 @@ function titleBar() {
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec");
   if (k === "l05") bigCard(t, "plan");
-  if (k === "l13" || k === "l14") shoutCard(t, CUE.l13 + .2, "勝者", "ハンマー投げ", "#EAF2F8", "#FF9A3D", ["あと1回 炎を浴びていたら", "負けていた"]); }; }
+  if (k === "l14" || k === "l15") shoutCard(t, CUE.l14 + .2, "勝者", "ハンマー投げ", "#EAF2F8", "#FF9A3D", ["炎より 1秒早い", "ギリギリの勝利"]); }; }
 
-function buildMood() { const c = CUE; MOOD = [[0, { cool: .0, sat: 1.0, vig: .35 }], [c.l04, { cool: .0, sat: 1.05, vig: .4 }], [c.l07, { cool: .05, sat: 1.0, vig: .45 }], [c.l13, { cool: .0, sat: 1.0, vig: .35 }]]; }
+function buildMood() { const c = CUE; MOOD = [[0, { cool: .0, sat: 1.0, vig: .35 }], [c.l04, { cool: .0, sat: 1.08, vig: .42 }], [c.l07, { cool: .05, sat: 1.0, vig: .48 }], [c.l12, { cool: .0, sat: 1.08, vig: .45 }], [c.l14, { cool: .0, sat: 1.0, vig: .35 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "身長50mの怪獣", 540, 450, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "vs", 540, 590, 90, "#FF9A3D", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "ハンマー投げ5万人", 540, 730, 110, "#FF9A3D", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
 
 // 書体：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
