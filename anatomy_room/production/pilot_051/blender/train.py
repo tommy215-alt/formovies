@@ -24,9 +24,10 @@ def _section(s, nose):
     """鼻の先からの距離 s（m）での断面：半幅・上端・下端"""
     if not nose or s >= NOSE:
         return W, H, FLOOR
-    u = clamp(s / NOSE); w = .25 + (W - .25) * (1 - (1 - u) ** 2.2) ** .5
-    top = .95 + (H - .95) * (u ** .9) * (3 - 2 * u ** .9) ** .35 / 1.0
-    return w, min(H, top), FLOOR + .05 * (1 - u)
+    u = clamp(s / NOSE)
+    w = float(np.interp(u, [0, .08, .25, .5, .75, 1], [.32, .75, 1.22, 1.52, 1.66, W]))           # 細い鼻先から広がる
+    top = float(np.interp(u, [0, .1, .3, .48, .6, .75, .88, 1], [.62, .92, 1.22, 1.55, 2.25, 3.05, 3.45, H]))   # 低く長い鼻 → 運転席でふくらむ
+    return w, min(H, top), FLOOR + .12 * (1 - u) ** 2
 
 
 def _ring(w, top, bot, n=56):
@@ -43,7 +44,7 @@ def _ring(w, top, bot, n=56):
 def car_body(name, front_nose, back_nose, y0):
     """y0：車両の前の端（y の大きい方）。前・後ろに鼻をつけるか"""
     ws, gl, ln, un = paint(); bm = bmesh.new(); rows = []; ys = []
-    n_nose = 26
+    n_nose = 40
     st = [i / n_nose * NOSE for i in range(n_nose + 1)] if front_nose else [0.0]
     mid = [NOSE + (CAR - 2 * NOSE) * k / 12 for k in range(1, 12)] if (front_nose or back_nose) else [CAR * k / 12 for k in range(1, 12)]
     stb = [CAR - i / n_nose * NOSE for i in range(n_nose, -1, -1)] if back_nose else [CAR]
@@ -62,10 +63,11 @@ def car_body(name, front_nose, back_nose, y0):
             f = bm.faces.new((rows[j][i], rows[j][(i + 1) % n], rows[j + 1][(i + 1) % n], rows[j + 1][i]))
             c = f.calc_center_median(); z = c.z; sf = y0 - c.y; sb = CAR - sf; edge = min(sf if front_nose else 99, sb if back_nose else 99)
             mi = 0
-            if edge < NOSE and NOSE * .42 < edge < NOSE * .72 and z > 1.6 and abs(c.x) < 1.25:
+            wtop = _section(edge, True)[1] if edge < NOSE else H
+            if edge < NOSE and NOSE * .5 < edge < NOSE * .8 and z > wtop - .75 and abs(c.x) < 1.1:
                 mi = 1                                              # 運転席の窓
-            elif edge >= NOSE * .9 and 2.05 < z < 2.6 and abs(c.x) > 1.2 and (sf % 2.6) > .55:
-                mi = 1                                              # 客室の窓（並んだ窓）
+            elif edge >= NOSE * .95 and 2.12 < z < 2.62 and abs(c.x) > 1.2:
+                mi = 1                                              # 客室の窓の帯
             elif 1.62 < z < 1.78 and abs(c.x) > 1.0:
                 mi = 2                                              # 帯
             elif z < FLOOR + .35:
@@ -76,6 +78,14 @@ def car_body(name, front_nose, back_nose, y0):
     if not back_nose:
         bm.faces.new(rows[-1]).material_index = 3
     o = mesh_obj(name, bm, [ws, gl, ln, un])
+    if front_nose or back_nose:                                     # 前照灯（鼻先の両わき）
+        lm = emat("tr_lamp", (.9, .9, .85), .2, (1, .97, .9), 6.0, haze=False)
+        for sx in (-1, 1):
+            for nose_y, on in ((y0 - 1.15, front_nose), (y0 - CAR + 1.15, back_nose)):
+                if on:
+                    lb = bmesh.new(); bmesh.ops.create_uvsphere(lb, u_segments=16, v_segments=8, radius=.16); bmesh.ops.scale(lb, vec=(1.3, .6, .55), verts=lb.verts)
+                    w_, t_, b_ = _section(1.15, True); bmesh.ops.translate(lb, vec=(sx * (w_ * .78), nose_y, b_ + (t_ - b_) * .55), verts=lb.verts)
+                    l_ = mesh_obj(f"{name}_lamp{sx}{int(on)}{int(nose_y)}", lb, [lm]); l_.parent = None
     for p in o.data.polygons:
         p.use_smooth = True
     sd = o.modifiers.new("sd", "SUBSURF"); sd.levels = 1; sd.render_levels = 2

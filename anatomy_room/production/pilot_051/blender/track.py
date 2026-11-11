@@ -149,22 +149,93 @@ def bake(base_obj, name):
     log("bake", name, len(new), sum(len(o.data.vertices) for o in new))
     anchor = link(bpy.data.objects.new(name, bpy.data.meshes.new(name)))   # 原点・回転なしの空の形にまとめる（最初の 1 株を基準にすると区画が傾く）
     anchor.select_set(True); bpy.context.view_layer.objects.active = anchor; bpy.ops.object.join(); P = anchor
+    try:                                # 読み込んだ形の決まった法線は、まとめると向きが崩れて黒くなる → 形から作り直す
+        bpy.ops.mesh.customdata_custom_splitnormals_clear()
+    except Exception:
+        pass
     for c_ in list(P.users_collection):
         c_.objects.unlink(P)
     _patch_col().objects.link(P)
     bpy.data.objects.remove(base_obj, do_unlink=True); return P
 
 
+CACHE = os.path.join(HERE, "..", "work", "patches.blend")
+
+
+def cached(names):
+    """作った区画を work/patches.blend から読む（なければ None）。区画づくりは 1 回 3 分かかるので使い回す"""
+    if not os.path.exists(CACHE):
+        return None
+    with bpy.data.libraries.load(CACHE) as (src, dst):
+        if not all(n in src.objects for n in names):
+            return None
+        dst.objects = list(names)
+    for o in dst.objects:
+        _patch_col().objects.link(o)
+    return list(dst.objects)
+
+
+def save_cache():
+    objs = set(o for o in _patch_col().objects)
+    old = []
+    if os.path.exists(CACHE):
+        with bpy.data.libraries.load(CACHE) as (src, dst):
+            old = [n for n in src.objects if n not in [o.name for o in objs]]
+            dst.objects = old
+        objs |= set(o for o in dst.objects if o)
+    bpy.data.libraries.write(CACHE, objs, fake_user=True); log("patches saved", len(objs))
+
+
+def gn_bake(base_obj, col, density, scale=(1.0, 2.0), seed=1, name="patch", normal_rot=False):
+    """ジオメトリノードで base_obj の面に col の物を散らし（1 m² に density 個）、1 つの形にして適用する（色・法線を正しく引き継ぐ）"""
+    ng = bpy.data.node_groups.new(name + "_gn", "GeometryNodeTree"); N = ng.nodes; L = ng.links
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry"); ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    gi = N.new("NodeGroupInput"); go = N.new("NodeGroupOutput")
+    dp = N.new("GeometryNodeDistributePointsOnFaces"); dp.distribute_method = "RANDOM"; dp.inputs["Density"].default_value = density; dp.inputs["Seed"].default_value = seed
+    ci = N.new("GeometryNodeCollectionInfo"); ci.inputs["Collection"].default_value = col; ci.inputs["Separate Children"].default_value = True; ci.inputs["Reset Children"].default_value = True
+    ip = N.new("GeometryNodeInstanceOnPoints"); ip.inputs["Pick Instance"].default_value = True
+    def rnd_node(kind, lo, hi, sd):
+        n = N.new("FunctionNodeRandomValue"); n.data_type = kind; typ = {"INT": "INT", "FLOAT": "VALUE", "FLOAT_VECTOR": "VECTOR"}[kind]
+        ins = [i for i in n.inputs if i.enabled and i.type == typ and i.name in ("Min", "Max")]; ins[0].default_value = lo; ins[1].default_value = hi
+        n.inputs["Seed"].default_value = sd; out = next(o for o in n.outputs if o.enabled and o.type == typ); return out
+    ri = rnd_node("INT", 0, 999, seed + 1); rr = rnd_node("FLOAT_VECTOR", (0, 0, 0), (0, 0, 6.283) if not normal_rot else (6.283, 6.283, 6.283), seed + 2)
+    rs = rnd_node("FLOAT", scale[0], scale[1], seed + 3)
+    re = N.new("GeometryNodeRealizeInstances")
+    L.new(gi.outputs[0], dp.inputs["Mesh"]); L.new(dp.outputs["Points"], ip.inputs["Points"]); L.new(ci.outputs[0], ip.inputs["Instance"])
+    L.new(ri, ip.inputs["Instance Index"]); L.new(rr, ip.inputs["Rotation"]); L.new(rs, ip.inputs["Scale"])
+    L.new(ip.outputs[0], re.inputs[0]); L.new(re.outputs[0], go.inputs[0])
+    md = base_obj.modifiers.new("gn", "NODES"); md.node_group = ng
+    for o in list(bpy.context.selected_objects):
+        o.select_set(False)
+    bpy.context.view_layer.objects.active = base_obj; base_obj.select_set(True); bpy.ops.object.modifier_apply(modifier="gn")
+    base_obj.name = name; base_obj.data.name = name
+    for c_ in list(base_obj.users_collection):
+        c_.objects.unlink(base_obj)
+    _patch_col().objects.link(base_obj); log("gn_bake", name, len(base_obj.data.vertices)); return base_obj
+
+
+def _mixcol(srcs, nm):
+    col = bpy.data.collections.get(nm)
+    if col is None:
+        col = bpy.data.collections.new(nm); sc.collection.children.link(col)
+        for s_ in srcs:
+            for o in model(s_).objects:
+                if o.parent is None:
+                    col.objects.link(o)
+        bpy.context.view_layer.layer_collection.children[col.name].exclude = True
+    return col
+
+
 def grass_patches(size=2.0, dens=120., nvar=4, seed=3):
     """草はらの区画（size m 四方、原点が中心）を nvar 種類"""
-    out = []
+    names = [f"grass_patch{int(dens)}_{v}" for v in range(nvar)]; c_ = cached(names)
+    if c_:
+        return c_
+    out = []; gc = _mixcol(["grass_medium_01", "grass_medium_02", "grass_bermuda_01", "dandelion_01", "celandine_01"], "mix_grass_all")
     for v in range(nvar):
         g = plane(f"gp_base{v}", -size / 2, size / 2, -size / 2, size / 2, 0.0, mat("gp_tmp", (.3, .3, .3)), 2, 2)
-        A = size * size
-        scatter(g, ["grass_medium_01", "grass_medium_02", "grass_bermuda_01"], int(A * dens), (1.0, 2.2), seed + v * 7, f"gp_g{v}")
-        scatter(g, ["dandelion_01", "celandine_01"], max(1, int(A * dens * .02)), (.8, 1.3), seed + v * 7 + 1, f"gp_f{v}")
-        out.append(bake(g, f"grass_patch{v}"))
-    return out
+        out.append(gn_bake(g, gc, dens, (1.0, 2.2), seed + v * 7, names[v]))
+    save_cache(); return out
 
 
 def tile(name, patches, x0, x1, y0, y1, step, z=0.0, seed=1):
@@ -197,12 +268,14 @@ def ballast(y0, y1, w=BALLAST_W, h=BALLAST_H):
             bm.faces.new((a[i], a[i + 1], b_[i + 1], b_[i]))
     o = mesh_obj("ballast", bm, [pbr("gravel_floor_02", 3.0, 0.0, tint=(.2, .2, .19), name="ballast_base")])
     # 表面に 3D の砕石を敷き詰める（1 m² に 550 個）：長さ 4 m の区間で散らして 1 つにまとめ、線路に沿って並べる
-    SEG = 4.0; segs = []
-    for v in range(3):
+    SEG = 4.0; segs = cached([f"ballast_patch{v}" for v in range(3)]) or []
+    for v in range(0 if segs else 3):
         sb = bmesh.new(); r0 = [sb.verts.new((x, -SEG / 2, z)) for x, z in prof]; r1 = [sb.verts.new((x, SEG / 2, z)) for x, z in prof]
         for i in range(len(prof) - 1):
             sb.faces.new((r0[i], r0[i + 1], r1[i + 1], r1[i]))
-        so = mesh_obj(f"bseg{v}", sb, [mat("gp_tmp", (.3, .3, .3))]); _stones_on(so, (w + h * 3.6) * SEG, 9 + v); segs.append(bake(so, f"ballast_patch{v}"))
+        so = mesh_obj(f"bseg{v}", sb, [mat("gp_tmp", (.3, .3, .3))]); segs.append(gn_bake(so, stones(), 550., (.55, 1.45), 9 + v, f"ballast_patch{v}", True))
+        if v == 2:
+            save_cache()
     rnd = np.random.default_rng(4); groups = {}
     for y in np.arange(y0 + SEG / 2, y1, SEG):
         groups.setdefault(int(rnd.integers(0, 3)), []).append((0, y, 0))

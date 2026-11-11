@@ -3,7 +3,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import *
 import track, train, time
-t0 = time.time(); track.world_hdri("kloofendal_48d_partly_cloudy_puresky", exposure=-.4); track.track_scene(-460, 120, 30, True)
+t0 = time.time(); track.world_hdri("kloofendal_48d_partly_cloudy_puresky", exposure=-.4); track.track_scene(-460, 120, 30, os.environ.get("FAR", "1") == "1")
 T = train.build_train(16); train.place(T, 20, track.TOP); track.haze(); log("built", round(time.time() - t0, 1))
 sc.render.resolution_percentage = int(os.environ.get("PCT", "40")); sc.render.use_motion_blur = False
 ENG = os.environ.get("ENGINE", "CYCLES")
