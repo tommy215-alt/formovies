@@ -196,7 +196,7 @@ EP = standard.config({
     "cues": CUES,
     "sfx": [["bed_near", "t0", 1.0, 0]] + [["click", c, .7, 0] for c in POPS],
     "final_hold": 0.0,
-    "music": {"style": "file_049", "sections": [["t0", 0.0, "f_mute"]]},
+    "music": {"style": "file_050", "sections": [["t0", 0.0, "f_mute"]]},
     "segments": ["open"] + [s["id"] for s in SHOTS[1:]],
     "extra_files": epkit.FILES + ["../ext/kit/shots.js", "work/blender/index.js", "../ext/blender/blframes.js", "assets/plan.js"],
     "workers": 1,

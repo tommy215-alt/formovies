@@ -51,7 +51,7 @@ def crowd(name, ya, yb, sides=(-1, 1), lod=0, seed=1, cheer=.7, fill=.8, rows=(1
     if not P:
         return None
     md = np.where(rnd.random(len(P)) < cheer, 1, 2)
-    return people.People(name, P, heading=np.array(H), mode=md, seed=seed + 5, lod=lod, bib=False, wave=wave)
+    return people.split(name, P, heading=np.array(H), mode=md, seed=seed + 5, lod=lod, bib=False, wave=wave)
 
 
 def runners(name, P, speed, seed=1, lod=0, **kw):

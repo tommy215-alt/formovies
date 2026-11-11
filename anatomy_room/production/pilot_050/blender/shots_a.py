@@ -24,7 +24,7 @@ def _start_world(lod0_y=-46., strip=None, keep=None):
 def _s_start():
     near, far = _start_world()
     rnd = np.random.default_rng(3); md = np.where(rnd.random(len(near)) < .12, 1, 2)
-    S["near"] = people.People("run0", near, heading=0.0, mode=md, seed=31, wave=.6)
+    S["near"] = people.split("run0", near, heading=0.0, mode=md, seed=31, wave=.6)
     S["far"] = people.People("run1", far, heading=0.0, mode=2, seed=32, lod=1)
     log("start world", len(near), len(far))
 

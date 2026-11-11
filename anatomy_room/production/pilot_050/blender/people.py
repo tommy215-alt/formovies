@@ -34,12 +34,19 @@ def _pmat():
 
 
 class People:
-    def __init__(self, name, P0, heading=0.0, speed=0.0, mode=0, seed=1, delay=None, lod=0, accel=1.6, shirts=None, bib=True, wave=1.0):
-        P0 = np.asarray(P0, float).reshape(-1, 2); N = len(P0); self.N = N; rnd = np.random.default_rng(seed); self.lod = lod
+    def __init__(self, name, P0, heading=0.0, speed=0.0, mode=0, seed=1, delay=None, lod=0, accel=1.6, shirts=None, bib=True, wave=1.0, sub=None):
+        """sub：N 人のうち、この物に入れる人（split() で動く人と動かない人を分ける。一人ひとりの色・大きさ・動きは分けないときと同じ）"""
+        P0 = np.asarray(P0, float).reshape(-1, 2); N = len(P0); rnd = np.random.default_rng(seed); self.lod = lod
         self.P0 = P0; self.h = np.broadcast_to(np.asarray(heading, float), (N,)).copy(); self.sp = np.broadcast_to(np.asarray(speed, float), (N,)).copy()
         self.mode = np.broadcast_to(np.asarray(mode), (N,)).copy(); self.free = delay is None; self.delay = np.zeros(N) if delay is None else np.broadcast_to(np.asarray(delay, float), (N,)).copy()
         self.T = accel; self.t3 = 0.0; self.ph = rnd.uniform(0, 6.28, N); self.s = rnd.uniform(.9, 1.08, N); self.wf = rnd.uniform(4.5, 7.5, N) * wave; self.one = rnd.random(N) < .35
-        self.SL = np.maximum(.9, self.sp / 1.45) * 1.0
+        pal = np.array(shirts if shirts is not None else SHIRTS); sh = pal[rnd.integers(0, len(pal), N)]; pants = np.array([(.03, .03, .04), (.05, .06, .12), (.12, .03, .03)])[rnd.integers(0, 3, N)]
+        skin = np.array(SKIN) * rnd.uniform(.7, 1.15, (N, 1))
+        if sub is not None:
+            for k in ("P0", "h", "sp", "mode", "delay", "ph", "s", "wf", "one"):
+                setattr(self, k, getattr(self, k)[sub])
+            sh, pants, skin = sh[sub], pants[sub], skin[sub]; N = int(np.sum(sub))
+        self.N = N; self.SL = np.maximum(.9, self.sp / 1.45) * 1.0
         cv, cf = _capsule(8 if lod == 0 else 6); hv, hf = _ico(1 if lod else 2)
         self.cv = cv; self.hv = hv; nc = len(cv); nh = len(hv)
         parts = ["torso"] + ([] if lod else ["thL", "shL", "thR", "shR", "uaL", "faL", "uaR", "faR"])
@@ -54,14 +61,17 @@ class People:
         allf = [tuple(i * nv + k for k in fc) for i in range(N) for fc in faces]
         me = bpy.data.meshes.new(name); me.from_pydata(np.zeros((N * nv, 3)).tolist(), [], allf); me.update()
         me.polygons.foreach_set("use_smooth", np.ones(len(me.polygons), bool)); me.materials.append(_pmat())
-        pal = np.array(shirts if shirts is not None else SHIRTS); sh = pal[rnd.integers(0, len(pal), N)]; pants = np.array([(.03, .03, .04), (.05, .06, .12), (.12, .03, .03)])[rnd.integers(0, 3, N)]
-        skin = np.array(SKIN) * rnd.uniform(.7, 1.15, (N, 1)); col = np.zeros((N, nv, 3))
+        col = np.zeros((N, nv, 3))
         for p, o_ in self.off.items():
             n_ = nh if p == "head" else 4 if p == "bib" else nc
             c_ = sh if p in ("torso", "uaL", "uaR") else pants if p in ("thL", "thR") else np.ones((N, 3)) * .9 if p == "bib" else skin
             col[:, o_:o_ + n_] = c_[:, None]
         ca = me.color_attributes.new("Col", "FLOAT_COLOR", "POINT"); ca.data.foreach_set("color", np.concatenate([col.reshape(-1, 3), np.ones((N * nv, 1))], 1).ravel())
         self.me = me; self.o = link(bpy.data.objects.new(name, me)); self.V = np.zeros((N, nv, 3)); DYN.append(self.update); self.update(0.0)
+        # 動かない人（立っているだけ、遠くの人は応援の上下 5 cm も見えない）は毎コマ作り直さない：
+        # 形が変わらなければ Blender はシーンを GPU に送り直さないので速い（絵は同じ）
+        if not self.sp.any() and (lod or not ((self.mode == 1) | (self.mode == 3)).any()):
+            DYN.remove(self.update)
 
     def _seg(self, part, A, B, r0, r1, Rt, xs=1.0):
         d = B - A; L = np.linalg.norm(d, axis=1)[:, None]; d = d / np.maximum(L, 1e-6)
@@ -122,6 +132,17 @@ class People:
     def pos(self, t):
         dist, _ = self._dist(t)
         return self.P0 + np.stack([-np.sin(self.h), np.cos(self.h)], 1) * dist[:, None]
+
+
+def split(name, P0, heading=0.0, speed=0.0, mode=0, lod=0, **kw):
+    """動く人（走る・手を振る）と動かない人を別の物にする：動かない方は毎コマ作り直さず、GPU にも送り直さない（速い。絵は同じ）。
+    返すのは動く方（全員が同じなら 1 つだけ）"""
+    N = len(P0); sp = np.broadcast_to(np.asarray(speed, float), (N,)); md = np.broadcast_to(np.asarray(mode), (N,))
+    mov = (sp > 0) | ((((md == 1) | (md == 3))) & (lod == 0))
+    if mov.all() or not mov.any():
+        return People(name, P0, heading, speed, mode, lod=lod, **kw)
+    People(name + "_still", P0, heading, speed, mode, lod=lod, sub=~mov, **kw)
+    return People(name, P0, heading, speed, mode, lod=lod, sub=mov, **kw)
 
 
 def grid(n, x0, x1, y0, y1, seed=1, jitter=.35, avoid=None):
