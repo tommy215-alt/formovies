@@ -3,7 +3,7 @@
 // （%LOCALAPPDATA%\reverse_yt_profile）。ログイン状態はそこにだけ残る。パスワードはこのスクリプトでは扱わない（ユーザーが画面で一度ログインする）。
 //   node anatomy_room/tools/yt_upload.js login          ログイン用に Chrome を開く（YouTube Studio のチャンネル画面に入ったら自動で閉じる）
 //   node anatomy_room/tools/yt_upload.js next           queue.json の status が queued の回を順に全部上げて、予約公開まで入れる。
-//       公開の時刻を過ぎていた回（PC が切れていたなど）や publish_at が空の回は、次に空いている 8:00・19:00 に振り直す。
+//       公開の時刻を過ぎていた回（PC が切れていたなど）や publish_at が空の回は、次に空いている枠（queue.json の slots、2026-11-12〜 毎日 19:00）に振り直す。
 //       Windows のタスク スケジューラ「Reverse-YouTube-Upload」が、ログオン時と 3 時間ごとにこれを動かす（tools/yt_task.ps1）
 //   node anatomy_room/tools/yt_upload.js upload pilot_024   指定した回を上げる
 //   --show を付けると画面を表示したまま操作する（最初の数回の確認用）
@@ -182,7 +182,7 @@ async function makePrivate(item) {   // 動画の編集画面で、公開設定�
     if (!/非公開|Private/.test(v) || /スケジュール|Scheduled/.test(v)) throw new Error("非公開になったか確かめられない：" + v.slice(0, 80));
   } catch (e) { const f = await shot("error"); e.message += `（画面：${f}）`; throw e; } finally { await ctx.close(); }
 }
-// 公開の枠（日本時間の 8:00・19:00）：PC が切れていて予定の時刻を過ぎた回、または publish_at が空の回は、次に空いている枠に振り直す
+// 公開の枠（日本時間、queue.json の slots：2026-11-12〜 19:00 だけ）：PC が切れていて予定の時刻を過ぎた回、または publish_at が空の回は、次に空いている枠に振り直す
 const jst = (d, hm) => new Date(`${d}T${hm}:00+09:00`);
 function nextSlot(q, after) {
   const taken = new Set(q.items.filter(x => x.status === "scheduled" && x.publish_at).map(x => x.publish_at));
