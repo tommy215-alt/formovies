@@ -263,6 +263,15 @@
    ],
    "reupload": true,
    "uploaded": "2026-11-10T13:30:45.543Z"
+  },
+  {
+   "id": "pilot_050",
+   "video": "anatomy_room/production/pilot_050/reverse_050_trex_marathon.mp4",
+   "meta": "anatomy_room/production/pilot_050/youtube_metadata.md",
+   "publish_at": "2026-11-12 08:00",
+   "status": "scheduled",
+   "note": "2026-11-12 もしも設計の 6 本目（ティラノサウルスのマラソン）。ユーザーが予約投稿を指示（次に空いている枠）",
+   "uploaded": "2026-11-11T15:03:43.834Z"
   }
  ]
 }
