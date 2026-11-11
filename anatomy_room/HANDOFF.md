@@ -4,6 +4,7 @@
 
 ## いまの状態
 
+- **【リマインド】051 が完成したら、ユーザーに完成を伝え、052 の「アイデア出し」と「必要なツールのインストール」（Sketchfab から CC0・CC BY の素材を使う準備など。ログインはユーザー。条件なしのソフトだけ）をリマインドする**（2026-11-12 ユーザーの指示。052 は 051 が終わってからユーザーと一緒に行う）。1 本は 3〜4 時間で（メモリ `feedback-time-budget`）。
 - **2026-11-11 夜：pilot_050 完成、CG の作り方を変更（ユーザーの承認）**
   - **050「ティラノサウルスはマラソンで優勝できる？」は完成**：`production/pilot_050/reverse_050_trex_marathon.mp4`（56.6 秒、QA の NG は字幕・共通エンディングだけ＝もしも設計なので問題なし）、説明文 `youtube_metadata.md`、素材 `scripts/pilot_050/assets.md`。3D は `blender/scene.py`（`shots_a/b/c.py`・`stage.py`・`city.py`・`trex.py`・`people.py`）、1 コマ約 7.7 秒（GPU 4.5 秒＋CPU の準備 3 秒）。`people.split()` で動く人と動かない人を分けた。queue.json には未登録（ユーザーの感想待ち）。サムネイル・自己レビューはまだ。
   - **CG の方針（メモリ `feedback-cg-assets`）**：コードで一から模型を作らず既製の素材（PD・CC0・CC BY）、群衆はジオメトリノード、舞台は使い回す。導入するソフトは条件なし（ログイン不要）のものだけ。**051 は Poly Haven などアカウント不要の CC0 だけ、Sketchfab は 052 から**。Megascans・Mixamo は使わない。EEVEE は 050 の l02・l05 で試したが速くならず（1 コマ 7〜8 秒）、空が白く暗くなった。
