@@ -121,6 +121,63 @@ def scatter(target, srcs, count, size=(.8, 1.3), seed=1, name=None, vgroup=None)
     return ps
 
 
+# ---------------------------------------------------------------- 区画にまとめて並べる（2026-11-12：速さ）
+# 草や石を 1 株ずつ並べると数百万個になり、Cycles は毎コマそれを GPU に渡し直す（1 コマ 27 秒のうち 25 秒）。
+# 小さな区画（数 m）の中で散らした物を 1 つの形にまとめ、区画を並べる（見た目は同じ、渡す数は数千）。
+_PATCH = bpy.data.collections.get("patches")
+
+
+def _patch_col():
+    global _PATCH
+    if _PATCH is None:
+        _PATCH = bpy.data.collections.new("patches"); sc.collection.children.link(_PATCH); bpy.context.view_layer.layer_collection.children[_PATCH.name].exclude = True
+    return _PATCH
+
+
+def bake(base_obj, name):
+    """base_obj（パーティクルで物を散らした面）の散らした物を本物の形にして 1 つにまとめる。面そのものは消す"""
+    for o in list(bpy.context.selected_objects):
+        o.select_set(False)
+    bpy.context.view_layer.objects.active = base_obj; base_obj.select_set(True)
+    before = set(bpy.data.objects); bpy.ops.object.duplicates_make_real(); new = [o for o in bpy.data.objects if o not in before and o.type == "MESH"]
+    for o in list(bpy.context.selected_objects):
+        o.select_set(False)
+    for o in new:
+        o.select_set(True)
+    for o in new:                     # 型（石・草の元）と形を共有したままつなぐと、型そのものが書き換わる
+        o.data = o.data.copy()
+    log("bake", name, len(new), sum(len(o.data.vertices) for o in new))
+    anchor = link(bpy.data.objects.new(name, bpy.data.meshes.new(name)))   # 原点・回転なしの空の形にまとめる（最初の 1 株を基準にすると区画が傾く）
+    anchor.select_set(True); bpy.context.view_layer.objects.active = anchor; bpy.ops.object.join(); P = anchor
+    for c_ in list(P.users_collection):
+        c_.objects.unlink(P)
+    _patch_col().objects.link(P)
+    bpy.data.objects.remove(base_obj, do_unlink=True); return P
+
+
+def grass_patches(size=2.0, dens=120., nvar=4, seed=3):
+    """草はらの区画（size m 四方、原点が中心）を nvar 種類"""
+    out = []
+    for v in range(nvar):
+        g = plane(f"gp_base{v}", -size / 2, size / 2, -size / 2, size / 2, 0.0, mat("gp_tmp", (.3, .3, .3)), 2, 2)
+        A = size * size
+        scatter(g, ["grass_medium_01", "grass_medium_02", "grass_bermuda_01"], int(A * dens), (1.0, 2.2), seed + v * 7, f"gp_g{v}")
+        scatter(g, ["dandelion_01", "celandine_01"], max(1, int(A * dens * .02)), (.8, 1.3), seed + v * 7 + 1, f"gp_f{v}")
+        out.append(bake(g, f"grass_patch{v}"))
+    return out
+
+
+def tile(name, patches, x0, x1, y0, y1, step, z=0.0, seed=1):
+    """区画を格子に並べる（区画の種類と 90° ごとの向きはばらばら）。区画ごとに 1 つの頂点＝頂点で並べる仕組み（VERTS）"""
+    rnd = np.random.default_rng(seed); groups = {}
+    for x in np.arange(x0 + step / 2, x1, step):
+        for y in np.arange(y0 + step / 2, y1, step):
+            groups.setdefault((int(rnd.integers(0, len(patches))), int(rnd.integers(0, 4))), []).append((x, y, z))
+    for (v, r), P in groups.items():
+        me = bpy.data.meshes.new(f"{name}_{v}{r}"); me.from_pydata(P, [], []); host = link(bpy.data.objects.new(f"{name}_{v}{r}", me)); host.instance_type = "VERTS"
+        ch_ = bpy.data.objects.new(f"{name}_{v}{r}_p", patches[v].data); link(ch_); ch_.parent = host; ch_.rotation_euler = (0, 0, r * math.pi / 2)
+
+
 # ---------------------------------------------------------------- 地面・線路
 def plane(name, x0, x1, y0, y1, z, m, nx=1, ny=1):
     bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=nx, y_segments=ny, size=.5)
@@ -132,18 +189,34 @@ def plane(name, x0, x1, y0, y1, z, m, nx=1, ny=1):
 def ballast(y0, y1, w=BALLAST_W, h=BALLAST_H):
     """砂利の土手（台形の断面）"""
     bm = bmesh.new(); prof = [(-w / 2 - h * 1.5, 0), (-w / 2, h), (w / 2, h), (w / 2 + h * 1.5, 0)]; rows = []
+    prof = [(-w / 2 - h * 1.5, 0), (-w / 2 - h * .75, h * .5), (-w / 2, h), (0, h), (w / 2, h), (w / 2 + h * .75, h * .5), (w / 2 + h * 1.5, 0)]
     for y in np.linspace(y0, y1, int((y1 - y0) / 2) + 2):
         rows.append([bm.verts.new((x, y, z)) for x, z in prof])
     for a, b_ in zip(rows, rows[1:]):
         for i in range(len(prof) - 1):
             bm.faces.new((a[i], a[i + 1], b_[i + 1], b_[i]))
     o = mesh_obj("ballast", bm, [pbr("gravel_floor_02", 3.0, 0.0, tint=(.2, .2, .19), name="ballast_base")])
-    # 表面に 3D の砕石を敷き詰める（1 m² に 550 個。線路の近くだけ、遠くは質感だけでも見分けがつかない）
-    md = o.modifiers.new("stones", "PARTICLE_SYSTEM"); ps = md.particle_system; st = ps.settings; A = (w + h * 3.6) * (y1 - y0)
+    # 表面に 3D の砕石を敷き詰める（1 m² に 550 個）：長さ 4 m の区間で散らして 1 つにまとめ、線路に沿って並べる
+    SEG = 4.0; segs = []
+    for v in range(3):
+        sb = bmesh.new(); r0 = [sb.verts.new((x, -SEG / 2, z)) for x, z in prof]; r1 = [sb.verts.new((x, SEG / 2, z)) for x, z in prof]
+        for i in range(len(prof) - 1):
+            sb.faces.new((r0[i], r0[i + 1], r1[i + 1], r1[i]))
+        so = mesh_obj(f"bseg{v}", sb, [mat("gp_tmp", (.3, .3, .3))]); _stones_on(so, (w + h * 3.6) * SEG, 9 + v); segs.append(bake(so, f"ballast_patch{v}"))
+    rnd = np.random.default_rng(4); groups = {}
+    for y in np.arange(y0 + SEG / 2, y1, SEG):
+        groups.setdefault(int(rnd.integers(0, 3)), []).append((0, y, 0))
+    for v, P in groups.items():
+        me = bpy.data.meshes.new(f"ballast_t{v}"); me.from_pydata(P, [], []); host = link(bpy.data.objects.new(f"ballast_t{v}", me)); host.instance_type = "VERTS"
+        ch_ = bpy.data.objects.new(f"ballast_t{v}_p", segs[v].data); link(ch_); ch_.parent = host
+    return o
+
+
+def _stones_on(o, A, seed):
+    md = o.modifiers.new("stones", "PARTICLE_SYSTEM"); ps = md.particle_system; st = ps.settings
     st.type = "HAIR"; st.count = int(A * 550); st.hair_length = 1.0; st.use_advanced_hair = True; st.emit_from = "FACE"; st.use_emit_random = True; st.use_even_distribution = True
     st.render_type = "COLLECTION"; st.instance_collection = stones(); st.use_collection_pick_random = True; st.particle_size = 1.0; st.size_random = .45
-    st.use_rotations = True; st.rotation_mode = "NOR"; st.phase_factor_random = 2.0; st.rotation_factor_random = 1.0; ps.seed = 9
-    return o
+    st.use_rotations = True; st.rotation_mode = "NOR"; st.phase_factor_random = 2.0; st.rotation_factor_random = 1.0; ps.seed = seed
 
 
 def stones(nvar=8, seed=5):
@@ -197,11 +270,15 @@ def sleepers(y0, y1, gap=.6):
     return o
 
 
+_GP = {}
+
+
 def field(x0, x1, y0, y1, dens=120., seed=3, name="field"):
-    """草はら：土と草の質感の地面に、草の株（1 m² あたり dens 株）・花・低木を散らす"""
+    """草はら：土と草の質感の地面に、草の株（1 m² あたり dens 株、2 m の区画を並べる）・低木を散らす"""
     g = plane(name, x0, x1, y0, y1, 0.0, pbr("sparse_grass", .5, .02, tint=(.8, .95, .7), spec=.15), nx=4, ny=8); A = abs(x1 - x0) * abs(y1 - y0)
-    scatter(g, ["grass_medium_01", "grass_medium_02", "grass_bermuda_01"], int(A * dens), (1.0, 2.2), seed, name + "_grass")
-    scatter(g, ["dandelion_01", "celandine_01"], int(A * dens * .02), (.8, 1.3), seed + 1, name + "_flowers")
+    if dens not in _GP:
+        _GP[dens] = grass_patches(2.0, dens, 4, seed)
+    tile(name + "_grass", _GP[dens], x0, x1, y0, y1, 2.0, 0.0, seed)
     scatter(g, ["nettle_plant", "shrub_02", "shrub_04"], int(A * dens * .0015), (.5, 1.0), seed + 2, name + "_shrubs")
     return g
 
