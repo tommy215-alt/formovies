@@ -287,6 +287,15 @@
    "status": "scheduled",
    "note": "2026-11-12 もしも設計の 7 本目（猫と新幹線）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
    "uploaded": "2026-11-12T08:58:05.813Z"
+  },
+  {
+   "id": "pilot_052",
+   "video": "anatomy_room/production/pilot_052/reverse_052_hamster_power.mp4",
+   "meta": "anatomy_room/production/pilot_052/youtube_metadata.md",
+   "publish_at": "2026-11-15 19:00",
+   "status": "scheduled",
+   "note": "2026-11-13 もしも設計の 8 本目（ハムスターの回し車で東京の電気）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-12T22:35:36.678Z"
   }
  ]
 }
