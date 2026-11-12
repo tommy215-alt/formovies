@@ -32,6 +32,9 @@ def add_haze(m, d0=800., d1=16000., top=.85):
     L.new(cd.outputs["View Distance"], mr.inputs[0])
     em = n.new("ShaderNodeEmission"); ms = n.new("ShaderNodeMixShader"); L.new(mr.outputs[0], ms.inputs[0]); L.new(src, ms.inputs[1]); L.new(em.outputs[0], ms.inputs[2]); L.new(ms.outputs[0], out.inputs["Surface"])
     HAZE.append((em, mr))
+    # 霞の発光は色づけだけ。照明として扱うと、草の葉 1 枚まで数百万の照明になり、毎コマ「光の木」の計算に 10 秒、光の計算も 6 倍遅くなる
+    # （2026-11-12 の実測：l04 1 コマ 31.2 → 4.8 秒、l06 28.4 → 4.4 秒、明るさの平均は同じ、差はノイズの細かさだけ）
+    m.cycles.emission_sampling = "NONE"
 
 
 def set_haze(col, k, d0=800., d1=16000.):
