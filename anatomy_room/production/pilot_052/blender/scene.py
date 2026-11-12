@@ -222,11 +222,11 @@ def a_l05(u, t, f):
 # ================================================================ l06：上京（田園を走る新幹線、051 の部品）
 def s_l06():
     base_common(); track.world_hdri("kloofendal_48d_partly_cloudy_puresky", exposure=-.4); track.track_scene(-600, 400, 30, True)
-    S["T"] = train.build_train(16); track.haze(); sc.render.use_motion_blur = True
+    S["T"] = train.build_train(16); track.haze()      # 動きのぶれは入れない（入れると 1 コマ約 100 秒）
 
 
 def a_l06(u, t, f):
-    ty = -80 + 75 * t; train.place(S["T"], ty, track.TOP); keyp(S["T"]["root"], f, loc=tuple(S["T"]["root"].location))
+    ty = -40 + 32 * t; train.place(S["T"], ty, track.TOP); keyp(S["T"]["root"], f, loc=tuple(S["T"]["root"].location))
     cam.look((9, 40, 2.2), (0, 10, 2.4), 28)
 
 
@@ -251,7 +251,7 @@ def a_l09(u, t, f):
 
 
 # ---------------------------------------------------------------- 書き出し
-SHOTS3 = [k for k in NAMES if k != "l08"]
+SHOTS3 = [k for k in NAMES if k not in ("l08", "l06")]      # l06・l08 は画面の図（l06 は 3D だと 1 コマ 38 秒かかったため図に）
 ANIM = [cam.o]
 SHOTS = {k: (globals()["s_" + k], (lambda a: (lambda u, t, f: (log("anim frame", f) if f % 30 == 0 else None, a(u, t, f), _keyham(f))))(globals()["a_" + k])) for k in SHOTS3}
 

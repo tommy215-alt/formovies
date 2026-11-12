@@ -44,7 +44,7 @@ const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
 const IDS = PL.shots.map(s => s.id), SIM = PL.sim;
 Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
   opening: { img: null, bg: blShot("l00"), title: ["ハムスター何匹で", "東京の電気をまかなえる？"], size1: 84, size2: 104, credit: [] } });
-SHOTS = IDS.slice(1).map(k => k === "l08" ? { at: k, kind: "2d", draw: areaShot } : { at: k, kind: "3d", draw: blShot(k) });
+SHOTS = IDS.slice(1).map(k => k === "l08" ? { at: k, kind: "2d", draw: areaShot } : k === "l06" ? { at: k, kind: "2d", draw: tripShot } : { at: k, kind: "3d", draw: blShot(k) });
 S.docSub = () => {};   // 字幕なし（ナレーションがない）
 
 // ---------------------------------------------------------------- 猫の数（plan の n を補間）
@@ -71,6 +71,19 @@ function statusUI(t) {
   ui.restore();
 }
 
+// ---------------------------------------------------------------- l06：上京（町から東京へ、新幹線のマークが進む模式の図。地図のデータは使わない）
+function tripShot(t, u) {
+  bg.fillStyle = "#EAF4FF"; bg.fillRect(0, 0, W, H);
+  const xa = 230, xb = 820, y = 1060, k = easeInOut(clamp((u - .1) / .75));
+  bg.strokeStyle = "#B8C8D8"; bg.lineWidth = 16; bg.lineCap = "round"; bg.beginPath(); bg.moveTo(xa, y); bg.lineTo(xb, y); bg.stroke();
+  bg.strokeStyle = "#FFBE5A"; bg.beginPath(); bg.moveTo(xa, y); bg.lineTo(xa + (xb - xa) * k, y); bg.stroke();
+  S.group(() => {
+    for (const [x, nm] of [[xa, "町"], [xb, "東京"]]) { bg.fillStyle = "#26364A"; bg.beginPath(); bg.arc(x, y, 26, 0, 7); bg.fill(); text(bg, nm, x, y + 90, 60, "#26364A", { weight: 800 }); }
+    text(bg, "🚄", xa + (xb - xa) * k, y - 80, 96, "#000", {}); text(bg, "🐹", xa + (xb - xa) * k - 70, y - 70, 60, "#000", {});
+    text(bg, "いよいよ 東京へ", 540, 820, 80, "#26364A", { weight: 900 });
+  });
+}
+
 // ---------------------------------------------------------------- l08：回し車を並べた広さ ＝ 四国（正方形で比べる模式の図。地図のデータは使わない）
 function areaShot(t, u) {
   bg.fillStyle = "#EAF4FF"; bg.fillRect(0, 0, W, H);
@@ -79,9 +92,9 @@ function areaShot(t, u) {
   bg.fillStyle = "rgba(90,140,90,.18)"; bg.strokeStyle = "#4E7A4E"; bg.lineWidth = 6; bg.fillRect(cx - sb / 2, cy - sb / 2, sb, sb); bg.strokeRect(cx - sb / 2, cy - sb / 2, sb, sb);
   bg.fillStyle = "rgba(255,170,60,.55)"; bg.fillRect(cx - sa / 2, cy - sa / 2, sa, sa);
   S.group(() => {
-    text(bg, "四国（4県）", cx, cy - sb / 2 - 40, 50, "#2F5A2F", { weight: 800 });
+    text(bg, `四国（4県） ${B.toLocaleString("ja-JP")} km²`, cx, cy - sb / 2 - 40, 46, "#2F5A2F", { weight: 800 });
     if (k2 > 0) { bg.globalAlpha = k2; text(bg, "回し車の広さ", cx, cy - 30, 60, "#5A3300", { weight: 900 }); text(bg, `${Math.round(A).toLocaleString("ja-JP")} km²`, cx, cy + 50, 64, "#5A3300", { weight: 900 }); bg.globalAlpha = 1; }
-    text(bg, `${B.toLocaleString("ja-JP")} km²`, cx, cy + sb / 2 + 60, 44, "#2F5A2F", { weight: 700 });
+
   });
 }
 
