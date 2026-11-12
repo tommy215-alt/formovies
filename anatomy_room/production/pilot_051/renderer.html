@@ -73,7 +73,7 @@ function statusUI(t) {
 // ---------------------------------------------------------------- l08：東京 → 新大阪（模式の図。地図のデータは使わない）
 function mapShot(t, u) {
   bg.fillStyle = "#EAF4FF"; bg.fillRect(0, 0, W, H);
-  const y = 1080, xa = 900, xb = 180, k = clamp(u * 1.15);
+  const y = 1080, xa = 800, xb = 230, k = clamp(u * 1.15);
   bg.strokeStyle = "#B8C8D8"; bg.lineWidth = 18; bg.lineCap = "round"; bg.beginPath(); bg.moveTo(xa, y); bg.lineTo(xb, y); bg.stroke();
   for (let d = 0; d <= 21; d++) { const x = xa + (xb - xa) * d / 21.4; bg.fillStyle = "#9FB3C8"; bg.fillRect(x - 2, y - 26, 4, 52); }
   const cx = xa + (xb - xa) * k; bg.strokeStyle = "#FF9A3D"; bg.lineWidth = 18; bg.beginPath(); bg.moveTo(xa, y); bg.lineTo(cx, y); bg.stroke();
@@ -82,7 +82,7 @@ function mapShot(t, u) {
     text(bg, "🐈", cx, y - 70, 92, "#000", {}); const day = Math.min(21, Math.floor(k * 21.4) + 1);
     text(bg, `${day}日目`, 540, 800, 96, "#26364A", { weight: 900 });
     if ((k * 21.4) % 1 > .55) text(bg, "Zz", cx + 70, y - 140, 64, "#5A7CA0", { weight: 900 });
-    const tk = easeOut(clamp((u - .45) / .12)); if (tk > 0) { bg.globalAlpha = tk; text(bg, "🚄", xa + (xb - xa) * tk, y + 230, 96, "#000", {}); bg.globalAlpha = 1; }
+    const tk = easeOut(clamp((u - .45) / .12)); if (tk > 0) { bg.globalAlpha = tk; text(bg, "🚄", xa + (xb - xa) * tk, y - 250, 96, "#000", {}); bg.globalAlpha = 1; }
   });
 }
 
@@ -147,7 +147,7 @@ function titleBar() {
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec");
   if (k === "l06" && t - CUE.l06 > SH.l06.big[0]) shoutCard(t, CUE.l06 + SH.l06.big[0], "坂を引くには", SH.l06.big[1], "#EAF2F8", "#FFAA5A", null);
-  if (k === "l09") shoutCard(t, CUE.l09 + .2, "動くのは 約1,100匹", "大阪まで 約3週間", "#EAF2F8", "#FFAA5A", ["新幹線なら 2時間21分"]); }; }
+  if (k === "l09") shoutCard(t, CUE.l09 + .2, "約1,100匹で 動く", "大阪へ 3週間", "#EAF2F8", "#FFAA5A", ["新幹線なら 2時間21分"]); }; }
 
 function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "猫 何匹で", 540, 450, 110, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "新幹線は動く？", 540, 600, 110, "#FFAA5A", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
