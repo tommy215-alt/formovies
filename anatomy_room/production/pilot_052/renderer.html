@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_052 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+/* もしも設計：上にタイトルの帯（黒地に赤、TBAR）。3D の画は帯の半分だけ下げる（空の隕石が帯に隠れないように、下は地面が少し切れる） */
+#stage canvas:not(#ui){top:218px}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="assets/plan.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
+<script>
+// pilot_052 のレンダラー（もしも設計の既定、templates/DESIGN_MODES.md。土台は pilot_051）。ハムスターの回し車で、東京の電気をまかなうには何匹？
+// ナレーションなし：情報はすべてポップアップ（左上の札・出来事の札・大きな札）。ショットと出来事は plan.py（assets/plan.js）。
+// 3D は Blender（blender/scene.py）。数字は計算の結果（scripts/pilot_052/sim/hamster.json）。上にタイトルの帯（黒地に赤、Dela Gothic One）。
+const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
+const IDS = PL.shots.map(s => s.id), SIM = PL.sim;
+Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
+  opening: { img: null, bg: blShot("l00"), title: ["ハムスター何匹で", "東京の電気をまかなえる？"], size1: 84, size2: 104, credit: [] } });
+SHOTS = IDS.slice(1).map(k => k === "l08" ? { at: k, kind: "2d", draw: areaShot } : { at: k, kind: "3d", draw: blShot(k) });
+S.docSub = () => {};   // 字幕なし（ナレーションがない）
+
+// ---------------------------------------------------------------- 猫の数（plan の n を補間）
+function curId(t) { let k = IDS[0]; for (const id of IDS) if (CUE[id] !== undefined && t >= CUE[id]) k = id; return k; }
+function nAt(k, t) { const s = SH[k], u = clamp(t / s.dur), c = s.n;
+  for (let i = 0; i < c.length - 1; i++) { const [u0, c0] = c[i], [u1, c1] = c[i + 1]; if (u <= u1 || i === c.length - 2) return c0 + (c1 - c0) * clamp((u - u0) / Math.max(1e-9, u1 - u0)); }
+  return c[c.length - 1][1]; }
+function nNow(t) { const k = curId(t); return nAt(k, t - CUE[k]); }
+const fmt = n => n >= 1e8 ? `${(n / 1e8).toLocaleString("ja-JP", { maximumFractionDigits: 0 })}億` : n >= 1e4 ? `${(n / 1e4).toLocaleString("ja-JP", { maximumFractionDigits: n >= 1e6 ? 0 : 1 })}万` : Math.round(n).toLocaleString("ja-JP");
+function stamp(e) { return ""; }
+
+// ---------------------------------------------------------------- 左上：ハムスターの数と、電気（1 日に作る量）
+function statusUI(t) {
+  const k = curId(t); if (!["l02", "l03", "l04", "l05", "l06", "l07"].includes(k)) return;
+  const n = nNow(t), wh = n * SIM.wh_day, kwh = wh / 1000, x0 = 40, y0 = TBAR + 24, w = 600, h = 150;
+  const ws = kwh >= 1e8 ? `${(kwh / 1e8).toFixed(1)}億kWh` : kwh >= 1e4 ? `${(kwh / 1e4).toFixed(0)}万kWh` : kwh >= 1 ? `${kwh.toFixed(1)}kWh` : `${wh.toFixed(1)}Wh`;
+  ui.save(); ui.translate(x0, y0);
+  ui.fillStyle = "rgba(6,10,16,.82)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,190,90,.8)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
+  ui.fillStyle = "#FFBE5A"; ui.fillRect(0, 20, 8, h - 40);
+  S.group(() => {
+    text(ui, "ハムスター", 36, 52, 32, "#FFD9A0", { weight: 800, align: "left" }); text(ui, `${fmt(n)}匹`, w - 32, 52, 50, "#FFFFFF", { weight: 900, align: "right" });
+    text(ui, "1日の電気", 36, 112, 32, "#FFD9A0", { weight: 800, align: "left" }); text(ui, ws, w - 32, 112, 44, "#FFE27A", { weight: 900, align: "right" });
+  }, [x0, y0, x0 + w, y0 + h]);
+  ui.restore();
+}
+
+// ---------------------------------------------------------------- l08：回し車を並べた広さ ＝ 四国（正方形で比べる模式の図。地図のデータは使わない）
+function areaShot(t, u) {
+  bg.fillStyle = "#EAF4FF"; bg.fillRect(0, 0, W, H);
+  const A = SIM.area_km2, B = 18802, sc_ = 560 / Math.sqrt(B), k = easeOut(clamp(u * 2.2)), k2 = easeOut(clamp((u - .35) * 2.5));
+  const cx = 540, cy = 1060, sb = Math.sqrt(B) * sc_, sa = Math.sqrt(A) * sc_ * k;
+  bg.fillStyle = "rgba(90,140,90,.18)"; bg.strokeStyle = "#4E7A4E"; bg.lineWidth = 6; bg.fillRect(cx - sb / 2, cy - sb / 2, sb, sb); bg.strokeRect(cx - sb / 2, cy - sb / 2, sb, sb);
+  bg.fillStyle = "rgba(255,170,60,.55)"; bg.fillRect(cx - sa / 2, cy - sa / 2, sa, sa);
+  S.group(() => {
+    text(bg, "四国（4県）", cx, cy - sb / 2 - 40, 50, "#2F5A2F", { weight: 800 });
+    if (k2 > 0) { bg.globalAlpha = k2; text(bg, "回し車の広さ", cx, cy - 30, 60, "#5A3300", { weight: 900 }); text(bg, `${Math.round(A).toLocaleString("ja-JP")} km²`, cx, cy + 50, 64, "#5A3300", { weight: 900 }); bg.globalAlpha = 1; }
+    text(bg, `${B.toLocaleString("ja-JP")} km²`, cx, cy + sb / 2 + 60, 44, "#2F5A2F", { weight: 700 });
+  });
+}
+
+// ---------------------------------------------------------------- 下：出来事の札
+const TAGC0 = { H: ["ハムスター", "#FFBE5A"], E: ["電気", "#FFE27A"], C: ["比べると", "#7FD0FF"], Z: ["ひと休み", "#7EE07E"] };
+const TAGC = new Proxy({}, { get: (_, k) => { const [n, c] = TAGC0[k[0]]; return [k.endsWith("?") ? n + "（予想）" : n, c]; } });
+const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], s: e[1], kind: e[2] })));
+function evTime(e) { return CUE[e.at] + e.off; }
+function eventsUI(t) {
+  if (t >= CUE.l09) return;
+  const live = EVS.filter(e => t >= evTime(e) && t < evTime(e) + 4.6).slice(-3), y1 = 1560, hh = 112, gap = 14;
+  live.forEach((e, i) => {
+    const u = t - evTime(e), k = easeOut(clamp(u / .25)) * (1 - clamp((u - 4.2) / .4)), y = y1 - (live.length - i) * (hh + gap) + hh / 2, x0 = 40 - 60 * (1 - k);
+    const [tg, tc] = TAGC[e.kind];
+    ui.save(); ui.globalAlpha *= k; ui.font = `800 44px ${S.FONT}`; const tw = Math.min(760, ui.measureText(e.s).width), w = Math.max(560, tw + 120);
+    const pop = 1 + .12 * Math.pow(1 - clamp(u / .18), 2); ui.translate(x0, y); ui.scale(pop, pop); ui.translate(-x0, -y);
+    ui.fillStyle = "rgba(6,10,16,.84)"; rrect(ui, x0, y - hh / 2, w, hh, 14); ui.fill(); ui.fillStyle = tc; ui.fillRect(x0, y - hh / 2 + 12, 7, hh - 24);
+    S.group(() => {
+      const sw_ = -18, gw = (ui.font = `700 26px ${S.FONT}`, ui.measureText(tg).width) + 24;
+      ui.fillStyle = tc; rrect(ui, x0 + 48 + sw_, y - 42, gw, 36, 6); ui.fill(); text(ui, tg, x0 + 48 + sw_ + gw / 2, y - 23, 26, "#0A0E14", { weight: 700 });
+      const sz = tw > 720 ? Math.floor(44 * 720 / tw) : 44; text(ui, e.s, x0 + 30, y + 24, sz, "#FFFFFF", { weight: 800, align: "left" });
+    }, [x0, y - hh / 2, x0 + w, y + hh / 2]);
+    ui.restore();
+  });
+}
+
+// ---------------------------------------------------------------- 大きな札：両者の紹介・作戦・結果
+const CARDS = {
+  spec: { title: "1匹の 電気", col: "#FFBE5A", rows: [["走っている間", `${SIM.p_elec_w.toFixed(2)}W`], ["豆電球は", `${SIM.bulb_w.toFixed(2)}W`], ["つけるには", `${PL.nb}匹`]] } };
+function bigCard(t, id) {
+  const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
+  const x0 = 60, w = 960, rh = 104, y0 = TBAR + 60, h = 140 + cd.rows.length * rh;
+  ui.save(); ui.globalAlpha *= k * ko; const pop = 1 + .1 * Math.pow(1 - clamp(u / .22), 2); ui.translate(540, y0 + h / 2); ui.scale(pop, pop); ui.translate(-540, -y0 - h / 2);
+  ui.fillStyle = "rgba(6,10,18,.88)"; rrect(ui, x0, y0, w, h, 16); ui.fill(); ui.strokeStyle = cd.col; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 16); ui.stroke();
+  ui.fillStyle = cd.col; ui.fillRect(x0, y0 + 18, 10, 76);
+  S.group(() => {
+    text(ui, cd.title, x0 + 44, y0 + 58, 56, "#FFFFFF", { weight: 700, align: "left" });
+    cd.rows.forEach(([l, r], i) => { const ru = u - .35 - i * .45, rk = easeOut(clamp(ru / .22)); if (rk <= 0) return; const y = y0 + 150 + i * rh, dx = 30 * (1 - rk);
+      ui.save(); ui.globalAlpha *= rk; ui.fillStyle = "rgba(255,255,255,.07)"; rrect(ui, x0 + 26 + dx, y - 44, w - 52, 88, 10); ui.fill();
+      text(ui, l, x0 + 56 + dx, y + 2, 38, cd.col, { weight: 700, align: "left" }); text(ui, r, x0 + 290 + dx, y + 2, 48, "#FFFFFF", { weight: 700, align: "left" });
+      ui.restore(); });
+  }, [x0, y0, x0 + w, y0 + h]);
+  ui.restore();
+}
+function shoutCard(t, a, l1, l2, c1, c2, sub) {   // 画面の中央に大きな文字（少し遅れて 2 行目、さらに小さな 3 行目）
+  const u = t - a; if (u < 0) return; const k = easeOut(clamp(u / .45)), k2 = easeOut(clamp((u - .45) / .45)), k3 = easeOut(clamp((u - 1.1) / .45));
+  ui.save(); ui.globalAlpha *= k; S.group(() => text(ui, l1, 540, 820, 92, c1, { weight: 700, stroke: "#05080c", sw: 14 })); ui.restore();
+  ui.save(); ui.globalAlpha *= k2; ui.translate(540, 970); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, l2, 0, 0, 112, c2, { weight: 700, stroke: "#05080c", sw: 16 })); ui.restore();
+  if (sub) { ui.save(); ui.globalAlpha *= k3; S.group(() => sub.forEach((s, i) => text(ui, s, 540, 1110 + i * 64, 50, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 10 }))); ui.restore(); }
+}
+// ---------------------------------------------------------------- 上：タイトルの帯（もしも設計の既定：黒地に赤、Dela Gothic One、最初から最後まで）
+const TBAR = 436;   // 2026-11-10 ユーザー「タイトル帯をあと 5% 下げて」→ 帯を 96px 高くして文字を 96px 下げた
+function fitText(s, size, maxw) { ui.font = `400 ${size}px TitleBlack`; const w = ui.measureText(s).width; return w > maxw ? Math.floor(size * maxw / w) : size; }
+function titleBar() {
+  ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR);
+  const [l1, l2] = KIT.opening.title, s1 = fitText(l1, 92, 1000), s2 = fitText(l2, 104, 1000);
+  S.group(() => { ui.fillStyle = "#FF2A2A"; ui.textAlign = "center"; ui.textBaseline = "middle";
+    ui.font = `400 ${s1}px TitleBlack`; ui.fillText(l1, 540, 236); ui.font = `400 ${s2}px TitleBlack`; ui.fillText(l2, 540, 354); }, [0, 0, W, TBAR]);   // 2026-11-10 全画面で上が少し見切れる → 22px 下げた
+  ui.restore();
+}
+{ const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
+  const k = curId(t); statusUI(t); eventsUI(t);
+  if (k === "l01") bigCard(t, "spec");
+  if (k === "l09") shoutCard(t, CUE.l09 + .2, "東京の電気には", PL.oku, "#EAF2F8", "#FFBE5A", ["並べると 四国くらい"]); }; }
+
+function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "ハムスター何匹で", 540, 450, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "東京の電気を？", 540, 600, 110, "#FFBE5A", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
+
+// 書体：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
+const bizReady = window.ASSETS.font_biz ? new FontFace("Noto Sans CJK JP", b64buf(window.ASSETS.font_biz), { weight: "100 900" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
+const titleReady = window.ASSETS.font_title ? new FontFace("TitleBlack", b64buf(window.ASSETS.font_title), { weight: "400" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
+kitStart(() => {}); window.READY = Promise.all([window.READY, bizReady, titleReady]); BL.install();
+</script>
+</body></html>

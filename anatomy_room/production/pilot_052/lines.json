@@ -1,0 +1,133 @@
+{
+ "title": "ハムスター何匹で東京の電気をまかなえる？",
+ "theme": "ハムスターの回し車で、東京の電気をまかなうには何匹？（もしも設計）",
+ "note": "もしも設計の既定（タイトルの帯つき）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オープニング：田舎の古民家の縁側。回し車を全力で回す 1 匹。豆電球はつかない（フィラメントがかすかに赤いだけ）"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "走るハムスターの寄り（顔・足）→ 回し車と発電機"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "回し車が 4 台に増え、豆電球がぱっとつく"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "地方の一軒家（かやぶきの古民家）：庭と田んぼのあぜが回し車で埋まっていく空撮"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "ひと休み：止まった回し車の中で丸くなって寝るハムスター。隣の回し車が回り出す（交代）"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "町全体：田んぼと空き地を回し車が埋める空撮"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "上京：田園を新幹線が走る（051 の部品）"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 7.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "東京：ビル街の道と屋上を回し車が埋め尽くす空撮"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "図：回し車を並べた広さ ＝ 四国とほぼ同じ／えさ 1日 約190万トン"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "l09",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.5,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "結果（大きな札）"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "l10",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.5,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "縁側の 1 匹に戻る（冒頭につながる）"
+  }
+ ]
+}
