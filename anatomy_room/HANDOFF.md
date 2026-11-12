@@ -4,7 +4,7 @@
 
 ## いまの状態
 
-- **pilot_051「猫 何匹で、新幹線は動く？」完成（2026-11-12 17:45）**：`production/pilot_051/reverse_051_cats_shinkansen.mp4`（56.6 秒、142 MB のため git に入れない）。QA の NG は字幕・共通エンディングだけ。説明文 `youtube_metadata.md`、素材 `scripts/pilot_051/assets.md`。3D は `blender/scene.py`（track・train・crowd・cat）、Blender の書き出しは 1 コマ約 14 秒で約 7 時間。l06 の終わりの空撮は田んぼの区画が人工的に見える（052 の課題）。queue.json には未登録（ユーザーの感想待ち）。サムネイル・自己レビューはまだ。
+- **pilot_051「猫 何匹で、新幹線は動く？」完成（2026-11-12 17:45）**：`production/pilot_051/reverse_051_cats_shinkansen.mp4`（56.6 秒、142 MB のため git に入れない）。QA の NG は字幕・共通エンディングだけ。説明文 `youtube_metadata.md`、素材 `scripts/pilot_051/assets.md`。3D は `blender/scene.py`（track・train・crowd・cat）、Blender の書き出しは 1 コマ約 14 秒で約 7 時間。l06 の終わりの空撮は田んぼの区画が人工的に見える（052 の課題）。**2026-11-14 19:00 に予約公開**（050 は 11/13 19:00）。スマホ用の試写ページ https://claude.ai/artifact/UcebGY2ERqAVB4UCNQ7neh （`work/preview/`）。サムネイル・自己レビューはまだ。
 - **【相談】書き出しの速さはユーザーと改めて検討する（2026-11-12、051 は 1 コマ約 15 秒で約 6 時間かかった。メモリ `feedback-time-budget` に実測）**。
 - **【リマインド】051 が完成したら、ユーザーに完成を伝え、052 の「アイデア出し」と「必要なツールのインストール」（Sketchfab から CC0・CC BY の素材を使う準備など。ログインはユーザー。条件なしのソフトだけ）をリマインドする**（2026-11-12 ユーザーの指示。052 は 051 が終わってからユーザーと一緒に行う）。1 本は 3〜4 時間で（メモリ `feedback-time-budget`）。
 - **2026-11-11 夜：pilot_050 完成、CG の作り方を変更（ユーザーの承認）**

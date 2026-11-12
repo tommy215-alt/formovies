@@ -278,6 +278,15 @@
     }
    ],
    "reupload": true
+  },
+  {
+   "id": "pilot_051",
+   "video": "anatomy_room/production/pilot_051/reverse_051_cats_shinkansen.mp4",
+   "meta": "anatomy_room/production/pilot_051/youtube_metadata.md",
+   "publish_at": "2026-11-14 19:00",
+   "status": "scheduled",
+   "note": "2026-11-12 もしも設計の 7 本目（猫と新幹線）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-12T08:58:05.813Z"
   }
  ]
 }
