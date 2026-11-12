@@ -66,6 +66,8 @@
 - 尺は実際の音声合成で測る（`tools/measure_tts.py`）。VOICEVOX ENGINE を 127.0.0.1:50021 で起動して使う。
 - YouTube へのアップロード・公開は、ユーザーの明示の指示があるまで行わない。**例外（2026-11-01 ユーザーの承認）：`anatomy_room/publish/queue.json` に載せた回は、`node anatomy_room/tools/yt_upload.js next` で予約公開まで上げてよい**（毎日 19:00〔日本時間〕の 1 枠。2026-11-12 から 8:00 はやめた。公開前の確認は不要、改変または合成されたコンテンツは「いいえ」）。queue.json に載せるのはユーザーが選んだ回だけ。ブラウザは PC の Chrome、プロフィールはリポジトリの外（`%LOCALAPPDATA%\reverse_yt_profile`）で、ログインはユーザーが画面で行う。パスワードなどの認証情報は扱わない・保存しない。Windows のタスク スケジューラ「Reverse-YouTube-Upload」がログオン時と 3 時間ごとに自動で動かす（時刻を過ぎた回は次の空いた枠へ。`anatomy_room/HANDOFF.md`）。
 
+- **Sketchfab の素材（2026-11-12〜、ユーザーの承認。052 から）**：`node anatomy_room/tools/sketchfab_get.js get <uid> <出力先>`（glTF を落として展開、`credit.json` に作者・ライセンス）。ライセンスは公開の API で先に確かめ、CC0・CC BY 以外は落とさない。ブラウザは PC の Chrome、プロフィールはリポジトリの外（`%LOCALAPPDATA%everse_sketchfab_profile`）、ログインはユーザーが画面で一度だけ（`login`）。パスワード・トークンは扱わない。CC BY は説明文に作者名。他社のキャラクター・ロゴの入った模型は使わない。落とした素材は git に入れない（`assets/sketchfab/`）。
+
 ## 書き出しの時短と、トークンの節約（rv、2026-10-28〜。ユーザーの指示「制作パイプラインの時間とトークン消費の最適化」）
 
 **この節を読めば、毎回プロジェクトを探さなくてよい。** 書き出しは原則 `rv` で行う（従来の `production_script.py all` もそのまま使える）。
