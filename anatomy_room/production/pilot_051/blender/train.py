@@ -85,7 +85,7 @@ def car_body(name, front_nose, back_nose, y0):
                 if on:
                     lb = bmesh.new(); bmesh.ops.create_uvsphere(lb, u_segments=16, v_segments=8, radius=.16); bmesh.ops.scale(lb, vec=(1.3, .6, .55), verts=lb.verts)
                     w_, t_, b_ = _section(1.15, True); bmesh.ops.translate(lb, vec=(sx * (w_ * .78), nose_y, b_ + (t_ - b_) * .55), verts=lb.verts)
-                    l_ = mesh_obj(f"{name}_lamp{sx}{int(on)}{int(nose_y)}", lb, [lm]); l_.parent = None
+                    l_ = mesh_obj(f"{name}_lamp{sx}{int(on)}{int(nose_y)}", lb, [lm]); l_.parent = o
     for p in o.data.polygons:
         p.use_smooth = True
     sd = o.modifiers.new("sd", "SUBSURF"); sd.levels = 1; sd.render_levels = 2

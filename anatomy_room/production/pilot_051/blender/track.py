@@ -162,28 +162,37 @@ def bake(base_obj, name):
 CACHE = os.path.join(HERE, "..", "work", "patches.blend")
 
 
+_LIB = None
+
+
 def cached(names):
-    """作った区画を work/patches.blend から読む（なければ None）。区画づくりは 1 回 3 分かかるので使い回す"""
+    """作った区画を work/patches.blend から読む（なければ None）。ファイルの中身の一覧は 1 回だけ読む"""
+    global _LIB
     if not os.path.exists(CACHE):
         return None
+    if _LIB is None:
+        with bpy.data.libraries.load(CACHE) as (src, dst):
+            _LIB = set(src.objects)
+    if not all(n in _LIB for n in names):
+        return None
+    have = [bpy.data.objects.get(n) for n in names]
+    if all(have):
+        return have
     with bpy.data.libraries.load(CACHE) as (src, dst):
-        if not all(n in src.objects for n in names):
-            return None
-        dst.objects = list(names)
+        dst.objects = [n for n in names if not bpy.data.objects.get(n)]
     for o in dst.objects:
         _patch_col().objects.link(o)
-    return list(dst.objects)
+    return [bpy.data.objects.get(n) for n in names]
 
 
-def save_cache():
-    objs = set(o for o in _patch_col().objects)
-    old = []
-    if os.path.exists(CACHE):
-        with bpy.data.libraries.load(CACHE) as (src, dst):
-            old = [n for n in src.objects if n not in [o.name for o in objs]]
-            dst.objects = old
-        objs |= set(o for o in dst.objects if o)
-    bpy.data.libraries.write(CACHE, objs, fake_user=True); log("patches saved", len(objs))
+DIRTY = [False]
+
+
+def save_cache(force=False):
+    """新しく作った区画があれば、区画のコレクションの全部を 1 回で書く（作るたびに書くと 1 回 70 秒かかった）"""
+    if not (DIRTY[0] or force):
+        return
+    objs = set(_patch_col().objects); bpy.data.libraries.write(CACHE, objs, fake_user=True); DIRTY[0] = False; log("patches saved", len(objs))
 
 
 def gn_bake(base_obj, col, density, scale=(1.0, 2.0), seed=1, name="patch", normal_rot=False):
@@ -228,14 +237,14 @@ def _mixcol(srcs, nm):
 
 def grass_patches(size=2.0, dens=120., nvar=4, seed=3):
     """草はらの区画（size m 四方、原点が中心）を nvar 種類"""
-    names = [f"grass_patch{int(dens)}_{v}" for v in range(nvar)]; c_ = cached(names)
+    names = [f"grass_patch{int(dens)}s_{v}" for v in range(nvar)]; c_ = cached(names)
     if c_:
         return c_
     out = []; gc = _mixcol(["grass_medium_01", "grass_medium_02", "grass_bermuda_01", "dandelion_01", "celandine_01"], "mix_grass_all")
     for v in range(nvar):
         g = plane(f"gp_base{v}", -size / 2, size / 2, -size / 2, size / 2, 0.0, mat("gp_tmp", (.3, .3, .3)), 2, 2)
-        out.append(gn_bake(g, gc, dens, (1.0, 2.2), seed + v * 7, names[v]))
-    save_cache(); return out
+        out.append(gn_bake(g, gc, dens, (.55, 1.15), seed + v * 7, names[v]))   # 猫（肩 25 cm）が隠れない背丈
+    DIRTY[0] = True; save_cache(); return out
 
 
 def tile(name, patches, x0, x1, y0, y1, step, z=0.0, seed=1):
@@ -275,7 +284,7 @@ def ballast(y0, y1, w=BALLAST_W, h=BALLAST_H):
             sb.faces.new((r0[i], r0[i + 1], r1[i + 1], r1[i]))
         so = mesh_obj(f"bseg{v}", sb, [mat("gp_tmp", (.3, .3, .3))]); segs.append(gn_bake(so, stones(), 550., (.55, 1.45), 9 + v, f"ballast_patch{v}", True))
         if v == 2:
-            save_cache()
+            DIRTY[0] = True; save_cache()
     rnd = np.random.default_rng(4); groups = {}
     for y in np.arange(y0 + SEG / 2, y1, SEG):
         groups.setdefault(int(rnd.integers(0, 3)), []).append((0, y, 0))

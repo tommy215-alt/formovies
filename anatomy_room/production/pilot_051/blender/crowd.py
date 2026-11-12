@@ -39,7 +39,7 @@ def bake_poses(coat, mode="walk", n=8, seed=1):
         o = _join_eval(parts, names[k]); track._patch_col().objects.link(o); out.append(o)
     for o in [o for o in bpy.data.objects if o.name.startswith(f"tmp_{coat}")]:
         bpy.data.objects.remove(o, do_unlink=True)
-    track.save_cache(); log("bake_poses", coat, mode, n); return out
+    track.DIRTY[0] = True; log("bake_poses", coat, mode, n); return out      # 保存は全部作ったあとに 1 回（scene.py）
 
 
 def frames_collection(name, objs):

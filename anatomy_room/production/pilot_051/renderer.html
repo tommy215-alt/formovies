@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
-<title>pilot_050 renderer</title>
+<title>pilot_051 renderer</title>
 <style>
 html,body{margin:0;background:#000}
 #stage{position:relative;width:1080px;height:1920px;overflow:hidden}
@@ -37,60 +37,59 @@ html,body{margin:0;background:#000}
 <script src="work/blender/index.js"></script>
 <script src="../ext/blender/blframes.js"></script>
 <script>
-// pilot_050 のレンダラー（もしも設計の既定、templates/DESIGN_MODES.md。土台は pilot_049）。ティラノサウルスがマラソン大会に出たら
+// pilot_051 のレンダラー（もしも設計の既定、templates/DESIGN_MODES.md。土台は pilot_050）。猫 何匹で、新幹線は動く？
 // ナレーションなし：情報はすべてポップアップ（左上の札・出来事の札・大きな札）。ショットと出来事は plan.py（assets/plan.js）。
-// 3D は Blender（blender/scene.py）。数字は計算の結果（scripts/pilot_050/sim/race.json）。上にタイトルの帯（黒地に赤、Dela Gothic One）。
+// 3D は Blender（blender/scene.py）。数字は計算の結果（scripts/pilot_051/sim/cats.json）。上にタイトルの帯（黒地に赤、Dela Gothic One）。
 const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
 const IDS = PL.shots.map(s => s.id), SIM = PL.sim;
 Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
-  opening: { img: null, bg: blShot("l00"), title: ["ティラノサウルスは", "マラソンで優勝できる？"], size1: 84, size2: 104, credit: [] } });
-SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: blShot(k) }));
+  opening: { img: null, bg: blShot("l00"), title: ["猫 何匹で", "新幹線は動く？"], size1: 84, size2: 104, credit: [] } });
+SHOTS = IDS.slice(1).map(k => k === "l08" ? { at: k, kind: "2d", draw: mapShot } : { at: k, kind: "3d", draw: blShot(k) });
 S.docSub = () => {};   // 字幕なし（ナレーションがない）
 
-// ---------------------------------------------------------------- 時計（号砲からの秒）
-function clockAt(k, t) {
-  const s = SH[k], u = clamp(t / s.dur), c = s.c;
-  for (let i = 0; i < c.length - 1; i++) { const [u0, c0] = c[i], [u1, c1] = c[i + 1];
-    if (u <= u1 || i === c.length - 2) { const v = clamp((u - u0) / Math.max(1e-9, u1 - u0)); return c0 + (c1 - c0) * v; } }
-  return c[c.length - 1][1];
-}
+// ---------------------------------------------------------------- 猫の数（plan の n を補間）
 function curId(t) { let k = IDS[0]; for (const id of IDS) if (CUE[id] !== undefined && t >= CUE[id]) k = id; return k; }
-function clockNow(t) { const k = curId(t); return clockAt(k, t - CUE[k]); }
-const pad = n => String(Math.floor(n)).padStart(2, "0");
-function hms(c) { c = Math.max(0, c); return `${Math.floor(c / 3600)}:${pad(c % 3600 / 60)}:${pad(c % 60)}`; }
-function stamp(c) { return hms(c); }
-function rate(t) { const k = curId(t), a = t - CUE[k]; return (clockAt(k, a + .05) - clockAt(k, a)) / .05; }
-// ティラノの体温（sim の 5 分ごとの記録を補間。l08 は気温 30℃の場合、ほかは 10℃）
-function temp(c, hot) { const lg = SIM.cases[hot ? "30" : "10"].log; if (c <= 0) return 38.0;
-  let p = { min: 0, temp: 38.0 }; for (const r of lg) { if (r.min * 60 >= c) { const v = (c / 60 - p.min) / (r.min - p.min); return p.temp + (r.temp - p.temp) * v; } p = r; }
-  return lg[lg.length - 1].temp; }
-function km(c, hot) { return Math.min(hot ? PL.hot.km : 42.195, PL.v * Math.max(0, c) / 1000); }
+function nAt(k, t) { const s = SH[k], u = clamp(t / s.dur), c = s.n;
+  for (let i = 0; i < c.length - 1; i++) { const [u0, c0] = c[i], [u1, c1] = c[i + 1]; if (u <= u1 || i === c.length - 2) return c0 + (c1 - c0) * clamp((u - u0) / Math.max(1e-9, u1 - u0)); }
+  return c[c.length - 1][1]; }
+function nNow(t) { const k = curId(t); return nAt(k, t - CUE[k]); }
+const fmt = n => Math.round(n).toLocaleString("ja-JP");
+function stamp(e) { return ""; }
 
-// ---------------------------------------------------------------- 左上：ティラノの経過・距離・体温
-function ffMark(x, y, k) { if (k <= 0) return; ui.save(); ui.globalAlpha *= k; ui.fillStyle = "#8FDCFF";
-  for (const dx of [0, 22]) { ui.beginPath(); ui.moveTo(x + dx, y - 13); ui.lineTo(x + dx + 20, y); ui.lineTo(x + dx, y + 13); ui.closePath(); ui.fill(); }
-  text(ui, "早送り", x + 104, y + 1, 30, "#8FDCFF", { weight: 800, align: "center" }); ui.restore(); }
+// ---------------------------------------------------------------- 左上：猫の数・新幹線の速さ
 function statusUI(t) {
-  const k = curId(t); if (!["l03", "l04", "l05", "l06", "l08"].includes(k)) return;
-  const hot = k === "l08", c = clockNow(t), a = CUE[k], u = t - a, tc = temp(c, hot), col = hot ? "#FF5A4A" : "#FF9A3D";
-  const x0 = 40, y0 = TBAR + 24, w = 600, h = 210;
+  const k = curId(t); if (!["l02", "l03", "l04", "l06"].includes(k)) return;
+  const n = nNow(t), v = SH[k].v || (k === "l03" && t - CUE.l03 > 3.4 ? .1 : 0), x0 = 40, y0 = TBAR + 24, w = 560, h = 150;
   ui.save(); ui.translate(x0, y0);
-  ui.fillStyle = "rgba(6,10,16,.82)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = hot ? "rgba(255,90,74,.85)" : "rgba(255,150,70,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
-  ui.fillStyle = col; ui.fillRect(0, 20, 8, h - 40);
+  ui.fillStyle = "rgba(6,10,16,.82)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,170,90,.75)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
+  ui.fillStyle = "#FFAA5A"; ui.fillRect(0, 20, 8, h - 40);
   S.group(() => {
-    text(ui, "経過", 36, 52, 32, "#FFC48A", { weight: 800, align: "left" }); text(ui, hms(c), w - 32, 52, 50, "#FFFFFF", { weight: 900, align: "right" });
-    text(ui, "ティラノ", 36, 112, 32, "#FFC48A", { weight: 800, align: "left" }); text(ui, `${km(c, hot).toFixed(1)}km`, w - 32, 112, 46, "#FFD58A", { weight: 900, align: "right" });
-    const hk = clamp((tc - 38.4) / 2.4), tcol = `rgb(255,${Math.round(213 - 140 * hk)},${Math.round(138 - 70 * hk)})`;
-    text(ui, "体温", 36, 172, 32, "#FFC48A", { weight: 800, align: "left" }); text(ui, `${tc.toFixed(1)}℃`, w - 32, 172, 46, tcol, { weight: 900, align: "right" });
+    text(ui, "猫", 36, 52, 32, "#FFC48A", { weight: 800, align: "left" }); text(ui, `${fmt(n)}匹`, w - 32, 52, 50, "#FFFFFF", { weight: 900, align: "right" });
+    text(ui, "新幹線", 36, 112, 32, "#FFC48A", { weight: 800, align: "left" }); text(ui, v > 0 ? `時速${v.toFixed(1)}km` : "止まっている", w - 32, 112, 42, v > 0 ? "#7EE07E" : "#FFD58A", { weight: 900, align: "right" });
   }, [x0, y0, x0 + w, y0 + h]);
   ui.restore();
-  const ff = rate(t) > 8 ? clamp((u - .2) / .3) : 0; if (ff) S.group(() => ffMark(x0 + 18, y0 + h + 44, ff));
+}
+
+// ---------------------------------------------------------------- l08：東京 → 新大阪（模式の図。地図のデータは使わない）
+function mapShot(t, u) {
+  bg.fillStyle = "#EAF4FF"; bg.fillRect(0, 0, W, H);
+  const y = 1080, xa = 900, xb = 180, k = clamp(u * 1.15);
+  bg.strokeStyle = "#B8C8D8"; bg.lineWidth = 18; bg.lineCap = "round"; bg.beginPath(); bg.moveTo(xa, y); bg.lineTo(xb, y); bg.stroke();
+  for (let d = 0; d <= 21; d++) { const x = xa + (xb - xa) * d / 21.4; bg.fillStyle = "#9FB3C8"; bg.fillRect(x - 2, y - 26, 4, 52); }
+  const cx = xa + (xb - xa) * k; bg.strokeStyle = "#FF9A3D"; bg.lineWidth = 18; bg.beginPath(); bg.moveTo(xa, y); bg.lineTo(cx, y); bg.stroke();
+  S.group(() => {
+    for (const [x, nm] of [[xa, "東京"], [xb, "新大阪"]]) { bg.fillStyle = "#26364A"; bg.beginPath(); bg.arc(x, y, 26, 0, 7); bg.fill(); text(bg, nm, x, y + 90, 58, "#26364A", { weight: 800 }); }
+    text(bg, "🐈", cx, y - 70, 92, "#000", {}); const day = Math.min(21, Math.floor(k * 21.4) + 1);
+    text(bg, `${day}日目`, 540, 800, 96, "#26364A", { weight: 900 });
+    if ((k * 21.4) % 1 > .55) text(bg, "Zz", cx + 70, y - 140, 64, "#5A7CA0", { weight: 900 });
+    const tk = easeOut(clamp((u - .45) / .12)); if (tk > 0) { bg.globalAlpha = tk; text(bg, "🚄", xa + (xb - xa) * tk, y + 230, 96, "#000", {}); bg.globalAlpha = 1; }
+  });
 }
 
 // ---------------------------------------------------------------- 下：出来事の札
-const TAGC0 = { T: ["ティラノ", "#7EE07E"], R: ["レース", "#FF9A3D"], H: ["暑さ", "#FF5A4A"], C: ["比べると", "#7FD0FF"] };
+const TAGC0 = { N: ["猫", "#FFAA5A"], S: ["新幹線", "#7FD0FF"], C: ["比べると", "#B38CFF"], Z: ["ひと休み", "#7EE07E"] };
 const TAGC = new Proxy({}, { get: (_, k) => { const [n, c] = TAGC0[k[0]]; return [k.endsWith("?") ? n + "（予想）" : n, c]; } });
-const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], c: e[1], s: e[2], kind: e[3] })));
+const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], s: e[1], kind: e[2] })));
 function evTime(e) { return CUE[e.at] + e.off; }
 function eventsUI(t) {
   if (t >= CUE.l09) return;
@@ -102,8 +101,7 @@ function eventsUI(t) {
     const pop = 1 + .12 * Math.pow(1 - clamp(u / .18), 2); ui.translate(x0, y); ui.scale(pop, pop); ui.translate(-x0, -y);
     ui.fillStyle = "rgba(6,10,16,.84)"; rrect(ui, x0, y - hh / 2, w, hh, 14); ui.fill(); ui.fillStyle = tc; ui.fillRect(x0, y - hh / 2 + 12, 7, hh - 24);
     S.group(() => {
-      const st = stamp(e.c); text(ui, st, x0 + 30, y - 24, 30, "#FFD58A", { weight: 700, align: "left" });
-      ui.font = `700 30px ${S.FONT}`; const sw_ = ui.measureText(st).width, gw = (ui.font = `700 26px ${S.FONT}`, ui.measureText(tg).width) + 24;
+      const sw_ = -18, gw = (ui.font = `700 26px ${S.FONT}`, ui.measureText(tg).width) + 24;
       ui.fillStyle = tc; rrect(ui, x0 + 48 + sw_, y - 42, gw, 36, 6); ui.fill(); text(ui, tg, x0 + 48 + sw_ + gw / 2, y - 23, 26, "#0A0E14", { weight: 700 });
       const sz = tw > 720 ? Math.floor(44 * 720 / tw) : 44; text(ui, e.s, x0 + 30, y + 24, sz, "#FFFFFF", { weight: 800, align: "left" });
     }, [x0, y - hh / 2, x0 + w, y + hh / 2]);
@@ -113,9 +111,7 @@ function eventsUI(t) {
 
 // ---------------------------------------------------------------- 大きな札：両者の紹介・作戦・結果
 const CARDS = {
-  spec: { title: "対決", col: "#7EE07E", rows: [["ティラノ", "体重7.2トン"], ["相手", "世界記録のペース"], ["その速さ", "時速21km"]] },
-  walk: { title: "実は 走れない", col: "#FF5A4A", rows: [["走ると", "脚の骨が 耐えられない"], ["限界は", "早歩き 時速19km"]] },
-  goal: { title: "ティラノ ゴール", col: "#FFD58A", rows: [["記録", PL.fin_text], ["順位", `${SIM.main.rank_men_tokyo2026}位／3.7万人`]] } };
+  spec: { title: "対決", col: "#FFAA5A", rows: [["新幹線", "16両・700トン"], ["猫", "1匹 4kg"], ["引く力", "体重の1割（400g分）"]] } };
 function bigCard(t, id) {
   const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
   const x0 = 60, w = 960, rh = 104, y0 = TBAR + 60, h = 140 + cd.rows.length * rh;
@@ -150,12 +146,11 @@ function titleBar() {
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec");
-  if (k === "l02") bigCard(t, "walk");
-  if (k === "l07") bigCard(t, "goal");
-  if (k === "l09") shoutCard(t, CUE.l09 + .2, "優勝は", "できない", "#EAF2F8", "#FF5A4A", ["でも 上位0.1%"]); }; }
+  if (k === "l06" && t - CUE.l06 > SH.l06.big[0]) shoutCard(t, CUE.l06 + SH.l06.big[0], "坂を引くには", SH.l06.big[1], "#EAF2F8", "#FFAA5A", null);
+  if (k === "l09") shoutCard(t, CUE.l09 + .2, "動くのは 約1,100匹", "大阪まで 約3週間", "#EAF2F8", "#FFAA5A", ["新幹線なら 2時間21分"]); }; }
 
-function buildMood() { const c = CUE; MOOD = [[0, { cool: .0, sat: 1.05, vig: .25 }], [c.l08, { cool: .0, sat: 1.1, vig: .3 }], [c.l09, { cool: .0, sat: 1.05, vig: .25 }]]; }
-function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "ティラノサウルスが", 540, 450, 96, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "マラソンに出たら", 540, 600, 110, "#7EE07E", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
+function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "猫 何匹で", 540, 450, 110, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "新幹線は動く？", 540, 600, 110, "#FFAA5A", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
 
 // 書体：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
 const bizReady = window.ASSETS.font_biz ? new FontFace("Noto Sans CJK JP", b64buf(window.ASSETS.font_biz), { weight: "100 900" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
