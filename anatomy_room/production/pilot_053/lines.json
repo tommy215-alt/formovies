@@ -1,0 +1,122 @@
+{
+ "title": "観測史上最大が全部同時に起きたら？",
+ "theme": "日本の観測史上最大の記録が、東京で同時に起きたら？（もしも設計）",
+ "note": "もしも設計の既定（タイトルの帯つき）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オープニング：真夏の青空の下、ビル街が 4 階まで雪に埋まっている。気温 41.8℃"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "同じ街、ゆっくり寄る。5 つの記録の大きな札"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "図：2 階建ての家の断面。11.82 m の雪に埋まり、屋根に 1 m² あたり 2.4 トン"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "41.8℃：雪から湯気、雪の面が下がり始める"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "雨 153 mm：雪どけの水と合わせて道に水がたまる"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "風 72.5 m/s：雨と雪が横に飛ぶ、旗や看板が揺れる"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "震度 7：画面が揺れ、水が波立つ"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "24 時間後：雪が消え、2 階まで水につかったビル街の空撮"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.5,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "結果（大きな札）"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "l09",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.5,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "冒頭の、雪に埋まった真夏の街に戻る（ループ）"
+  }
+ ]
+}
