@@ -83,10 +83,10 @@ function houseShot(t, u) {
   bg.fillStyle = "rgba(120,100,80,.25)"; bg.strokeStyle = "#5A4632"; bg.lineWidth = 6; bg.fillRect(hx, g - hh + drop * .4, hw, hh - drop * .4); bg.strokeRect(hx, g - hh + drop * .4, hw, hh - drop * .4);
   bg.beginPath(); bg.moveTo(hx - 30, g - hh + drop); bg.lineTo(hx + hw / 2, g - hh - roof + drop * 1.6); bg.lineTo(hx + hw + 30, g - hh + drop); bg.closePath(); bg.fillStyle = "rgba(90,70,60,.45)"; bg.fill(); bg.stroke();
   S.group(() => {
-    const yTop = g - sw * k; bg.strokeStyle = "#34506E"; bg.lineWidth = 4; bg.beginPath(); bg.moveTo(900, g); bg.lineTo(900, yTop); bg.stroke();
-    if (k > .3) text(bg, `${PL.snow.toFixed(2)}m`, 900, yTop - 40, 54, "#34506E", { weight: 900 });
+    const yTop = g - sw * k; bg.strokeStyle = "#34506E"; bg.lineWidth = 4; bg.beginPath(); bg.moveTo(820, g); bg.lineTo(820, yTop); bg.stroke();
+    if (k > .3) text(bg, `${PL.snow.toFixed(2)}m`, 760, yTop - 40, 54, "#34506E", { weight: 900 });
     for (let i = 0; i < 5; i++) { const ax = hx + 40 + i * 70, ay = g - hh - roof - 120 + 30 * Math.sin(t * 3 + i); if (u > .3) { bg.fillStyle = "#D8442C"; bg.beginPath(); bg.moveTo(ax, ay + 60); bg.lineTo(ax - 16, ay + 30); bg.lineTo(ax + 16, ay + 30); bg.fill(); bg.fillRect(ax - 5, ay - 10, 10, 40); } }
-    text(bg, "2階建ての家", hx + hw / 2, g + 70, 44, "#5A4632", { weight: 800 });
+    text(bg, "2階建ての家", hx + hw / 2, g - hh / 2, 40, "#5A4632", { weight: 800 });
   });
 }
 
@@ -115,7 +115,7 @@ function eventsUI(t) {
 
 // ---------------------------------------------------------------- 大きな札：両者の紹介・作戦・結果
 const CARDS = {
-  spec: { title: "観測史上 1位を 全部 東京に", col: "#FF7850", rows: [["最高気温", "41.8℃"], ["積雪", "11.82m"], ["雨", "1時間153mm・1日922.5mm"], ["風", "72.5m/s（瞬間 91.0m/s）"], ["震度", "7"]] } };
+  spec: { title: "観測史上 1位を 全部 東京に", col: "#FF7850", rows: [["最高気温", "41.8℃"], ["積雪", "11.82m"], ["雨", "1時間 153mm"], ["風", "72.5m/s"], ["震度", "7"]] } };
 function bigCard(t, id) {
   const cd = CARDS[id], a = CUE[`card_${curId(t)}`]; if (a === undefined) return; const u = t - a, k = easeOut(clamp(u / .3)), end = CUE[IDS[IDS.indexOf(curId(t)) + 1]] - .25, ko = 1 - clamp((t - end) / .25);
   const x0 = 60, w = 960, rh = 104, y0 = TBAR + 60, h = 140 + cd.rows.length * rh;
@@ -150,7 +150,7 @@ function titleBar() {
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec");
-  if (k === "l08") shoutCard(t, CUE.l08 + .2, "東京は", `水深${PL.water_end.toFixed(1)}mの 湖に`, "#EAF2F8", "#7FD0FF", ["一番こわいのは 暑さ×大雪"]); }; }
+  if (k === "l08") shoutCard(t, CUE.l08 + .2, `水深 ${PL.water_end.toFixed(1)}m`, "東京が 湖に", "#EAF2F8", "#7FD0FF", ["一番こわいのは 暑さ×大雪"]); }; }
 
 function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "観測史上最大が", 540, 450, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "全部同時に", 540, 600, 110, "#FF7850", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
