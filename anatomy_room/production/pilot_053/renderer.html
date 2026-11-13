@@ -44,7 +44,7 @@ const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
 const IDS = PL.shots.map(s => s.id), SIM = PL.sim;
 Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
   opening: { img: null, bg: blShot("l00"), title: ["観測史上最大が", "東京で全部同時に起きたら？"], size1: 84, size2: 104, credit: [] } });
-SHOTS = IDS.slice(1).map(k => k === "l02" ? { at: k, kind: "2d", draw: houseShot } : { at: k, kind: "3d", draw: blShot(k) });
+SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: blShot(k) }));   // v2（2026-11-13）：全部 3D（東京の名所）
 S.docSub = () => {};   // 字幕なし（ナレーションがない）
 
 // ---------------------------------------------------------------- 猫の数（plan の n を補間）
@@ -53,12 +53,15 @@ function cAt(k, t) { const s = SH[k], u = clamp(t / s.dur), c = s.c;
   for (let i = 0; i < c.length - 1; i++) { const [u0, c0] = c[i], [u1, c1] = c[i + 1]; if (u <= u1 || i === c.length - 2) return c0 + (c1 - c0) * clamp((u - u0) / Math.max(1e-9, u1 - u0)); }
   return c[c.length - 1][1]; }
 function cNow(t) { const k = curId(t); return cAt(k, t - CUE[k]); }
-const snowH = c => Math.max(0, PL.snow * (1 - c / PL.melt_h)), waterH = c => Math.min(PL.water_end, (SIM.inflow_mm_h / 1000 - .05) * c);
+// blender/scene.py の snow_h・water_h と同じ（2.5 時間で積もり、そこから とけて水がたまる）
+const sstep = (a, b, x) => { const u = clamp((x - a) / (b - a)); return u * u * (3 - 2 * u); };
+const snowH = c => c < 2.5 ? PL.snow * sstep(.1, 2.5, c) : Math.max(0, PL.snow * (1 - (c - 2.5) / PL.melt_h)),
+  waterH = c => Math.min(PL.water_end, Math.max(0, (SIM.inflow_mm_h / 1000 - .05) * (c - 2.5)));
 function stamp(e) { return ""; }
 
 // ---------------------------------------------------------------- 左上：経過・気温・雪・水
 function statusUI(t) {
-  const k = curId(t); if (["l00", "l01", "l02", "l08", "l09"].includes(k)) return;
+  const k = curId(t); if (["l00", "l01", "l09", "l10"].includes(k)) return;
   const c = cNow(t), x0 = 40, y0 = TBAR + 24, w = 560, h = 268, sh = snowH(c), wh = waterH(c), lake = sh < wh;
   ui.save(); ui.translate(x0, y0);
   ui.fillStyle = "rgba(6,10,16,.84)"; rrect(ui, 0, 0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,120,80,.8)"; ui.lineWidth = 3; rrect(ui, 0, 0, w, h, 18); ui.stroke();
@@ -73,30 +76,13 @@ function statusUI(t) {
   ui.restore();
 }
 
-// ---------------------------------------------------------------- l02：2 階建ての家の断面と雪（模式の図）
-function houseShot(t, u) {
-  bg.fillStyle = "#EEF3F8"; bg.fillRect(0, 0, W, H);
-  const g = 1420, px = 52, sw = PL.snow * px, k = easeOut(clamp(u * 1.6)), sinkK = easeInOut(clamp((u - .55) / .25));   // 1 m ＝ 52 px
-  bg.fillStyle = "#8C7B66"; bg.fillRect(0, g, W, 40);
-  bg.fillStyle = "#FFFFFF"; bg.fillRect(0, g - sw * k, W, sw * k); bg.strokeStyle = "#B8C8DA"; bg.lineWidth = 3; bg.beginPath(); bg.moveTo(0, g - sw * k); bg.lineTo(W, g - sw * k); bg.stroke();
-  const hx = 360, hw = 360, hh = 6 * px, roof = 2.2 * px, drop = sinkK * 1.2 * px;
-  bg.fillStyle = "rgba(120,100,80,.25)"; bg.strokeStyle = "#5A4632"; bg.lineWidth = 6; bg.fillRect(hx, g - hh + drop * .4, hw, hh - drop * .4); bg.strokeRect(hx, g - hh + drop * .4, hw, hh - drop * .4);
-  bg.beginPath(); bg.moveTo(hx - 30, g - hh + drop); bg.lineTo(hx + hw / 2, g - hh - roof + drop * 1.6); bg.lineTo(hx + hw + 30, g - hh + drop); bg.closePath(); bg.fillStyle = "rgba(90,70,60,.45)"; bg.fill(); bg.stroke();
-  S.group(() => {
-    const yTop = g - sw * k; bg.strokeStyle = "#34506E"; bg.lineWidth = 4; bg.beginPath(); bg.moveTo(820, g); bg.lineTo(820, yTop); bg.stroke();
-    if (k > .3) text(bg, `${PL.snow.toFixed(2)}m`, 760, yTop - 40, 54, "#34506E", { weight: 900 });
-    for (let i = 0; i < 5; i++) { const ax = hx + 40 + i * 70, ay = g - hh - roof - 120 + 30 * Math.sin(t * 3 + i); if (u > .3) { bg.fillStyle = "#D8442C"; bg.beginPath(); bg.moveTo(ax, ay + 60); bg.lineTo(ax - 16, ay + 30); bg.lineTo(ax + 16, ay + 30); bg.fill(); bg.fillRect(ax - 5, ay - 10, 10, 40); } }
-    text(bg, "2階建ての家", hx + hw / 2, g - hh / 2, 40, "#5A4632", { weight: 800 });
-  });
-}
-
 // ---------------------------------------------------------------- 下：出来事の札
 const TAGC0 = { S: ["雪", "#EAF4FF"], T: ["暑さ", "#FF6A4C"], R: ["雨", "#7FD0FF"], W: ["風", "#B8F0C8"], Q: ["地震", "#FFB84C"], C: ["比べると", "#B38CFF"] };
 const TAGC = new Proxy({}, { get: (_, k) => { const [n, c] = TAGC0[k[0]]; return [k.endsWith("?") ? n + "（予想）" : n, c]; } });
 const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach((e, j) => EVS.push({ at: s.id, off: e[0], s: e[1], kind: e[2] })));
 function evTime(e) { return CUE[e.at] + e.off; }
 function eventsUI(t) {
-  if (t >= CUE.l08) return;
+  if (t >= CUE.l09) return;
   const live = EVS.filter(e => t >= evTime(e) && t < evTime(e) + 4.6).slice(-3), y1 = 1560, hh = 112, gap = 14;
   live.forEach((e, i) => {
     const u = t - evTime(e), k = easeOut(clamp(u / .25)) * (1 - clamp((u - 4.2) / .4)), y = y1 - (live.length - i) * (hh + gap) + hh / 2, x0 = 40 - 60 * (1 - k);
@@ -150,7 +136,7 @@ function titleBar() {
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
   const k = curId(t); statusUI(t); eventsUI(t);
   if (k === "l01") bigCard(t, "spec");
-  if (k === "l08") shoutCard(t, CUE.l08 + .2, `水深 ${PL.water_end.toFixed(1)}m`, "東京が 湖に", "#EAF2F8", "#7FD0FF", ["一番こわいのは 暑さ×大雪"]); }; }
+  if (k === "l09") shoutCard(t, CUE.l09 + .2, `水深 ${PL.water_end.toFixed(1)}m`, "東京が 湖に", "#EAF2F8", "#7FD0FF", ["一番こわいのは 暑さ×大雪"]); }; }
 
 function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "観測史上最大が", 540, 450, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "全部同時に", 540, 600, 110, "#FF7850", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
