@@ -1,0 +1,131 @@
+{
+ "title": "全人類が渋谷に集まったら？",
+ "theme": "全人類 82 億人が、渋谷のスクランブル交差点に集まったら？（新もしも設計）",
+ "note": "新もしも設計（templates/DESIGN_MODES.md）：冒頭の問いと最後の答えは W 冥鳴ひまり、途中は M 阿井田 茂 Calm。BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "voice_override": {
+  "M": {
+   "preset": "aida",
+   "speed": 1.3
+  },
+  "W": {
+   "speed": 1.25,
+   "inton": 1.0
+  }
+ },
+ "gap": 0.05,
+ "max_duration": 45.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "W",
+   "scene": "l00",
+   "speech": "全人類、はちじゅうに億人が、渋谷のスクランブル交差点に集まったら？",
+   "sub": [
+    "全人類82億人が 渋谷の",
+    "スクランブル交差点に集まったら？"
+   ],
+   "pause": 0.3,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "0 秒目：交差点はもう人でぎっしり。カメラが上がると、どの道も人で埋まっている"
+  },
+  {
+   "id": "L01",
+   "who": "W",
+   "scene": "l01",
+   "speech": "どこまで埋まると思う？",
+   "sub": [
+    "どこまで埋まると思う？"
+   ],
+   "pause": 1.0,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "人の中の目の高さ。まわりの人が手を振る。予想を聞く"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "1平方メートルに2人ずつ。安全に立てる目安で、詰めていく。",
+   "sub": [
+    "1m²に2人ずつ",
+    "安全に立てる目安で 詰めていく"
+   ],
+   "pause": 0.25,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "真上から：1 m² のます目に 2 人"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "渋谷区がいっぱいで、3000万人。",
+   "sub": [
+    "渋谷区がいっぱいで 3,000万人"
+   ],
+   "pause": 0.8,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "真上から一気に上がる。見える街がすべて人"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "日本人全員で、山手線の内側くらい。",
+   "sub": [
+    "日本人全員で 山手線の内側くらい"
+   ],
+   "pause": 0.6,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "地図：人の塗りが広がる（日本人全員）"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "それでも、まだ世界の1.5%。",
+   "sub": [
+    "それでも まだ世界の1.5％"
+   ],
+   "pause": 0.5,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "地図：まだこれだけ"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "横浜、大宮、八王子、そして千葉まで。",
+   "sub": [
+    "横浜 大宮 八王子 そして千葉まで"
+   ],
+   "pause": 1.8,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "地図：一気に広がる。横浜・大宮・八王子・千葉に届く"
+  },
+  {
+   "id": "L07",
+   "who": "W",
+   "scene": "l07",
+   "speech": "答えは、半径40キロ。東京都、およそ2つ分。",
+   "sub": [
+    "答えは 半径40km",
+    "東京都 およそ2つ分"
+   ],
+   "pause": 1.4,
+   "fact": "scripts/pilot_054/fact_check.md",
+   "what": "答え（大きな札）：半径 40 km・東京都 約 2 つ分"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.0,
+   "fact": "—",
+   "what": "冒頭の交差点に戻る（ループ）"
+  }
+ ]
+}

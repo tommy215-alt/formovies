@@ -1,6 +1,7 @@
 """ナレーションのない回（2026-11-06〜、pilot_045 v2。ユーザー「ナレーションはなしにして、情報はポップアップで」）。
 
 lines.json に "silent": true がある回だけ、各行を声の代わりに無音（長さは行の "hold" 秒）で置く。
+声のある回でも、行に "silent": true を書くとその行だけ無音（hold 秒）になる（2026-11-15〜、新もしも設計のループの画）。
 行はショットの区切り（cue）として残るので、timeline.json・効果音のきっかけ・場面の切り替えは従来どおり使える。
 クレジットから合成音声の名前を外す。テンプレートの外の部品で、pipeline.Episode の synth_cached・step_voice を包む（common/ は変えない）。
 """
@@ -24,7 +25,7 @@ def apply(pipeline):
     sc0, sv0 = E.synth_cached, E.step_voice
 
     def synth_cached(self, ln, cache):
-        if not self.lines().get("silent"):
+        if not self.lines().get("silent") and not ln.get("silent"):   # 行ごとの "silent": true（2026-11-15〜、声のある回の無音のショット）
             return sc0(self, ln, cache)
         # 共通エンディングの句（このあと noend_ext が外す）も無音にする
         p = {"speaker": 0, "style": "normal", "speed": 1.0, "pitch": 0.0, "inton": 1.0, "silent": True}

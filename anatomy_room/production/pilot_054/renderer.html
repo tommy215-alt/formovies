@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<title>pilot_054 renderer</title>
+<style>
+html,body{margin:0;background:#000}
+#stage{position:relative;width:1080px;height:1920px;overflow:hidden}
+#stage canvas{position:absolute;left:0;top:0}
+/* もしも設計：上にタイトルの帯（黒地に赤、TBAR）。3D の画は帯の半分だけ下げる（空の隕石が帯に隠れないように、下は地面が少し切れる） */
+#stage canvas:not(#ui){top:218px}
+</style>
+</head><body>
+<div id="stage">
+  <canvas id="bg" width="1080" height="1920"></canvas>
+  <canvas id="ui" width="1080" height="1920"></canvas>
+</div>
+<script src="../common/vendor/three.min.js"></script>
+<script src="../ext/vendor/three147/GLTFLoader.js"></script>
+<script src="../ext/vendor/three147/RGBELoader.js"></script>
+<script src="../ext/vendor/three147/Pass.js"></script>
+<script src="../ext/vendor/three147/EffectComposer.js"></script>
+<script src="../ext/vendor/three147/RenderPass.js"></script>
+<script src="../ext/vendor/three147/ShaderPass.js"></script>
+<script src="../ext/vendor/three147/CopyShader.js"></script>
+<script src="../ext/vendor/three147/SimplexNoise.js"></script>
+<script src="../ext/vendor/three147/SSAOShader.js"></script>
+<script src="../ext/vendor/three147/SSAOPass.js"></script>
+<script src="../ext/vendor/three147/BokehShader.js"></script>
+<script src="../ext/vendor/three147/BokehPass.js"></script>
+<script src="../common/stage.js"></script>
+<script src="../common/cine.js"></script>
+<script src="../ext/hud_ext.js"></script>
+<script src="assets/assets.js"></script>
+<script src="assets/plan.js"></script>
+<script src="assets/map/map.js"></script>
+<script src="../ext/kit/scene_assets.js"></script>
+<script src="../ext/kit/kit.js"></script>
+<script src="../ext/kit/shots.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
+<script>
+// pilot_054 のレンダラー（新もしも設計、templates/DESIGN_MODES.md。土台は pilot_053）。全人類 82 億人が、渋谷のスクランブル交差点に集まったら？
+// 声あり（冒頭の問いと最後の答え＝冥鳴ひまり、途中＝阿井田 茂）。字幕は S.docSub。左上に集まった人数、下に出来事の札、l01 で予想を聞く、l07 で答え。
+// 3D は Blender（blender/scene.py：l00〜l03・l08）。地図（l04〜l07）はここで描く：Natural Earth 10m の陸と都県の境（assets/map/map.js）、人は陸の上だけ、交差点から近い順。
+const PL = window.PLAN, SH = {}; PL.shots.forEach(s => SH[s.id] = s);
+const IDS = PL.shots.map(s => s.id), SIM = PL.sim;
+Object.assign(KIT, { design: "intel", scenes: ["open", "l01"], images: [], ci: {}, hits: [],
+  opening: { img: null, bg: blShot("l00"), title: ["全人類82億人が", "渋谷に集まったら？"], size1: 92, size2: 104, credit: [] } });
+loadImages(["map_land", "map_pref"]);
+// ---------------------------------------------------------------- 上：タイトルの帯（もしも設計の既定：黒地に赤、Dela Gothic One、最初から最後まで）
+const TBAR = 436;   // 2026-11-10 ユーザー「タイトル帯をあと 5% 下げて」→ 帯を 96px 高くして文字を 96px 下げた
+function fitText(s, size, maxw) { ui.font = `400 ${size}px TitleBlack`; const w = ui.measureText(s).width; return w > maxw ? Math.floor(size * maxw / w) : size; }
+function titleBar() {
+  ui.save(); ui.fillStyle = "#000"; ui.fillRect(0, 0, W, TBAR);
+  const [l1, l2] = KIT.opening.title, s1 = fitText(l1, 92, 1000), s2 = fitText(l2, 104, 1000);
+  S.group(() => { ui.fillStyle = "#FF2A2A"; ui.textAlign = "center"; ui.textBaseline = "middle";
+    ui.font = `400 ${s1}px TitleBlack`; ui.fillText(l1, 540, 236); ui.font = `400 ${s2}px TitleBlack`; ui.fillText(l2, 540, 354); }, [0, 0, W, TBAR]);   // 2026-11-10 全画面で上が少し見切れる → 22px 下げた
+  ui.restore();
+}
+
+SHOTS = IDS.slice(1).map(k => ({ at: k, kind: "3d", draw: SH[k].map ? mapShot(k) : blShot(k) }));
+
+// ---------------------------------------------------------------- 人数（plan の n を対数で補間）と、塗りの半径
+function curId(t) { let k = IDS[0]; for (const id of IDS) if (CUE[id] !== undefined && t >= CUE[id]) k = id; return k; }
+function shotDur(k) { const i = IDS.indexOf(k); return (i + 1 < IDS.length ? CUE[IDS[i + 1]] : TL.ending_start) - CUE[k]; }
+function nAt(k, t) { const s = SH[k], u = clamp(t / shotDur(k)), c = s.n;
+  for (let i = 0; i < c.length - 1; i++) { const [u0, a] = c[i], [u1, b] = c[i + 1]; if (u <= u1 || i === c.length - 2) { const e = easeInOut(clamp((u - u0) / Math.max(1e-9, u1 - u0))); return Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * e); } }
+  return c[c.length - 1][1]; }
+function nNow(t) { const k = curId(t); return nAt(k, t - CUE[k]); }
+function radiusFor(n) { const c = SIM.curve; if (n <= c[1][1]) return c[1][0] * Math.sqrt(n / Math.max(1, c[1][1]));
+  for (let i = 1; i < c.length; i++) if (c[i][1] >= n) { const [r0, n0] = c[i - 1], [r1, n1] = c[i]; return r0 + (r1 - r0) * (n - n0) / Math.max(1, n1 - n0); }
+  return c[c.length - 1][0]; }
+function fmtN(n) { if (n >= 1e8) return `${(n / 1e8).toFixed(n >= 1e9 ? 0 : 2)}億人`; if (n >= 1e4) return `${Math.round(n / 1e4).toLocaleString("ja-JP")}万人`; return `${Math.round(n).toLocaleString("ja-JP")}人`; }
+function fmtA(n) { const a = n / SIM.dens / 1e6; return a >= 10 ? `${Math.round(a).toLocaleString("ja-JP")}km²` : a >= .1 ? `${a.toFixed(1)}km²` : `${Math.round(a * 1e6).toLocaleString("ja-JP")}m²`; }
+
+// ---------------------------------------------------------------- 地図（l04〜l07）
+const MAPC = document.createElement("canvas"); MAPC.width = W; MAPC.height = H; const mc = MAPC.getContext("2d");
+let CROWD = null;
+function crowdPattern() {   // 人の色の点（画面の大きさで一定。遠くから見た人の群れ）
+  if (CROWD) return CROWD; const c = document.createElement("canvas"); c.width = c.height = 48; const x = c.getContext("2d"), r = S.rng(54);
+  x.fillStyle = "#4a4038"; x.fillRect(0, 0, 48, 48);
+  const cols = ["#e8483a", "#f29a2e", "#f2cf3a", "#3f9a4a", "#3a7fd0", "#2a3f8a", "#8a3a9a", "#eeeeea", "#e8648a", "#3ab0b0"];
+  for (let i = 0; i < 70; i++) { x.fillStyle = cols[Math.floor(r() * cols.length)]; x.beginPath(); x.arc(r() * 48, r() * 48, 2.2 + r() * 1.2, 0, 7); x.fill(); x.fillStyle = "#c79a74"; x.beginPath(); x.arc(r() * 48, r() * 48, 1.1, 0, 7); x.fill(); }
+  CROWD = mc.createPattern(c, "repeat"); return CROWD; }
+function mapShot(k) {
+  return (tg) => {   // kit は全体の時刻を渡す → ショットの中の時刻に
+    const t = tg - CUE[k], s = SH[k], u = clamp(t / shotDur(k)), hw = Math.exp(Math.log(s.map[0]) + (Math.log(s.map[1]) - Math.log(s.map[0])) * easeInOut(u));   // 画面の横の半分が何 km か
+    const sp = (W / 2) / hw, cx = W / 2, cy = TBAR + (H - TBAR) * .5, n = nAt(k, t), r = radiusFor(n), half = SIM.half_km, im = IMG.map_land, pr = IMG.map_pref;
+    const X = km => cx + km * sp, Y = km => cy - km * sp, rs = SIM.res_km;
+    const kx = hw * 1.02, kt = (cy - TBAR) / sp * 1.02, kb = (H - cy) / sp * 1.02;   // 見えている範囲（km）だけを切り出して描く（全体を拡大するとブラウザが落ちた）
+    const part = (ctx, img) => ctx.drawImage(img, (half - kx) / rs, (half - kt) / rs, 2 * kx / rs, (kt + kb) / rs, X(-kx), Y(kt), 2 * kx * sp, (kt + kb) * sp);
+    bg.fillStyle = "#8ec3e4"; bg.fillRect(0, 0, W, H);
+    bg.imageSmoothingEnabled = true; part(bg, im);
+    // 人の塗り：円（交差点から r km）を人の模様で塗り、陸の形で切り抜く
+    mc.clearRect(0, 0, W, H); mc.save(); mc.fillStyle = crowdPattern(); mc.beginPath(); mc.arc(X(0), Y(0), Math.max(2, r * sp), 0, 7); mc.fill();
+    mc.lineWidth = 10; mc.strokeStyle = "rgba(255,214,60,.95)"; mc.stroke(); mc.restore();
+    mc.save(); mc.globalCompositeOperation = "destination-in"; part(mc, im); mc.restore();
+    bg.drawImage(MAPC, 0, 0);
+    bg.globalAlpha = .9; part(bg, pr); bg.globalAlpha = 1;
+    S.group(() => {   // 地名・縮尺
+      const inSafe = (x, y) => x > 90 && x < W - 200 && y > TBAR + 260 && y < H - 420;   // 右のボタン列・下の説明文・左上の札にかからない所だけ
+      if (hw > 10 && k !== "l07") { if (inSafe(X(12), Y(-22))) text(bg, "東京湾", X(12), Y(-22), 40, "#2f6f9a", { weight: 800 }); if (inSafe(X(-16), Y(12))) text(bg, "東京都", X(-16), Y(12), 44, "#6a5a4a", { weight: 900 }); }
+      if (s.towns) for (const [nm, p] of Object.entries(SIM.towns)) { if (p.km > hw * 1.35 || !inSafe(X(p.x), Y(p.y) - 38)) continue; const hit = r >= p.km; bg.fillStyle = hit ? "#d8231f" : "#3a3a3a"; bg.beginPath(); bg.arc(X(p.x), Y(p.y), hit ? 12 : 9, 0, 7); bg.fill();
+        text(bg, nm, X(p.x), Y(p.y) - 38, hit ? 50 : 40, hit ? "#d8231f" : "#3a3a3a", { weight: 900, stroke: "#ffffff", sw: 10 }); }
+      bg.fillStyle = "#d8231f"; bg.beginPath(); bg.arc(X(0), Y(0), 14, 0, 7); bg.fill(); bg.strokeStyle = "#fff"; bg.lineWidth = 5; bg.stroke();
+      text(bg, "渋谷", X(0) + 70, Y(0) + 6, 44, "#d8231f", { weight: 900, stroke: "#ffffff", sw: 10 });
+      const L = hw > 20 ? 10 : hw > 6 ? 2 : 1, x0 = 790, x1 = x0 + L * sp, y = TBAR + 150; if (k !== "l07") { bg.fillStyle = "#222"; bg.fillRect(x0, y, x1 - x0, 8); text(bg, `${L}km`, (x0 + x1) / 2, y - 30, 34, "#222", { weight: 800, stroke: "#fff", sw: 8 }); }   // 縮尺は右上（地図の出典は説明文に）
+    }, [0, TBAR, W, H]);
+  };
+}
+
+// ---------------------------------------------------------------- 左上：集まった人数・広さ
+function statusUI(t) {
+  const k = curId(t); if (k === "l08" || k === "l07") return;   // 答えでは大きな札が人数を出す
+  const n = nNow(t), x0 = 40, y0 = TBAR + 24, w = 700, h = 200;
+  ui.save(); ui.fillStyle = "rgba(6,10,16,.84)"; rrect(ui, x0, y0, w, h, 18); ui.fill(); ui.strokeStyle = "rgba(255,200,60,.85)"; ui.lineWidth = 3; rrect(ui, x0, y0, w, h, 18); ui.stroke();
+  ui.fillStyle = "#FFC83C"; ui.fillRect(x0, y0 + 20, 8, h - 40);
+  S.group(() => {
+    text(ui, "集まった人", x0 + 36, y0 + 50, 32, "#FFE7A8", { weight: 800, align: "left" }); text(ui, fmtN(n), x0 + w - 30, y0 + 66, 68, "#FFFFFF", { weight: 900, align: "right" });
+    text(ui, "広さ（1m²に2人）", x0 + 36, y0 + 150, 30, "#FFE7A8", { weight: 800, align: "left" }); text(ui, fmtA(n), x0 + w - 30, y0 + 152, 48, "#FFC83C", { weight: 900, align: "right" });
+  }, [x0, y0, x0 + w, y0 + h]);
+  ui.restore();
+}
+
+// ---------------------------------------------------------------- l01：予想を聞く
+function promptUI(t) {
+  if (curId(t) !== "l01") return; const u = t - CUE.l01, k = easeOut(clamp(u / .3)), k2 = easeOut(clamp((u - .5) / .3));
+  ui.save(); ui.globalAlpha *= k; ui.translate(540, 1000); ui.scale(1 + .15 * (1 - k), 1 + .15 * (1 - k));
+  S.group(() => text(ui, "どこまで埋まる？", 0, 0, 104, "#FFD23C", { weight: 900, stroke: "#05080c", sw: 16 })); ui.restore();
+  ui.save(); ui.globalAlpha *= k2; S.group(() => text(ui, "予想をコメントで", 540, 1130, 56, "#FFFFFF", { weight: 800, stroke: "#05080c", sw: 12 })); ui.restore();
+}
+
+// ---------------------------------------------------------------- 下：出来事の札（字幕の上）
+const TAGC0 = { P: ["人", "#FFC83C"], A: ["広さ", "#7FD0FF"], C: ["比べると", "#B38CFF"] };
+const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach(e => EVS.push({ at: s.id, off: e[0], s: e[1], kind: e[2] })));
+function eventsUI(t) {
+  if (t >= CUE.l07) return;
+  const live = EVS.filter(e => t >= CUE[e.at] + e.off && t < CUE[e.at] + e.off + 3.4).slice(-2), y1 = 1390, hh = 108, gap = 14;
+  live.forEach((e, i) => {
+    const u = t - CUE[e.at] - e.off, k = easeOut(clamp(u / .25)) * (1 - clamp((u - 3.0) / .4)), y = y1 - (live.length - i) * (hh + gap) + hh / 2, x0 = 40 - 60 * (1 - k);
+    const [tg, tc] = TAGC0[e.kind];
+    ui.save(); ui.globalAlpha *= k; ui.font = `800 44px ${S.FONT}`; const tw = Math.min(900, ui.measureText(e.s).width), w = Math.max(520, tw + 80);
+    const pop = 1 + .12 * Math.pow(1 - clamp(u / .18), 2); ui.translate(x0, y); ui.scale(pop, pop); ui.translate(-x0, -y);
+    ui.fillStyle = "rgba(6,10,16,.86)"; rrect(ui, x0, y - hh / 2, w, hh, 14); ui.fill(); ui.fillStyle = tc; ui.fillRect(x0, y - hh / 2 + 12, 7, hh - 24);
+    S.group(() => {
+      const gw = (ui.font = `700 26px ${S.FONT}`, ui.measureText(tg).width) + 24;
+      ui.fillStyle = tc; rrect(ui, x0 + 30, y - 42, gw, 34, 6); ui.fill(); text(ui, tg, x0 + 30 + gw / 2, y - 24, 26, "#0A0E14", { weight: 700 });
+      const sz = tw > 900 ? Math.floor(44 * 900 / tw) : 44; text(ui, e.s, x0 + 30, y + 24, sz, "#FFFFFF", { weight: 800, align: "left" });
+    }, [x0, y - hh / 2, x0 + w, y + hh / 2]);
+    ui.restore();
+  });
+}
+
+// ---------------------------------------------------------------- l07：答え
+function shoutCard(t, a, l1, l2, c1, c2, sub) {
+  const u = t - a; if (u < 0) return; const k = easeOut(clamp(u / .4)), k2 = easeOut(clamp((u - .5) / .4)), k3 = easeOut(clamp((u - 1.2) / .4));
+  ui.save(); ui.globalAlpha *= k; S.group(() => text(ui, l1, 540, TBAR + 100, 100, c1, { weight: 900, stroke: "#05080c", sw: 16 })); ui.restore();
+  ui.save(); ui.globalAlpha *= k2; ui.translate(540, TBAR + 230); ui.scale(1 + .25 * (1 - k2), 1 + .25 * (1 - k2)); S.group(() => text(ui, l2, 0, 0, 100, c2, { weight: 900, stroke: "#05080c", sw: 16 })); ui.restore();
+  if (sub) { ui.save(); ui.globalAlpha *= k3; S.group(() => sub.forEach((s, i) => text(ui, s, 540, TBAR + 340 + i * 66, 50, "#FFFFFF", { weight: 800, stroke: "#05080c", sw: 12 }))); ui.restore(); }
+}
+{ const _ds = S.docSub; S.docSub = (ctx, t, o) => { if (curId(t) !== "l07") _ds(ctx, t, o); }; }   // 答えは大きな札で出すので字幕は出さない
+{ const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
+  const k = curId(t); statusUI(t); eventsUI(t); promptUI(t);
+  if (k === "l07") shoutCard(t, CUE.l07 + .15, "答え：半径 約40km", "東京都 約2つ分", "#FFFFFF", "#FFD23C",
+    [`82億人 ＝ ${Math.round(SIM.world.area_km2).toLocaleString("ja-JP")}km²`]); }; }
+
+function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
+function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "全人類82億人が", 540, 450, 100, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "渋谷に集まったら？", 540, 600, 104, "#FFD23C", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
+
+// 書体：BIZ UDPゴシック Bold（OFL、assets/make_assets.py で埋め込み）
+const bizReady = window.ASSETS.font_biz ? new FontFace("Noto Sans CJK JP", b64buf(window.ASSETS.font_biz), { weight: "100 900" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
+const titleReady = window.ASSETS.font_title ? new FontFace("TitleBlack", b64buf(window.ASSETS.font_title), { weight: "400" }).load().then(f => document.fonts.add(f)) : Promise.resolve();
+kitStart(() => {}); window.READY = Promise.all([window.READY, bizReady, titleReady]); BL.install();
+</script>
+</body></html>
