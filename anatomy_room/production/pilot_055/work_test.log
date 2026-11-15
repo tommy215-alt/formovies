@@ -1,0 +1,31 @@
+00:04.093  cycles           | WARNING HIPEW initialization failed: Error opening HIP dynamic library
+[INFO ] services.locationservice ...............: Not adding link to MakeHuman user data, since neither explicit path nor auto-discovery is set in preferences.
+[INFO ] mpfb.init ..............................: Build info 20261010
+[INFO ] mpfb.init ..............................: Online access preference is not enabled. Not checking if MakeHuman is online.
+[INFO ] mpfb.init ..............................: MPFB initialization has finished.
+12:12:37 | INFO: Data are loaded, start creating Blender stuff
+12:12:37 | INFO: Blender create Mesh node island_trees_01_blockout_cleaned
+12:12:41 | INFO: glTF import finished in 4.62s
+12:12:41 | INFO: Data are loaded, start creating Blender stuff
+12:12:41 | INFO: Blender create Mesh node mesh.001
+12:12:44 | INFO: glTF import finished in 3.09s
+12:12:44 | INFO: Data are loaded, start creating Blender stuff
+12:12:44 | INFO: Blender create Mesh node BezierCurve.002
+12:12:51 | INFO: glTF import finished in 6.33s
+C:\Users\Duncan_Tommy21\formovies\anatomy_room\production\pilot_055\blender\scene.py:91: DeprecationWarning: 'Material.use_nodes' is expected to be removed in Blender 6.0
+  m = bpy.data.materials.new(name); m.use_nodes = True; t = m.node_tree
+[   14.5s] anim frame 0
+[   14.5s] anim frame 30
+[   14.5s] anim frame 60
+[   14.5s] anim frame 90
+[   14.5s] anim frame 120
+[   14.5s] anim frame 150
+00:21.984  render           | Saved: 'C:\Users\Duncan_Tommy21\formovies\anatomy_room\production\pilot_055\work\test\l06_0.5.png'
+[   18.0s] test l06 0.5 render 3.5 s
+00:22.515  render           | Saved: 'C:\Users\Duncan_Tommy21\formovies\anatomy_room\production\pilot_055\work\test\l06_2.png'
+[   18.5s] test l06 2.0 render 0.5 s
+00:23.031  render           | Saved: 'C:\Users\Duncan_Tommy21\formovies\anatomy_room\production\pilot_055\work\test\l06_3.6.png'
+[   19.0s] test l06 3.6 render 0.5 s
+Blender 5.2.3 LTS (hash e13b728c6880 built 2026-10-22 01:37:16)
+
+Blender quit

@@ -1,0 +1,122 @@
+{
+ "title": "10万ボルトの電撃が現実にあったら？",
+ "theme": "10万ボルトの電撃が、現実にあったら？（もしも設計）",
+ "note": "もしも設計の既定（タイトルの帯つき）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "0 秒目：昼のバトル場。電気をまとった黄色い服の人が、5 m 先の的の人形と向き合う"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "ためる：体じゅうを電気が走る"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "発射（スロー）：手から飛んだ電撃が、指先から数 cm で消える"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "指先と定規のアップ：火花は 3 cm 余り"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "電圧の比べっこ（はしご）"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "5 m 先に当てるには"
+  },
+  {
+   "id": "L05B",
+   "who": "M",
+   "scene": "l05b",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "もし 1,500 万ボルトなら：太い電撃が 5 m 飛んで的に当たり、的がゆれて焦げ、煙"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オチ：的の目の前まで歩いて行って、パチッ"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "結果（大きな札）"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "冒頭に戻る（ループ）"
+  }
+ ]
+}
