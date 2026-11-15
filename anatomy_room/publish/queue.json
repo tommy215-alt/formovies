@@ -305,6 +305,15 @@
    "status": "scheduled",
    "note": "2026-11-13 もしも設計の 9 本目（観測史上最大が東京で同時に、v2）。ユーザーが投稿を指示（次に空いている 19:00 の枠）",
    "uploaded": "2026-11-13T14:15:03.896Z"
+  },
+  {
+   "id": "pilot_055",
+   "video": "anatomy_room/production/pilot_055/reverse_055_100kv.mp4",
+   "meta": "anatomy_room/production/pilot_055/youtube_metadata.md",
+   "publish_at": "2026-11-17 19:00",
+   "status": "scheduled",
+   "note": "2026-11-15 もしも設計（アニメの必殺技：10万ボルト、黄色い犬）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-15T12:54:18.197Z"
   }
  ]
 }
