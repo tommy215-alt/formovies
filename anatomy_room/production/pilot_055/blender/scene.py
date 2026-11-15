@@ -133,6 +133,9 @@ class Bolts:
                         p_.co = (*q, 1.0)
                     sp.use_smooth = False
                 o.data.bevel_depth = w * k
+        for o in (self.core, self.halo):                                 # 線が 0 本のコマで Cycles が止まったので、地面の下に見えない短い線を 1 本残す
+            if not o.data.splines:
+                sp = o.data.splines.new("POLY"); sp.points.add(1); sp.points[0].co = (0, 0, -5, 1); sp.points[1].co = (0, .001, -5, 1)
         # 曲線は 1 つの太さしか持てないので、太さはいちばん太い電撃に合わせる（同じショットではそろえる）
 
 
@@ -186,33 +189,107 @@ def ruler(A, d, length=.12):
 
 
 
-# ================================================================ 人と電気の動き（時刻 t の関数：描くときに DYN が呼ぶ）
-def crackle(J, t, n=5, r=.35, seed=0):
-    """体のまわりをはう小さな電気（ためるとき）"""
+# ================================================================ 黄色い小さな犬（Sketchfab "Shiba Inu Doggy" by aaadragon、CC BY 4.0、色を黄色に）
+# 2026-11-15 ユーザー「電撃を放つのは人じゃなくて黄色い小さい犬みたいな動物にして」。作品のキャラクターに似せない：犬（赤いほっぺ・稲妻のしっぽ・先の黒い長い耳はなし）。
+# 模型は -Y を向いて立つ（高さ 約 0.6 m）。dog_root を z に 180° 回して +Y（的の方）を向かせる。動き：Idle・Walk（24 fps の動きを 30 fps でそのままの速さに）
+DOGF = os.path.join(HERE, "..", "assets", "sketchfab", "dog", "scene.gltf")
+DOGC = {"rusty": (1.0, .74, .0), "blend": (1.0, .86, .25)}
+DOGO = []
+
+
+def dog(x, y, segs):
+    """segs：[(動きの名前, 始まりのコマ, 終わりのコマ), ...]（コマはショットの中、0 から）。空なら立ったまま（動きなし）"""
+    for o in DOGO:                                                       # 前のショットの犬を消す（残ると 2 匹になった）
+        try:
+            bpy.data.objects.remove(o, do_unlink=True)
+        except ReferenceError:                                           # env_clear で消えていた
+            pass
+    DOGO.clear()
+    before = set(bpy.data.objects); bpy.ops.import_scene.gltf(filepath=DOGF); new = [o for o in bpy.data.objects if o not in before]
+    ico = [o for o in new if o.name.startswith("Icosphere")]; new = [o for o in new if o not in ico]   # 模型に入っている大きな球（使わない）
+    for o in ico:
+        bpy.data.objects.remove(o, do_unlink=True)
+    root = link(bpy.data.objects.new("dog_root", None)); root.location = (x, y, 0); root.rotation_euler = (0, 0, math.pi)
+    for o in new:
+        if o.parent is None:
+            o.parent = root
+        if o.type == "MESH":
+            for sl in o.material_slots:
+                m = sl.material
+                if m and m.name.split(".")[0] in DOGC and m.use_nodes:
+                    b = m.node_tree.nodes.get("Principled BSDF")
+                    if b:
+                        for l_ in list(b.inputs["Base Color"].links):                 # 頂点の色が茶色をのせているので外して黄色に
+                            m.node_tree.links.remove(l_)
+                        b.inputs["Base Color"].default_value = (*DOGC[m.name.split(".")[0]], 1); b.inputs["Roughness"].default_value = .6
+                        b.inputs["Sheen Weight"].default_value = .5
+    arm = next(o for o in new if o.type == "ARMATURE"); ad = arm.animation_data or arm.animation_data_create(); ad.action = None
+    for tr in list(ad.nla_tracks):
+        ad.nla_tracks.remove(tr)
+    if segs:
+        tr = ad.nla_tracks.new()
+        for k, (nm, f0, f1) in enumerate(segs):
+            act = next(a for a in bpy.data.actions if a.name.startswith("Dog|" + nm))
+            st = tr.strips.new(f"{nm}{k}", int(f0) + 1, act)
+            if hasattr(st, "action_slot") and len(getattr(act, "slots", [])):   # Blender 5：2 本目からは slot を自分で付けないと元の形（寝た形）になった
+                st.action_slot = act.slots[0]
+            st.scale = 30 / 24; L = (act.frame_range[1] - act.frame_range[0]) * st.scale
+            st.repeat = max(.01, (f1 - f0) / L); st.extrapolation = "NOTHING" if k < len(segs) - 1 else "HOLD"
+    if os.environ.get("DOGDBG"):
+        for o in bpy.data.objects:
+            if o.type in ("MESH", "ARMATURE"):
+                c = sum((o.matrix_world @ Vector(v) for v in o.bound_box), Vector()) / 8; log("DBG", o.name, o.type, tuple(round(x, 2) for x in c), o.parent.name if o.parent else None, [m.type for m in o.modifiers])
+    DOGO.extend(new + [root]); S["dog"] = root; S["dog_arm"] = arm; S["dog_meshes"] = [o for o in new if o.type == "MESH"]
+    bpy.context.view_layer.update(); return root
+
+
+def dog_points(n=60, seed=1):
+    """犬の体の表面の点（今の形で）：電気がはう所"""
+    dg = bpy.context.evaluated_depsgraph_get(); P = []
+    for o in S["dog_meshes"]:
+        oe = o.evaluated_get(dg); me = oe.to_mesh(); M = oe.matrix_world
+        P += [tuple(M @ v.co) for k, v in enumerate(me.vertices) if k % 7 == 0]; oe.to_mesh_clear()
+    P = np.array(P); r = np.random.default_rng(seed); return P[r.choice(len(P), min(n, len(P)), replace=False)]
+
+
+def nose():
+    """鼻の先（いちばん前 +Y の点）"""
+    dg = bpy.context.evaluated_depsgraph_get(); best = None
+    for o in S["dog_meshes"]:
+        oe = o.evaluated_get(dg); me = oe.to_mesh(); M = oe.matrix_world
+        for v in me.vertices:
+            w = M @ v.co
+            if best is None or w.y > best.y:
+                best = w.copy()
+        oe.to_mesh_clear()
+    return np.array(best) + np.array([0, .005, 0])
+
+
+def crackle_pts(P, t, n=5, r=.2, seed=0):
+    """体のまわりをはう小さな電気（ためるとき）。P：体の表面の点"""
     out = []; rg = np.random.default_rng(seed + int(t * 30))
-    pts = [J["haR"], J["haL"], J["neck"], J["head"], J["elR"], J["elL"], J["hip"]]
     for i in range(n):
-        A = np.array(pts[int(rg.integers(0, len(pts)))]); B = A + rg.normal(0, r * .5, 3)
-        out.append((A, B, .02, .004))
+        A = P[int(rg.integers(0, len(P)))]; B = A + rg.normal(0, r * .5, 3) + np.array([0, 0, abs(rg.normal(0, r * .3))])
+        out.append((A, B, .012, .003))
     return out
 
 
-def setup_people(pose_fn, arcs_fn):
-    S["pup"] = Puppet("hero", pose_fn); S["bolts"] = Bolts("bolts", arcs_fn, seed=3)
+def spark(A, cm):
+    """鼻の先から cm センチ前へ伸びる火花"""
+    A = np.array(A); B = A + np.array([0, cm / 100.0, 0]); return (A, B, .004, .0016)
 
 
-def spark_from(J, cm):
-    """指先から cm センチ前へ伸びる火花"""
-    A = fingertip(J); B = A + np.array([0, cm / 100.0, 0]); return (A, B, .004, .0016)
+def zap(arcs_fn):
+    S["bolts"] = Bolts("bolts", arcs_fn, seed=3)
 
 
-# ================================================================ ショット
+# ================================================================ ショット（犬の高さ 約 0.6 m にカメラを合わせる）
 def s_l00():
-    arena(); setup_people(lambda t: pose(0, AY, {"charge": .35}), lambda t: crackle(pose(0, AY, {"charge": .35}), t, 4, .3, 1))
+    arena(); dog(0, AY, [("Idle", 0, 400)]); P = dog_points(80, 1); zap(lambda t: crackle_pts(P, t, 4, .18, 1))
 
 
 def a_l00(u, t, f):
-    e = ease(u); cam.look(Vector((2.6, -7.2, 1.8)).lerp(Vector((2.0, -6.4, 1.7)), e), Vector((0, .8, 1.1)), 28)
+    e = ease(u); cam.look(Vector((1.7, -6.6, 1.15)).lerp(Vector((1.4, -5.9, 1.05)), e), Vector((0, .6, .5)), 28)
 
 
 def s_l08():
@@ -220,96 +297,86 @@ def s_l08():
 
 
 def a_l08(u, t, f):
-    e = ease(u); cam.look(Vector((3.2, -8.2, 2.0)).lerp(Vector((2.6, -7.2, 1.8)), e), Vector((0, .8, 1.1)), 28)
+    e = ease(u); cam.look(Vector((2.1, -7.5, 1.3)).lerp(Vector((1.7, -6.6, 1.15)), e), Vector((0, .6, .5)), 28)
 
 
 def s_l01():
-    def pf(t):
-        return pose(0, AY, {"charge": smooth(0, .8, t)})
-    arena(); setup_people(pf, lambda t: crackle(pf(t), t, 4 + int(10 * smooth(.3, 3.5, t)), .25 + .35 * smooth(.3, 3.5, t), 11))
+    arena(); dog(0, AY, [("Idle", 0, 400)]); P = dog_points(120, 2)
+    zap(lambda t: crackle_pts(P, t, 4 + int(12 * smooth(.3, 3.5, t)), .15 + .3 * smooth(.3, 3.5, t), 11))
 
 
 def a_l01(u, t, f):
-    e = ease(u); cam.look(Vector((1.5, -.6, 1.45)).lerp(Vector((1.1, -1.1, 1.4)), e), Vector((0, AY, 1.25)), 40)
+    e = ease(u); cam.look(Vector((.9, -1.0, .75)).lerp(Vector((.65, -1.45, .65)), e), Vector((0, AY, .42)), 38)
 
 
-SLOW = .25        # l02・l03 のスロー（1 秒＝ 0.25 秒）
-
-
-def fire_pose(t):
-    k = smooth(.0, .5, t); return pose(0, AY, {"charge": 1 - k, "fire": k})
-
-
-def fire_arcs(t, slow=SLOW):
-    """撃つ：指先から火花がのび、約 3.3 cm で止まって消える（スロー）"""
-    J = fire_pose(t); tt = (t - 1.0) * slow                               # 撃った瞬間から（実時間）
-    if tt < 0:
-        return crackle(J, t, 3, .2, 21)
-    cm = SIMO["cm_sphere"] * smooth(0, .05, tt) * (1 - smooth(.25, .4, tt))
-    return [spark_from(J, cm)] + ([spark_from(J, cm * .8)] if tt < .3 else [])
+SLOW = .25        # l02 のスロー（1 秒＝ 0.25 秒）
 
 
 def s_l02():
-    arena(); setup_people(fire_pose, fire_arcs); J = fire_pose(2.0); ruler(fingertip(J), (0, 1, 0), .12)
+    arena(); dog(0, AY, []); N = nose(); P = dog_points(80, 3)
+    def arcs(t):
+        tt = (t - 1.0) * SLOW
+        if tt < 0:
+            return crackle_pts(P, t, 3, .12, 21)
+        cm = SIMO["cm_sphere"] * smooth(0, .05, tt) * (1 - smooth(.25, .4, tt))
+        return [spark(N, cm)] + ([spark(N, cm * .8)] if tt < .3 else [])
+    zap(arcs); ruler(N, (0, 1, 0), .12); S["nose"] = N
 
 
 def a_l02(u, t, f):
-    e = ease(u); J = fire_pose(2.0); h = Vector(fingertip(J))
-    cam.look(h + Vector((.85, -.05, .12)).lerp(Vector((.65, 0, .1)), e), h + Vector((0, .02, -.04)), 40)
+    e = ease(u); h = Vector(S["nose"])
+    cam.look(h + Vector((.75, -.12, .1)).lerp(Vector((.55, -.05, .08)), e), h + Vector((0, .01, -.04)), 40)
 
 
 def s_l03():
-    def arcs(t):   # 指先のアップ：約 3.3 cm の火花がちらつき続ける
-        J = fire_pose(2.0); r = np.random.default_rng(int(t * 30)); return [spark_from(J, SIMO["cm_sphere"] * r.uniform(.85, 1.0))] if r.random() < .8 else []
-    arena(); setup_people(fire_pose, arcs); J = fire_pose(2.0); ruler(fingertip(J), (0, 1, 0), .12)
+    arena(); dog(0, AY, []); N = nose()
+    def arcs(t):   # 鼻先のアップ：約 3.3 cm の火花がちらつき続ける
+        r = np.random.default_rng(int(t * 30)); return [spark(N, SIMO["cm_sphere"] * r.uniform(.85, 1.0))] if r.random() < .8 else []
+    zap(arcs); ruler(N, (0, 1, 0), .12); S["nose"] = N
 
 
 def a_l03(u, t, f):
-    J = fire_pose(2.0); h = Vector(fingertip(J)); e = ease(u)
-    cam.look(h + Vector((.32, .02, .06)).lerp(Vector((.26, .03, .05)), e), h + Vector((0, .03, -.01)), 60)
+    h = Vector(S["nose"]); e = ease(u)
+    cam.look(h + Vector((.34, -.14, .08)).lerp(Vector((.28, -.1, .07)), e), h + Vector((0, .025, -.015)), 48)
 
 
 def s_l04():
-    arena(); setup_people(lambda t: pose(0, AY, {"charge": .6}), lambda t: crackle(pose(0, AY, {"charge": .6}), t, 8, .4, 31))
+    arena(); dog(0, AY, [("Idle", 0, 400)]); P = dog_points(100, 4); zap(lambda t: crackle_pts(P, t, 8, .25, 31))
 
 
 def a_l04(u, t, f):
-    a = -.5 + .9 * u; cam.look(Vector((8.5 * math.sin(a), -8.5 * math.cos(a) - 1, 3.6)), Vector((0, 0, .9)), 26)
+    a = -.5 + .9 * u; cam.look(Vector((7.5 * math.sin(a), -7.5 * math.cos(a) - 1, 3.0)), Vector((0, 0, .5)), 26)
 
 
 def s_l05():
-    def pf(t):
-        return fire_pose(1.2)
-    def arcs(t):
-        J = pf(t); return [spark_from(J, SIMO["cm_sphere"])] if (t % 1.2) < .5 else crackle(J, t, 2, .1, 51)   # 10 万ボルトの火花は 3 cm（大きな電撃は l05b）
-    arena(); setup_people(pf, arcs)
+    arena(); dog(0, AY, []); N = nose(); P = dog_points(60, 5)
+    zap(lambda t: [spark(N, SIMO["cm_sphere"])] if (t % 1.2) < .5 else crackle_pts(P, t, 2, .1, 51))   # 10 万ボルトの火花は 3 cm（大きな電撃は l05b）
     yl = mat("tape", (.95, .8, .1), .5); xf = [(0, (AY + DY) / 2, .02, .05, DY - AY - .3, .004, 0, 0, 0)] + [(0, AY + .15 + i, .02, .22, .03, .005, 0, 0, 0) for i in range(6)]
     instances("tape", CUBE_V, CUBE_F, xf, [yl])
 
 
 def a_l05(u, t, f):
-    e = ease(u); cam.look(Vector((7.2, -.5, 3.6)).lerp(Vector((6.6, 0, 3.2)), e), Vector((0, 0, .8)), 28)
+    e = ease(u); cam.look(Vector((6.6, -.5, 3.0)).lerp(Vector((6.0, 0, 2.6)), e), Vector((0, 0, .5)), 28)
 
 
 def s_l05b():
     """もし 1,500 万ボルトなら：太い電撃が 5 m 飛んで的に当たる（想像）。的がゆれ、胸に焦げ跡、煙"""
-    def pf(t):
-        return fire_pose(1.2)
+    arena(); dog(0, AY, []); N = nose(); P = dog_points(60, 6)
     def arcs(t):
-        J = pf(t); A = fingertip(J); B = np.array([0, DY - .24, 1.25]); k = smooth(.5, .8, t); fade = 1 - smooth(3.6, 4.4, t)
+        A = N; B = np.array([0, DY - .24, 1.15]); k = smooth(.5, .8, t); fade = 1 - smooth(3.6, 4.4, t)
         if fade < .02:
-            return crackle(J, t, 2, .1, 61)
+            return crackle_pts(P, t, 2, .1, 61)
         L = [(A, A + (B - A) * k, .07 * fade + .015, .009)]
         if k > .9:
             L += [(B, B + np.array([.4 * math.sin(i * 2.1), -.15, -.35 + .25 * math.cos(i * 1.7)]), .03, .009) for i in range(3)]   # 当たった所から散る枝
-        return L
-    arena(); setup_people(pf, arcs)
-    sm = bpy.data.materials.new("smoke"); sm.use_nodes = True; b = sm.node_tree.nodes["Principled BSDF"]; b.inputs["Base Color"].default_value = (.32, .32, .33, 1); b.inputs["Alpha"].default_value = .45
+        return L + crackle_pts(P, t, 3, .12, 62)
+    zap(arcs)
+    sm = bpy.data.materials.new("smoke"); sm.use_nodes = True; b = sm.node_tree.nodes["Principled BSDF"]; b.inputs["Base Color"].default_value = (.32, .32, .33, 1); b.inputs["Alpha"].default_value = .4
     S["smoke"] = []
     for i in range(7):
         bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0); o = mesh_obj(f"smoke{i}", bm, [sm]); o.visible_shadow = False; S["smoke"].append(o)
     bm = bmesh.new(); bmesh.ops.create_circle(bm, cap_ends=True, segments=24, radius=.13); bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "X"), verts=bm.verts)
-    bmesh.ops.translate(bm, vec=(0, DY - .245, 1.22), verts=bm.verts); S["burn"] = mesh_obj("burn", bm, [mat("burnm", (.04, .03, .02), .9)])
+    bmesh.ops.translate(bm, vec=(0, DY - .245, 1.12), verts=bm.verts); S["burn"] = mesh_obj("burn", bm, [mat("burnm", (.04, .03, .02), .9)])
 
 
 def a_l05b(u, t, f):
@@ -321,34 +388,35 @@ def a_l05b(u, t, f):
         tt = t - .9 - i * .25
         if tt < 0:
             keyp(o, f, loc=(0, DY, -5), scale=(.01, .01, .01)); continue
-        r = .1 + .12 * tt; keyp(o, f, loc=(rg.uniform(-.15, .15) + .1 * tt, DY - .3 + rg.uniform(-.1, .1), 1.25 + .45 * tt), scale=(r, r, r))
-    e = ease(u); P = Vector((.95, AY - 1.7, 1.65)).lerp(Vector((.85, AY - 1.3, 1.6)), e) + (shake(f, .03) if .8 <= t < 1.6 else Vector((0, 0, 0)))
-    cam.look(P, Vector((-.1, DY - .5, 1.15)), 28)
+        r = .1 + .12 * tt; keyp(o, f, loc=(rg.uniform(-.15, .15) + .1 * tt, DY - .3 + rg.uniform(-.1, .1), 1.15 + .45 * tt), scale=(r, r, r))
+    e = ease(u); P = Vector((.75, AY - 1.5, .85)).lerp(Vector((.7, AY - 1.2, .8)), e) + (shake(f, .03) if .8 <= t < 1.6 else Vector((0, 0, 0)))
+    cam.look(P, Vector((-.1, DY - .5, .8)), 28)
 
 
-def walk_pose(t):
-    d = DY - .76 - AY; T = 2.6                                            # 指先が的の胸（半径 .24）から 約 3 cm 手前で止まる                                            # 2.6 秒で的の手前まで歩く
-    w = smooth(0, .3, t) * (1 - smooth(T - .2, T, t)); y = AY + d * smooth(0, T, t) ** 1.0
-    ra = smooth(T, T + .6, t)
-    return pose(0, y, {"walk": w, "ph": t * 7.5, "raise": ra})
+WALK_T = 2.4       # l06：2.4 秒（歩きの動き 2 回分）で的の手前まで歩く
 
 
 def s_l06():
+    arena(); post = DY - .06                                              # 的の柱の前の面
+    S["walk_y1"] = None
+    root = dog(0, AY, [("Walk", 0, WALK_T * 30)])                       # 歩きのちょうど 2 回分で止め、最後の形（立った形）のまま
+    # 歩いたあとの鼻の位置（止まってから）を測って、柱から 約 3 cm 手前で止まるように歩く距離を決める
+    sc.frame_set(int(WALK_T * 30) + 10); n0 = nose(); d = (post - .033) - n0[1]
+    S["walk_d"] = d; P = dog_points(40, 7)
     def arcs(t):
-        J = walk_pose(t)
-        if t < 3.4:
-            return crackle(J, t, 2, .15, 41)
-        A = fingertip(J); B = np.array([A[0], DY - .245, A[2]])             # 的の胸まで 約 3 cm → パチッ
-        return [(A, B, .006, .0018), (A, B, .006, .0018)] if t < 3.9 else crackle(J, t, 2, .1, 43)
-    arena(); setup_people(walk_pose, arcs)
+        if t < 3.4 or t > 3.9:
+            return []
+        N = np.array(S["nose_now"]) if S.get("nose_now") is not None else n0 + np.array([0, d, 0])
+        return [(N, np.array([N[0], post, N[2]]), .006, .0018), (N, np.array([N[0], post, N[2]]), .006, .0018)]
+    zap(arcs); S["nose_now"] = n0 + np.array([0, d, 0])
 
 
 def a_l06(u, t, f):
-    J = walk_pose(t); y = J["hip"][1]; e = ease(u)
-    m = (y + DY) / 2; k = smooth(1.2, 3.0, t)                             # はじめは肩の後ろから的を見て、近づいたら横から 2 人を
-    cam.look(Vector((1.3, y - 2.0, 1.65)).lerp(Vector((2.2, m - .4, 1.45)), k), Vector((0, y + 2.2, 1.1)).lerp(Vector((0, m + .05, 1.15)), k), 26 + 16 * k)
+    y = AY + S["walk_d"] * smooth(0, WALK_T, t); keyp(S["dog"], f, loc=(0, y, 0))
+    k = smooth(2.2, 3.4, t)                                               # 横から犬について行き、止まったら少し寄る
+    cam.look(Vector((2.1, y + .1, .9)).lerp(Vector((1.5, y + .25, .75)), k), Vector((0, y + .75, .42)).lerp(Vector((0, y + .5, .5)), k), 28 + 6 * k)
     if t > 3.4:                                                          # パチッで的が少しゆれる
-        k = math.exp(-(t - 3.4) * 3) * math.sin((t - 3.4) * 18); S["dummy"].rotation_euler = (math.radians(4) * k, 0, 0)
+        kk = math.exp(-(t - 3.4) * 3) * math.sin((t - 3.4) * 18); S["dummy"].rotation_euler = (math.radians(4) * kk, 0, 0)
     else:
         S["dummy"].rotation_euler = (0, 0, 0)
     S["dummy"].keyframe_insert("rotation_euler", frame=f + 1)
@@ -359,7 +427,7 @@ def s_l07():
 
 
 def a_l07(u, t, f):
-    a_l06(1.0, 6.0 + t, f); e = ease(u); cam.look(Vector((3.6, .4, 2.2)).lerp(Vector((4.2, .2, 2.6)), e), Vector((0, 1.4, 1.0)), 30)
+    a_l06(1.0, 6.0 + t, f); e = ease(u); cam.look(Vector((3.2, .6, 1.7)).lerp(Vector((3.7, .4, 2.0)), e), Vector((0, 1.6, .55)), 30)
 
 
 # ---------------------------------------------------------------- 書き出し

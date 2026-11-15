@@ -22,7 +22,9 @@ if __name__ == "__main__":
     p = HERE / "assets.js"; out = json.loads(p.read_text(encoding="utf-8")[len("window.ASSETS = "):].rstrip().rstrip(";"))
     out["font_biz"] = base64.b64encode(kit.font_subset(HERE / "fonts" / "BIZUDPGothic-Bold.ttf", chars)).decode()
     # タイトルの帯は Dela Gothic One（SIL OFL 1.1）。縁取りで太くすると字がつぶれるので、太い書体そのものを使う（2026-11-10 ユーザー）
-    tt = "".join(sorted(set("観測史上最大が 東京で全部同時に起きたら？")))
+    import re   # 帯の文字は renderer.html の KIT.opening.title から拾う（053 の題名のまま固定だったので、ほかの回で字が別の書体に落ちていた。2026-11-15）
+    m_ = re.search(r"title: \[([^\]]*)\]", (HERE.parent / "renderer.html").read_text(encoding="utf-8")).group(1)
+    tt = "".join(sorted(set("".join(re.findall(r'"([^"]*)"', m_)) + "？")))
     out["font_title"] = base64.b64encode(kit.font_subset(HERE / "fonts" / "DelaGothicOne-Regular.ttf", tt)).decode()
     p.write_text("window.ASSETS = " + json.dumps(out) + ";\n", encoding="utf-8")
     print("font_biz", len(chars), "文字", len(out["font_biz"]) // 1024, "KB")
