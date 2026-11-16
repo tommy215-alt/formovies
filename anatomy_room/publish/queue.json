@@ -314,6 +314,14 @@
    "status": "scheduled",
    "note": "2026-11-15 もしも設計（アニメの必殺技：10万ボルト、黄色い犬）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
    "uploaded": "2026-11-15T12:54:18.197Z"
+  },
+  {
+   "id": "pilot_056",
+   "video": "anatomy_room/production/pilot_056/reverse_056_head_propeller.mp4",
+   "meta": "anatomy_room/production/pilot_056/youtube_metadata.md",
+   "publish_at": "2026-11-18 19:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-16T03:10:10.403Z"
   }
  ]
 }
