@@ -355,7 +355,7 @@ def a_l08(u, t, f):
 # ---------------------------------------------------------------- 地図（l02・l03）
 def map_scene():
     env_clear(); S.clear(); sc.render.use_motion_blur = False
-    w = sc.world.node_tree; w.nodes.clear(); bg = w.nodes.new("ShaderNodeBackground"); bg.inputs["Color"].default_value = (.001, .002, .012, 1); w.links.new(bg.outputs[0], w.nodes.new("ShaderNodeOutputWorld").inputs[0])
+    w = sc.world.node_tree; w.nodes.clear(); bg = w.nodes.new("ShaderNodeBackground"); bg.inputs["Color"].default_value = (.0043, .0039, .0415, 1); w.links.new(bg.outputs[0], w.nodes.new("ShaderNodeOutputWorld").inputs[0])
     sc.view_settings.exposure = 0.0; MJ = json.load(open(os.path.join(AS, "photo", "map.json"), encoding="utf-8")); half = MJ["half_km"] * 1000.0
     def plane(nm, image, z, alpha=False):
         m = bpy.data.materials.new(nm); m.use_nodes = True; t = m.node_tree; t.nodes.clear(); tx = t.nodes.new("ShaderNodeTexImage"); tx.image = img(os.path.join(AS, "photo", image)); tx.interpolation = "Cubic"
@@ -458,23 +458,29 @@ def descend(p, n=60, ds=40.0):
     return pts
 
 
+NB = 34                        # 雪煙のかたまりの数
+
+
 def s_l05():
-    sky(sun=(32., 210.), exposure=-.35, d0=3000., d1=90000.); terrain(EV, mountain_mat(), 1); clouds(4800, 5400, 3, 100000, scale=1 / 3000., dens=.8)
+    sky(sun=(30., 40.), exposure=-.35, d0=3000., d1=90000.); terrain(EV, mountain_mat(), 1); clouds(4800, 5400, 3, 100000, scale=1 / 3000., dens=.8)
     path = descend(Vector((-900, -1400, 0))); S["path"] = path
     m = bpy.data.materials.new("powder"); m.use_nodes = True; t = m.node_tree; nd = t.nodes; L = t.links
     for x in list(nd):
         if x.type != "OUTPUT_MATERIAL":
             nd.remove(x)
-    tc = nd.new("ShaderNodeTexCoord"); nz = nd.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 2.5; nz.inputs["Detail"].default_value = 6; L.new(tc.outputs["Object"], nz.inputs["Vector"])
-    gr = nd.new("ShaderNodeVectorMath"); gr.operation = "LENGTH"; L.new(tc.outputs["Object"], gr.inputs[0]); fo = nd.new("ShaderNodeMapRange"); fo.inputs[1].default_value = 1.0; fo.inputs[2].default_value = .4; L.new(gr.outputs["Value"], fo.inputs[0])
-    cr = nd.new("ShaderNodeMapRange"); cr.inputs[1].default_value = .35; cr.inputs[2].default_value = .65; L.new(nz.outputs["Fac"], cr.inputs[0])
-    m1 = nd.new("ShaderNodeMath"); m1.operation = "MULTIPLY"; L.new(cr.outputs[0], m1.inputs[0]); L.new(fo.outputs[0], m1.inputs[1])
-    m2 = nd.new("ShaderNodeMath"); m2.operation = "MULTIPLY"; L.new(m1.outputs[0], m2.inputs[0]); m2.inputs[1].default_value = .02
-    pv = nd.new("ShaderNodeVolumePrincipled"); pv.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1); pv.inputs["Anisotropy"].default_value = .0; pv.inputs["Emission Strength"].default_value = .12; pv.inputs["Emission Color"].default_value = (.85, .9, 1.0, 1); L.new(m2.outputs[0], pv.inputs["Density"]); L.new(pv.outputs[0], nd["Material Output"].inputs["Volume"])
+    tc = nd.new("ShaderNodeTexCoord"); nz = nd.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 3.2; nz.inputs["Detail"].default_value = 12; nz.inputs["Roughness"].default_value = .62
+    nz.inputs["Distortion"].default_value = .35; L.new(tc.outputs["Object"], nz.inputs["Vector"])
+    gr = nd.new("ShaderNodeVectorMath"); gr.operation = "LENGTH"; L.new(tc.outputs["Object"], gr.inputs[0]); fo = nd.new("ShaderNodeMapRange"); fo.inputs[1].default_value = 1.0; fo.inputs[2].default_value = .55; L.new(gr.outputs["Value"], fo.inputs[0])
+    ad = nd.new("ShaderNodeMath"); ad.operation = "ADD"; L.new(nz.outputs["Fac"], ad.inputs[0]); L.new(fo.outputs[0], ad.inputs[1])                    # 縁はノイズで食われ、もこもこの輪郭に
+    cr = nd.new("ShaderNodeMapRange"); cr.inputs[1].default_value = 1.25; cr.inputs[2].default_value = 1.45; L.new(ad.outputs[0], cr.inputs[0])
+    m2 = nd.new("ShaderNodeMath"); m2.operation = "MULTIPLY"; L.new(cr.outputs[0], m2.inputs[0]); m2.inputs[1].default_value = .022
+    pv = nd.new("ShaderNodeVolumePrincipled"); pv.inputs["Color"].default_value = (.98, .98, .99, 1); pv.inputs["Anisotropy"].default_value = .1; L.new(m2.outputs[0], pv.inputs["Density"]); L.new(pv.outputs[0], nd["Material Output"].inputs["Volume"])
     S["blobs"] = []
-    for k in range(14):
-        bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=3, radius=1.0); o = mesh_obj(f"powder{k}", bm, [m]); o.visible_shadow = True; S["blobs"].append(o)
-    sc.cycles.volume_step_rate = 2.0; sc.cycles.volume_max_steps = 256
+    for k in range(NB):
+        bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0); o = mesh_obj(f"powder{k}", bm, [m]); o.visible_shadow = True; S["blobs"].append(o)
+    sc.cycles.volume_step_rate = 8.0; sc.cycles.volume_max_steps = 96; sc.cycles.volume_bounces = 2      # 中で光がはね回って白く明るい雪煙に
+    if not os.environ.get("AT"):
+        sc.render.resolution_percentage = 50                                 # 雪煙は重いので半分の大きさで描き、bl_pack の前に 1080×1920 へ拡大（やわらかい雪煙なので差は目立たない）
     finish()
 
 
@@ -486,35 +492,49 @@ def gzE(x, y):
 
 
 def a_l05(u, t, f):
-    path = S["path"]; L_ = len(path) - 1; seg = 40.0
+    path = S["path"]; L_ = len(path) - 1; seg = 40.0; r_ = np.random.default_rng(5)
     def at(d):
         q = np.clip(d / seg, 0, L_); i = int(min(q, L_ - 1)); return path[i].lerp(path[i + 1], q - i)
-    front = 120 + AV * t
+    front = 150 + AV * t
     for k, o in enumerate(S["blobs"]):
-        d = front - k * 45.0; age = max(0.0, d) / 400.0; r = (40 + 220 * min(1.0, age)) * (1 - .03 * k)
-        p = at(max(d, 0)) + Vector((0, 0, r * .55)); keyp(o, f, loc=tuple(p), scale=(r * 1.2, r * 1.2, r)); keyhide(o, d < 0, f)
-    c0 = at(1100); dv = (at(1100) - at(1000)); dv.z = 0; sd = Vector((dv.y, -dv.x, 0)).normalized()
-    cpos = c0 + sd * 380 + Vector((0, 0, 0)); cpos.z = max(c0.z, gzE(cpos.x, cpos.y)) + 120                                   # 道の横、少し高い所から見上げる
-    cam.look(cpos + shake(f, 5.0 * smooth(1.5, 4.5, t), 7), at(front - 60) + Vector((0, 0, 80)), 22)
+        jx, jy, jz, sp = r_.uniform(-1, 1), r_.uniform(-1, 1), r_.uniform(.2, 1.0), r_.uniform(0, 6.28)
+        d = front - k * 30.0; age = max(0.0, d) / 500.0; r = (40 + 250 * min(1.0, age) ** .6) * r_.uniform(.7, 1.15)
+        p = at(max(d, 0)) + Vector((jx * r * .6, jy * r * .6, r * (.35 + .5 * jz) + 320 * min(1.0, age) * jz))      # 前は地面をはい、後ろほど高く巻き上がる
+        keyp(o, f, loc=tuple(p), rot=(sp + t * .5, sp * .7, sp), scale=(r * 1.15, r * 1.15, r * .9)); keyhide(o, d < 0, f)
+    c0 = at(700); dv = (at(760) - at(640)); dv.z = 0; sd = Vector((dv.y, -dv.x, 0)).normalized()
+    cpos = c0 + sd * 800 + dv.normalized() * 500; cpos.z = max(c0.z, gzE(cpos.x, cpos.y)) + 60                                   # 道の横・少し下手の高い所から、迫る雪煙を見る
+    cam.look(cpos + shake(f, 4.0 * smooth(2.0, 5.0, t), 7), at(max(front - 150, 45.0)) + Vector((0, 0, 220)), 24)     # 出だしは尾根の陰を見ないように
 
 
 # ---------------------------------------------------------------- 東京から（l06）
 def s_l06():
-    sky(sun=(22., 120.), exposure=-.25, haze=(.68, .76, .88), hk=.7, d0=3000., d1=380000.)
+    sky(sun=(22., 120.), exposure=.15, rot=180., haze=(.62, .75, .95), hk=.32, d0=3000., d1=380000.)
     D = PLJ["tokyo_km"] * 1000.0; terrain(EV, mountain_mat(), 2, at=(0, D, 0), curv=(0, 0), taper=14000.0)
     r = np.random.default_rng(3); walls = city.WALLS
-    for k in range(70):
-        y = r.uniform(4000, 12000); x = (y * .05) * r.uniform(-1, 1); w_ = r.uniform(30, 70); d_ = r.uniform(30, 60); h_ = r.uniform(50, 180) if r.random() < .4 else r.uniform(25, 70)
+    for k in range(240):
+        y = r.uniform(1500, 14000); x = (y * .06) * r.uniform(-1, 1); w_ = r.uniform(30, 70); d_ = r.uniform(30, 60); h_ = r.uniform(50, 180) if r.random() < .4 else r.uniform(25, 70)
         wc = walls[k % len(walls)]; bm_ = city.bmat(f"b{k % len(walls)}", *wc)
         bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0); bmesh.ops.scale(bm, vec=(w_, d_, h_), verts=bm.verts); bmesh.ops.translate(bm, vec=(x, y, h_ / 2 - (x * x + y * y) / (2 * RE)), verts=bm.verts)
         mesh_obj(f"bld{k}", bm, [bm_])
-    g = mat("cityground", (.3, .3, .31), .9); bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=30000.0); mesh_obj("cg", bm, [g])
+    g = mat("cityground", (.16, .17, .18), .9); bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=60, y_segments=60, size=30000.0)
+    for v in bm.verts:
+        v.co.z = -(v.co.x ** 2 + v.co.y ** 2) / (2 * RE)                     # 地面も地球の丸みで下がる（平らな板の縁が白い壁に見えていた）
+    mesh_obj("cg", bm, [g])
+    m = bpy.data.materials.new("skyback"); m.use_nodes = True; nd = m.node_tree.nodes; L = m.node_tree.links                # 山の後ろの青空（遠くの空が灰色にくすんでいた）
+    for x in list(nd):
+        if x.type != "OUTPUT_MATERIAL":
+            nd.remove(x)
+    tc = nd.new("ShaderNodeTexCoord"); sp = nd.new("ShaderNodeSeparateXYZ"); L.new(tc.outputs["Generated"], sp.inputs[0]); rp = nd.new("ShaderNodeValToRGB")
+    rp.color_ramp.elements[0].color = (.66, .76, .88, 1); rp.color_ramp.elements[1].position = .6; rp.color_ramp.elements[1].color = (.26, .43, .74, 1); L.new(sp.outputs["Z"], rp.inputs[0])
+    em = nd.new("ShaderNodeEmission"); em.inputs["Strength"].default_value = 1.0; L.new(rp.outputs[0], em.inputs[0]); L.new(em.outputs[0], nd["Material Output"].inputs["Surface"])
+    bm = bmesh.new(); r_ = bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=.5); bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "X"), verts=bm.verts)
+    bmesh.ops.scale(bm, vec=(500000., 1., 50000.), verts=bm.verts); bmesh.ops.translate(bm, vec=(0, D + 160000., 25000. - 9000.), verts=bm.verts); o = mesh_obj("skyback", bm, [m]); o.visible_shadow = False
     finish()
 
 
 def a_l06(u, t, f):
     e = ease(u); D = PLJ["tokyo_km"] * 1000.0; top = 8741 - D * D / (2 * RE)
-    cam.look(Vector((0, 0, 230)), Vector((0, D, top * .55 + 120 * e)), 520 + 120 * e)
+    cam.look(Vector((0, 0, 230)), Vector((0, D, top * .45 + 900 * e)), 380 + 280 * e)     # 街の上から山へ、ゆっくり寄りながら見上げる
 
 
 # ---------------------------------------------------------------- 書き出し
