@@ -1,0 +1,111 @@
+{
+ "title": "日本アルプスがヒマラヤになったら？",
+ "theme": "日本アルプスが、ヒマラヤ山脈になったら？（もしも設計）",
+ "note": "もしも設計の既定（タイトルの帯つき）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "0 秒目：雲海を突き破ってそびえる雪と氷の巨大な壁（エベレストの実際の標高データ）へ飛んでいく"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "地図：日本の衛星画像の上で、日本アルプスから同じ縮尺のヒマラヤが本州の向きに広がる"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "高さ比べ：富士山とエベレストを同じ縮尺で並べる（実際の標高データ）"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "空：旅客機が山頂のすぐ上を通り過ぎる"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "東京から：ビル街の向こう、地平線の上に白い壁（望遠、地球の丸みで下は隠れる）"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "山頂：雲海と、やわらかい朝の光"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "天気：冬の雲が壁にぶつかって積み上がる"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.4,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "結果（大きな札）"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "冒頭に戻る（ループ）"
+  }
+ ]
+}
