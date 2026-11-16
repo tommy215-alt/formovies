@@ -332,6 +332,15 @@
    "note": "2026-11-17 もしも設計（日本アルプスがいきなりヒマラヤに、v2）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
    "uploaded": "2026-11-16T22:49:20.000Z",
    "video_id": "HbCbxgsx8zY"
+  },
+  {
+   "id": "pilot_058",
+   "video": "anatomy_room/production/pilot_058/reverse_058_giraffe_sled.mp4",
+   "meta": "anatomy_room/production/pilot_058/youtube_metadata.md",
+   "publish_at": "2026-11-20 19:00",
+   "status": "scheduled",
+   "note": "2026-11-17 もしも設計（キリンぞりで南極横断、v2）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-16T22:52:53.239Z"
   }
  ]
 }
