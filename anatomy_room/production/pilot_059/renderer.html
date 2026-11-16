@@ -60,7 +60,7 @@ function titleBar() {
 }
 
 // ---------------------------------------------------------------- 下：出来事の札
-const TAGC0 = { S: ["もしも", "#EAF2F8"], L: ["長さ", "#FFB84C"], H: ["高さ", "#FF7AA8"], A: ["空", "#7FD0FF"], V: ["見える", "#9CE6B0"], Z: ["山頂", "#EAF2F8"], W: ["天気", "#9FD8FF"], C: ["比べると", "#B38CFF"] };
+const TAGC0 = { S: ["もしも", "#EAF2F8"], H: ["高さ", "#FF7AA8"], L: ["長さ", "#FFB84C"], P: ["場所", "#FFD23C"], N: ["日本全体", "#7FD0FF"], A: ["雪崩", "#FF6B5B"], V: ["見える", "#9CE6B0"], C: ["比べると", "#B38CFF"] };
 const EVS = []; PL.shots.forEach(s => (s.ev || []).forEach(e => EVS.push({ at: s.id, off: e[0], s: e[1], kind: e[2] })));
 function eventsUI(t) {
   if (t >= CUE.l07) return;
@@ -89,7 +89,7 @@ function shoutCard(t, a, l1, l2, c1, c2, sub) {
 }
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
   const k = curId(t); eventsUI(t);
-  if (k === "l07") shoutCard(t, CUE.l07 + .15, "日本一の山は", "エベレストに", "#FFFFFF", "#FFD23C", ["東京からも 毎日見える", "8,000m級の山が 10座"]); }; }
+  if (k === "l07") shoutCard(t, CUE.l07 + .15, "エベレストは", "山形県に", "#FFFFFF", "#FFD23C", ["日本の平均標高は 約3,400m", "雪崩は 福島市まで届く"]); }; }
 
 function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "日本アルプスが", 540, 450, 96, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "ヒマラヤになったら？", 540, 600, 110, "#FFD23C", { weight: 700, stroke: "#05080c", sw: 16 }); }); }

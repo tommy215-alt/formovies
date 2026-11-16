@@ -7,10 +7,13 @@
 - 標高：AWS Terrain Tiles（terrarium、登録・キー不要）。中身は SRTM・GMTED2010（U.S. Geological Survey、パブリックドメイン）、ETOPO1（NOAA、パブリックドメイン）など。クレジット：「United States 3DEP (formerly NED) and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey」
 - 衛星画像："Whole world - land and oceans.jpg"（NASA Earth Observatory／NASA Goddard Space Flight Center、パブリックドメイン）https://commons.wikimedia.org/wiki/File:Whole_world_-_land_and_oceans.jpg
 
+- 市町村の名前：OpenStreetMap の Nominatim（逆ジオコーディング、© OpenStreetMap contributors、ODbL）。画面と説明文には市町村名だけ（地図の画像は使わない）
+
 ## 3D・質感
 
-- Sketchfab（CC BY 4.0、git に入れない）："Medium haul plane (low poly)" by reeledzin https://sketchfab.com/3d-models/medium-haul-plane-low-poly-226d0f39a9154db9922fcbdd56efe0f5 （航空会社のロゴなし）
-- Poly Haven（CC0）：HDRI kloofendal_43d_clear_puresky・kloofendal_48d_partly_cloudy_puresky、質感 aerial_rocks_02・aerial_grass_rock（2026-11-16 追加）
+- Sketchfab（CC BY 4.0、git に入れない）："Medium haul plane (low poly)" by reeledzin https://sketchfab.com/3d-models/medium-haul-plane-low-poly-226d0f39a9154db9922fcbdd56efe0f5 （航空会社のロゴなし。v1 だけで使用、v2 では使わない）
+- Poly Haven（CC0）：HDRI kloofendal_43d_clear_puresky・kloofendal_48d_partly_cloudy_puresky、質感 aerial_rocks_02・aerial_grass_rock（2026-11-16 追加）、roof_tiles・plastered_wall（町の家）
+- 人：顔のないピクトグラム（自作、pilot_056 の Puppet）。家・電柱・道路は自作
 
 ## 書体・音
 
