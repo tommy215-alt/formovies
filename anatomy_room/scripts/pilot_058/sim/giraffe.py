@@ -17,7 +17,7 @@ M, HALF = 1_200, .25              # 体重 kg（オス）、左右の脚の間�
 v_tip = math.sqrt(M * 9.8 * HALF / HC / (.5 * RHO * CD * A))
 
 O = dict(route_km=ROUTE, dog_days=DOG_DAYS, vmax=VMAX, days_at_vmax=ROUTE / VMAX / 24, food=FOOD, n=N,
-         food_total_t=FOOD * N * DOG_DAYS / 1000, zoo_c=ZOO_C, tmin=TMIN, colder=ZOO_C - TMIN, rho=RHO, tip_kmh=v_tip * 3.6)
+         food_total_kg=FOOD * N * round(ROUTE / VMAX / 24), zoo_c=ZOO_C, tmin=TMIN, colder=ZOO_C - TMIN, rho=RHO, tip_kmh=v_tip * 3.6)
 if __name__ == "__main__":
     (Path(__file__).with_name("giraffe.json")).write_text(json.dumps(O, ensure_ascii=False, indent=1), encoding="utf-8")
     for k, v in O.items():

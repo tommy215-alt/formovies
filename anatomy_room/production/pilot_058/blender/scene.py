@@ -370,20 +370,48 @@ def a_l04(u, t, f):
     cam.look(Vector((-2.0 + 2.0 * u, -2.5, gz(-2, -2.5) + 1.4)), Vector((x + 4.0, 12.0, gz(x, 12) + 3.0)), 30)
 
 
+HEAP = (3.6, 12.5, 2.4, 2.1)     # 4 頭×4 日分のエサ（約 540 kg）の山：中心 x・y、半径、高さ（かさ 約 13 m³。葉のついた枝はすき間が多い、仮定）
+
+
+def leaf_mats():
+    ms = []
+    for k, c in enumerate(((.05, .16, .03), (.08, .22, .04), (.12, .26, .05), (.17, .25, .06))):
+        m = mat(f"leaf{k}", c, .6); b = m.node_tree.nodes.get("Principled BSDF"); t = m.node_tree
+        if b:                                                                  # 葉の細かい凹凸
+            nz = t.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 60.0; bp = t.nodes.new("ShaderNodeBump"); bp.inputs["Strength"].default_value = .6
+            t.links.new(nz.outputs["Fac"], bp.inputs["Height"]); t.links.new(bp.outputs["Normal"], b.inputs["Normal"])
+        if b:
+            b.inputs["Subsurface Weight"].default_value = .15
+        ms.append(m)
+    return ms
+
+
+def heap():
+    """葉っぱの山：枝の束（つぶれた球）を円すいに積み、表面に葉っぱの板をびっしり"""
+    cx, cy, R, H = HEAP; r = np.random.default_rng(21); ms = leaf_mats(); z0 = gz(cx, cy)
+    xf, mi = [], []
+    for k in range(420):                                                    # 枝の束
+        a = r.uniform(0, 6.283); q = np.sqrt(r.uniform(0, 1)); rr = R * q; h = H * (1 - q) * r.uniform(.75, 1.0)
+        xf.append((cx + rr * math.cos(a), cy + rr * math.sin(a), z0 + h * r.uniform(.85, 1.0) + .1, r.uniform(.3, .5), r.uniform(.25, .45), r.uniform(.15, .28), r.uniform(0, 6.28), r.uniform(-.3, .3), r.uniform(-.3, .3))); mi.append(k % 4)
+    import common as _c; tv, tf = _c._template("ico"); ob = instances("bundles", tv, tf, xf, ms, np.array(mi)); ob.data.polygons.foreach_set("use_smooth", np.ones(len(ob.data.polygons), bool))
+    xf, mi = [], []
+    for k in range(12000):                                                  # 表面の葉っぱ
+        a = r.uniform(0, 6.283); q = np.sqrt(r.uniform(0, 1)) * 1.05; rr = R * min(q, 1.05); h = max(0.0, H * (1 - q)) + r.uniform(0, .15)
+        xf.append((cx + rr * math.cos(a), cy + rr * math.sin(a), z0 + h + .1, .13, .065, .004, r.uniform(0, 6.28), r.uniform(-1.2, 1.2), r.uniform(-1.2, 1.2))); mi.append(r.integers(0, 4))
+    instances("leaves", CUBE_V, CUBE_F, xf, ms, np.array(mi))
+
+
 def s_l05():
-    plateau(sun=(20., 330.), haze_k=.5); S["spd"] = 0.0; team(kind="eat", seed=6, musher=False)
-    leaf = MATS.get("leafbale") or mat("leafbale", (.16, .32, .08), .85); r2 = np.random.default_rng(9)
-    for k in range(22):                                                      # 前におろした葉っぱの山
-        bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0); o = mesh_obj(f"pile{k}", bm, [leaf])
-        x, y = r2.uniform(-1.6, 1.6), r2.uniform(10.5, 13.0); o.location = (x, y, gz(x, y) + r2.uniform(.1, .5)); o.scale = (r2.uniform(.35, .6), r2.uniform(.35, .6), r2.uniform(.25, .4))
-        for p_ in o.data.polygons:
-            p_.use_smooth = True
-    flakes(2000, (-12, 12, -12, 12, 0, 9), (.8, .3), .6, (.005, .012), 9)
+    plateau(sun=(20., 330.), haze_k=.5); S["spd"] = 0.0; team(kind="eat", seed=6, musher=False); heap()
+    mn = imp(os.path.join(SKF, "explorer", "scene.gltf")); mh = fit(mn, height=1.75, axis=2); x, y = HEAP[0] + 2.5, HEAP[1] - 1.5
+    mh.location = (x, y, gz(x, y)); mh.rotation_euler = (0, 0, 2.4)                                  # 大きさ比べの人（身長 1.75 m）
+    flakes(2000, (-12, 14, -12, 22, 0, 9), (.8, .3), .6, (.005, .012), 9)
 
 
 def a_l05(u, t, f):
-    team_key(f, 0, 0); e = ease(u)
-    cam.look(Vector((5.5 - 1.0 * e, 17.5 - 1.0 * e, gz(5, 17) + 1.3)), Vector((0, 8.5, gz(0, 9) + 1.8 + .8 * e)), 26)         # 前から：葉っぱの山と、食べるキリン
+    team_key(f, 0, 0); e = ease(smooth(.15, .85, u))
+    p0, a0 = Vector((2.2, 14.5, 2.6)), Vector((0, 6.5, 4.6)); p1, a1 = Vector((7.6, 18.6, .9)), Vector((4.6, 11.0, 1.6))
+    cy = gz(p0.x, p0.y); cam.look(p0.lerp(p1, e) + Vector((0, 0, cy)), a0.lerp(a1, e) + Vector((0, 0, cy)), 30 - 6 * e)   # 上を向いて食べるキリンから、引いてエサの山へ
 
 
 def s_l06():

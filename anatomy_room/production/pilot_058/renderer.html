@@ -89,7 +89,7 @@ function shoutCard(t, a, l1, l2, c1, c2, sub) {
 }
 { const _du = drawUI; drawUI = function (t, name) { titleBar(); if (name === "open") return;
   const k = curId(t); eventsUI(t);
-  if (k === "l07") shoutCard(t, CUE.l07 + .15, "キリンぞりは", "寒さに弱すぎる", "#FFFFFF", "#FFD23C", ["全力なら 約4日 でも続かない", "ごはんは 約30トン"]); }; }
+  if (k === "l07") shoutCard(t, CUE.l07 + .15, "キリンぞりは", "寒さに弱すぎる", "#FFFFFF", "#FFD23C", ["全力なら 約4日 でも続かない", "4日分のごはんで 約540kg"]); }; }
 
 function buildMood() { MOOD = [[0, { cool: .0, sat: 1.05, vig: .22 }]]; }
 function thumb() { CUE = CUE || {}; CUE.t0 = 0; bg.fillStyle = "#0c1018"; bg.fillRect(0, 0, W, H); S.group(() => { text(ui, "キリンぞりで南極を", 540, 450, 96, "#EAF2F8", { weight: 700, stroke: "#05080c", sw: 14 }); text(ui, "横断したら？", 540, 600, 110, "#FFD23C", { weight: 700, stroke: "#05080c", sw: 16 }); }); }
