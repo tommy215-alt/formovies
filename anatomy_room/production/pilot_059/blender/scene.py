@@ -206,16 +206,19 @@ def a_l01(u, t, f):
 def s_l02():
     sky(sun=(30., 170.), exposure=-.35, d0=20000., d1=900000., hk=.35)
     mf = mountain_mat("mtn_f", snowline=3100.0, green=2300.0)
-    terrain("fuji", mf, 1, at=(-8500, 0, 0), crop=11000.0, taper=8000.0); terrain(EV, mountain_mat(), 1, at=(8500, 0, 0), crop=10000.0, taper=9000.0)
-    f2 = bpy.data.objects["fuji"].copy(); f2.data = f2.data.copy(); link(f2); f2.name = "fuji2"; S["fuji2"] = f2       # 2 つめの富士山（上に積む。すその平らな所は消す）
-    bm = bmesh.new(); bm.from_mesh(f2.data); bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < 120], context="VERTS"); bm.to_mesh(f2.data); bm.free()
+    terrain("fuji", mf, 1, at=(-7500, 0, 0), crop=14000.0, taper=4000.0); terrain(EV, mountain_mat(), 1, at=(7500, 0, 0), crop=12000.0, taper=6000.0)
+    S["lines"] = []
+    for k, z in enumerate((SIMO["fuji"], 2 * SIMO["fuji"])):                  # 富士山の高さ・富士山 2 つ分の高さの線
+        m = emat(f"hl{k}", (1.0, .85, .25), emit=(1.0, .85, .25), k=1.2, haze=False); bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.scale(bm, vec=(30000, 40, 40), verts=bm.verts); o = mesh_obj(f"hline{k}", bm, [m]); o.location = (0, 0, z); S["lines"].append(o)
     g = mat("plain", (.35, .37, .33), .9); bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=600000.0); mesh_obj("plain", bm, [g])
     finish()
 
 
 def a_l02(u, t, f):
-    k = ease(smooth(3.3, 4.3, t)); keyp(S["fuji2"], f, loc=(0, 0, SIMO["fuji"] + 2500 * (1 - k)), scale=(1, 1, max(.001, k)))
-    e = ease(u); cam.look(Vector((-1500, -52000 - 3000 * e, 1500)), Vector((-1500, 0, 5200)), 40)
+    for o, t0 in zip(S["lines"], (.4, 3.3)):                                     # 線は左から右へ伸びる
+        k = ease(smooth(t0, t0 + .8, t)); keyp(o, f, loc=(-15000 * (1 - k), 0, o.location.z), scale=(max(.001, k), 1, 1))
+    e = ease(u); cam.look(Vector((-500, -44000 - 3000 * e, 2600)), Vector((-500, 0, 1800)), 36)
 
 
 def s_l03():
@@ -232,8 +235,8 @@ def s_l03():
 
 
 def a_l03(u, t, f):
-    x = -2500 + 240 * t; keyp(S["plane"], f, loc=(x, 1200, 10000), rot=(0, 0, 0 if S["pl_ax"] == 0 else -math.pi / 2))      # 時速 約 860 km で横切る
-    cam.look(Vector((1800, 3600, 9300)), Vector((x * .5, 700, 9300)), 26)
+    x = -1500 + 240 * t; P = Vector((x, 1300, 10000)); keyp(S["plane"], f, loc=tuple(P), rot=(0, 0, float(os.environ.get("PROT", "0")) + (0 if S["pl_ax"] == 0 else -math.pi / 2)))   # 時速 約 860 km
+    cam.look(P + Vector((-75 + 25 * u, 95, 30)), P + Vector((60, -260, -170)), 24)                                   # 旅客機を斜め後ろから追う。下に山頂
 
 
 def s_l04():
