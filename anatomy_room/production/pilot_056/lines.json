@@ -1,0 +1,111 @@
+{
+ "title": "頭のプロペラで空を飛んだら？",
+ "theme": "頭の小さなプロペラで、空を飛んだら？（もしも設計）",
+ "note": "もしも設計の既定（タイトルの帯つき）：ナレーションなし（silent_ext）、情報はポップアップ、BGM なし。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "silent": true,
+ "gap": 0.0,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "M",
+   "scene": "l00",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 3.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "0 秒目：土管の空き地。頭のプロペラで浮き上がりかけた子ども、足もとの砂が爆発的に吹き飛ぶ"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "l01",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "条件：子どもとプロペラの寄り"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "l02",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "風：地面すれすれ、砂と小石と葉っぱが外へ吹き飛ぶ"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "l03",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "風で土管が転がり、板の塀がばたつく"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "l04",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 6.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "パワー：浮いた子どもの横に軽自動車"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "l05",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.6,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "オチ：反動で体が逆に回り始める"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "l06",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 5.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "もっと速く回る（コマのよう）"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "l07",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 4.2,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "結果（大きな札）"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "l08",
+   "speech": "",
+   "sub": "",
+   "silent": true,
+   "hold": 2.0,
+   "fact": "画面のポップアップ（plan.py）",
+   "what": "冒頭に戻る（ループ）"
+  }
+ ]
+}
