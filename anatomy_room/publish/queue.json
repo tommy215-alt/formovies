@@ -322,6 +322,16 @@
    "publish_at": "2026-11-18 19:00",
    "status": "scheduled",
    "uploaded": "2026-11-16T03:10:10.403Z"
+  },
+  {
+   "id": "pilot_059",
+   "video": "anatomy_room/production/pilot_059/reverse_059_himalaya.mp4",
+   "meta": "anatomy_room/production/pilot_059/youtube_metadata.md",
+   "publish_at": "2026-11-19 19:00",
+   "status": "scheduled",
+   "note": "2026-11-17 もしも設計（日本アルプスがいきなりヒマラヤに、v2）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-16T22:49:20.000Z",
+   "video_id": "HbCbxgsx8zY"
   }
  ]
 }
