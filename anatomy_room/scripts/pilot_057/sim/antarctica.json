@@ -1,0 +1,11 @@
+{
+ "area_ratio": 37.03948673854091,
+ "route_km": 6000,
+ "days": 220,
+ "km_per_day": 27.272727272727273,
+ "route_vs_japan": 2.0,
+ "tmin_c": -47.77777777777778,
+ "wind_kmh": 160.9,
+ "dog_kcal": 10000,
+ "dog_vs_human": 5.0
+}
