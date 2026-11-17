@@ -13,9 +13,10 @@ sys.path.insert(0, str(HERE.parent.parent / "ext" / "kit"))
 import make_assets as kit  # noqa: E402
 
 PHOTOS = {k: (f"photo/{k}.jpg", "RGB") for k in ("tenmei", "kanto", "war", "tohoku")}
+PHOTOS.update({f"tx_{k}": (f"tex/{k}.jpg", "RGB") for k in ("wood", "plank", "stone", "granite", "rock", "concrete", "tatami")})   # v3：質感（Poly Haven CC0、textures.py）
 
 if __name__ == "__main__":
-    kit.episode(HERE, PHOTOS, size=900)
+    kit.episode(HERE, PHOTOS, size=1024)
     text = (HERE.parent / "renderer.html").read_text(encoding="utf-8") + (HERE / "plan.js").read_text(encoding="utf-8") + (HERE.parent / "lines.json").read_text(encoding="utf-8")
     text += "0123456789:：.,，、。・（）()／/～〜-+％%億万人秒分年代約残り真夜中 ？！?!"
     chars = "".join(sorted(set(c for c in text if c.strip())))

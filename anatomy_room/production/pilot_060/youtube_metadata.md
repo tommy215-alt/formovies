@@ -15,7 +15,7 @@
 出典：W. W. Farris の推計（天平の天然痘）、内閣府（関東大震災）、総務省消防庁（東日本大震災）、国勢調査、国立社会保障・人口問題研究所
 
 写真：Wikimedia Commons（パブリックドメイン）天明飢饉之図／1923年 関東大震災／Bomb damage in Tokyo（US Army Signal Corps）／Rikuzentakata（U.S. Navy）
-音楽："Movement Proposition" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/
+音楽："Funk Game Loop" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/
 音声：AivisSpeech 阿井田 茂／VOICEVOX:冥鳴ひまり
 
 #日本 #人口減少 #終末時計 #歴史

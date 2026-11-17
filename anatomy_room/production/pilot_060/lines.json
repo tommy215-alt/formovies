@@ -1,7 +1,7 @@
 {
  "title": "日本終末時計",
  "theme": "もし日本だけの終末時計があったら、歴史の中で真夜中まで何秒だったか（新ドパ設計）",
- "note": "新ドパ設計：冒頭の問いと最後は W 冥鳴ひまり、本編は M 阿井田 茂 Calm 速め。BGM は Movement Proposition（Kevin MacLeod、CC BY 4.0）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "note": "新ドパ設計：冒頭の問いと最後は W 冥鳴ひまり、本編は M 阿井田 茂 Calm 速め。BGM は Raving Energy（Kevin MacLeod、CC BY 4.0。v3 の仮）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
  "voices": "v7",
  "voice_override": {
   "M": {
@@ -26,7 +26,7 @@
     "もし 日本だけの終末時計があったら",
     "いま 真夜中まで何秒？"
    ],
-   "pause": 0.388,
+   "pause": 0.293,
    "kind": "open",
    "ev": null,
    "fact": "scripts/pilot_060/fact_check.md"
@@ -54,7 +54,7 @@
     "737年 天然痘の大流行",
     "人口の およそ3割が亡くなった"
    ],
-   "pause": 0.555,
+   "pause": 0.46,
    "kind": "ev",
    "ev": "H1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -67,7 +67,7 @@
    "sub": [
     "真夜中まで 31秒"
    ],
-   "pause": 0.598,
+   "pause": 0.503,
    "kind": "hit",
    "ev": "H1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -81,7 +81,7 @@
     "1780年代 天明の飢饉",
     "死者90万人以上 → 91秒"
    ],
-   "pause": 0.279,
+   "pause": 0.66,
    "kind": "ev",
    "ev": "H2",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -95,7 +95,7 @@
     "1923年 関東大震災",
     "約10万5千人 → 164秒"
    ],
-   "pause": 0.345,
+   "pause": 0.15,
    "kind": "ev",
    "ev": "H3",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -109,7 +109,7 @@
     "1945年 戦争",
     "約310万人 → 82秒"
    ],
-   "pause": 0.269,
+   "pause": 0.56,
    "kind": "ev",
    "ev": "H4",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -123,7 +123,7 @@
     "2011年 東日本大震災",
     "約2万2千人 → 226秒"
    ],
-   "pause": 0.412,
+   "pause": 0.15,
    "kind": "ev",
    "ev": "H5",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -136,7 +136,7 @@
    "sub": [
     "では いまは。"
    ],
-   "pause": 0.379,
+   "pause": 0.15,
    "kind": "now",
    "ev": null,
    "fact": "scripts/pilot_060/fact_check.md"
@@ -151,7 +151,7 @@
     "でも 2070年の人口は 約8,700万人（推計）",
     "50年で 3割が減る"
    ],
-   "pause": 0.569,
+   "pause": 0.394,
    "kind": "decline",
    "ev": "P1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -165,7 +165,7 @@
     "真夜中まで 30秒",
     "1300年前の大流行と ほぼ同じ"
    ],
-   "pause": 0.536,
+   "pause": 0.25,
    "kind": "hit",
    "ev": "P1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -179,7 +179,7 @@
     "2120年には 5,000万人を割る（参考推計）",
     "→ 13秒"
    ],
-   "pause": 0.593,
+   "pause": 0.15,
    "kind": "ev",
    "ev": "P2",
    "fact": "scripts/pilot_060/fact_check.md"

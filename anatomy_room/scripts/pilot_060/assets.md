@@ -2,7 +2,8 @@
 
 | 素材 | 作者・出典 | ライセンス | 確認 |
 |---|---|---|---|
-| BGM「Movement Proposition」 | Kevin MacLeod（incompetech.com） | CC BY 4.0 | incompetech のファイル（2026-11-17 取得）。説明文にクレジット |
+| BGM「Funk Game Loop」（v3、小節を並べ替えてサビを冒頭と最後に。v2 までは「Movement Proposition」） | Kevin MacLeod（incompetech.com） | CC BY 4.0 | incompetech のファイル（2026-11-17 取得）。説明文にクレジット |
+| 質感（木・檜の板・石垣・御影石・岩・コンクリート・畳） | Poly Haven（lacquered_cherry_wood・hinoki_planks・japanese_stone_wall・granite_tile・rock_wall_08・concrete_wall_006・tatami_mat） | CC0 | Poly Haven の公開 API（2026-11-17）、assets/textures.py |
 | 天明飢饉之図（1786 年ごろ） | 作者不明、福島県会津美里町教育委員会蔵。Wikimedia Commons「Great Tenmei Famine Map Artwork.png」 | パブリックドメイン | Commons の API の LicenseShortName（2026-11-17） |
 | 関東大震災の写真（1923 年） | 作者不明。Commons「1923 Great Kantō earthquake destructions.jpg」 | パブリックドメイン | 同上 |
 | 空襲のあとの東京（1945 年） | US Army Signal Corps。Commons「Bomb damage in Tokyo.jpg」 | パブリックドメイン | 同上 |

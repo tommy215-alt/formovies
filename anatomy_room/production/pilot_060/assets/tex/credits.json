@@ -1,0 +1,50 @@
+[
+ {
+  "key": "wood",
+  "polyhaven": "lacquered_cherry_wood",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/lacquered_cherry_wood"
+ },
+ {
+  "key": "plank",
+  "polyhaven": "hinoki_planks",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/hinoki_planks"
+ },
+ {
+  "key": "stone",
+  "polyhaven": "japanese_stone_wall",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/japanese_stone_wall"
+ },
+ {
+  "key": "granite",
+  "polyhaven": "granite_tile",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/granite_tile"
+ },
+ {
+  "key": "rock",
+  "polyhaven": "rock_wall_08",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/rock_wall_08"
+ },
+ {
+  "key": "plaster",
+  "polyhaven": "white_plaster_rough_01",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/white_plaster_rough_01"
+ },
+ {
+  "key": "concrete",
+  "polyhaven": "concrete_wall_006",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/concrete_wall_006"
+ },
+ {
+  "key": "tatami",
+  "polyhaven": "tatami_mat",
+  "license": "CC0",
+  "url": "https://polyhaven.com/a/tatami_mat"
+ }
+]

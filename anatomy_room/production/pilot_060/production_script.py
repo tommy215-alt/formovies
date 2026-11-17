@@ -15,10 +15,10 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "ext" / "kit"))
 import epkit  # noqa: E402
 
-BGM = "Movement Proposition.mp3"
 BEAT = json.loads((HERE / "assets" / "bgm" / "beats.json").read_text(encoding="utf-8"))
+BGM = BEAT.get("file", "Movement Proposition.mp3")   # v3：Raving Energy（前の曲は beats_movement_proposition.json）
 P = BEAT["period"]
-START = BEAT["phase"] + P * 9            # 曲のこの秒を動画の 0 秒に（小節の頭、前奏のあとの音の厚いところ）
+START = BEAT["phase"] + P * BEAT.get("start_beats", 9)            # 曲のこの秒を動画の 0 秒に（小節の頭、前奏のあとの音の厚いところ）
 pipeline, standard = epkit.setup(HERE, "intel", bgm=(BGM, round(BEAT["bpm"])), ending_gain=.0)
 import bgm_file  # noqa: E402
 bgm_file.register("file_060", HERE / "assets" / "bgm" / BGM, start=START, bpm=round(BEAT["bpm"]), gains={"ending": .0}, smooth=.3)

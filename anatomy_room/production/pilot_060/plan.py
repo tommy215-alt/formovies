@@ -43,7 +43,7 @@ for i, (lid, who, sp, sub, kind, ev) in enumerate(L):
 doc = {
     "title": "日本終末時計",
     "theme": "もし日本だけの終末時計があったら、歴史の中で真夜中まで何秒だったか（新ドパ設計）",
-    "note": "新ドパ設計：冒頭の問いと最後は W 冥鳴ひまり、本編は M 阿井田 茂 Calm 速め。BGM は Movement Proposition（Kevin MacLeod、CC BY 4.0）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+    "note": "新ドパ設計：冒頭の問いと最後は W 冥鳴ひまり、本編は M 阿井田 茂 Calm 速め。BGM は Funk Game Loop（Kevin MacLeod、CC BY 4.0。小節を並べ替えてサビを冒頭と最後に）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
     "voices": "v7",
     "voice_override": {"M": {"preset": "aida", "speed": 1.55}, "W": {"speed": 1.35, "inton": 1.0}},
     "gap": 0.05,
