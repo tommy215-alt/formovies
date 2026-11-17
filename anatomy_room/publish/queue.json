@@ -341,6 +341,14 @@
    "status": "scheduled",
    "note": "2026-11-17 もしも設計（キリンぞりで南極横断、v2）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
    "uploaded": "2026-11-16T22:52:53.239Z"
+  },
+  {
+   "id": "pilot_060",
+   "video": "anatomy_room/production/pilot_060/reverse_060_doomsday_japan.mp4",
+   "meta": "anatomy_room/production/pilot_060/youtube_metadata.md",
+   "publish_at": "2026-11-21 19:00",
+   "status": "scheduled",
+   "uploaded": "2026-11-17T09:32:18.219Z"
   }
  ]
 }
