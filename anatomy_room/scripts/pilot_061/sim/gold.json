@@ -1,0 +1,60 @@
+{
+ "gold_usd_oz": 3885,
+ "usd_per_g": 124.91,
+ "regions": [
+  {
+   "name": "アメリカ",
+   "usd_bn": 2470,
+   "tonnes": 19775,
+   "pop": 342000000.0,
+   "usd_pp": 7222,
+   "g_pp": 57.8
+  },
+  {
+   "name": "ユーロ圏",
+   "usd_bn": 1818,
+   "tonnes": 14552,
+   "pop": 351000000.0,
+   "usd_pp": 5178,
+   "g_pp": 41.5
+  },
+  {
+   "name": "中国",
+   "usd_bn": 2252,
+   "tonnes": 18029,
+   "pop": 1408000000.0,
+   "usd_pp": 1599,
+   "g_pp": 12.8
+  },
+  {
+   "name": "日本",
+   "usd_bn": 728,
+   "tonnes": 5829,
+   "pop": 123300000.0,
+   "usd_pp": 5905,
+   "g_pp": 47.3
+  },
+  {
+   "name": "インド",
+   "usd_bn": 458,
+   "tonnes": 3669,
+   "pop": 1460000000.0,
+   "usd_pp": 314,
+   "g_pp": 2.5
+  },
+  {
+   "name": "アフリカ",
+   "usd_bn": 190,
+   "tonnes": 1521,
+   "pop": 1550000000.0,
+   "usd_pp": 123,
+   "g_pp": 1.0
+  }
+ ],
+ "six_tonnes": 63375,
+ "six_share_of_all_gold": 0.283,
+ "us_vs_reserve": 2.43,
+ "japan_vs_africa_pp": 47,
+ "africa_sum_bn": 190,
+ "bars_japan": 468569
+}
