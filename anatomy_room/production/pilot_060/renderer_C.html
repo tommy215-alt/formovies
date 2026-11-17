@@ -362,7 +362,7 @@ const CAM = {
 };
 function camAt(t, i) {
   const l = LN[i], t0 = CUE[l.scene], b = (t - t0) / BP; let f;
-  if (l.scene === "s09") { const [tx, ty] = graphTip(reachAt(b)); f = b < 1 ? [540, 500, 1.6] : b < 12 ? [tx, ty, 1.55] : [540, 900, 1.1];
+  if (l.scene === "s09") { const [tx, ty] = graphTip(reachAt(b)); f = b < 1 ? [540, 620, 1.28] : b < 12 ? [540 + (tx - 540) * .45, 560 + (ty - 560) * .5, 1.3] : [540, 900, 1.1];
     if (b >= 11 && b < 13) { const e = easeInOut((b - 11) / 2), [ax, ay] = graphTip(reachAt(11)); f = [ax + (540 - ax) * e, ay + (900 - ay) * e, 1.55 + (1.1 - 1.55) * e]; }
     if (b >= .5 && b < 1.5) { const e = easeInOut((b - .5)), [ax, ay] = graphTip(1920); f = [540 + (ax - 540) * e, 500 + (ay - 500) * e, 1.6 - .05 * e]; } }
   else if (shotAt(l, b)) { const { k, s: q } = shotAt(l, b), uu = clamp((b - q[0]) / (q[1] - q[0])), e = k === SHOTS[l.scene].length - 1 ? easeInOut(uu) : uu; f = [q[2] + (q[5] - q[2]) * e, q[3] + (q[6] - q[3]) * e, q[4] + (q[7] - q[4]) * e]; f.rot = q[8] + (q[9] - q[8]) * e; }
@@ -395,7 +395,7 @@ function composite(t, i) {
 // ---------------------------------------------------------------- セリフの文字：句ごとに 帯・木の札・ポップ・光る文字 を切り替える（声に合わせて出る）
 const STY = { L00: ["band", "glow"], L01: ["plank", "band"], L02: ["band", "pop"], L03: ["glow"], L04: ["plank", "band"], L05: ["band", "pop"], L06: ["glow", "band"], L07: ["band", "pop"],
   L08: ["glow"], L09: ["band", "plank", "pop"], L10: ["glow", "band"], L11: ["band", "pop"], L12: ["plank", "glow"] };
-const TY = 1520;
+const TY = 1520, TX = 470;   // 文字の中心は少し左へ（右側のボタン列 x≥950 を避ける）
 function phrases(t) {
   const out = [], Ls = TL.lines.filter(x => !x.ending);
   Ls.forEach((L, li) => { const ln = (window.SUBS && window.SUBS[L.id]) || []; if (!ln.length) return; const tot = ln.join("").length; let acc = 0;
@@ -414,37 +414,37 @@ function drawPhrase(p, t) {
   const st = (STY[p.id] || [])[p.j] || "band", u = t - p.a, out = clamp((t - (p.z - .14)) / .14), s = p.s; if (out >= 1) return;
   ui.save(); ui.textAlign = "center"; ui.textBaseline = "middle";
   if (st === "band") {
-    const F = sz => `900 ${sz}px ${BIZ}`, { lines, size } = fitText(ui, s, F, 70, 960, 50), h = lines.length * size * 1.25 + size * .75, y0 = TY - h / 2, e = easeOut(clamp(u / .18));
+    const F = sz => `900 ${sz}px ${BIZ}`, { lines, size } = fitText(ui, s, F, 70, 800, 46), h = lines.length * size * 1.25 + size * .75, y0 = TY - h / 2, e = easeOut(clamp(u / .18));
     ui.globalAlpha *= 1 - out; ui.save(); ui.beginPath(); ui.rect(out > 0 ? W * easeInOut(out) : 0, 0, W * e, H); ui.clip();
     ui.fillStyle = "rgba(14,11,8,.86)"; ui.fillRect(0, y0, W, h); ui.fillStyle = "#E0B04A"; ui.fillRect(0, y0 - 6, W, 6); ui.fillRect(0, y0 + h, W, 6); ui.fillStyle = CRED; ui.fillRect(0, y0, 18, h); ui.restore();
     const n = Math.ceil([...lines.join("")].length * clamp((u - .05) / .3)); let used = 0, pb = 1 + .025 * pulse(t);
-    lines.forEach((ln, k) => { const m = clamp(n - used, 0, ln.length); used += ln.length; const y = y0 + size * .75 / 2 + size * 1.25 * (k + .5); ui.save(); ui.translate(540 + 50 * (1 - e), y); ui.scale(pb, pb); ui.font = F(size); ui.fillStyle = "#FFF"; const w = ui.measureText(ln).width;
+    lines.forEach((ln, k) => { const m = clamp(n - used, 0, ln.length); used += ln.length; const y = y0 + size * .75 / 2 + size * 1.25 * (k + .5); ui.save(); ui.translate(TX + 50 * (1 - e), y); ui.scale(pb, pb); ui.font = F(size); ui.fillStyle = "#FFF"; const w = ui.measureText(ln).width;
       ui.textAlign = "left"; ui.fillText(ln.slice(0, m), -w / 2, 0); logBox(ui, ln, -w / 2, -size * .55, w / 2, size * .55, size); ui.restore(); });
   } else if (st === "plank") {
-    const F = sz => `700 ${sz}px ${MIN}`, { lines, size } = fitText(ui, s, F, 72, 860, 50); ui.font = F(size); const tw = Math.max(...lines.map(x => ui.measureText(x).width)), w = tw + 110, h = lines.length * size * 1.25 + 70;
+    const F = sz => `700 ${sz}px ${MIN}`, { lines, size } = fitText(ui, s, F, 72, 700, 46); ui.font = F(size); const tw = Math.max(...lines.map(x => ui.measureText(x).width)), w = tw + 110, h = lines.length * size * 1.25 + 70;
     const e = spring(u / .42), y = TY - 300 * (1 - e) + 400 * out * out, rot = .05 * Math.exp(-u * 3) * Math.sin(u * 9) + (beatIdx(t) % 2 ? 1 : -1) * .012 * pulse(t);
-    ui.globalAlpha *= clamp(u / .08) * (1 - out); ui.translate(540, y); ui.rotate(rot);
+    ui.globalAlpha *= clamp(u / .08) * (1 - out); ui.translate(TX, y); ui.rotate(rot);
     ui.strokeStyle = "rgba(60,40,20,.9)"; ui.lineWidth = 4; ui.beginPath(); ui.moveTo(-w * .3, -h / 2); ui.lineTo(0, -h / 2 - 120); ui.lineTo(w * .3, -h / 2); ui.stroke();
     ui.fillStyle = "rgba(0,0,0,.45)"; rrect(ui, -w / 2 + 10, -h / 2 + 14, w, h, 12); ui.fill(); ui.fillStyle = pat(ui, "plank", .55, 0, 0); rrect(ui, -w / 2, -h / 2, w, h, 12); ui.fill();
     const g = ui.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, "rgba(255,240,210,.25)"); g.addColorStop(1, "rgba(60,30,10,.3)"); ui.fillStyle = g; rrect(ui, -w / 2, -h / 2, w, h, 12); ui.fill();
     ui.strokeStyle = "#4A2E16"; ui.lineWidth = 6; rrect(ui, -w / 2, -h / 2, w, h, 12); ui.stroke(); ui.fillStyle = "#6A6058"; for (const [nx, ny] of [[-w / 2 + 26, -h / 2 + 24], [w / 2 - 26, -h / 2 + 24]]) { ui.beginPath(); ui.arc(nx, ny, 8, 0, 7); ui.fill(); }
     ui.font = F(size); ui.fillStyle = "#1E120A"; lines.forEach((ln, k) => { const yy = (k - (lines.length - 1) / 2) * size * 1.25 + 6; ui.fillText(ln, 0, yy); const lw = ui.measureText(ln).width; logBox(ui, ln, -lw / 2, yy - size * .55, lw / 2, yy + size * .55, size); });
   } else if (st === "pop") {
-    const F = sz => `400 ${sz}px ${DG}`, { lines, size } = fitText(ui, s, F, 92, 940, 76);
+    const F = sz => `400 ${sz}px ${DG}`, { lines, size } = fitText(ui, s, F, 92, 800, 70);
     ui.globalAlpha *= 1 - out; ui.font = F(size);
     lines.forEach((ln, k) => { const yy = TY + (k - (lines.length - 1) / 2) * size * 1.3, chars = [...ln], lw = ui.measureText(ln).width;
-      for (const pass of [0, 1, 2]) { let x = -lw / 2; chars.forEach((ch, ci) => { const cw = ui.measureText(ch).width, cu = u - ci * .025 - k * .1, e = spring(cu / .3); if (cu > 0) { ui.save(); ui.translate(540 + x + cw / 2, yy - 10 * pulse(t + (ci % 2) * BP / 2)); ui.scale(e, e); ui.rotate((ci % 2 ? 1 : -1) * .05 * (1 - clamp(cu / .3)));
+      for (const pass of [0, 1, 2]) { let x = -lw / 2; chars.forEach((ch, ci) => { const cw = ui.measureText(ch).width, cu = u - ci * .025 - k * .1, e = spring(cu / .3); if (cu > 0) { ui.save(); ui.translate(TX + x + cw / 2, yy - 10 * pulse(t + (ci % 2) * BP / 2)); ui.scale(e, e); ui.rotate((ci % 2 ? 1 : -1) * .05 * (1 - clamp(cu / .3)));
         ui.lineJoin = "round"; if (pass === 0) { ui.lineWidth = size * .26; ui.strokeStyle = "#1A0A04"; ui.strokeText(ch, 0, 0); } else if (pass === 1) { ui.lineWidth = size * .12; ui.strokeStyle = "#FFF"; ui.strokeText(ch, 0, 0); }
         else { const g = ui.createLinearGradient(0, -size / 2, 0, size / 2); g.addColorStop(0, "#FFE45C"); g.addColorStop(1, "#FF7A1F"); ui.fillStyle = g; ui.fillText(ch, 0, 0); } ui.restore(); } x += cw; }); }
-      ui.save(); ui.translate(540, yy); logBox(ui, ln, -lw / 2, -size * .55, lw / 2, size * .55, size); ui.restore(); });
+      ui.save(); ui.translate(TX, yy); logBox(ui, ln, -lw / 2, -size * .55, lw / 2, size * .55, size); ui.restore(); });
   } else {   // glow：金色の明朝体、柔らかい光と、文字の上を流れる光
-    const F = sz => `700 ${sz}px ${MIN}`, { lines, size } = fitText(ui, s, F, 96, 940, 54), k = easeOut(clamp(u / .32)), sc0 = 1.18 - .18 * k;
+    const F = sz => `700 ${sz}px ${MIN}`, { lines, size } = fitText(ui, s, F, 96, 780, 50), k = easeOut(clamp(u / .32)), sc0 = 1.18 - .18 * k;
     const h = lines.length * size * 1.25; ui.globalAlpha *= k * (1 - out);
-    const g0 = ui.createRadialGradient(540, TY, 40, 540, TY, 560); g0.addColorStop(0, "rgba(8,6,4,.72)"); g0.addColorStop(1, "rgba(8,6,4,0)"); ui.fillStyle = g0; ui.fillRect(0, TY - h / 2 - 140, W, h + 280);
+    const g0 = ui.createRadialGradient(TX, TY, 40, TX, TY, 560); g0.addColorStop(0, "rgba(8,6,4,.72)"); g0.addColorStop(1, "rgba(8,6,4,0)"); ui.fillStyle = g0; ui.fillRect(0, TY - h / 2 - 140, W, h + 280);
     tmp.clearRect(0, 0, W, 520); tmp.save(); tmp.font = F(size); tmp.textAlign = "center"; tmp.textBaseline = "middle"; const gg = tmp.createLinearGradient(0, 260 - size / 2, 0, 260 + size / 2); gg.addColorStop(0, "#FFF6D2"); gg.addColorStop(1, "#E6AE45"); tmp.fillStyle = gg;
     lines.forEach((ln, j) => tmp.fillText(ln, 540, 260 + (j - (lines.length - 1) / 2) * size * 1.25));
     tmp.globalCompositeOperation = "source-atop"; const sx = -300 + ((u * 900) % 1700); const sg = tmp.createLinearGradient(sx - 120, 0, sx + 120, 0); sg.addColorStop(0, "rgba(255,255,255,0)"); sg.addColorStop(.5, "rgba(255,255,255,.75)"); sg.addColorStop(1, "rgba(255,255,255,0)"); tmp.fillStyle = sg; tmp.fillRect(0, 0, W, 520); tmp.restore();
-    ui.translate(540, TY); ui.scale(sc0 * (1 + .03 * pulse(t)), sc0 * (1 + .03 * pulse(t))); ui.shadowColor = "rgba(255,180,70,.75)"; ui.shadowBlur = 26 + 14 * pulse(t); ui.drawImage(TMP, -540, -260); ui.shadowBlur = 0;
+    ui.translate(TX, TY); ui.scale(sc0 * (1 + .03 * pulse(t)), sc0 * (1 + .03 * pulse(t))); ui.shadowColor = "rgba(255,180,70,.75)"; ui.shadowBlur = 26 + 14 * pulse(t); ui.drawImage(TMP, -540, -260); ui.shadowBlur = 0;
     ui.font = F(size); lines.forEach((ln, j) => { const lw = ui.measureText(ln).width, yy = (j - (lines.length - 1) / 2) * size * 1.25; logBox(ui, ln, -lw / 2, yy - size * .55, lw / 2, yy + size * .55, size); });
   }
   ui.restore();
