@@ -41,7 +41,7 @@ const LN = PL.lines, SCN_IDS = LN.map(l => l.scene);
 Object.assign(KIT, { design: "intel", scenes: SCN_IDS, images: [], ci: {}, hits: [] });
 loadImages(["tenmei", "kanto", "war", "tohoku"]);
 const BIZ = '"Noto Sans CJK JP", sans-serif';
-const CPAPER = ["#F7EBD2", "#EFD7AA"], CINK = "#2A2118", CRED = "#C8281E", CDIM = "#8A7A66";
+const CPAPER = ["#F7EBD2", "#EFD7AA"], CRED = "#C8281E"; let CINK = "#2A2118", CDIM = "#8A7A66";
 
 // ---------------------------------------------------------------- 拍
 const beatIdx = t => Math.floor(t / BP + 1e-6), beatPhase = t => t - beatIdx(t) * BP;
@@ -68,24 +68,16 @@ function readoutAt(t) { const hs = HAND.filter(h => t >= h[0]), i = hs.length - 
 
 // ---------------------------------------------------------------- 背景：暖かい紙、ゆっくり動く窓の光、舞う埃
 const DUST = (() => { const r = S.rng(60); return Array.from({ length: 70 }, () => [r() * W, r() * H, 1 + r() * 2.5, r() * 6.28, .2 + r() * .6]); })();
-const PAL = { open: ["#F7EBD2", "#EFD7AA", "#2A2118"], rule: ["#F7EBD2", "#E9CF9E", "#2A2118"], H1: ["#E3E8D6", "#B8C4A2", "#25301E"], H2: ["#EEDDB8", "#C9A066", "#3A2614"],
-  H3: ["#DDE2E7", "#A9B4C0", "#1E2733"], H4: ["#4A3029", "#21140F", "#F6E6D6"], H5: ["#D8EAF4", "#8FBAD6", "#10283A"], now: ["#2C2620", "#14100C", "#F6E6D6"],
-  decline: ["#DFE5EC", "#AEBACA", "#18222E"], P1: ["#F3D9CE", "#D79A86", "#3A1810"], P2: ["#D2CCE0", "#8C84A8", "#1E1830"], end: ["#2B3244", "#12151E", "#F2ECE0"] };
+const PAL = { open: ["#F4E3C3", "#F4E3C3", "#2A2118"], rule: ["#F4E3C3", "#F4E3C3", "#2A2118"], H1: ["#CFE0BE", "#CFE0BE", "#1F2A18"], H2: ["#E8C688", "#E8C688", "#3A2410"],
+  H3: ["#C9D3DE", "#C9D3DE", "#16202C"], H4: ["#2B2F36", "#2B2F36", "#F2EDE4"], H5: ["#BFDDF0", "#BFDDF0", "#0E2638"], now: ["#1B1A1F", "#1B1A1F", "#F2EDE4"],
+  decline: ["#D3DCE6", "#D3DCE6", "#16202C"], P1: ["#F0C7B6", "#F0C7B6", "#3A1408"], P2: ["#C3B8DD", "#C3B8DD", "#1C1430"], end: ["#1E2433", "#1E2433", "#F2EDE4"] };
 function palKey(l) { return l.kind === "rule" ? "rule" : l.kind === "now" ? "now" : l.kind === "decline" ? "decline" : l.kind === "end" ? "end" : l.ev || "open"; }
-const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)), mixc = (a, b, k) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(",")})`; };
+const hex = c => c.startsWith("rgb") ? c.match(/\d+/g).map(Number) : [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)), mixc = (a, b, k) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(",")})`; };
 let HEADINK = "#2A2118";
 function palAt(t) { const i = cur(t), now = PAL[palKey(LN[i])], prev = i ? PAL[palKey(LN[i - 1])] : now, k = easeInOut(clamp((t - CUE[LN[i].scene]) / BP)); return [0, 1, 2].map(j => mixc(prev[j], now[j], k)); }
-function background(t, dark) {
-  const pl = palAt(t); HEADINK = pl[2];
-  const g = bg.createLinearGradient(0, 0, 0, H); g.addColorStop(0, pl[0]); g.addColorStop(1, pl[1]); bg.fillStyle = g; bg.fillRect(0, 0, W, H);
-  bg.save(); bg.globalAlpha = .16; bg.fillStyle = "#FFF7E0";                   // 窓の光：ゆっくり横へ流れる 2 本の帯（明滅しない）
-  for (let k = 0; k < 2; k++) { const x = ((t * 22 + k * 620) % 1700) - 500; bg.beginPath(); bg.moveTo(x, 0); bg.lineTo(x + 260, 0); bg.lineTo(x - 340, H); bg.lineTo(x - 600, H); bg.closePath(); bg.fill(); }
-  bg.restore();
-  bg.save(); for (const [x0, y0, r, p, s] of DUST) { const x = (x0 + Math.sin(t * .4 + p) * 30 + t * 8 * s) % W, y = (y0 - t * 14 * s + H) % H; bg.globalAlpha = .25 + .2 * Math.sin(t + p); bg.fillStyle = "#FFFFFF"; bg.beginPath(); bg.arc(x, y, r, 0, 7); bg.fill(); } bg.restore();
-  bg.save(); bg.strokeStyle = "rgba(120,90,50,.08)"; bg.lineWidth = 2; for (let y = 120; y < H; y += 64) { bg.beginPath(); bg.moveTo(0, y); bg.lineTo(W, y); bg.stroke(); } bg.restore();   // 方眼の紙
-  if (dark > 0) {   // 「いまは」：まわりを落としてスポットライト（閃光なし、ゆっくり）
-    const v = bg.createRadialGradient(540, 760, 260, 540, 860, 1150); v.addColorStop(0, "rgba(20,14,8,0)"); v.addColorStop(1, `rgba(20,14,8,${.78 * dark})`); bg.fillStyle = v; bg.fillRect(0, 0, W, H);
-  }
+function background(t, dark) {   // 背景という概念はなし：場面ごとの一色の地だけ。物と文字で画面を埋める
+  const pl = palAt(t); HEADINK = pl[2]; CINK = pl[2]; CDIM = mixc(pl[2], pl[0], .3);
+  bg.fillStyle = pl[0]; bg.fillRect(0, 0, W, H);
 }
 
 // ---------------------------------------------------------------- 終末時計（最後の 5 分を 90° に拡大）
@@ -180,14 +172,14 @@ function subtitle(t) {
 // ---------------------------------------------------------------- 主役：出来事の図（真ん中の大きな場所、y 560〜1450）。時計は右上に小さく
 const ART_Y0 = 560, ART_Y1 = 1450;
 const kin = (t, t0, d = .3) => easeOut(clamp((t - t0) / d));
-function card(t0, t, x0, y0, w, h) { const k = kin(t, t0, .28); ui.fillStyle = `rgba(255,251,240,${.9 * k})`; rrect(ui, x0, y0 + 30 * (1 - k), w, h, 22); ui.fill(); ui.strokeStyle = `rgba(42,33,24,${.15 * k})`; ui.lineWidth = 3; ui.stroke(); return k; }
+function card(t0, t) { return kin(t, t0, .28); }   // 背景なし：枠は描かない
 // 100 人の人形（10×10）。lost 人を、拍ごとに少しずつ灰色に
-function grid100(t, t0, lost, x0 = 230, y0 = 940, cell = 62, col = "#3A6EA5") {
+function grid100(t, t0, lost, x0 = 190, y0 = 930, cell = 70, col = "#3A6EA5") {
   const k = kin(t, t0); if (k <= 0) return;
   const n = Math.min(lost, (t - t0 - 2 * BP) / (6 * BP) * lost);                    // 2 拍目から 6 拍で灰色に
-  for (let i = 0; i < 100; i++) { const r = Math.floor(i / 10), c = i % 10, x = x0 + c * cell + cell / 2, y = y0 + r * 50 + 20;
+  for (let i = 0; i < 100; i++) { const r = Math.floor(i / 10), c = i % 10, x = x0 + c * cell + cell / 2, y = y0 + r * 52 + 20;
     const b = kin(t, t0 + (r + c) * .02, .2), yy = y + 18 * (1 - b) - 5 * pulse(t + ((r + c) % 2) * BP / 2), f = clamp(n - (99 - i));
-    ui.save(); ui.globalAlpha *= b; person(ui, x, yy + 26, .37, f >= 1 ? "#BDB3A6" : col); if (f > 0 && f < 1) { ui.globalAlpha *= f; person(ui, x, yy + 26, .37, "#BDB3A6"); } ui.restore(); }
+    ui.save(); ui.globalAlpha *= b; person(ui, x, yy + 26, .4, f >= 1 ? "#8F857A" : col); if (f > 0 && f < 1) { ui.globalAlpha *= f; person(ui, x, yy + 26, .4, "#8F857A"); } ui.restore(); }
 }
 // 細かい点の人（1,000 人・1 万人）。lost 人だけ赤い丸で囲む
 function dotGeo(N) { const cols = N > 2000 ? 125 : 40, w = 780, cell = w / cols; return { cols, rows: N / cols, x0: 150, cell, y0: N > 2000 ? 920 : 960 }; }
@@ -212,17 +204,17 @@ function artRule(t, t0) {   // 10 人のうち 1 人が消える → 時計が 1
   const y = 820, gap = 86, x0 = 540 - gap * 4.5;
   for (let i = 0; i < 10; i++) { const b = kin(t, t0 + i * BP / 4, .2), out = i === 9 ? kin(t, t0 + 3 * BP, .35) : 0;
     ui.save(); ui.globalAlpha *= b * (1 - .75 * out); person(ui, x0 + i * gap, y + 40 - 8 * pulse(t + (i % 2) * BP / 2) + 60 * out, 1.15, i === 9 ? "#C8281E" : "#3A6EA5"); ui.restore(); }
-  bigLabel(t, t0 + 2 * BP, "人口の 10分の1 を失う", 960, CINK, 60);
+  bigLabel(t, t0 + 2 * BP, "人口の 10分の1 を失う", 960, CINK, 72);
   const ka = kin(t, t0 + 4 * BP, .3); if (ka > 0) { ui.save(); ui.globalAlpha *= ka; ui.fillStyle = CRED; ui.beginPath(); ui.moveTo(500, 1030); ui.lineTo(580, 1030); ui.lineTo(540, 1080); ui.closePath(); ui.fill(); ui.restore(); }
-  bigLabel(t, t0 + 5 * BP, "終末時計が 1分 進む", 1150, CRED, 72);
-  bigLabel(t, t0 + 7 * BP, "全員いなくなる＝真夜中", 1270, CDIM, 44);
+  bigLabel(t, t0 + 5 * BP, "終末時計が 1分 進む", 1150, CRED, 86);
+  bigLabel(t, t0 + 7 * BP, "全員いなくなる＝真夜中", 1270, CDIM, 53);
 }
 function artH1(t, t0) {   // 天然痘：ウイルスが流れ込み、100 人のうち 30 人が灰色に
   card(t0, t, 70, 600, 940, 860);
   for (let i = 0; i < 9; i++) { const r = S.rng(i + 5), x = 1100 - ((t - t0) * (180 + r() * 120) + r() * 600) % 1300, y = 680 + r() * 120 + 20 * Math.sin(t * 2 + i); if (t > t0) virus(ui, x, y, 16 + r() * 14 + 3 * pulse(t), t * (1 + r())); }
-  bigLabel(t, t0 + BP, "天然痘が 全国に広がる", 830, CRED, 54);
-  grid100(t, t0 + BP, 30, 230, 900);
-  bigLabel(t, t0 + 8 * BP, "100人のうち 約30人", 1440, CINK, 56);
+  bigLabel(t, t0 + BP, "天然痘が 全国に広がる", 830, CRED, 65);
+  grid100(t, t0 + BP, 30, 190, 890);
+  bigLabel(t, t0 + 8 * BP, "100人のうち 約30人", 1440, CINK, 67);
 }
 function artH2(t, t0) {   // 天明の飢饉：浅間山の噴火・冷害 → 空のお椀、100 人のうち 3 人
   card(t0, t, 70, 600, 940, 860);
@@ -231,8 +223,8 @@ function artH2(t, t0) {   // 天明の飢饉：浅間山の噴火・冷害 → �
   for (let i = 0; i < 6; i++) { const u = ((t - t0) * .6 + i / 6) % 1; ui.fillStyle = `rgba(90,80,70,${.5 * (1 - u)})`; ui.beginPath(); ui.arc(330 + 80 * u * Math.sin(i), 680 - 160 * u, 26 + 50 * u, 0, 7); ui.fill(); }
   const bx = 760, by = 790, bs = 1 + .05 * pulse(t); ui.translate(bx, by); ui.scale(bs, bs); ui.fillStyle = "#3B2A1C"; ui.beginPath(); ui.arc(0, 0, 110, 0, Math.PI); ui.closePath(); ui.fill(); ui.fillStyle = "#5A4030"; ui.beginPath(); ui.ellipse(0, 0, 110, 22, 0, 0, 7); ui.fill(); ui.restore();
   S.group(() => { text(ui, "噴火・冷害", 330, 900, 40, CDIM, { weight: 900 }); text(ui, "米がとれない", 760, 900, 40, CDIM, { weight: 900 }); });
-  grid100(t, t0 + 2 * BP, 3, 230, 950);
-  bigLabel(t, t0 + 8 * BP, "100人のうち 約3人", 1415, CINK, 56);
+  grid100(t, t0 + 2 * BP, 3, 190, 940);
+  bigLabel(t, t0 + 8 * BP, "100人のうち 約3人", 1415, CINK, 67);
 }
 function artH3(t, t0) {   // 関東大震災：揺れる波形と家、1,000 人のうち 約 2 人
   card(t0, t, 70, 600, 940, 900);
@@ -247,8 +239,8 @@ function artH4(t, t0) {   // 戦争：1937→1945 の帯に数が積み上がる
   const u = clamp((t - t0 - BP) / (6 * BP)), n = Math.round(310 * easeInOut(u));
   ui.save(); ui.fillStyle = "#D9CBB0"; rrect(ui, 140, 690, 800, 46, 23); ui.fill(); ui.fillStyle = CRED; rrect(ui, 140, 690, 800 * easeInOut(u), 46, 23); ui.fill(); ui.restore();
   S.group(() => { text(ui, "1937年", 150, 780, 34, CDIM, { weight: 800, align: "left" }); text(ui, "1945年", 930, 780, 34, CDIM, { weight: 800, align: "right" }); text(ui, `約${n}万人`, 540, 850, 64, CRED, { weight: 900 }); });
-  grid100(t, t0 + 2 * BP, 4.3, 230, 920);
-  bigLabel(t, t0 + 8 * BP, "100人のうち 約4人", 1410, CINK, 56);
+  grid100(t, t0 + 2 * BP, 4.3, 190, 910);
+  bigLabel(t, t0 + 8 * BP, "100人のうち 約4人", 1410, CINK, 67);
 }
 function artH5(t, t0) {   // 東日本大震災：波が家に届く、1 万人のうち 約 2 人
   card(t0, t, 70, 600, 940, 900);
@@ -286,7 +278,7 @@ function artCompare(t, t0) {   // 737 年と 2070 年を並べる
   bars.forEach(([y, n, p, c], i) => { const x = 330 + i * 420, u = easeOut(clamp((t - t0 - (1 + 2 * i) * BP) / .5)), h = 560 * p / 35 * u;
     ui.fillStyle = c; rrect(ui, x - 90, 1300 - h, 180, h, 14); ui.fill();
     S.group(() => { text(ui, y, x, 1350, 48, CINK, { weight: 900 }); text(ui, n, x, 1410, 32, CDIM, { weight: 800 }); if (u > .3) text(ui, `約${p}%`, x, 1300 - h - 46, 60, c, { weight: 900 }); }); });
-  bigLabel(t, t0, "失う人口の割合", 680, CINK, 50);
+  bigLabel(t, t0, "失う人口の割合", 760, CINK, 60);
 }
 
 // ---------------------------------------------------------------- 時計の置き場所：冒頭は大きく → 拍で右上へ小さく、最後にまた大きく
@@ -299,8 +291,8 @@ function clockPose(t, l, t0) {
 function smallReadout(t, sc) {   // 小さな時計の下の「あと○秒」
   const r = readoutAt(t); if (!r || sc > .6) return; const u = clamp((t - r.t0) / .5), v = Math.round(r.prev + (r.v - r.prev) * easeOut(u)), pop = 1 + .35 * Math.pow(1 - clamp((t - r.t0) / .25), 2) + .04 * pulse(t);
   ui.save(); ui.translate(178, 475); ui.scale(pop, pop); ui.fillStyle = "rgba(255,251,240,.92)"; rrect(ui, -150, -46, 300, 92, 18); ui.fill();
-  S.group(() => text(ui, "あと", -95, 6, 34, CINK, { weight: 900 })); ui.font = `400 70px ${DG}`; ui.textAlign = "center"; ui.textBaseline = "middle"; ui.fillStyle = v <= 60 ? CRED : CINK; ui.fillText(String(v), 20, 0); logBox(ui, String(v), -30, -40, 70, 40, 70);
-  S.group(() => text(ui, "秒", 110, 10, 34, CINK, { weight: 900 })); ui.restore();
+  S.group(() => text(ui, "あと", -95, 6, 34, "#2A2118", { weight: 900 })); ui.font = `400 70px ${DG}`; ui.textAlign = "center"; ui.textBaseline = "middle"; ui.fillStyle = v <= 60 ? CRED : "#2A2118"; ui.fillText(String(v), 20, 0); logBox(ui, String(v), -30, -40, 70, 40, 70);
+  S.group(() => text(ui, "秒", 110, 10, 34, "#2A2118", { weight: 900 })); ui.restore();
 }
 
 // ---------------------------------------------------------------- カメラ（図の層だけ）：[拍, 見る点 x, y, 倍率]。場面の頭は滑り込み、小節の頭で軽く跳ねる
@@ -323,9 +315,9 @@ function camAt(t, l, i, t0) {
   const K = camKeys(l, i), b = (t - t0) / BP; let f = K[0].slice(1);
   for (let k = 0; k < K.length - 1; k++) { const [b0, ...a] = K[k], [b1, ...c] = K[k + 1]; if (b >= b0) { const e = easeInOut(clamp((b - b0) / (b1 - b0))); f = a.map((v, j) => v + (c[j] - v) * e); } }
   if (b >= K[K.length - 1][0]) f = K[K.length - 1].slice(1);
-  const bi = beatIdx(t), bar = bi % 4 === 0 ? 1 : .35; f[2] *= 1 + .028 * bar * pulse(t);                      // 拍で跳ねる（小節の頭は強く）
+  const bi = beatIdx(t), bar = bi % 4 === 0 ? 1 : .45; f[2] *= 1.16 * (1 + .055 * bar * pulse(t));                      // 拍で跳ねる（小節の頭は強く）
   const dir = [[1, 0], [0, 1], [-1, 0], [0, -1]][i % 4], sl = i && l.kind !== "end" ? Math.pow(1 - easeOut(clamp((t - t0) / .3)), 2) : 0;   // 場面の頭：滑り込む
-  return { fx: f[0], fy: f[1], z: f[2], ox: dir[0] * 1150 * sl, oy: dir[1] * 1500 * sl, rot: (i % 2 ? -1 : 1) * .05 * sl };
+  return { fx: f[0], fy: f[1], z: f[2], ox: dir[0] * 1150 * sl, oy: dir[1] * 1500 * sl, rot: (i % 2 ? -1 : 1) * .05 * sl + (bi % 2 ? 1 : -1) * .018 * pulse(t) + .012 * Math.sin(t * 1.7) };
 }
 
 // ---------------------------------------------------------------- 1 コマ
