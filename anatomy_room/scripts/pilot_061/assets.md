@@ -8,3 +8,13 @@
 | BGM | Kevin MacLeod「Funk Game Loop」（incompetech.com）、pilot_060 で小節を並べ替えたもの | CC BY 4.0 | 説明文に記載 |
 | 書体 | Dela Gothic One・BIZ UDPゴシック・しっぽり明朝 ほか（kit の共通） | OFL | — |
 | お札の束・延べ棒・天秤・玉・1 円玉・ゴルフボール・人形 | 自作の 2D（特定の国のお札の図柄は使わない、記号だけ） | — | — |
+
+## v2（3D）で足したもの
+
+| 素材 | 出どころ | ライセンス |
+|---|---|---|
+| 光（HDRI）brown_photostudio_02 | Poly Haven | CC0 |
+| 机 wood_table_001、壁 brushed_concrete、dark_wood | Poly Haven | CC0 |
+| 延べ棒・天秤・表彰台・人形・カード・スマホ・お札・定規 | 自作（Blender、blender/lib61.py・make_tex.py。お札・カード・スマホの画面はどこの国のものでもない記号だけ） | — |
+
+v2 では金庫の写真（NARA）は使わない。

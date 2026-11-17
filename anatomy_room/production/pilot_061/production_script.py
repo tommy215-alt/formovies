@@ -48,9 +48,9 @@ def snap():
 SFX = []
 for ln in LINES:
     k = ln["kind"]
-    if k in ("world", "us", "big3", "gap"):
+    if k in ("world", "china", "big3", "gap"):
         SFX.append(["whoosh", ln["scene"], .8, 0.0]); SFX.append(["stamp", ln["scene"], 1.0, P * 2])
-    elif k in ("rank", "jp", "mid", "uk", "low", "wealth"):
+    elif k in ("rank", "jp", "mid", "low", "wealth"):
         SFX.append(["tagpop", ln["scene"], .9, 0.0])
 SFX.append(["title", "s00", .7, 0.0])
 
@@ -61,9 +61,9 @@ EP = standard.config({
     "cues": {l["scene"]: [l["id"], 0.0] for l in LINES},
     "sfx": SFX,
     "final_hold": P * 2,
-    "music": {"style": "file_061", "sections": [["s00", 0.0, "f_full"], ["s01", 0.0, "f_85"], ["s07", 0.0, "f_55"], ["s09", 0.0, "f_85"], ["s11", 0.0, "f_full"]]},
+    "music": {"style": "file_061", "sections": [["s00", 0.0, "f_full"], ["s01", 0.0, "f_85"], ["s07", 0.0, "f_55"], ["s09", 0.0, "f_85"], ["s10", 0.0, "f_full"]]},
     "segments": [l["scene"] for l in LINES],
-    "extra_files": epkit.FILES + ["assets/plan.js"],
+    "extra_files": epkit.FILES + ["assets/plan.js", "work/blender/index.js", "../ext/blender/blframes.js"],
     "workers": 2,
     "qc_frames": [[l["scene"], .5] for l in LINES],
     "scenes": [(f"{i} {l['scene']}", l["scene"] if i else None, LINES[i + 1]["scene"] if i + 1 < len(LINES) else "endcard", l["id"], "") for i, l in enumerate(LINES)]

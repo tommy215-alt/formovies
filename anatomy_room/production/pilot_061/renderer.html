@@ -31,6 +31,8 @@ html,body{margin:0;background:#000}
 <script src="assets/plan.js"></script>
 <script src="../ext/kit/scene_assets.js"></script>
 <script src="../ext/kit/kit.js"></script>
+<script src="work/blender/index.js"></script>
+<script src="../ext/blender/blframes.js"></script>
 <script>
 // pilot_061 のレンダラー（新ドパ設計 2 本目）。もしも世界中の現金が、いま金に変わったら。
 // pilot_060 v3 のパターン A（物そのもので画面を埋め、物から物へ拍の頭で寄って突き抜ける）を引き継ぐ。
@@ -252,35 +254,16 @@ function sWealth(c, t, b) {   // 100 人の大人：上位の 2 人の足元に�
   vignette(c, .5);
 }
 function sEnd2(c, t, b) { mapBoard(c); mapPiles(c, 99, 0, 0, { labels: false }); vignette(c, .45, 540, 800); }
-function drawScene(c, i, t) {
-  const l = LN[i], t0 = CUE[l.scene], b = (t - t0) / BP; c.save(); c.clearRect(0, 0, W, H);
-  ({ s00: sOpen, s01: sWorld, s02: sUS, s03: sBig3, s04: sRank, s05: sJP, s06: sMid, s07: sUK, s08: sLow, s09: sGap, s10: sWealth, s11: sEnd2 }[l.scene])(c, t, b);
-  c.restore();
+// v2（ユーザーの指示）：場面は Blender（Cycles）で描いた 3D のコマ（blender/scene61.py、work/blender/<場面>/）。ここでは拍の小さな寄りと場面の変わり目、文字だけ
+function blDraw(c, name, t) {
+  const i = BL.frameAt(name, t), im = BL.cache.get(name + ":" + i);
+  if (im) { BL.cache.delete(name + ":" + i); BL.cache.set(name + ":" + i, im); c.drawImage(im, 0, 0, W, H); }
+  else { c.fillStyle = "#000"; c.fillRect(0, 0, W, H); BL.missing = [name, i]; }
+  if (name === LN[cur(t)].scene) BL.last = [name, i];
 }
-
-// ---------------------------------------------------------------- カメラ：[拍, 見る点 x, y, 倍率]
-const CAM = {
-  s00: [[0, 540, 760, 1.5], [4, 540, 900, 1.12], [8, 540, 900, 1.05]],
-  s01: [[0, 300, 640, 2.2], [2, 640, 600, 1.8], [4, 540, 680, 1.3], [6.5, 540, 950, 1.1], [9, 540, 1130, 1.3], [13, 540, 1050, 1.1]],
-  s02: [[0, 300, 1000, 1.7], [3, 540, 950, 1.2], [5, 830, 800, 1.35], [7, 540, 950, 1.1]],
-  s03: [[0, 330, 900, 1.45], [2, 540, 900, 1.45], [4, 750, 900, 1.45], [6, 540, 850, 1.15]],
-  s04: [[0, 540, 760, 1.7], [2, 260, 900, 1.6], [4, 820, 980, 1.6], [6.5, 540, 1000, 1.1]],
-  s05: [[0, 540, 900, 1.5], [2, 540, 900, 1.12], [5, 540, 900, 1.2]],
-  s06: [[0, 420, 900, 1.5], [2, 670, 900, 1.5], [4, 920, 900, 1.5], [6, 540, 900, 1.1]],
-  s07: [[0, 330, 900, 1.6], [2, 700, 900, 1.3], [4, 540, 800, 1.1]],
-  s08: [[0, 300, 700, 1.6], [2, 780, 700, 1.6], [4.3, 540, 1000, 1.25], [7, 540, 1000, 1.1]],
-  s09: [[0, 540, 900, 1.3], [2, 540, 800, 1.08], [4, 540, 820, 1.15]],
-  s10: [[0, 540, 1250, 1.3], [3, 330, 800, 1.5], [6, 540, 900, 1.08], [10, 540, 900, 1.12]],
-  s11: [[0, 900, 640, 2.2], [3, 540, 650, 1.4], [6, 540, 800, 1.1], [10, 540, 800, 1.05]],
-};
-function camAt(t, i) {
-  const l = LN[i], t0 = CUE[l.scene], b = (t - t0) / BP, K = CAM[l.scene]; let f = K[0].slice(1);
-  for (let k = 0; k < K.length - 1; k++) { const [b0, ...a] = K[k], [b1, ...c] = K[k + 1]; if (b >= b0) { const e = easeInOut(clamp((b - b0) / (b1 - b0))); f = a.map((v, j) => v + (c[j] - v) * e); } }
-  if (b >= K[K.length - 1][0]) f = K[K.length - 1].slice(1);
-  const z = f[2] * 1.06 * (1 + .07 * barPulse(t)) * (1 + .012 * (b % 4));
-  return { fx: clamp(f[0], 540 / z, W - 540 / z), fy: clamp(f[1], 960 / z, H - 960 / z), z, rot: (beatIdx(t) % 2 ? 1 : -1) * .012 * pulse(t) + .008 * Math.sin(t * 1.3) };
-}
-const TR = { s01: "zoom", s02: "whip", s03: "zoom", s04: "whip", s05: "zoom", s06: "whip", s07: "zoom", s08: "whip", s09: "punch", s10: "dust", s11: "zoom" };
+function drawScene(c, i, t) { c.save(); c.clearRect(0, 0, W, H); blDraw(c, LN[i].scene, t); c.restore(); }
+function camAt(t, i) { return { fx: 540, fy: 960, z: 1.0 + .03 * barPulse(t), rot: (beatIdx(t) % 2 ? 1 : -1) * .004 * pulse(t) }; }
+const TR = { s01: "zoom", s02: "zoom", s03: "whip", s04: "zoom", s05: "zoom", s06: "whip", s07: "zoom", s08: "whip", s09: "zoom", s10: "zoom" };
 function blit(src, cm, { ox = 0, oy = 0, extra = 1, alpha = 1 } = {}) { bg.save(); bg.globalAlpha = alpha; bg.translate(540 + ox, 960 + oy); bg.rotate(cm.rot); bg.scale(cm.z * extra, cm.z * extra); bg.translate(-cm.fx, -cm.fy); bg.drawImage(src, 0, 0); bg.restore(); }
 function composite(t, i) {
   const l = LN[i], t0 = CUE[l.scene], u = t - t0, t1 = sEnd(i), cm = camAt(t, i), tr = TR[l.scene], nxt = i + 1 < LN.length ? TR[LN[i + 1].scene] : null;
@@ -291,15 +274,15 @@ function composite(t, i) {
     bg.save(); const r = S.rng(Math.floor(t * 30)); bg.beginPath(); for (let j = 0; j < 260; j++) { const x = r() * W, y = r() * H, s = 30 + r() * 140 * k; if (r() < k * 1.2) bg.rect(x - s / 2, y - s / 2, s, s); } bg.rect(0, 0, W, H * k * .2); bg.clip(); blit(SC2, cp, { alpha: 1 }); bg.restore();
     bg.save(); bg.globalAlpha = .7 * k; bg.fillStyle = "#E8D8B0"; const r2 = S.rng(Math.floor(t * 30) + 5); for (let j = 0; j < 160; j++) { bg.beginPath(); bg.arc(r2() * W, r2() * H - u * 300 * r2(), 2 + r2() * 5, 0, 7); bg.fill(); } bg.restore(); return; }
   if (kin_ > 0 && tr === "zoom") { blit(SC, cm, { extra: 1 + .9 * kin_ * kin_ }); for (let j = 1; j <= 5; j++) blit(SC, cm, { extra: (1 + .9 * kin_ * kin_) * (1 + .05 * j * kin_), alpha: .22 }); return; }
-  if (kin_ > 0 && tr === "whip") { const d = (i % 2 ? 1 : -1) * 1100 * kin_ * kin_; blit(SC, cm, { ox: d }); for (let j = 1; j <= 5; j++) blit(SC, cm, { ox: d + (i % 2 ? 1 : -1) * j * 60 * kin_, alpha: .2 }); return; }
+  if (kin_ > 0 && tr === "whip") { const sg = i % 2 ? 1 : -1, d = sg * 1100 * kin_ * kin_; if (i > 0) { drawScene(sc2, i - 1, t); blit(SC2, camAt(t, i - 1), { ox: d - sg * 1100 }); } blit(SC, cm, { ox: d }); for (let j = 1; j <= 5; j++) blit(SC, cm, { ox: d + (i % 2 ? 1 : -1) * j * 60 * kin_, alpha: .2 }); return; }
   if (kout > 0 && nxt === "zoom") { blit(SC, cm, { extra: 1 + .6 * kout * kout }); for (let j = 1; j <= 5; j++) blit(SC, cm, { extra: (1 + .6 * kout * kout) * (1 + .05 * j * kout), alpha: .22 }); return; }
-  if (kout > 0 && nxt === "whip") { const d = -((i + 1) % 2 ? 1 : -1) * 1100 * kout * kout; blit(SC, cm, { ox: d }); for (let j = 1; j <= 5; j++) blit(SC, cm, { ox: d - ((i + 1) % 2 ? 1 : -1) * j * 60 * kout, alpha: .2 }); return; }
+  if (kout > 0 && nxt === "whip") { const sg = (i + 1) % 2 ? 1 : -1, d = -sg * 1100 * kout * kout; drawScene(sc2, i + 1, t); blit(SC2, camAt(t, i + 1), { ox: d + sg * 1100 }); blit(SC, cm, { ox: d }); for (let j = 1; j <= 5; j++) blit(SC, cm, { ox: d - ((i + 1) % 2 ? 1 : -1) * j * 60 * kout, alpha: .2 }); return; }
   blit(SC, cm, { extra: tr === "punch" ? 1 + .12 * Math.pow(1 - clamp(u / .3), 2) : 1 });
 }
 
 // ---------------------------------------------------------------- セリフの文字：句ごとに 帯・木の札・ポップ・光る文字 を切り替える（声に合わせて出る）
-const STY = { L00: ["title", "title"], L01: ["plank", "band", "glow"], L02: ["band", "pop"], L03: ["band", "band", "pop"], L04: ["glow", "pop", "band", "band"],
-  L05: ["pop", "plank"], L06: ["band", "band", "band"], L07: ["band", "glow"], L08: ["band", "band", "pop", "plank"], L09: ["glow"], L10: ["plank", "band", "glow"], L11: ["band", "glow"] };
+const STY = { L00: ["title", "title"], L01: ["plank", "band", "glow", "pop"], L02: ["band", "pop"], L03: ["band", "band", "pop"], L04: ["glow", "band", "pop"],
+  L05: ["pop", "plank"], L06: ["band", "band", "band"], L07: ["band", "plank"], L08: ["glow"], L09: ["plank", "band", "glow"], L10: ["band", "glow"] };
 const TY = 1520, TX = 470;   // 文字の中心は少し左へ（右側のボタン列 x≥950 を避ける）
 function phrases(t) {
   const out = [], Ls = TL.lines.filter(x => !x.ending);
@@ -369,6 +352,7 @@ function frame(t) {
   NOW = t; bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
   const es = TL.ending_start, i = cur(Math.min(t, es - .001));
   composite(t, i); addGrain(t);
+  if (CUE.s08 !== undefined && t >= CUE.s08 && t < CUE.s09) seal(ui, "約75倍", 470, 330, 120, t, CUE.s08 + 2 * BP, -.08);
   phrases(t).forEach(p => drawPhrase(p, t));
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
 }
@@ -383,6 +367,15 @@ kitStart(() => {});
 const _setTL = window.setTimeline;
 window.setTimeline = tl => { _setTL(tl); tl.lines.forEach(x => { if (x.sub) window.SUBS[x.id] = Array.isArray(x.sub) ? x.sub : [x.sub]; }); };
 window.renderFrame = frame;
+// 切り替えでは 2 つのショットを同時に描くので、足りないコマがなくなるまで読み込んで描き直す（blframes.js の install は 1 回だけ）
+window.renderFrame = function (t) {
+  BL.missing = null; BL.last = null; frame(t);
+  const pre = () => { if (BL.last) { const [n, i] = BL.last, m = BL.meta[n]; for (let j = i + 1; j <= Math.min(m.frames, i + 4); j++) BL.load(n, j).catch(() => {}); } };
+  if (!BL.missing) { pre(); return; }
+  let tries = 0;
+  const go = () => { const [n, i] = BL.missing; return BL.load(n, i).then(() => { BL.missing = null; BL.last = null; frame(t); if (BL.missing && ++tries < 6) return go(); pre(); }); };
+  return go();
+};
 window.READY = Promise.all([window.READY, bizReady, ...imgReady]);
 </script>
 </body></html>
