@@ -49,11 +49,101 @@
    "pop": 1550000000.0,
    "usd_pp": 123,
    "g_pp": 1.0
+  },
+  {
+   "name": "イギリス",
+   "usd_bn": 124,
+   "tonnes": 993,
+   "pop": 69300000.0,
+   "usd_pp": 1790,
+   "g_pp": 14.3
+  },
+  {
+   "name": "スイス",
+   "usd_bn": 87,
+   "tonnes": 699,
+   "pop": 9000000.0,
+   "usd_pp": 9707,
+   "g_pp": 77.7
+  },
+  {
+   "name": "ロシア",
+   "usd_bn": 262,
+   "tonnes": 2102,
+   "pop": 146000000.0,
+   "usd_pp": 1798,
+   "g_pp": 14.4
+  },
+  {
+   "name": "韓国",
+   "usd_bn": 161,
+   "tonnes": 1287,
+   "pop": 51700000.0,
+   "usd_pp": 3110,
+   "g_pp": 24.9
+  },
+  {
+   "name": "ブラジル",
+   "usd_bn": 61,
+   "tonnes": 488,
+   "pop": 213000000.0,
+   "usd_pp": 286,
+   "g_pp": 2.3
+  },
+  {
+   "name": "メキシコ",
+   "usd_bn": 183,
+   "tonnes": 1464,
+   "pop": 132000000.0,
+   "usd_pp": 1386,
+   "g_pp": 11.1
+  },
+  {
+   "name": "サウジアラビア",
+   "usd_bn": 66,
+   "tonnes": 529,
+   "pop": 35000000.0,
+   "usd_pp": 1890,
+   "g_pp": 15.1
+  },
+  {
+   "name": "インドネシア",
+   "usd_bn": 66,
+   "tonnes": 529,
+   "pop": 284000000.0,
+   "usd_pp": 233,
+   "g_pp": 1.9
+  },
+  {
+   "name": "オーストラリア",
+   "usd_bn": 70,
+   "tonnes": 564,
+   "pop": 27600000.0,
+   "usd_pp": 2554,
+   "g_pp": 20.4
+  },
+  {
+   "name": "カナダ",
+   "usd_bn": 88,
+   "tonnes": 705,
+   "pop": 41500000.0,
+   "usd_pp": 2122,
+   "g_pp": 17.0
+  },
+  {
+   "name": "香港",
+   "usd_bn": 86,
+   "tonnes": 688,
+   "pop": 7500000.0,
+   "usd_pp": 11455,
+   "g_pp": 91.7
   }
  ],
- "six_tonnes": 63375,
- "six_share_of_all_gold": 0.283,
+ "pop_total": 6250900000.0,
+ "total_tonnes": 73425,
+ "share_of_all_gold": 0.327,
  "us_vs_reserve": 2.43,
+ "jp_vs_reserve": 6.9,
  "japan_vs_africa_pp": 47,
  "africa_sum_bn": 190,
  "bars_japan": 468569
