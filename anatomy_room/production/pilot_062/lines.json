@@ -1,0 +1,227 @@
+{
+ "title": "人類のスポーツ記録、いちばん\"ありえない\"のは？",
+ "theme": "競技をまたいで、偏差値（平均から標準偏差の何倍離れているか）で記録を比べる。ブラッドマンの 99.94（新ドパ設計 v2）",
+ "note": "新ドパ設計 v2（061 型）：冒頭と最後は W 春日部つむぎ、本編は M 青山龍星 ノーマル。BGM は JMHBM「Dance the Night Away」（FMA、CC BY 4.0）、ドラムが入る瞬間を 0 秒に。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "voice_override": {
+  "M": {
+   "name": "青山龍星",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13
+   },
+   "default_style": "normal",
+   "speed": 1.725,
+   "inton": 1.0
+  },
+  "W": {
+   "name": "春日部つむぎ",
+   "credit": "VOICEVOX:春日部つむぎ",
+   "styles": {
+    "normal": 8
+   },
+   "default_style": "normal",
+   "speed": 1.35,
+   "inton": 1.0
+  }
+ },
+ "gap": 0.05,
+ "max_duration": 75.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "W",
+   "scene": "s00",
+   "speech": "もし、人類のスポーツ記録を、全部、同じ物差しで比べたら。いちばん、ありえないのは？",
+   "sub": [
+    "人類のスポーツ記録",
+    "いちばん ありえないのは？"
+   ],
+   "pause": 0.556,
+   "kind": "open",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "s01",
+   "speech": "物差しは、偏差値。一流の選手たちの中で、どれだけ、飛び抜けているか。",
+   "sub": [
+    "物差しは 偏差値",
+    "一流の選手の中で どれだけ飛び抜けているか"
+   ],
+   "pause": 0.469,
+   "kind": "rule",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "s02",
+   "speech": "ボルトの、9秒58。世界記録を、一気に、0.11秒、縮めた。",
+   "sub": [
+    "ボルト 100m 9秒58",
+    "世界記録を一気に 0.11秒縮めた"
+   ],
+   "pause": 0.613,
+   "kind": "bolt",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "s03",
+   "speech": "サッカーの、ペレ。1試合あたりのゴールは、偏差値、87。",
+   "sub": [
+    "サッカー ペレ",
+    "1試合あたりのゴール 偏差値87"
+   ],
+   "pause": 0.15,
+   "kind": "pele",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "s04",
+   "speech": "野球の、タイカッブ。打率で、偏差値、86。",
+   "sub": [
+    "野球 タイ・カッブ",
+    "打率 偏差値86"
+   ],
+   "pause": 0.544,
+   "kind": "cobb",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "s05",
+   "speech": "でも、ひとりだけ、桁が違う。クリケットの、ドン・ブラッドマン。",
+   "sub": [
+    "でも ひとりだけ 桁が違う",
+    "クリケット ドン・ブラッドマン"
+   ],
+   "pause": 0.502,
+   "kind": "reveal",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "s06",
+   "speech": "クリケットは、投げられた球を、打って、走って、点を取る競技。打者の後ろには、3本の柱。",
+   "sub": [
+    "投げられた球を 打って走って 点を取る",
+    "打者の後ろに 3本の柱（ウィケット）"
+   ],
+   "pause": 0.15,
+   "kind": "crk1",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "s07",
+   "speech": "球が柱に当たるか、打球を捕られたら、アウト。アウトになるまで、何点でも、取り続けられる。",
+   "sub": [
+    "球が柱に当たる・打球を捕られる → アウト",
+    "アウトまで 何点でも取り続けられる"
+   ],
+   "pause": 0.564,
+   "kind": "crk2",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "s08",
+   "speech": "成績は、アウト1回までに取る、点の平均。名選手でも、60点前後。",
+   "sub": [
+    "成績＝アウト1回までに取る 点の平均",
+    "名選手でも 60点前後"
+   ],
+   "pause": 0.269,
+   "kind": "avg",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "s09",
+   "speech": "ブラッドマンは、99.94点。",
+   "sub": [
+    "ブラッドマンは 99.94点"
+   ],
+   "pause": 0.281,
+   "kind": "tower",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "s10",
+   "speech": "偏差値に直すと、94。別の分析では、116。",
+   "sub": [
+    "偏差値に直すと 94",
+    "別の分析では 116"
+   ],
+   "pause": 0.15,
+   "kind": "z",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L11",
+   "who": "M",
+   "scene": "s11",
+   "speech": "正規分布なら、およそ18万人に、1人の水準です。",
+   "sub": [
+    "正規分布なら",
+    "およそ18万人に1人の水準"
+   ],
+   "pause": 0.96,
+   "kind": "crowd",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L12",
+   "who": "M",
+   "scene": "s12",
+   "speech": "最後の打席。4点取れば、平均は、ちょうど100だった。",
+   "sub": [
+    "最後の打席",
+    "4点取れば 平均はちょうど100"
+   ],
+   "pause": 0.281,
+   "kind": "last",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L13",
+   "who": "M",
+   "scene": "s13",
+   "speech": "結果は、0点。それでも、誰も、届かない。",
+   "sub": [
+    "結果は 0点",
+    "それでも 誰も届かない"
+   ],
+   "pause": 0.247,
+   "kind": "duck",
+   "fact": "scripts/pilot_062/fact_check.md"
+  },
+  {
+   "id": "L14",
+   "who": "W",
+   "scene": "s14",
+   "speech": "99.94。人類のスポーツで、いちばん、格が違う数字。",
+   "sub": [
+    "99.94",
+    "人類のスポーツで いちばん格が違う数字"
+   ],
+   "pause": 0.15,
+   "kind": "end",
+   "fact": "scripts/pilot_062/fact_check.md"
+  }
+ ]
+}
