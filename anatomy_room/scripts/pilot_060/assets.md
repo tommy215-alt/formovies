@@ -12,3 +12,14 @@
 | 声 | AivisSpeech 阿井田 茂、VOICEVOX:冥鳴ひまり | 各規約（クレジット表記） | 既存の回と同じ |
 
 天平の天然痘（737 年）は、パブリックドメインの合う画像が見つからなかったので図（ウイルスの絵）だけ。
+
+## 効果音（v4、2026-11-18）
+
+| ファイル（production/pilot_060/assets/sfx/） | 元 | ライセンス | 確認方法 |
+|---|---|---|---|
+| impact-sounds の impactMetal・impactWood・impactPlate・impactSoft・impactGlass・impactGeneric・footstep | Kenney「Impact Sounds」 https://kenney.nl/assets/impact-sounds | CC0 1.0 | ページの「License: Creative Commons CC0」と同梱の License.txt（2026-11-18） |
+| chips-stack・card-slide | Kenney「Casino Audio」 | CC0 1.0 | 同梱の License.txt |
+| select・tick | Kenney「Interface Sounds」 | CC0 1.0 | 同梱の License.txt |
+| creak1・metalClick | Kenney「RPG Audio」 | CC0 1.0 | 同梱の License.txt |
+
+加工：pedalboard（低域・高域のカット、軽いコンプレッサー、小さな部屋の響き）。クレジットは不要（CC0）。

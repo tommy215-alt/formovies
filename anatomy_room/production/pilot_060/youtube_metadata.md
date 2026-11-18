@@ -17,8 +17,8 @@
 
 写真：Wikimedia Commons（パブリックドメイン）天明飢饉之図／1923年 関東大震災／Bomb damage in Tokyo（US Army Signal Corps）／Rikuzentakata（U.S. Navy）
 音楽："Funk Game Loop" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/（小節を並べ替えて使用）
-質感：Poly Haven（CC0）
-音声：AivisSpeech 阿井田 茂／VOICEVOX:冥鳴ひまり
+3D：Blender（Cycles）。光と質感：Poly Haven（CC0）。効果音：Kenney（CC0）
+音声：VOICEVOX:青山龍星／VOICEVOX:春日部つむぎ
 
 #もしも #日本 #人口減少 #終末時計 #歴史 #リバース #shorts
 ```

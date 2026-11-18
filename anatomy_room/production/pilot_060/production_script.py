@@ -44,15 +44,9 @@ def snap():
     print("snap:", sum(add.values()) - sum(old.values()), "秒のばした")
 
 
-# 効果音（行の頭＝拍の頭）。出来事の行はスタンプ、時計が大きく進むところは重い一打
-SFX = []
-for ln in LINES:
-    k = ln["kind"]
-    if k in ("ev", "hit"):
-        SFX.append(["whoosh", ln["scene"], .8, 0.0]); SFX.append(["stamp", ln["scene"], 1.0, P * 2 if k == "ev" else 0.0])
-    elif k in ("rule", "now", "decline"):
-        SFX.append(["tagpop", ln["scene"], .9, 0.0])
-SFX.append(["title", "s00", .7, 0.0])
+# 効果音（v4、新ドパ設計 v2）：動き・帯・札・判の出も効果音も表拍。Kenney の録音（CC0）＋pedalboard、音量は控えめ（sfx60.py）
+sys.path.insert(0, str(HERE)); import sfx60  # noqa: E402
+SFX = sfx60.events(TLP, LINES, P) if TLP.exists() else []
 
 EP = standard.config({
     "id": "pilot_060",
@@ -63,12 +57,12 @@ EP = standard.config({
     "final_hold": P * 2,
     "music": {"style": "file_060", "sections": [["s00", 0.0, "f_full"], ["s01", 0.0, "f_85"], ["s08", 0.0, "f_55"], ["s10", 0.0, "f_85"], ["s12", 0.0, "f_full"]]},
     "segments": [l["scene"] for l in LINES],
-    "extra_files": epkit.FILES + ["assets/plan.js"],
+    "extra_files": epkit.FILES + ["assets/plan.js", "work/blender/index.js", "../ext/blender/blframes.js"],
     "workers": 2,
     "qc_frames": [[l["scene"], .5] for l in LINES],
     "scenes": [(f"{i} {l['scene']}", l["scene"] if i else None, LINES[i + 1]["scene"] if i + 1 < len(LINES) else "endcard", l["id"], "") for i, l in enumerate(LINES)]
               + [(f"{len(LINES)} 終わり（エンディングなし）", "endcard", None, "", "")],
-    "plan_notes": ["## 演出の方針", "", "- 新ドパ設計（2026-11-17〜）：画面は常に動き、出現・切り替えは BGM の拍の頭。2D 中心、明るく暖かい背景、小さなポラロイド風の本物の写真（PD）。",
+    "plan_notes": ["## 演出の方針", "", "- 新ドパ設計 v2（061 型、2026-11-18 作り直し）：3D（Blender）の畳の部屋の大きな時計と 100 体の人形（1 体＝人口の 1%）。動き・効果音は表拍、カメラは拍に合わせて素早く。本物の写真（PD）は額に入れて部屋に置く。",
                    "- 時計：真夜中＝日本の人が一人もいなくなる。人口の 10 分の 1 を失うごとに 1 分（秒＝60×log10(1/割合)）。",
                    "- 山：戦争や災害ではなく、いま進む人口減少（2070 年推計）が、1,300 年前の天然痘の大流行と同じ 31 秒前。閃光・点滅なし。"],
 })

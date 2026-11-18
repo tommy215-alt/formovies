@@ -1,0 +1,202 @@
+{
+ "title": "日本終末時計",
+ "theme": "もし日本だけの終末時計があったら、歴史の中で真夜中まで何秒だったか（新ドパ設計）",
+ "note": "新ドパ設計：冒頭の問いと最後は W 冥鳴ひまり、本編は M 阿井田 茂 Calm 速め。BGM は Raving Energy（Kevin MacLeod、CC BY 4.0。v3 の仮）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "voice_override": {
+  "M": {
+   "preset": "aida",
+   "speed": 1.55
+  },
+  "W": {
+   "speed": 1.35,
+   "inton": 1.0
+  }
+ },
+ "gap": 0.05,
+ "max_duration": 60.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "W",
+   "scene": "s00",
+   "speech": "もし、日本だけの、終末時計があったら。いま、真夜中まで、何秒？",
+   "sub": [
+    "もし 日本だけの終末時計があったら",
+    "いま 真夜中まで何秒？"
+   ],
+   "pause": 0.293,
+   "kind": "open",
+   "ev": null,
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "s01",
+   "speech": "真夜中は、日本の人が、一人もいなくなる時。人口の、10分の1を失うごとに、1分進む。",
+   "sub": [
+    "真夜中＝日本の人が一人もいなくなる時",
+    "人口の10分の1を失うごとに 1分進む"
+   ],
+   "pause": 0.498,
+   "kind": "rule",
+   "ev": null,
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "s02",
+   "speech": "737年。天然痘の大流行で、人口の、およそ3割が亡くなったとされます。",
+   "sub": [
+    "737年 天然痘の大流行",
+    "人口の およそ3割が亡くなった"
+   ],
+   "pause": 0.46,
+   "kind": "ev",
+   "ev": "H1",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "s03",
+   "speech": "真夜中まで、31秒。",
+   "sub": [
+    "真夜中まで 31秒"
+   ],
+   "pause": 0.503,
+   "kind": "hit",
+   "ev": "H1",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "s04",
+   "speech": "1780年代、天明の飢饉。死者は90万人以上。91秒。",
+   "sub": [
+    "1780年代 天明の飢饉",
+    "死者90万人以上 → 91秒"
+   ],
+   "pause": 0.66,
+   "kind": "ev",
+   "ev": "H2",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "s05",
+   "speech": "1923年、関東大震災。およそ10万5千人。164秒。",
+   "sub": [
+    "1923年 関東大震災",
+    "約10万5千人 → 164秒"
+   ],
+   "pause": 0.15,
+   "kind": "ev",
+   "ev": "H3",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "s06",
+   "speech": "1945年。戦争で、およそ310万人。82秒。",
+   "sub": [
+    "1945年 戦争",
+    "約310万人 → 82秒"
+   ],
+   "pause": 0.56,
+   "kind": "ev",
+   "ev": "H4",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "s07",
+   "speech": "2011年、東日本大震災。およそ2万2千人。226秒。",
+   "sub": [
+    "2011年 東日本大震災",
+    "約2万2千人 → 226秒"
+   ],
+   "pause": 0.15,
+   "kind": "ev",
+   "ev": "H5",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "s08",
+   "speech": "では、いまは。",
+   "sub": [
+    "では いまは。"
+   ],
+   "pause": 0.15,
+   "kind": "now",
+   "ev": null,
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "s09",
+   "speech": "戦争も、大きな災害もない。でも、日本の人口は、2070年に、およそ8,700万人と推計。50年で、3割が減る。",
+   "sub": [
+    "戦争も 大きな災害もない",
+    "でも 2070年の人口は 約8,700万人（推計）",
+    "50年で 3割が減る"
+   ],
+   "pause": 0.394,
+   "kind": "decline",
+   "ev": "P1",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "s10",
+   "speech": "真夜中まで、30秒。1,300年前の、大流行と、ほぼ同じです。",
+   "sub": [
+    "真夜中まで 30秒",
+    "1300年前の大流行と ほぼ同じ"
+   ],
+   "pause": 0.25,
+   "kind": "hit",
+   "ev": "P1",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L11",
+   "who": "M",
+   "scene": "s11",
+   "speech": "さらに2120年には、5,000万人を割る。13秒。",
+   "sub": [
+    "2120年には 5,000万人を割る（参考推計）",
+    "→ 13秒"
+   ],
+   "pause": 0.15,
+   "kind": "ev",
+   "ev": "P2",
+   "fact": "scripts/pilot_060/fact_check.md"
+  },
+  {
+   "id": "L12",
+   "who": "W",
+   "scene": "s12",
+   "speech": "日本の時計の針は、いまも、静かに進んでいます。",
+   "sub": [
+    "日本の時計の針は",
+    "いまも 静かに進んでいる"
+   ],
+   "pause": 0.15,
+   "kind": "end",
+   "ev": null,
+   "fact": "scripts/pilot_060/fact_check.md"
+  }
+ ]
+}

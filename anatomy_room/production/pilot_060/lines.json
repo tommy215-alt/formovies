@@ -1,14 +1,26 @@
 {
  "title": "日本終末時計",
  "theme": "もし日本だけの終末時計があったら、歴史の中で真夜中まで何秒だったか（新ドパ設計）",
- "note": "新ドパ設計：冒頭の問いと最後は W 冥鳴ひまり、本編は M 阿井田 茂 Calm 速め。BGM は Raving Energy（Kevin MacLeod、CC BY 4.0。v3 の仮）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "note": "新ドパ設計 v2（061 型、2026-11-18 作り直し）：冒頭の問いと最後は W 春日部つむぎ、本編は M 青山龍星 ノーマル。BGM は Funk Game Loop（Kevin MacLeod、CC BY 4.0。小節を並べ替えてサビを冒頭と最後に）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
  "voices": "v7",
  "voice_override": {
   "M": {
-   "preset": "aida",
-   "speed": 1.55
+   "name": "青山龍星",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13
+   },
+   "default_style": "normal",
+   "speed": 1.725,
+   "inton": 1.0
   },
   "W": {
+   "name": "春日部つむぎ",
+   "credit": "VOICEVOX:春日部つむぎ",
+   "styles": {
+    "normal": 8
+   },
+   "default_style": "normal",
    "speed": 1.35,
    "inton": 1.0
   }
@@ -23,10 +35,10 @@
    "scene": "s00",
    "speech": "もし、日本だけの、終末時計があったら。いま、真夜中まで、何秒？",
    "sub": [
-    "もし 日本だけの終末時計があったら",
+    "もし 日本だけの 終末時計があったら",
     "いま 真夜中まで何秒？"
    ],
-   "pause": 0.293,
+   "pause": 0.565,
    "kind": "open",
    "ev": null,
    "fact": "scripts/pilot_060/fact_check.md"
@@ -35,12 +47,12 @@
    "id": "L01",
    "who": "M",
    "scene": "s01",
-   "speech": "真夜中は、日本の人が、一人もいなくなる時。人口の、10分の1を失うごとに、1分進む。",
+   "speech": "真夜中は、日本の人が、一人もいなくなる時。人口の、じゅうぶんのいちを失うごとに、1分進む。",
    "sub": [
     "真夜中＝日本の人が一人もいなくなる時",
     "人口の10分の1を失うごとに 1分進む"
    ],
-   "pause": 0.498,
+   "pause": 0.593,
    "kind": "rule",
    "ev": null,
    "fact": "scripts/pilot_060/fact_check.md"
@@ -54,7 +66,7 @@
     "737年 天然痘の大流行",
     "人口の およそ3割が亡くなった"
    ],
-   "pause": 0.46,
+   "pause": 0.489,
    "kind": "ev",
    "ev": "H1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -67,7 +79,7 @@
    "sub": [
     "真夜中まで 31秒"
    ],
-   "pause": 0.503,
+   "pause": 0.331,
    "kind": "hit",
    "ev": "H1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -81,7 +93,7 @@
     "1780年代 天明の飢饉",
     "死者90万人以上 → 91秒"
    ],
-   "pause": 0.66,
+   "pause": 0.655,
    "kind": "ev",
    "ev": "H2",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -95,7 +107,7 @@
     "1923年 関東大震災",
     "約10万5千人 → 164秒"
    ],
-   "pause": 0.15,
+   "pause": 0.555,
    "kind": "ev",
    "ev": "H3",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -109,7 +121,7 @@
     "1945年 戦争",
     "約310万人 → 82秒"
    ],
-   "pause": 0.56,
+   "pause": 0.484,
    "kind": "ev",
    "ev": "H4",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -136,7 +148,7 @@
    "sub": [
     "では いまは。"
    ],
-   "pause": 0.15,
+   "pause": 0.327,
    "kind": "now",
    "ev": null,
    "fact": "scripts/pilot_060/fact_check.md"
@@ -151,7 +163,7 @@
     "でも 2070年の人口は 約8,700万人（推計）",
     "50年で 3割が減る"
    ],
-   "pause": 0.394,
+   "pause": 0.15,
    "kind": "decline",
    "ev": "P1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -165,7 +177,7 @@
     "真夜中まで 30秒",
     "1300年前の大流行と ほぼ同じ"
    ],
-   "pause": 0.25,
+   "pause": 0.275,
    "kind": "hit",
    "ev": "P1",
    "fact": "scripts/pilot_060/fact_check.md"
@@ -179,7 +191,7 @@
     "2120年には 5,000万人を割る（参考推計）",
     "→ 13秒"
    ],
-   "pause": 0.15,
+   "pause": 0.679,
    "kind": "ev",
    "ev": "P2",
    "fact": "scripts/pilot_060/fact_check.md"
