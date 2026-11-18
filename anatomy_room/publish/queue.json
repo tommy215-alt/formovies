@@ -349,6 +349,15 @@
    "publish_at": "2026-11-21 19:00",
    "status": "scheduled",
    "uploaded": "2026-11-17T09:32:18.219Z"
+  },
+  {
+   "id": "pilot_061",
+   "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
+   "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
+   "publish_at": "2026-11-22 19:00",
+   "status": "scheduled",
+   "note": "2026-11-18 新ドパ設計 2 本目（お金が金に変わったら、v4）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-18T00:11:51.134Z"
   }
  ]
 }
