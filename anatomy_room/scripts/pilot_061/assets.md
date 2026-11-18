@@ -28,3 +28,5 @@ v2 では金庫の写真（NARA）は使わない。
 | select_001〜004.ogg | Kenney「Interface Sounds」 https://kenney.nl/assets/interface-sounds | CC0 1.0 | 同梱の License.txt |
 
 加工：pedalboard（低域・高域のカット、軽いコンプレッサー、小さな部屋の響き）。クレジットは不要（CC0）。
+| impactGlass_light・impactSoft_heavy・impactGeneric_light・impactMetal_heavy・footstep_concrete（v7） | Kenney「Impact Sounds」 | CC0 1.0 | 同梱の License.txt |
+| creak1.ogg（v7） | Kenney「RPG Audio」 https://kenney.nl/assets/rpg-audio | CC0 1.0 | 同梱の License.txt（Kenney_License_rpg.txt） |

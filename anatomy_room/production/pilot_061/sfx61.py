@@ -19,8 +19,13 @@ from music import SR, _soften
 SFXDIR = Path(__file__).resolve().parent / "assets" / "sfx"
 KEN = {"gclink": [f"impactMetal_light_00{i}.ogg" for i in range(5)], "gpile": [f"chips-stack-{i}.ogg" for i in range(1, 7)],
        "whoosh": [f"card-slide-{i}.ogg" for i in range(1, 5)], "tagpop": [f"select_00{i}.ogg" for i in range(1, 5)],
-       "stamp": ["impactWood_heavy_000.ogg"]}
-LEVEL = {"gclink": .035, "gpile": .045, "whoosh": .04, "tagpop": .035, "stamp": .08}   # 合成の版と同じ控えめの大きさ
+       "stamp": ["impactWood_heavy_000.ogg"], "glass": [f"impactGlass_light_00{i}.ogg" for i in range(4)],
+       "heavy": ["impactMetal_heavy_000.ogg"], "soft": [f"impactSoft_heavy_00{i}.ogg" for i in range(2)], "tap": [f"impactGeneric_light_00{i}.ogg" for i in range(2)]}
+# 重ねて作る音（ファイル, ずらす秒, 音量）
+MIX = {"tilt": [("creak1.ogg", 0, .8), ("impactMetal_heavy_000.ogg", .02, 1.0)],                       # 天秤が傾く：きしみ＋金属の重い音
+       "crowd": [(f"footstep_concrete_00{i % 5}.ogg", d, a) for i, (d, a) in enumerate(((0, .9), (.07, .7), (.13, .8), (.21, .6), (.26, .75), (.34, .55), (.41, .6), (.5, .45), (.58, .4)))]}   # 100 人が並ぶ：足音のざわめき
+LEVEL = {"gclink": .035, "gpile": .045, "whoosh": .04, "tagpop": .035, "stamp": .08, "glass": .03, "heavy": .06, "soft": .05, "tap": .035,
+         "tilt": .06, "crowd": .04}   # 合成の版と同じ控えめの大きさ
 
 
 def _load(fn, dur=.7):
@@ -40,6 +45,11 @@ def bank():
     for k, files in KEN.items():
         for i, fn in enumerate(files):
             out[f"{k}_{i}"] = _soften(_load(fn), cut=9500, rms=LEVEL[k])
+    for k, parts in MIX.items():
+        y = np.zeros(int(1.2 * SR))
+        for fn, d, a in parts:
+            x = _load(fn); i = int(d * SR); y[i:i + len(x)] += a * x[:len(y) - i]
+        out[f"{k}_0"] = _soften(y, cut=9500, rms=LEVEL[k])
     return out
 
 
@@ -57,18 +67,18 @@ if not getattr(music, "_SFX61", False):
 MOVES = [
     ("s00", 1, "gclink", .7), ("s00", 2, "gclink", .6), ("s00", 3, "gclink", .7), ("s00", 4, "gclink", .6), ("s00", 5, "whoosh", .6),
     *[("s01", k, "gpile", .55) for k in range(1, 10)],
-    ("s01", 8, "stamp", .5), ("s01", 9, "gclink", .6), ("s01", 10, "gclink", .55), ("s01", 11, "gclink", .6), ("s01", 12, "gclink", .65),
+    ("s01", 8, "heavy", .8), ("s01", 9, "glass", .6), ("s01", 10, "glass", .55), ("s01", 11, "glass", .6), ("s01", 12, "glass", .65),
     ("s02", 0, "gpile", .8),
     ("s03", 2, "whoosh", .6), ("s03", 4, "whoosh", .6),
     ("s04", 2, "gclink", .7), ("s04", 3, "gclink", .7), ("s04", 5, "gclink", .7), ("s04", 6, "whoosh", .5), ("s04", 7, "gclink", .6),
-    ("s05", 2, "gclink", .55),
+    ("s05", 2, "tap", .7),
     ("s06", 0, "gclink", .65), ("s06", 2, "gclink", .65), ("s06", 4, "gclink", .65), ("s06", 6, "whoosh", .5),
     ("s07", 1, "gclink", .5), ("s07", 4, "whoosh", .5),
-    ("s08", 1, "stamp", .55),
-    ("s09", 1, "whoosh", .5), ("s09", 3, "gpile", .8), ("s09", 5, "gclink", .6), ("s09", 6, "gpile", .5), ("s09", 7, "whoosh", .45), ("s09", 9, "whoosh", .45),
+    ("s08", 1, "tilt", .9),
+    ("s09", 0, "crowd", .8), ("s09", 1, "whoosh", .5), ("s09", 3, "gpile", .8), ("s09", 5, "soft", .7), ("s09", 6, "gpile", .5), ("s09", 7, "whoosh", .45), ("s09", 9, "whoosh", .45),
     ("s10", 1, "whoosh", .5), ("s10", 3, "whoosh", .5), ("s10", 6, "whoosh", .55),
 ]
-SEAL = [("s08", 2, "stamp", .6)]   # 2D の判（CUE.s08 + 2 拍）。CUE そのものから数える
+SEAL = [("s08", 2, "stamp", .6)]   # 天秤が傾く拍と同じなので、大きい方（tilt）だけ鳴る   # 2D の判（CUE.s08 + 2 拍）。CUE そのものから数える
 
 
 def events(tl_path, lines, BP, phrase_gain=.6):
@@ -99,5 +109,5 @@ def events(tl_path, lines, BP, phrase_gain=.6):
     out = [e for e in sorted(used.values(), key=lambda e: cues[e[1]] + e[3]) if cues[e[1]] + e[3] >= 0]
     n = {}
     for e in out:                                                   # 同じ種類の音は録音を順に回す
-        k = e[0]; e[0] = f"{k}_{n.get(k, 0) % len(KEN[k])}"; n[k] = n.get(k, 0) + 1
+        k = e[0]; e[0] = f"{k}_{n.get(k, 0) % len(KEN.get(k, [0]))}"; n[k] = n.get(k, 0) + 1
     return out
