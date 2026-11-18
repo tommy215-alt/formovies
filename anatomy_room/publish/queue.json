@@ -351,13 +351,23 @@
    "uploaded": "2026-11-17T09:32:18.219Z"
   },
   {
+   "id": "pilot_061_old",
+   "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
+   "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
+   "publish_at": "2026-11-22 19:00",
+   "status": "private",
+   "note": "2026-11-18 新ドパ設計 2 本目（お金が金に変わったら、v4）。ユーザーが予約を指示（次に空いている 19:00 の枠） ／ 2026-11-18 効果音を入れる前の版。v7 に差し替えるため非公開にした（削除はしていない）",
+   "uploaded": "2026-11-18T00:11:51.134Z"
+  },
+  {
    "id": "pilot_061",
    "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
    "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
    "publish_at": "2026-11-22 19:00",
    "status": "scheduled",
-   "note": "2026-11-18 新ドパ設計 2 本目（お金が金に変わったら、v4）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
-   "uploaded": "2026-11-18T00:11:51.134Z"
+   "reupload": true,
+   "note": "2026-11-18 v7（動き・効果音を表拍、Kenney の効果音）。前の版（非公開）と差し替え、ユーザーの指示",
+   "uploaded": "2026-11-18T03:02:43.686Z"
   }
  ]
 }
