@@ -44,7 +44,7 @@ def snap():
     print("snap:", sum(add.values()) - sum(old.values()), "秒のばした")
 
 
-# 効果音（2026-11-18 ユーザーの指示）：動き・帯・札の出は表拍、効果音は裏拍。金の音（sfx61.py）、音量は控えめ
+# 効果音（2026-11-18 ユーザーの指示）：動き・帯・札の出も効果音も表拍。金の音（sfx61.py）、音量は控えめ
 sys.path.insert(0, str(HERE)); import sfx61  # noqa: E402
 SFX = sfx61.events(TLP, LINES, P) if TLP.exists() else []
 
