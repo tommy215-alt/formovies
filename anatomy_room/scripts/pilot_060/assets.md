@@ -4,6 +4,8 @@
 |---|---|---|---|
 | BGM「Funk Game Loop」（v3、小節を並べ替えてサビを冒頭と最後に。v2 までは「Movement Proposition」） | Kevin MacLeod（incompetech.com） | CC BY 4.0 | incompetech のファイル（2026-11-17 取得）。説明文にクレジット |
 | 質感（木・檜の板・石垣・御影石・岩・コンクリート・畳） | Poly Haven（lacquered_cherry_wood・hinoki_planks・japanese_stone_wall・granite_tile・rock_wall_08・concrete_wall_006・tatami_mat） | CC0 | Poly Haven の公開 API（2026-11-17）、assets/textures.py |
+| v5 の場面ごとの舞台の質感（杉板・土壁・ひび割れた泥・板塀・がれき・れんが・焼けた地面・ひびのコンクリート壁・湿った砂・護岸のコンクリート・コンクリートのタイル・ビルの外壁・床のタイル・しっくい） | Poly Haven（japanese_cedar_planks・clay_plaster・mud_cracked_dry_03・brown_planks_07・rubble・brick_wall_001・burned_ground_01・cracked_concrete_wall・damp_beach_sand・precast_concrete_wall・concrete_tiles_02・concrete_tile_facade・floor_tiles_06・plastered_wall） | CC0 | Poly Haven の公開 API（2026-11-18）、production/pilot_060/blender/get_ph.py |
+| v5 の空の光（HDRI） | Poly Haven（kloofendal_overcast・industrial_sunset・approaching_storm・misty_dawn・urban_street_01・modern_evening_street） | CC0 | 同上 |
 | 天明飢饉之図（1786 年ごろ） | 作者不明、福島県会津美里町教育委員会蔵。Wikimedia Commons「Great Tenmei Famine Map Artwork.png」 | パブリックドメイン | Commons の API の LicenseShortName（2026-11-17） |
 | 関東大震災の写真（1923 年） | 作者不明。Commons「1923 Great Kantō earthquake destructions.jpg」 | パブリックドメイン | 同上 |
 | 空襲のあとの東京（1945 年） | US Army Signal Corps。Commons「Bomb damage in Tokyo.jpg」 | パブリックドメイン | 同上 |
