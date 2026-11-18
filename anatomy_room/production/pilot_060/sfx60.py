@@ -26,6 +26,7 @@ MIX = {"bigtick": [("metalClick.ogg", 0, 1.0), ("tick_001.ogg", .01, .6)],      
        "fall": [(f"impactPlate_light_00{i % 5}.ogg", d, a) for i, (d, a) in enumerate(((0, 1), (.04, .7), (.09, .8), (.15, .5), (.21, .45)))],   # 人形がまとめて倒れる
        "fall1": [("impactPlate_light_002.ogg", 0, 1.0)]}
 LEVEL = {"whoosh": .04, "tagpop": .035, "stamp": .08, "tick": .025, "plaque": .05, "frame": .045, "bigtick": .05, "fall": .045, "fall1": .035}   # 合成の版と同じ控えめの大きさ
+GAIN = 1.6   # 2026-11-18 ユーザーの指示「SE の音だけもう少し大きく」：全体を約 +4 dB
 
 
 def _load(fn, dur=.7):
@@ -44,12 +45,12 @@ def bank():
     out = {}
     for k, files in KEN.items():
         for i, fn in enumerate(files):
-            out[f"{k}_{i}"] = _soften(_load(fn), cut=9500, rms=LEVEL[k])
+            out[f"{k}_{i}"] = _soften(_load(fn), cut=9500, rms=LEVEL[k] * GAIN)
     for k, parts in MIX.items():
         y = np.zeros(int(1.2 * SR))
         for fn, d, a in parts:
             x = _load(fn); i = int(d * SR); y[i:i + len(x)] += a * x[:len(y) - i]
-        out[f"{k}_0"] = _soften(y, cut=9500, rms=LEVEL[k])
+        out[f"{k}_0"] = _soften(y, cut=9500, rms=LEVEL[k] * GAIN)
     return out
 
 

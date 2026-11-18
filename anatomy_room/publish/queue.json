@@ -343,12 +343,13 @@
    "uploaded": "2026-11-16T22:52:53.239Z"
   },
   {
-   "id": "pilot_060",
+   "id": "pilot_060_old",
    "video": "anatomy_room/production/pilot_060/reverse_060_doomsday_japan.mp4",
    "meta": "anatomy_room/production/pilot_060/youtube_metadata.md",
    "publish_at": "2026-11-21 19:00",
-   "status": "scheduled",
-   "uploaded": "2026-11-17T09:32:18.219Z"
+   "status": "private",
+   "uploaded": "2026-11-17T09:32:18.219Z",
+   "note": "2026-11-18 v5（場面ごとに出来事を描く・効果音を大きく）に差し替えるため非公開にした（削除はしていない）"
   },
   {
    "id": "pilot_061_old",
@@ -360,14 +361,34 @@
    "uploaded": "2026-11-18T00:11:51.134Z"
   },
   {
+   "id": "pilot_061_old2",
+   "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
+   "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
+   "publish_at": "2026-11-22 19:00",
+   "status": "private",
+   "reupload": true,
+   "note": "2026-11-18 v7（動き・効果音を表拍、Kenney の効果音）。前の版（非公開）と差し替え、ユーザーの指示 ／ 2026-11-18 効果音を大きくした版に差し替えるため非公開にした（削除はしていない）",
+   "uploaded": "2026-11-18T03:02:43.686Z"
+  },
+  {
+   "id": "pilot_060",
+   "video": "anatomy_room/production/pilot_060/reverse_060_doomsday_japan.mp4",
+   "meta": "anatomy_room/production/pilot_060/youtube_metadata.md",
+   "publish_at": "2026-11-21 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-18 v5（場面ごとに舞台と出来事を描く、効果音 +4dB）。ユーザーの承認「オッケー」",
+   "uploaded": "2026-11-18T11:56:58.974Z"
+  },
+  {
    "id": "pilot_061",
    "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
    "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
    "publish_at": "2026-11-22 19:00",
    "status": "scheduled",
    "reupload": true,
-   "note": "2026-11-18 v7（動き・効果音を表拍、Kenney の効果音）。前の版（非公開）と差し替え、ユーザーの指示",
-   "uploaded": "2026-11-18T03:02:43.686Z"
+   "note": "2026-11-18 v7 の効果音を +4dB（ユーザーの指示）",
+   "uploaded": "2026-11-18T11:58:29.465Z"
   }
  ]
 }

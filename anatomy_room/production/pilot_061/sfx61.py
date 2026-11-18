@@ -26,6 +26,7 @@ MIX = {"tilt": [("creak1.ogg", 0, .8), ("impactMetal_heavy_000.ogg", .02, 1.0)],
        "crowd": [(f"footstep_concrete_00{i % 5}.ogg", d, a) for i, (d, a) in enumerate(((0, .9), (.07, .7), (.13, .8), (.21, .6), (.26, .75), (.34, .55), (.41, .6), (.5, .45), (.58, .4)))]}   # 100 人が並ぶ：足音のざわめき
 LEVEL = {"gclink": .035, "gpile": .045, "whoosh": .04, "tagpop": .035, "stamp": .08, "glass": .03, "heavy": .06, "soft": .05, "tap": .035,
          "tilt": .06, "crowd": .04}   # 合成の版と同じ控えめの大きさ
+GAIN = 1.6   # 2026-11-18 ユーザーの指示「SE の音だけもう少し大きく」：全体を約 +4 dB
 
 
 def _load(fn, dur=.7):
@@ -44,12 +45,12 @@ def bank():
     out = {}
     for k, files in KEN.items():
         for i, fn in enumerate(files):
-            out[f"{k}_{i}"] = _soften(_load(fn), cut=9500, rms=LEVEL[k])
+            out[f"{k}_{i}"] = _soften(_load(fn), cut=9500, rms=LEVEL[k] * GAIN)
     for k, parts in MIX.items():
         y = np.zeros(int(1.2 * SR))
         for fn, d, a in parts:
             x = _load(fn); i = int(d * SR); y[i:i + len(x)] += a * x[:len(y) - i]
-        out[f"{k}_0"] = _soften(y, cut=9500, rms=LEVEL[k])
+        out[f"{k}_0"] = _soften(y, cut=9500, rms=LEVEL[k] * GAIN)
     return out
 
 
