@@ -288,7 +288,7 @@ function phrases(t) {
   const out = [], Ls = TL.lines.filter(x => !x.ending);
   Ls.forEach((L, li) => { const ln = (window.SUBS && window.SUBS[L.id]) || []; if (!ln.length) return; const tot = ln.join("").length; let acc = 0;
     const endL = Math.min(li + 1 < Ls.length ? Ls[li + 1].start : L.end + 1, L.end + .6) - .02;
-    const ps = ln.map((s, j) => { let a = L.start + (L.end - L.start) * acc / tot - .05; const nb = Math.round(a / BP) * BP; if (Math.abs(nb - a) < .16) a = nb; acc += s.length; return { id: L.id, j, s, a }; });
+    const ps = ln.map((s, j) => { let a = L.start + (L.end - L.start) * acc / tot - .05; a = Math.round(a / BP) * BP; /* 帯・札の出は必ず拍の頭（効果音は裏拍） */ acc += s.length; return { id: L.id, j, s, a }; });
     ps.forEach((p, j) => { p.z = j + 1 < ps.length ? ps[j + 1].a : endL; out.push(p); }); });
   return out.filter(p => t >= p.a && t < p.z);
 }

@@ -44,15 +44,9 @@ def snap():
     print("snap:", sum(add.values()) - sum(old.values()), "秒のばした")
 
 
-# 効果音（行の頭＝拍の頭）。金が積み上がる場面は重い一打、順位・比べる場面は札の音
-SFX = []
-for ln in LINES:
-    k = ln["kind"]
-    if k in ("world", "china", "big3", "gap"):
-        SFX.append(["whoosh", ln["scene"], .8, 0.0]); SFX.append(["stamp", ln["scene"], 1.0, P * 2])
-    elif k in ("rank", "jp", "mid", "low", "wealth"):
-        SFX.append(["tagpop", ln["scene"], .9, 0.0])
-SFX.append(["title", "s00", .7, 0.0])
+# 効果音（2026-11-18 ユーザーの指示）：動き・帯・札の出は表拍、効果音は裏拍。金の音（sfx61.py）、音量は控えめ
+sys.path.insert(0, str(HERE)); import sfx61  # noqa: E402
+SFX = sfx61.events(TLP, LINES, P) if TLP.exists() else []
 
 EP = standard.config({
     "id": "pilot_061",
