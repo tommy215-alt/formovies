@@ -412,10 +412,12 @@ def desk(name):
 
 
 def tv(name):
-    root = empty(name); bk = plain("mon", (.03, .03, .04), .3, coat=.5)
-    parent(box(name + "_st", (.8, .35, .35), (0, 0, .175), plain("tvst", (.3, .22, .15), .5), bevel=.01), root)
-    parent(box(name + "_m", (.95, .04, .56), (0, .05, .66), bk, bevel=.01), root)
-    parent(box(name + "_sc", (.88, .005, .5), (0, .028, .66), glow_mat("tvscr", (.6, .8, 1.0), 1.2), bevel=0), root); return root
+    """v4：テレビの扇はスマホに（ユーザーの指示）。台に立てた大きなスマホ（画面が光る）"""
+    root = empty(name); g = gold_mat("gold", .13)
+    parent(box(name + "_st", (.5, .32, .08), (0, .05, .04), plain("tvst", (.3, .22, .15), .5), bevel=.01), root)
+    parent(box(name + "_m", (.5, .05, .95), (0, .05, .55), plain("phoneb", (.05, .05, .06), .25, coat=.8), bevel=.05), root)
+    parent(box(name + "_sc", (.44, .005, .86), (0, .022, .56), glow_mat("phscr", (.45, .6, 1.0), 1.6), bevel=0), root)
+    parent(box(name + "_k", (.08, .2, .3), (0, .2, .2), g, bevel=.01), root); return root
 
 
 def table(name, w=1.1, d=.7, h=.5):
@@ -552,10 +554,11 @@ def s_s04():                                   # 仕事・テレビ・食事：�
     base_dial("meal")
 
 
-W4 = {"work": 1, "tv": 3, "meal": 5}
+W4 = {"work": 1, "tv": 5, "meal": 3}                 # a_s04 で字幕の句の拍に置き換える（仕事・食事・スマホの順）
 
 
 def a_s04(u, t, f):
+    W4["meal"] = pb("L04", 1); W4["tv"] = pb("L04", 2)
     S["bed"].location = S["bedp"]; S["w"]["sleep"].location = (0, 0, .05)
     for k, o, p in S["objs"]:
         drop(S["w"][k], (0, 0, .05), t, lbeat("s04", W4[k]), h=1.6); drop(o, p, t, lbeat("s04", W4[k]), h=2.0)
@@ -563,9 +566,10 @@ def a_s04(u, t, f):
             o.location = (p[0], p[1], p[2] + bob("s04", t, [b for b in range(W4[k] + 1, 9)], .04))
     x0, y0, z0 = S["bedp"]; S["bed"].location = (x0, y0, z0 + bob("s04", t, range(0, 9, 2), .03))
     P_ = {k: seg_mid(k, 1.85)[0] for k in W4}
+    kt = W4["tv"]
     go("s04", [(0, (-2.0, -6.6, 4.6), (0, 0, 0), 30), (1, (P_["work"][0] - 2.2, P_["work"][1] - 1.2, 1.4), (P_["work"][0], P_["work"][1], .5), 32),
-               (3, (P_["tv"][0] - 1.0, P_["tv"][1] - 2.4, 1.4), (P_["tv"][0], P_["tv"][1], .5), 32), (5, (P_["meal"][0] + 2.0, P_["meal"][1] - 1.6, 1.4), (P_["meal"][0], P_["meal"][1], .4), 32),
-               (7, (0, -7.8, 6.6), (0, 0, 0), 28)], t, 4.0)
+               (W4["meal"], (P_["meal"][0] + 2.0, P_["meal"][1] - 1.6, 1.4), (P_["meal"][0], P_["meal"][1], .4), 32), (kt, (P_["tv"][0] - 1.0, P_["tv"][1] - 2.4, 1.2), (P_["tv"][0], P_["tv"][1], .6), 32),
+               (kt + 2, (0, -7.8, 6.6), (0, 0, 0), 28)], t, 4.0)
 
 
 def s_s05():                                   # 通勤・通学：灰色の細い扇と、扇の上を走り抜ける小さな電車
@@ -622,11 +626,11 @@ def bars_set():
     """書斎の床に並ぶ 7 本の金の棒（高さ＝一生で使う年数）。上に名前、手前に小物"""
     stage("study"); spot("sp", (0, -5, 7), (0, 0, 1.2), 3200, size=.8, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.5), 12, 700)
     S["bars"] = []
-    for i, (nm, yr, ic) in enumerate(BARS):
+    for i, (nm, yr, ic, _) in enumerate(BARS):
         h = max(.06, yr * YS); x = BX[i]; m = gold_mat("gold", .13)
         o = empty("bar%d" % i, (x, 0, 0)); parent(box("barb%d" % i, (.55, .55, h), (0, 0, h / 2), m, bevel=.02), o)
         parent(label("barl%d" % i, nm, (0, -.3, h + .25), .14 if len(nm) < 5 else .11), o)
-        parent(label("bary%d" % i, ("%.1f年" % yr) if yr >= 1 else ("%dか月" % round(yr * 12)), (0, -.3, h + .08), .12), o)
+        parent(label("bary%d" % i, BARS[i][3], (0, -.3, h + .08), .12), o)          # v4：一生の 24 時間の時計で何分
         o["h"] = h + .6; ANIM.append(o); ic_o = icon(ic, "ic%d" % i); ic_o.location = (x, -.75, 0); ANIM.append(ic_o); S["bars"].append((o, ic_o, x))
 
 
@@ -642,24 +646,26 @@ def show_bars(t, name, plan, icon_at=None):
             rise(o, (x, 0, 0), t, lbeat(name, k), .4); drop(ic, (x, -.75, 0), t, lbeat(name, (icon_at or {}).get(i, k - 1)), h=1.6)
 
 
-def s_s06():                                   # スマホ：1 日約 2 時間 → 一生で約 7 年。スマホが落ち、いちばん高い棒がせり上がる
+def s_s06():                                   # v4：趣味・娯楽 約 2 年 10 か月＝時計の 48 分。隣にスマホの高い棒（s04 で出た 2 時間 6 分）
     bars_set()
 
 
 def a_s06(u, t, f):
-    show_bars(t, "s06", {0: pb("L06", 1)}, {0: 1})                     # スマホは拍 1 に落ちる（場面の入りから見せる）
-    x = BX[0]; k1 = pb("L06", 1)
-    go("s06", [(0, (x + 1.2, -2.6, .5), (x, -.7, .3), 36), (k1, (x + 2.6, -4.4, 1.2), (x, 0, 1.8), 28), (k1 + 3, (x + 3.4, -6.2, 2.0), (x + .6, 0, 2.2), 28)], t, 3.0)
+    k1 = pb("L06", 0, 1)
+    show_bars(t, "s06", {0: "on", 1: k1})
+    x = BX[1]
+    go("s06", [(0, (x + .9, -2.8, .7), (x, -.6, .5), 34), (k1, (x + 1.6, -4.4, 1.1), (x - .3, 0, 1.2), 30), (k1 + 3, (x + 2.2, -6.0, 1.8), (x - .5, 0, 1.6), 28)], t, 3.0)
 
 
-def s_s07():                                   # 趣味・娯楽 約 2 年 10 か月、泊まりの旅行 約 1 年 2 か月
+def s_s07():                                   # v4：泊まりの旅行 約 1 年 2 か月＝たった 21 分
     bars_set()
 
 
 def a_s07(u, t, f):
-    k1, k2 = pb("L07", 0, 1), pb("L07", 1)
-    show_bars(t, "s07", {0: "on", 1: k1, 2: k2})
-    go("s07", [(0, (-1.0, -5.2, 1.4), (-2.4, 0, 1.1), 30), (k2, (.2, -4.6, 1.0), (-1.6, 0, .7), 30), (k2 + 3, (-.6, -6.6, 2.0), (-1.8, 0, 1.4), 28)], t, 3.0)
+    k1 = pb("L07", 0, 1)
+    show_bars(t, "s07", {0: "on", 1: "on", 2: k1})
+    x = BX[2]
+    go("s07", [(0, (x + .8, -2.8, .6), (x, -.6, .4), 34), (k1, (x + .9, -4.2, 1.0), (x - .6, 0, .9), 30), (k1 + 3, (x + .4, -6.4, 1.8), (x - 1.0, 0, 1.4), 28)], t, 3.0)
 
 
 def s_s08():                                   # 料理 女性 約 4 年半・男性 約 10 か月、本や雑誌 約 9 か月

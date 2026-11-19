@@ -358,9 +358,10 @@ function frame(t) {
   const sb = n => Math.round(CUE[n] / BP) * BP, inS = n => CUE[n] !== undefined && t >= CUE[n] && t < sEnd(SCN_IDS.indexOf(n));
   const note = (txt, y = 1280) => { ui.save(); ui.font = `700 26px ${BIZ}`; ui.textAlign = "left"; ui.fillStyle = "rgba(255,255,255,.85)"; ui.shadowColor = "rgba(0,0,0,.8)"; ui.shadowBlur = 8; ui.fillText(txt, 40, y); ui.restore(); };
   if (inS("s01")) note("平均寿命：令和7年簡易生命表（男81.35年・女87.33年の平均）");
-  if (inS("s03") || inS("s04") || inS("s05")) note("1日の平均：総務省 社会生活基本調査 2021（10歳以上）");
-  if (inS("s06")) note("総務省 情報通信メディアの利用時間 令和7年度（13〜79歳）。ほかの時間と重なる");
-  if (inS("s07")) note("趣味：社会生活基本調査 2021／旅行：観光庁 2025（出張を含む）");
+  if (inS("s03") || inS("s05")) note("1日の平均：総務省 社会生活基本調査 2021（10歳以上）");
+  if (inS("s04")) note("社会生活基本調査 2021／スマホ：総務省 令和7年度（13〜79歳・ほかと重なる）");
+  if (inS("s06")) note("趣味・娯楽：社会生活基本調査 2021");
+  if (inS("s07")) note("旅行：観光庁 旅行・観光消費動向調査 2025（出張を含む）");
   if (inS("s08")) note("料理：社会生活基本調査 2021／読書：NHK国民生活時間調査 2020（雑誌・マンガを含む）");
   if (inS("s09")) note("交際・付き合い：社会生活基本調査 2021");
   if (inS("s12") || inS("s13")) note("仮定：お盆と正月に3日ずつ・1日4時間、親と30歳差");
