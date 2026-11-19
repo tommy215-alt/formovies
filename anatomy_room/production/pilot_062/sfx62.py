@@ -24,17 +24,29 @@ KEN0 = {"gclink": [f"impactMetal_light_00{i}.ogg" for i in range(5)], "gpile": [
 KEN = {"whoosh": KEN0["whoosh"], "tagpop": KEN0["tagpop"], "stamp": KEN0["stamp"], "drop": [f"impactWood_medium_00{i}.ogg" for i in range(3)],
        "clink": [f"impactMetal_light_00{i}.ogg" for i in range(5)], "kick": [f"impactPunch_medium_00{i}.ogg" for i in range(5)],
        "bat": [f"impactWood_light_00{i}.ogg" for i in range(5)], "pillar": [f"impactMetal_medium_00{i}.ogg" for i in range(5)],
-       "soft": [f"impactSoft_medium_00{i}.ogg" for i in range(2)], "frame": [f"impactSoft_medium_00{i}.ogg" for i in range(2)]}
+       "soft": [f"impactSoft_medium_00{i}.ogg" for i in range(2)], "frame": [f"impactSoft_medium_00{i}.ogg" for i in range(2)],
+       # v2b（2026-11-19 ユーザーの指示「SE の種類を増やして、もっと目立たせて。冒頭は強めに」）
+       "thud": [f"impactPunch_heavy_00{i}.ogg" for i in range(5)], "tin": [f"impactTin_medium_00{i}.ogg" for i in range(5)],
+       "plank": [f"impactPlank_medium_00{i}.ogg" for i in range(5)], "softh": [f"impactSoft_heavy_00{i}.ogg" for i in range(5)],
+       "woodh": [f"impactWood_heavy_00{i}.ogg" for i in range(5)], "rattle": [f"impactPlate_medium_00{i}.ogg" for i in range(5)],
+       "tap": [f"impactGeneric_light_00{i}.ogg" for i in range(5)], "metalh": [f"impactMetal_heavy_00{i}.ogg" for i in range(5)],
+       "swish": [f"card-shove-{i}.ogg" for i in range(1, 5)], "pluck": [f"pluck_00{i}.ogg" for i in range(1, 3)], "switch": [f"switch_00{i}.ogg" for i in range(1, 5)]}
 # 重ねて作る音（ファイル, ずらす秒, 音量）
 MIX = {"run": [(f"footstep_concrete_00{i % 5}.ogg", d, a) for i, (d, a) in enumerate(((0, 1), (.06, .8), (.13, .9), (.19, .7), (.26, .8), (.33, .6), (.4, .7), (.47, .5)))],
        "grass": [(f"footstep_grass_00{i % 5}.ogg", d, a) for i, (d, a) in enumerate(((0, 1), (.14, .8), (.28, .9), (.42, .7)))],
        "rise": [(f"impactPlate_light_00{i % 5}.ogg", d, a) for i, (d, a) in enumerate(((0, 1), (.03, .7), (.07, .8), (.11, .5), (.16, .45)))],
        "wicket": [("impactWood_medium_001.ogg", 0, 1.0), ("impactWood_light_002.ogg", .05, .7), ("impactWood_light_004.ogg", .16, .4)],
        "tower": [("impactMetal_heavy_000.ogg", 0, 1.0), ("impactBell_heavy_001.ogg", .02, .5)],
-       "bell": [("impactBell_heavy_003.ogg", 0, 1.0)]}
+       "bell": [("impactBell_heavy_003.ogg", 0, 1.0)],
+       "watch": [("impactMetal_medium_001.ogg", 0, 1.0), ("tick_001.ogg", .1, .8), ("tick_002.ogg", .35, .6)],          # ストップウォッチが台座に
+       "rumble": [("impactPlate_heavy_000.ogg", 0, 1.0), ("impactMining_001.ogg", .05, .7), ("impactPlate_heavy_002.ogg", .2, .5)],   # 柱がせり上がる（重い）
+       "cricket": [("impactWood_heavy_000.ogg", 0, 1.0), ("impactWood_light_003.ogg", .12, .7)],                       # バットと球が台座に
+       "swishball": [("impactPunch_heavy_001.ogg", 0, 1.0), ("impactTin_medium_002.ogg", .02, .6)]}                    # リングに当たって入る
 LEVEL = {"whoosh": .04, "tagpop": .035, "stamp": .08, "drop": .05, "clink": .035, "kick": .045, "bat": .05, "pillar": .05, "soft": .04, "frame": .045,
-         "run": .045, "grass": .04, "rise": .04, "wicket": .06, "tower": .07, "bell": .045}
-GAIN = 1.6   # 2026-11-18 ユーザーの指示「SE の音だけもう少し大きく」：全体を約 +4 dB
+         "run": .045, "grass": .04, "rise": .04, "wicket": .06, "tower": .07, "bell": .045,
+         "thud": .055, "tin": .045, "plank": .05, "softh": .05, "woodh": .06, "rattle": .045, "tap": .045, "metalh": .06, "swish": .04, "pluck": .035, "switch": .03,
+         "watch": .055, "rumble": .06, "cricket": .06, "swishball": .055}
+GAIN = 2.3   # 2026-11-18「SE の音だけもう少し大きく」で 1.6（+4 dB）→ 2026-11-19「もっと目立たせて」で 2.3（さらに約 +3 dB）
 
 
 def _load(fn, dur=.7):
@@ -73,24 +85,25 @@ if not getattr(music, "_SFX60", False):
 
 
 # (場面, 拍, 音, 音量)：動きの拍。効果音も同じ拍の頭。拍は scene61.py の lbeat（場面の cue のあとの最初の拍が 0）
-MOVES = [   # v2（2026-11-19）：場面の並べ替え（ジョーダン・ニクラウス・天才 5 人の柱・偏差値 94）
-    *[("s00", k, "drop", .8) for k in (0, 1, 3, 4, 6, 7)], ("s00", 9, "whoosh", .5), ("s00", 12, "whoosh", .45),
-    ("s01", 0, "rise", .7), ("s01", 3, "whoosh", .5), ("s01", 6, "clink", .7),
-    ("s02", 1, "run", .9), ("s02", 3, "whoosh", .5), ("s02", 5, "whoosh", .45), ("s02", 6, "pillar", .9),
-    ("s03", 1, "soft", .7), ("s03", 2, "clink", .8), ("s03", 4, "pillar", .9), ("s03", 6, "whoosh", .45),
-    ("s04", 1, "clink", .7), ("s04", 2, "soft", .8), ("s04", 4, "pillar", .9), ("s04", 6, "whoosh", .45),
-    ("s05", 1, "bat", 1.0), ("s05", 3, "pillar", .9), ("s05", 5, "whoosh", .45),
-    ("s06", 1, "kick", .9), ("s06", 2, "soft", .8), ("s06", 4, "pillar", .9), ("s06", 6, "whoosh", .45),
-    *[("s07", k, "pillar", .75) for k in (1, 2, 3)], ("s07", 5, "whoosh", .45),
-    ("s08", 2, "tower", 1.0), ("s08", 3, "whoosh", .5), ("s08", 5, "frame", .8), ("s08", 7, "whoosh", .5),
-    ("s09", 2, "whoosh", .5), ("s09", 3, "bat", 1.0), ("s09", 5, "grass", .8), ("s09", 7, "grass", .7), ("s09", 8, "whoosh", .45),
-    ("s10", 1, "whoosh", .45), ("s10", 2, "wicket", 1.0), *[("s10", 4 + i, "clink", .75) for i in range(6)],
-    *[("s11", k, "pillar", .7) for k in (1, 2, 3, 4)], ("s11", 6, "whoosh", .45),
-    ("s12", 1, "tower", 1.0), ("s12", 3, "whoosh", .45),
-    ("s13", 1, "whoosh", .5), ("s13", 3, "whoosh", .45), ("s13", 4, "drop", .8),
-    ("s14", 0, "bell", .8), ("s14", 2, "whoosh", .45), ("s14", 5, "whoosh", .45),
+MOVES = [   # v2b：場面・物ごとに音を変える。冒頭は強め（音量 1.3〜1.5）
+    ("s00", 0, "watch", 1.5), ("s00", 1, "thud", 1.5), ("s00", 3, "tap", 1.4), ("s00", 4, "plank", 1.4), ("s00", 6, "softh", 1.5), ("s00", 7, "cricket", 1.5),
+    ("s00", 9, "swish", .8), ("s00", 12, "whoosh", .7),
+    ("s01", 0, "rise", .9), ("s01", 3, "swish", .6), ("s01", 6, "clink", .9),
+    ("s02", 1, "run", 1.0), ("s02", 3, "whoosh", .55), ("s02", 5, "swish", .5), ("s02", 6, "rumble", .9),
+    ("s03", 1, "thud", .8), ("s03", 2, "swishball", 1.0), ("s03", 4, "rumble", .9), ("s03", 6, "swish", .5),
+    ("s04", 1, "tap", .9), ("s04", 2, "rattle", .9), ("s04", 4, "rumble", .9), ("s04", 6, "whoosh", .5),
+    ("s05", 1, "bat", 1.1), ("s05", 3, "rumble", .9), ("s05", 5, "swish", .5),
+    ("s06", 1, "kick", 1.0), ("s06", 2, "softh", .8), ("s06", 4, "rumble", .9), ("s06", 6, "whoosh", .5),
+    ("s07", 1, "pillar", .9), ("s07", 2, "metalh", .8), ("s07", 3, "pillar", .9), ("s07", 5, "swish", .5),
+    ("s08", 2, "tower", 1.1), ("s08", 3, "whoosh", .55), ("s08", 5, "frame", .9), ("s08", 7, "swish", .55),
+    ("s09", 2, "whoosh", .55), ("s09", 3, "bat", 1.1), ("s09", 5, "grass", .9), ("s09", 7, "grass", .8), ("s09", 8, "swish", .5),
+    ("s10", 1, "whoosh", .5), ("s10", 2, "wicket", 1.1), *[("s10", 4 + i, "clink", .8) for i in range(6)],
+    *[("s11", k, "pillar" if k % 2 else "tin", .8) for k in (1, 2, 3, 4)], ("s11", 6, "swish", .5),
+    ("s12", 1, "tower", 1.1), ("s12", 3, "whoosh", .5),
+    ("s13", 1, "swish", .6), ("s13", 3, "whoosh", .5), ("s13", 4, "metalh", 1.0),
+    ("s14", 0, "bell", .9), ("s14", 2, "whoosh", .5), ("s14", 5, "swish", .5),
 ]
-SEAL = [("s02", 5, "stamp", .7)]   # 2D の判（9.58）
+SEAL = [("s02", 5, "stamp", .9)]   # 2D の判（9.58）
 
 
 def events(tl_path, lines, BP, phrase_gain=.6):
@@ -110,14 +123,14 @@ def events(tl_path, lines, BP, phrase_gain=.6):
         put(sc, (round(cues[sc] / BP) + k) * BP, name, g)
     # 帯・札（字幕の句）の出：renderer.html の phrases() と同じ計算（拍の頭に丸める）
     st = {x["id"]: x for x in tl["lines"] if not x.get("ending")}
-    for ln in lines:
+    for li, ln in enumerate(lines):
         L = st.get(ln["id"]); subs = ln["sub"]
         if not L or not subs:
             continue
         tot = len("".join(subs)); acc = 0
         for s in subs:
             a = round((L["start"] + (L["end"] - L["start"]) * acc / tot - .05) / BP) * BP; acc += len(s)
-            put(ln["scene"], a, "tagpop", phrase_gain)
+            put(ln["scene"], a, "tagpop" if li % 2 == 0 else "pluck", phrase_gain)   # v2b：帯の音は 2 種類を行ごとに交互
     out = [e for e in sorted(used.values(), key=lambda e: cues[e[1]] + e[3]) if cues[e[1]] + e[3] >= 0]
     n = {}
     for e in out:                                                   # 同じ種類の音は録音を順に回す
