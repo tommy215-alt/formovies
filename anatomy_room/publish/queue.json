@@ -338,8 +338,8 @@
    "video": "anatomy_room/production/pilot_058/reverse_058_giraffe_sled.mp4",
    "meta": "anatomy_room/production/pilot_058/youtube_metadata.md",
    "publish_at": "2026-11-20 19:00",
-   "status": "scheduled",
-   "note": "2026-11-17 もしも設計（キリンぞりで南極横断、v2）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "status": "private",
+   "note": "2026-11-17 もしも設計（キリンぞりで南極横断、v2）。ユーザーが予約を指示（次に空いている 19:00 の枠） ／ 2026-11-19 ユーザーの指示で非公開に（明日の公開分から新ドパ設計に）",
    "uploaded": "2026-11-16T22:52:53.239Z"
   },
   {
@@ -400,13 +400,23 @@
    "uploaded": "2026-11-19T07:06:49.050Z"
   },
   {
-   "id": "pilot_063",
+   "id": "pilot_063_old",
    "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
    "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
    "publish_at": "2026-11-24 19:00",
-   "status": "scheduled",
-   "note": "2026-11-19 新ドパ設計 v2（一生を24時間に、v4）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "status": "private",
+   "note": "2026-11-19 新ドパ設計 v2（一生を24時間に、v4）。ユーザーが予約を指示（次に空いている 19:00 の枠） ／ 2026-11-19 11/20 の枠に入れ直すため非公開に（削除はしていない）",
    "uploaded": "2026-11-19T12:47:39.929Z"
+  },
+  {
+   "id": "pilot_063",
+   "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
+   "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
+   "publish_at": "2026-11-20 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-19 ユーザーの指示「明日の公開分から新ドパ設計に、キリンは非公開に」で 11/24 から 11/20 へ",
+   "uploaded": "2026-11-19T13:00:54.887Z"
   }
  ]
 }
