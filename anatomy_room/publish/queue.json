@@ -398,6 +398,15 @@
    "status": "scheduled",
    "note": "2026-11-19 新ドパ設計 v2（スポーツ記録の偏差値、v3）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
    "uploaded": "2026-11-19T07:06:49.050Z"
+  },
+  {
+   "id": "pilot_063",
+   "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
+   "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
+   "publish_at": "2026-11-24 19:00",
+   "status": "scheduled",
+   "note": "2026-11-19 新ドパ設計 v2（一生を24時間に、v4）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-19T12:47:39.929Z"
   }
  ]
 }
