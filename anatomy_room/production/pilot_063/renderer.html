@@ -261,7 +261,7 @@ function blDraw(c, name, t) {
   if (name === LN[cur(t)].scene) BL.last = [name, i];
 }
 function drawScene(c, i, t) { c.save(); c.clearRect(0, 0, W, H); blDraw(c, LN[i].scene, t); c.restore(); }
-function camAt(t, i) { return { fx: 540, fy: 960, z: 1.0 + .03 * barPulse(t), rot: (beatIdx(t) % 2 ? 1 : -1) * .004 * pulse(t) }; }
+function camAt(t, i) { return { fx: 540, fy: 960, z: 1.0 + .05 * barPulse(t), rot: (beatIdx(t) % 2 ? 1 : -1) * .006 * pulse(t) }; }   // v2：拍の押し出しを強く（MV のようなグルーブ）
 const TR = { s01: "zoom", s02: "whip", s03: "zoom", s04: "whip", s05: "whip", s06: "zoom", s07: "whip", s08: "zoom", s09: "whip", s10: "zoom" };
 function blit(src, cm, { ox = 0, oy = 0, extra = 1, alpha = 1 } = {}) { bg.save(); bg.globalAlpha = alpha; bg.translate(540 + ox, 960 + oy); bg.rotate(cm.rot); bg.scale(cm.z * extra, cm.z * extra); bg.translate(-cm.fx, -cm.fy); bg.drawImage(src, 0, 0); bg.restore(); }
 function composite(t, i) {

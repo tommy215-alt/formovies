@@ -389,6 +389,15 @@
    "reupload": true,
    "note": "2026-11-18 v7 の効果音を +4dB（ユーザーの指示）",
    "uploaded": "2026-11-18T11:58:29.465Z"
+  },
+  {
+   "id": "pilot_062",
+   "video": "anatomy_room/production/pilot_062/reverse_062_sports_outlier.mp4",
+   "meta": "anatomy_room/production/pilot_062/youtube_metadata.md",
+   "publish_at": "2026-11-23 19:00",
+   "status": "scheduled",
+   "note": "2026-11-19 新ドパ設計 v2（スポーツ記録の偏差値、v3）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "uploaded": "2026-11-19T07:06:49.050Z"
   }
  ]
 }

@@ -276,6 +276,16 @@ def cone(name, r1, r2, h, loc, m, seg=64):
     o = bpy.data.objects.new(name, mesh_from_bm(name, bm, [m])); o.location = loc; return link(o)
 
 
+def bob(name, t, beats, h=.05, dur=.28):
+    """拍の頭で弾む高さ（beats の拍それぞれ）。MV のようなグルーブ（2026-11-19 ユーザーの指示）"""
+    return sum(hop(t, lbeat(name, k), h, dur) for k in beats)
+
+
+def kick(name, t, beats, d=.07):
+    """拍の頭で手前へ押し出す量（時計の盤などの「ドン」）"""
+    return sum(d * math.exp(-max(0.0, t - lbeat(name, k)) * 10) * (t >= lbeat(name, k)) for k in beats)
+
+
 # ---------------------------------------------------------------- 24 時間の時計
 LIFE = PLAN["life"]
 ANG = lambda hr: hr / 24 * 2 * math.pi                       # 0 時が上（床では奥 +y）、時計回り
@@ -300,7 +310,7 @@ def wall_clock(name, loc=(0, 0, 2.3), R=1.8):
     hd = empty(name + "_hand", (0, -.1, 0)); parent(hd, root)
     parent(box(name + "_hb", (.08, .03, R - .3), (0, 0, (R - .3) / 2 - .1), gold_mat("goldhand", .1), bevel=.01), hd)
     parent(cyl(name + "_cap", .12, .06, (0, -.03, 0), g, 48), hd).rotation_euler = (math.pi / 2, 0, 0)
-    root["hand"] = hd.name; ANIM.append(hd); return root, hd
+    root["hand"] = hd.name; root["base"] = tuple(loc); ANIM.append(hd); ANIM.append(root); return root, hd
 
 
 def wedge(name, h0, h1, r, th, m, r0=0.0, z=0.0):
@@ -434,7 +444,7 @@ def a_s00(u, t, f):
         k = (t - t1) / (t7 - t1); a = a7 * (1 - (1 - k) ** 2)
     else:
         a = a7
-    S["hd"].rotation_euler = (0, a, 0)
+    S["hd"].rotation_euler = (0, a, 0); bx, by, bz = S["clk"]["base"]; S["clk"].location = (bx, by - kick("s00", t, range(1, 8)), bz)
     go("s00", [(0, (0, -3.0, 2.3), (0, 0, 2.3), 34), (3, (2.4, -4.6, 1.4), (0, 0, 2.3), 30), (6, (-1.6, -5.4, 2.8), (0, 0, 2.2), 28), (8, (0, -6.6, 2.3), (0, 0, 2.3), 30)], t, 4.0)
 
 
@@ -444,6 +454,7 @@ def s_s01():                                   # 平均寿命 84 年：時計の
 
 def a_s01(u, t, f):
     t1, t5 = lbeat("s01", 1), lbeat("s01", 5); k = eio(clamp((t - t1) / (t5 - t1))); S["hd"].rotation_euler = (0, 2 * math.pi * k, 0)
+    bx, by, bz = S["clk"]["base"]; S["clk"].location = (bx, by - kick("s01", t, range(1, 8), .05), bz)
     drop(S["l0"], (-.55, -.1, 4.55), t, lbeat("s01", 1), h=1.5); drop(S["l84"], (.6, -.1, 4.55), t, lbeat("s01", 5), h=1.5)
     go("s01", [(0, (0, -7.2, 3.0), (0, 0, 3.0), 30), (3, (2.2, -5.4, 2.0), (0, 0, 2.8), 30), (5, (0, -5.0, 4.2), (0, 0, 4.0), 34), (7, (0, -7.6, 2.8), (0, 0, 2.9), 30)], t, 4.0)
 
@@ -462,7 +473,7 @@ def a_s02(u, t, f):
     a = 0.0
     for ag, hr, b in AGES:
         tb = lbeat("s02", b); k = eio(clamp((t - (tb - .3)) / .3)); a = a + (ANG(hr) - a) * k if t >= tb - .3 else a
-    S["hd"].rotation_euler = (0, a, 0)
+    S["hd"].rotation_euler = (0, a, 0); bx, by, bz = S["clk"]["base"]; S["clk"].location = (bx, by - kick("s02", t, range(0, 9), .05), bz)
     for i, (ag, hr, b) in enumerate(AGES):
         r = 2.35; aa = ANG(hr); drop(S["ages"][i], (math.sin(aa) * r, -.15, 2.3 + math.cos(aa) * r), t, lbeat("s02", b), h=1.2)
     go("s02", [(0, (-.8, -7.4, 2.2), (0, 0, 2.3), 28), (3, (1.6, -6.6, 3.0), (.9, 0, 2.6), 28), (6, (3.0, -6.4, 2.2), (1.4, 0, 2.4), 28), (8, (0, -9.0, 2.6), (.6, 0, 2.4), 28)], t, 4.0)
@@ -486,6 +497,8 @@ def s_s03():                                   # 睡眠：床の大きな時計�
 
 def a_s03(u, t, f):
     drop(S["w"]["sleep"], (0, 0, .05), t, lbeat("s03", 1), h=2.0); drop(S["bed"], S["bedp"], t, lbeat("s03", 3), h=1.6)
+    if t > lbeat("s03", 3) + .3:
+        x0, y0, z0 = S["bedp"]; S["bed"].location = (x0, y0, z0 + bob("s03", t, range(4, 9), .04))
     (x, y), _ = seg_mid("sleep", 1.7)
     go("s03", [(0, (-1.0, -7.4, 5.8), (0, 0, 0), 30), (1, (-.4, -5.6, 4.2), (0, .3, 0), 30), (3, (x - 1.4, y - 2.4, 1.6), (x, y, .4), 34), (6, (x + 1.8, y - 2.8, 1.2), (x, y, .5), 32),
                (8, (0, -7.6, 6.4), (0, 0, 0), 28)], t, 4.0)
@@ -502,6 +515,9 @@ def a_s04(u, t, f):
     S["bed"].location = S["bedp"]; S["w"]["sleep"].location = (0, 0, .05)
     for k, o, p in S["objs"]:
         drop(S["w"][k], (0, 0, .05), t, lbeat("s04", W4[k]), h=1.6); drop(o, p, t, lbeat("s04", W4[k]), h=2.0)
+        if t > lbeat("s04", W4[k]) + .3:
+            o.location = (p[0], p[1], p[2] + bob("s04", t, [b for b in range(W4[k] + 1, 9)], .04))
+    x0, y0, z0 = S["bedp"]; S["bed"].location = (x0, y0, z0 + bob("s04", t, range(0, 9, 2), .03))
     P_ = {k: seg_mid(k, 1.85)[0] for k in W4}
     go("s04", [(0, (-2.0, -6.6, 4.6), (0, 0, 0), 30), (1, (P_["work"][0] - 2.2, P_["work"][1] - 1.2, 1.4), (P_["work"][0], P_["work"][1], .5), 32),
                (3, (P_["tv"][0] - 1.0, P_["tv"][1] - 2.4, 1.4), (P_["tv"][0], P_["tv"][1], .5), 32), (5, (P_["meal"][0] + 2.0, P_["meal"][1] - 1.6, 1.4), (P_["meal"][0], P_["meal"][1], .4), 32),
@@ -537,11 +553,12 @@ def s_s07():                                   # 家を出るまでは、毎日�
     stage("room"); S["tb"] = table("tb", 1.2, .8, .5); S["tb"].location = (0, .8, 0)
     spot("lamp", (0, .8, 2.6), (0, .8, .5), 900, (1, .82, .55), size=.3, ang=1.0, blend=.6)
     cyl("lampshade", .25, .18, (0, .8, 1.7), plain("shade", (.9, .8, .6), .6), 48); cyl("lampcord", .006, 1.0, (0, .8, 2.3), plain("cord", (.05, .05, .05), .5), 8)
-    fig("dad", (-.85, .8, 0), .62, ceramic(), rz=-math.pi / 2); fig("mom", (.85, .8, 0), .62, ceramic(), rz=math.pi / 2); S["kid"] = fig("kid", (0, .05, 0), .42, goldfig())
+    S["dad"] = fig("dad", (-.85, .8, 0), .62, ceramic(), rz=-math.pi / 2); S["mom"] = fig("mom", (.85, .8, 0), .62, ceramic(), rz=math.pi / 2); S["kid"] = fig("kid", (0, .05, 0), .42, goldfig())
 
 
 def a_s07(u, t, f):
-    S["kid"].location = (0, .05, hop(t, lbeat("s07", 1), .08, .4))
+    S["kid"].location = (0, .05, bob("s07", t, range(0, 5), .07, .32))
+    S["dad"].location = (-.85, .8, bob("s07", t, (1, 3), .03)); S["mom"].location = (.85, .8, bob("s07", t, (0, 2, 4), .03))
     go("s07", [(0, (0, -2.6, 1.9), (0, .7, .6), 32), (2, (1.8, -1.4, 1.0), (0, .6, .6), 30)], t, 3.0)
 
 
@@ -563,7 +580,8 @@ def s_s08():                                   # 18 歳で家を出て、お盆�
 
 def a_s08(u, t, f):
     for i, (m, o, p) in enumerate(S["tiles"]):
-        rise(o, p, t, lbeat("s08", 1), .35, depth=4.0)
+        rise(o, p, t, lbeat("s08", -1), .35, depth=4.0)
+        col = (m - 1) % 4; o.location = (o.location.x, o.location.y - kick("s08", t, [b for b in range(0, 9) if b % 4 == col], .12), o.location.z)          # 場面の入りから並んでいる（暗いコマを出さない）
     for o, p in S["gold"]:
         k = eio(clamp((t - (lbeat("s08", 2) - .3)) / .3)); o.location = (p[0], lerp(.0, p[1], k) if k > 0 else 0.05, p[2] if k > 0 else -50)
     go("s08", [(0, (0, -6.4, 1.4), (0, 0, 1.2), 30), (2, (-1.2, -4.6, 2.2), (-.3, 0, 1.9), 32), (5, (1.6, -5.6, .9), (0, 0, 1.4), 30)], t, 3.0)
@@ -576,6 +594,7 @@ def s_s09():                                   # 親が 87 歳まで生きても
 
 def a_s09(u, t, f):
     drop(S["hg"], (0, 0, 0), t, lbeat("s09", 1), h=2.0)
+    S["hg"].rotation_euler = (0, 0, sum(.06 * (1 if k % 2 else -1) * math.exp(-max(0.0, t - lbeat("s09", k)) * 8) * (t >= lbeat("s09", k)) for k in range(2, 7)))
     go("s09", [(0, (0, -4.2, 1.6), (0, 0, .6), 34), (2, (1.4, -2.4, .8), (0, 0, .5), 36), (4, (-.6, -2.0, 1.2), (0, 0, .35), 42)], t, 4.0)
 
 
@@ -593,7 +612,7 @@ def s_s10():                                   # 1 分 50 秒：時計盤の上�
 
 
 def a_s10(u, t, f):
-    S["hd"].rotation_euler = (0, ANG(HM(8, 32)) + .01 * math.sin(t * 6) * 0, 0)
+    S["hd"].rotation_euler = (0, ANG(HM(8, 32)), 0); bx, by, bz = S["clk"]["base"]; S["clk"].location = (bx, by - kick("s10", t, range(6, 12), .08), bz)
     a = ANG(19.0); dx, dy = math.sin(a), math.cos(a)                    # 外側から中心に向かって見る：扇は細い光の線に見える
     go("s10", [(0, (4.2 * dx, 4.2 * dy, .5), (1.6 * dx, 1.6 * dy, .2), 40), (3, (7.0 * dx, 7.0 * dy, 3.4), (0, 0, 0), 30), (6, (0, -8.4, 7.0), (0, 1.0, 0), 28),
                (9, (0, -6.0, 3.0), (0, 7.5, 3.6), 30)], t, 4.0, mv=.5)

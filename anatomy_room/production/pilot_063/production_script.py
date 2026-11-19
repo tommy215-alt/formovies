@@ -21,7 +21,7 @@ P = BEAT["period"]
 START = BEAT["phase"] + P * BEAT.get("start_beats", 9)            # 曲のこの秒を動画の 0 秒に（小節の頭、前奏のあとの音の厚いところ）
 pipeline, standard = epkit.setup(HERE, "intel", bgm=(BGM, round(BEAT["bpm"])), ending_gain=.0)
 import bgm_file  # noqa: E402
-bgm_file.register("file_063", HERE / "assets" / "bgm" / BGM, start=START, bpm=round(BEAT["bpm"]), gains={"ending": .0}, smooth=.3)
+bgm_file.register("file_063", HERE / "assets" / "bgm" / BGM, start=START, bpm=round(BEAT["bpm"]), gains={"ending": .0, "f_open": 1.8, "f_up": 1.5, "f_mid2": 1.25}, smooth=.3)
 import noend_ext  # noqa: E402
 noend_ext.apply(pipeline, black=0.0)
 
@@ -55,7 +55,7 @@ EP = standard.config({
     "cues": {l["scene"]: [l["id"], 0.0] for l in LINES},
     "sfx": SFX,
     "final_hold": P * 2,
-    "music": {"style": "file_063", "sections": [["s00", 0.0, "f_full"], ["s01", 0.0, "f_85"], ["s03", 0.0, "f_full"], ["s06", 0.0, "f_70"], ["s09", 0.0, "f_70"], ["s10", 0.0, "f_85"]]},
+    "music": {"style": "file_063", "sections": [["s00", 0.0, "f_open"], ["s01", 0.0, "f_up"], ["s06", 0.0, "f_mid2"], ["s09", 0.0, "f_mid2"], ["s10", 0.0, "f_up"]]},
     "segments": [l["scene"] for l in LINES],
     "extra_files": epkit.FILES + ["assets/plan.js", "work/blender/index.js", "../ext/blender/blframes.js"],
     "workers": 2,
