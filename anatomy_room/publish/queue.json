@@ -371,32 +371,32 @@
    "uploaded": "2026-11-18T03:02:43.686Z"
   },
   {
-   "id": "pilot_060",
+   "id": "pilot_060_old2",
    "video": "anatomy_room/production/pilot_060/reverse_060_doomsday_japan.mp4",
    "meta": "anatomy_room/production/pilot_060/youtube_metadata.md",
    "publish_at": "2026-11-21 19:00",
-   "status": "scheduled",
+   "status": "private",
    "reupload": true,
-   "note": "2026-11-18 v5（場面ごとに舞台と出来事を描く、効果音 +4dB）。ユーザーの承認「オッケー」",
+   "note": "2026-11-18 v5（場面ごとに舞台と出来事を描く、効果音 +4dB）。ユーザーの承認「オッケー」 ／ 2026-11-19 060 から順に入れ直すため非公開に（削除はしていない）",
    "uploaded": "2026-11-18T11:56:58.974Z"
   },
   {
-   "id": "pilot_061",
+   "id": "pilot_061_old3",
    "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
    "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
    "publish_at": "2026-11-22 19:00",
-   "status": "scheduled",
+   "status": "private",
    "reupload": true,
-   "note": "2026-11-18 v7 の効果音を +4dB（ユーザーの指示）",
+   "note": "2026-11-18 v7 の効果音を +4dB（ユーザーの指示） ／ 2026-11-19 060 から順に入れ直すため非公開に（削除はしていない）",
    "uploaded": "2026-11-18T11:58:29.465Z"
   },
   {
-   "id": "pilot_062",
+   "id": "pilot_062_old",
    "video": "anatomy_room/production/pilot_062/reverse_062_sports_outlier.mp4",
    "meta": "anatomy_room/production/pilot_062/youtube_metadata.md",
    "publish_at": "2026-11-23 19:00",
-   "status": "scheduled",
-   "note": "2026-11-19 新ドパ設計 v2（スポーツ記録の偏差値、v3）。ユーザーが予約を指示（次に空いている 19:00 の枠）",
+   "status": "private",
+   "note": "2026-11-19 新ドパ設計 v2（スポーツ記録の偏差値、v3）。ユーザーが予約を指示（次に空いている 19:00 の枠） ／ 2026-11-19 060 から順に入れ直すため非公開に（削除はしていない）",
    "uploaded": "2026-11-19T07:06:49.050Z"
   },
   {
@@ -409,14 +409,54 @@
    "uploaded": "2026-11-19T12:47:39.929Z"
   },
   {
-   "id": "pilot_063",
+   "id": "pilot_063_old2",
    "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
    "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
    "publish_at": "2026-11-20 19:00",
+   "status": "private",
+   "reupload": true,
+   "note": "2026-11-19 ユーザーの指示「明日の公開分から新ドパ設計に、キリンは非公開に」で 11/24 から 11/20 へ ／ 2026-11-19 060 から順に入れ直すため非公開に（削除はしていない）",
+   "uploaded": "2026-11-19T13:00:54.887Z"
+  },
+  {
+   "id": "pilot_060",
+   "video": "anatomy_room/production/pilot_060/reverse_060_doomsday_japan.mp4",
+   "meta": "anatomy_room/production/pilot_060/youtube_metadata.md",
+   "publish_at": "2026-11-20 19:00",
    "status": "scheduled",
    "reupload": true,
-   "note": "2026-11-19 ユーザーの指示「明日の公開分から新ドパ設計に、キリンは非公開に」で 11/24 から 11/20 へ",
-   "uploaded": "2026-11-19T13:00:54.887Z"
+   "note": "2026-11-19 ユーザーの指示「明日から 60 から順番に予約」",
+   "uploaded": "2026-11-19T13:24:29.236Z"
+  },
+  {
+   "id": "pilot_061",
+   "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
+   "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
+   "publish_at": "2026-11-21 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-19 ユーザーの指示「明日から 60 から順番に予約」 ／ 予約は済んだがセッションが切れて記録が残らなかったので、Studio の一覧（公開予約）で確かめて手で記録",
+   "url": "https://youtu.be/HJCyrpbG1pM"
+  },
+  {
+   "id": "pilot_062",
+   "video": "anatomy_room/production/pilot_062/reverse_062_sports_outlier.mp4",
+   "meta": "anatomy_room/production/pilot_062/youtube_metadata.md",
+   "publish_at": "2026-11-22 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-19 ユーザーの指示「明日から 60 から順番に予約」",
+   "uploaded": "2026-11-19T14:17:06.472Z"
+  },
+  {
+   "id": "pilot_063",
+   "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
+   "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
+   "publish_at": "2026-11-23 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-19 ユーザーの指示「明日から 60 から順番に予約」",
+   "uploaded": "2026-11-19T14:18:36.431Z"
   }
  ]
 }
