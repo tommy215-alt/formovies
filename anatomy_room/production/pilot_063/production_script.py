@@ -55,14 +55,14 @@ EP = standard.config({
     "cues": {l["scene"]: [l["id"], 0.0] for l in LINES},
     "sfx": SFX,
     "final_hold": P * 2,
-    "music": {"style": "file_063", "sections": [["s00", 0.0, "f_open"], ["s01", 0.0, "f_up"], ["s06", 0.0, "f_mid2"], ["s09", 0.0, "f_mid2"], ["s10", 0.0, "f_up"]]},
+    "music": {"style": "file_063", "sections": [["s00", 0.0, "f_open"], ["s01", 0.0, "f_up"], ["s10", 0.0, "f_mid2"], ["s13", 0.0, "f_mid2"], ["s14", 0.0, "f_up"]]},
     "segments": [l["scene"] for l in LINES],
     "extra_files": epkit.FILES + ["assets/plan.js", "work/blender/index.js", "../ext/blender/blframes.js"],
     "workers": 2,
     "qc_frames": [[l["scene"], .5] for l in LINES],
     "scenes": [(f"{i} {l['scene']}", l["scene"] if i else None, LINES[i + 1]["scene"] if i + 1 < len(LINES) else "endcard", l["id"], "") for i, l in enumerate(LINES)]
               + [(f"{len(LINES)} 終わり（エンディングなし）", "endcard", None, "", "")],
-    "plan_notes": ["## 演出の方針", "", "- 新ドパ設計 v2（061 型）：3D（Blender）。暗い展示室の金の 24 時間時計 → 床の大きな時計盤に、睡眠・仕事・テレビ・食事・通勤の扇が積み上がる → 夜の家・食卓・カレンダー・砂時計 → 最後は 1 分 50 秒ぶんの細い金の扇と、冒頭の時計。",
+    "plan_notes": ["## 演出の方針", "", "- 新ドパ設計 v2（061 型）：3D（Blender）。書斎の金の 24 時間時計 → 床の大きな時計盤に、睡眠・仕事・テレビ・食事・通勤の扇が積み上がる → 一生で使う年数の金の棒（スマホ・趣味・旅行・料理・読書・友達）→ 夜の家・食卓・カレンダー・砂時計 → 最後は 1 分 50 秒ぶんの細い金の扇と、冒頭の時計。",
                    "- 動き・効果音は表拍、カメラは拍に合わせて素早く。閃光・点滅なし。親と過ごす時間は仮定（画面に出す）。"],
 })
 

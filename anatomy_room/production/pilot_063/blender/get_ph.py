@@ -1,9 +1,9 @@
-"""pilot_062 の舞台の素材（Poly Haven、すべて CC0）を assets/ph/ に落とす（git に入れない）。権利は scripts/pilot_062/assets.md。"""
+"""pilot_063 の舞台の素材（Poly Haven、すべて CC0）を assets/ph/ に落とす（git に入れない）。権利は scripts/pilot_062/assets.md。"""
 import json, urllib.request
 from pathlib import Path
-OUT = Path(__file__).resolve().parents[1] / "assets" / "ph"; UA = {"User-Agent": "reverse-pilot062/1.0"}
-HDRI = ["stadium_01", "orlando_stadium", "meadow_2"]
-TEX = ["running_track", "grass_ground", "raked_dirt", "park_dirt", "wood_floor"]
+OUT = Path(__file__).resolve().parents[1] / "assets" / "ph"; UA = {"User-Agent": "reverse-pilot063/1.0"}
+HDRI = ["modern_evening_street", "brown_photostudio_02", "studio_small_08"]
+TEX = ["wood_floor", "grass_ground", "marble_01", "dark_wood", "brushed_concrete"]
 def get(url, p):
     if p.exists() and p.stat().st_size: return
     p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=300).read()); print("got", p.name, flush=True)

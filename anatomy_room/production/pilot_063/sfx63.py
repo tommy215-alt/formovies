@@ -85,24 +85,23 @@ if not getattr(music, "_SFX60", False):
 
 
 # (場面, 拍, 音, 音量)：動きの拍。効果音も同じ拍の頭。拍は scene61.py の lbeat（場面の cue のあとの最初の拍が 0）
-MOVES = [   # v2（2026-11-19「SE を細かく、種類も増やして、冒頭は強め、MV のようなグルーブ」）：動き・弾み・押し出しのすべての拍に
-    *[("s00", k, "tick", 1.3) for k in (1, 2, 4, 5)], ("s00", 3, "swish", 1.3), ("s00", 6, "whoosh", 1.2), ("s00", 7, "watch", 1.6), ("s00", 8, "metalh", 1.2),
-    ("s01", 1, "tin", 1.0), *[("s01", k, "tick", .7) for k in (2, 4, 6)], ("s01", 3, "swish", .6), ("s01", 5, "metalh", 1.0), ("s01", 7, "whoosh", .6),
-    ("s02", 0, "tick", .6), ("s02", 1, "clink", 1.0), ("s02", 2, "tick", .6), ("s02", 3, "tin", 1.0), ("s02", 4, "tick", .6), ("s02", 5, "swish", .55),
-    ("s02", 6, "metalh", 1.0), ("s02", 7, "tick", .6), ("s02", 8, "whoosh", .6),
-    ("s03", 1, "softh", 1.1), ("s03", 2, "swish", .5), ("s03", 3, "plank", 1.1), *[("s03", k, "tap", .55) for k in (4, 5, 7)], ("s03", 6, "whoosh", .55), ("s03", 8, "swish", .55),
-    ("s04", 0, "tap", .5), ("s04", 1, "thud", 1.1), ("s04", 2, "tap", .55), ("s04", 3, "rattle", 1.1), ("s04", 4, "tap", .55), ("s04", 5, "plank", 1.1),
-    ("s04", 6, "switch", .55), ("s04", 7, "swish", .6), ("s04", 8, "tap", .5),
-    ("s05", 0, "run", .8), ("s05", 1, "drop", 1.0), ("s05", 2, "whoosh", .6), ("s05", 3, "tap", .5),
-    ("s06", 1, "soft", .45), ("s06", 2, "swish", .5),
-    ("s07", 0, "tap", .5), ("s07", 1, "soft", .7), ("s07", 2, "whoosh", .5), ("s07", 3, "tap", .55), ("s07", 4, "soft", .6),
-    ("s08", 0, "switch", .55), ("s08", 1, "switch", .55), ("s08", 2, "rumble", 1.0), ("s08", 3, "switch", .55), ("s08", 4, "switch", .55),
-    ("s08", 5, "swish", .6), ("s08", 6, "switch", .55), ("s08", 7, "switch", .55),
-    ("s09", 1, "glass", 1.0), ("s09", 2, "whoosh", .55), ("s09", 3, "tap", .45), ("s09", 4, "swish", .5), ("s09", 5, "tap", .45),
-    ("s10", 0, "bell", .8), ("s10", 1, "tick", .5), ("s10", 2, "tick", .5), ("s10", 3, "whoosh", .6), ("s10", 5, "tick", .5), ("s10", 6, "metalh", .9),
-    ("s10", 7, "tick", .55), ("s10", 8, "tick", .55), ("s10", 9, "swish", .6), ("s10", 10, "tick", .55),
+MOVES = [   # v3：物・文字が動く拍だけ。冒頭は強め（1.4〜1.6）
+    ("s00", 1, "swish", 1.4), ("s00", 7, "watch", 1.6),                                     # 針が回り出す／止まる
+    ("s01", 1, "tin", 1.0), ("s01", 5, "metalh", 1.0),                                      # 「0歳」「84歳」の札が落ちる
+    ("s02", 1, "clink", 1.0), ("s02", 3, "tin", 1.0), ("s02", 6, "metalh", 1.0),            # 針が進み、年齢の札が落ちる
+    ("s03", 1, "softh", 1.1), ("s03", 3, "plank", 1.1),                                     # 紺の扇／ベッド
+    ("s04", 1, "thud", 1.1), ("s04", 3, "rattle", 1.1), ("s04", 5, "plank", 1.1),           # 扇と机・テレビ・食卓
+    ("s05", 0, "swish", .8), ("s05", 1, "drop", 1.0),                                       # 電車が走る／灰色の扇
+    ("s06", 1, "thud", 1.0), ("s06", ("L06", 1, 0), "rumble", 1.1),           # スマホが落ちる／いちばん高い棒
+    ("s07", ("L07", 0, 0), "plank", .9), ("s07", ("L07", 0, 1), "pillar", 1.0), ("s07", ("L07", 1, -1), "softh", .9), ("s07", ("L07", 1, 0), "tin", 1.0),
+    ("s08", ("L08", 0, 0), "rattle", .9), ("s08", ("L08", 0, 1), "pillar", 1.0), ("s08", ("L08", 0, 2), "tin", .9),
+    ("s08", ("L08", 1, -1), "tap", .9), ("s08", ("L08", 1, 0), "plank", 1.0),
+    ("s09", 0, "soft", .7), ("s09", 1, "clink", 1.0),                                       # 友達の小物／小さな光る棒
+    ("s11", 1, "soft", .6),                                                                 # 子どもが跳ねる
+    ("s12", ("L12", 1, 0), "rumble", 1.0),                                                  # 8 月と 1 月の札が金に
+    ("s13", 1, "glass", 1.0),                                                               # 砂時計が置かれる
 ]
-SEAL = [("s10", 4, "stamp", 1.0)]   # 2D の判（1分50秒）
+SEAL = [("s14", 4, "stamp", 1.0)]   # 2D の判（1分50秒）
 
 
 def events(tl_path, lines, BP, phrase_gain=.8):
@@ -116,8 +115,17 @@ def events(tl_path, lines, BP, phrase_gain=.8):
             return
         used[key] = [name, scene, gain, round(t_abs - cues[scene], 4)]
 
+    st0 = {x["id"]: x for x in tl["lines"] if not x.get("ending")}; lj = {x["id"]: x for x in lines}
+
+    def beat_of(sc, k):
+        """数字なら場面の拍。("L06", 句, ずらす拍) なら、その字幕の句が出る拍（renderer.html の phrases() と同じ計算）"""
+        if not isinstance(k, (tuple, list)):
+            return round(cues[sc] / BP) + k
+        lid, j, off = k; L = st0[lid]; sub = lj[lid]["sub"]; tot = len("".join(sub)); acc = len("".join(sub[:j]))
+        return round((L["start"] + (L["end"] - L["start"]) * acc / tot - .05) / BP) + off
+
     for sc, k, name, g in MOVES:
-        c = cues[sc]; put(sc, (round(c / BP) + k) * BP, name, g)
+        put(sc, beat_of(sc, k) * BP, name, g)
     for sc, k, name, g in SEAL:
         put(sc, (round(cues[sc] / BP) + k) * BP, name, g)
     # 帯・札（字幕の句）の出：renderer.html の phrases() と同じ計算（拍の頭に丸める）

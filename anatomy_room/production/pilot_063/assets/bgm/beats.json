@@ -1,8 +1,8 @@
 {
- "file": "Funk Game Loop (arr).wav",
- "bpm": 104.99031,
- "period": 0.5714812903638579,
- "phase": 0.0,
+ "file": "Dance the Night Away.mp3",
+ "bpm": 117.48883,
+ "period": 0.5106868511096446,
+ "phase": 49.412,
  "start_beats": 0,
- "note": "Funk Game Loop を小節で並べ替え（2026-11-17）：盛り上がり（16〜23 小節、元の 36.6 秒〜）→ 0〜11 小節 → 16〜23 小節。冒頭と最後がサビ。元の拍は phase 0.0638・105 BPM"
+ "note": "JMHBM「Dance the Night Away」（FMA、CC BY 4.0）。ドラムが入る瞬間（元の 49.41 秒）を動画の 0 秒に（2026-11-18 ユーザーの指示）。拍は librosa で推定（117.5 BPM）"
 }

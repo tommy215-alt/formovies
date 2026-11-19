@@ -26,7 +26,7 @@
   }
  },
  "gap": 0.05,
- "max_duration": 70.0,
+ "max_duration": 80.0,
  "meta": {},
  "lines": [
   {
@@ -38,7 +38,7 @@
     "あなたの一生を 24時間にしたら",
     "いま 何時？"
    ],
-   "pause": 0.593,
+   "pause": 0.557,
    "kind": "open",
    "fact": "scripts/pilot_063/fact_check.md"
   },
@@ -51,7 +51,7 @@
     "平均寿命 約84年",
     "生まれた瞬間が0時 84歳でまた0時"
    ],
-   "pause": 0.455,
+   "pause": 0.48,
    "kind": "dial",
    "fact": "scripts/pilot_063/fact_check.md"
   },
@@ -65,7 +65,7 @@
     "30歳は 8時32分",
     "40歳で もう11時23分"
    ],
-   "pause": 0.431,
+   "pause": 0.334,
    "kind": "ages",
    "fact": "scripts/pilot_063/fact_check.md"
   },
@@ -78,7 +78,7 @@
     "いちばん長いのは 睡眠",
     "約28年＝7時間54分ぶん"
    ],
-   "pause": 0.327,
+   "pause": 0.29,
    "kind": "sleep",
    "fact": "scripts/pilot_063/fact_check.md"
   },
@@ -92,7 +92,7 @@
     "テレビなど 約7年半",
     "食事 約6年"
    ],
-   "pause": 0.389,
+   "pause": 0.413,
    "kind": "work",
    "fact": "scripts/pilot_063/fact_check.md"
   },
@@ -104,7 +104,7 @@
    "sub": [
     "通勤・通学だけで 約1年10か月"
    ],
-   "pause": 0.336,
+   "pause": 0.603,
    "kind": "commute",
    "fact": "scripts/pilot_063/fact_check.md"
   },
@@ -112,62 +112,114 @@
    "id": "L06",
    "who": "M",
    "scene": "s06",
-   "speech": "じゃあ、親と過ごす時間は？",
+   "speech": "スマホでネットを見る時間は、1日約2時間。一生なら、約7年。",
    "sub": [
-    "じゃあ 親と過ごす時間は？"
+    "スマホでネット 1日約2時間",
+    "一生なら 約7年"
    ],
    "pause": 0.15,
-   "kind": "parents",
+   "kind": "phone",
    "fact": "scripts/pilot_063/fact_check.md"
   },
   {
    "id": "L07",
    "who": "M",
    "scene": "s07",
-   "speech": "家を出るまでは、毎日のように、一緒。",
+   "speech": "趣味と娯楽は、約2年10か月。泊まりの旅行は、約1年2か月。",
    "sub": [
-    "家を出るまでは",
-    "毎日のように 一緒"
+    "趣味・娯楽 約2年10か月",
+    "泊まりの旅行 約1年2か月"
    ],
-   "pause": 0.317,
-   "kind": "home",
+   "pause": 0.15,
+   "kind": "hobby",
    "fact": "scripts/pilot_063/fact_check.md"
   },
   {
    "id": "L08",
    "who": "M",
    "scene": "s08",
-   "speech": "18歳で家を出て、お盆と正月に、3日ずつ帰る。1日4時間、一緒にいるとして。",
+   "speech": "料理は、女性で約4年半、男性は約10か月。本や雑誌を読むのは、約9か月。",
    "sub": [
-    "18歳で家を出て",
-    "お盆と正月に 3日ずつ帰る",
-    "1日4時間 一緒にいるとして"
+    "料理 女性 約4年半・男性 約10か月",
+    "本や雑誌を読む 約9か月"
    ],
-   "pause": 0.255,
-   "kind": "visit",
+   "pause": 0.296,
+   "kind": "cook",
    "fact": "scripts/pilot_063/fact_check.md"
   },
   {
    "id": "L09",
    "who": "M",
    "scene": "s09",
+   "speech": "友達と会って話す時間は、たった7か月。",
+   "sub": [
+    "友達と会って話す時間",
+    "たった7か月"
+   ],
+   "pause": 0.57,
+   "kind": "friends",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "s10",
+   "speech": "そして、親と過ごす時間は？",
+   "sub": [
+    "そして 親と過ごす時間は？"
+   ],
+   "pause": 0.559,
+   "kind": "parents",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L11",
+   "who": "M",
+   "scene": "s11",
+   "speech": "家を出るまでは、毎日のように、一緒。",
+   "sub": [
+    "家を出るまでは",
+    "毎日のように 一緒"
+   ],
+   "pause": 0.57,
+   "kind": "home",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L12",
+   "who": "M",
+   "scene": "s12",
+   "speech": "18歳で家を出て、お盆と正月に、3日ずつ帰る。1日4時間、一緒にいるとして。",
+   "sub": [
+    "18歳で家を出て",
+    "お盆と正月に 3日ずつ帰る",
+    "1日4時間 一緒にいるとして"
+   ],
+   "pause": 0.28,
+   "kind": "visit",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L13",
+   "who": "M",
+   "scene": "s13",
    "speech": "親が87歳まで生きても、残りは、約940時間。",
    "sub": [
     "親が87歳まで生きても",
     "残りは 約940時間"
    ],
-   "pause": 0.546,
+   "pause": 0.15,
    "kind": "remain",
    "fact": "scripts/pilot_063/fact_check.md"
   },
   {
-   "id": "L10",
+   "id": "L14",
    "who": "W",
-   "scene": "s10",
-   "speech": "一生の24時間に直すと、たった、1分50秒。あなたの時計は、いま、何時？",
+   "scene": "s14",
+   "speech": "一生の24時間で、たった1分50秒。あなたの残りの時間は、何に使う？",
    "sub": [
     "一生の24時間で たった1分50秒",
-    "あなたの時計は いま何時？"
+    "あなたの残りの時間は 何に使う？"
    ],
    "pause": 0.15,
    "kind": "end",

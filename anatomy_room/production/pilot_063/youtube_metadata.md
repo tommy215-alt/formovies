@@ -9,12 +9,12 @@
 ```
 平均寿命 約84年を、24時間の時計にしたら。
 30歳は朝8時32分。睡眠・仕事・テレビ・食事・通勤で、時計はどんどん埋まっていく。
-では、大人になってから親と過ごす時間は？
+スマホは一生で約7年、友達と会って話す時間はたった7か月。では、親と過ごす時間は？
 
-※平均寿命は令和7年簡易生命表（男81.35年・女87.33年）の単純平均。1日の時間の使い方は総務省「社会生活基本調査」2021（10歳以上の週全体の平均）。
+※平均寿命は令和7年簡易生命表（男81.35年・女87.33年）の単純平均。1日の時間の使い方は総務省「社会生活基本調査」2021（10歳以上の週全体の平均）。スマホは総務省「情報通信メディアの利用時間と情報行動に関する調査」令和7年度（13〜79歳、ほかの時間と重なる）、旅行は観光庁「旅行・観光消費動向調査」2025年（出張を含む）、読書はNHK「国民生活時間調査2020」（雑誌・マンガを含む）。
 ※親と過ごす時間は「18歳で家を出て、お盆と正月に3日ずつ帰省、1日4時間、親と30歳差、親は87歳まで」と仮定した計算です。人物は模型です。
 
-音楽："Funk Game Loop" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/
+音楽："Dance the Night Away" by JMHBM (https://freemusicarchive.org/music/beat-mekanik/) is licensed under CC BY 4.0
 3D：Blender（Cycles）。光と質感：Poly Haven（CC0）。効果音：Kenney（CC0）
 音声：VOICEVOX:青山龍星／VOICEVOX:春日部つむぎ
 ```

@@ -110,11 +110,25 @@ def glow_mat(name, col, k):
 
 
 def stage(kind):
-    """舞台：arena（暗い展示室）・room（夜の食卓の部屋）・night（夜の住宅街の家の前）"""
+    """舞台：study（書斎、v3）・arena（暗い展示室）・room（夜の食卓の部屋）・night（夜の住宅街の家の前）"""
     clear_scene(); ANIM[:] = [cam.o]
     if kind == "arena":
         plane("floor", 80, 80, (0, 0, 0), plain("blackfloor", (.025, .024, .027), .22, coat=.8))
         plane("backw", 80, 20, (0, 9, 10), pbr_mat("bw", "brushed_concrete", 1 / 3.0, (.16, .15, .15), 1.0, box_proj=True), rot=(math.pi / 2, 0, 0)); lights((900, (1, .92, .8)), (600, (1, .8, .6)), "studio_small_08_2k.hdr", .35)
+    elif kind == "study":                     # 書斎：大理石の床、奥に天井までの本棚と木の壁、真鍮の灯り（v3）
+        plane("floor", 60, 60, (0, 0, 0), pbr_mat("marble", "marble_01", 1 / 2.2, (.95, .9, .82), .6, box_proj=True))
+        wd = pbr_mat("panel", "dark_wood", 1 / 1.5, (.55, .38, .26), 1.0, box_proj=True)
+        plane("backw", 60, 14, (0, 9.4, 7), wd, rot=(math.pi / 2, 0, 0))
+        bookshelf("shelf", (0, 9.0, 0), 22.0, 5.6)
+        for sx in (-1, 1):
+            plane("sidew%d" % sx, 30, 14, (sx * 11, 0, 7), wd, rot=(math.pi / 2, 0, math.pi / 2))
+            bookshelf("shelfs%d" % sx, (sx * 10.6, 1.0, 0), 14.0, 5.6, rz=-sx * math.pi / 2)
+        brass = gold_mat("brassl", .3, (.86, .62, .3)); shade = glow_mat("lampglow", (1, .82, .55), 6.0)
+        for x in (-4.2, 4.2):                 # 壁の真鍮の灯り
+            cyl("sc%g" % x, .05, .5, (x, 8.85, 3.2), brass, 24); sphere("scg%g" % x, .16, (x, 8.75, 3.55), shade, 32)
+            l = bpy.data.lights.new("scl%g" % x, "POINT"); l.energy = 260; l.color = (1, .78, .5); l.shadow_soft_size = .2
+            o = bpy.data.objects.new("scl%g" % x, l); o.location = (x, 8.5, 3.5); link(o)
+        lights((1100, (1, .9, .78)), (700, (1, .82, .62)), "brown_photostudio_02_2k.hdr", .55)
     elif kind == "room":
         plane("floor", 40, 40, (0, 0, 0), pbr_mat("court", "wood_floor", 1 / 1.6, (1, .9, .78), 1.0, box_proj=True))
         wl = plain("wall", (.55, .48, .4), .8)
@@ -261,6 +275,34 @@ def hop(t, t0, h=.2, dur=.4):
     u = (t - (t0 - dur / 2)) / dur; return h * math.sin(math.pi * u) if 0 < u < 1 else 0.0
 
 
+
+
+BOOKC = [(.42, .08, .07), (.09, .2, .14), (.1, .14, .3), (.55, .42, .2), (.3, .1, .2), (.72, .66, .55), (.18, .12, .08)]
+
+
+def bookshelf(name, loc, w, h, rz=0.0, rows=6):
+    """本棚：棚板と本を 1 つのメッシュにまとめる（物の数を増やさない）。本は色 7 種類"""
+    import random as _r
+    R = _r.Random(sum(map(ord, name))); bm = bmesh.new(); mats = [plain("shelfwood", (.22, .13, .08), .45, coat=.3)] + [plain("book%d" % i, c, .55, coat=.15) for i, c in enumerate(BOOKC)]
+    def cube(cx, cy, cz, sx, sy, sz, mi):
+        r = bmesh.ops.create_cube(bm, size=1.0); vs = r["verts"]
+        for v in vs:
+            v.co.x = cx + v.co.x * sx; v.co.y = cy + v.co.y * sy; v.co.z = cz + v.co.z * sz
+        for f in {f for v in vs for f in v.link_faces}:
+            f.material_index = mi
+    rh = h / rows
+    for i in range(rows + 1):
+        cube(0, 0, i * rh + .03, w, .42, .06, 0)
+    for xx in (-w / 2, w / 2):
+        cube(xx, 0, h / 2, .08, .42, h, 0)
+    for i in range(rows):
+        x = -w / 2 + .08
+        while x < w / 2 - .12:
+            bw = R.uniform(.035, .075); bh = rh * R.uniform(.62, .86)
+            if R.random() < .05:
+                x += R.uniform(.1, .3); continue
+            cube(x + bw / 2, R.uniform(-.03, .03), i * rh + .06 + bh / 2, bw, .3, bh, 1 + R.randrange(len(BOOKC))); x += bw + .004
+    o = bpy.data.objects.new(name, mesh_from_bm(name, bm, mats, smooth=False)); o.location = loc; o.rotation_euler = (0, 0, rz); return link(o)
 
 
 def glass_mat():
@@ -431,8 +473,10 @@ def hourglass(name, s=1.0):
 
 # ================================================================ ショット
 def s_s00():                                   # 冒頭：暗い展示室の壁に、金の 24 時間時計。針が勢いよく回り出す
-    stage("arena"); spot("sp", (0, -5, 7), (0, 0, 2.3), 3000, size=.8, ang=.9, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 2.3), 8, 700)
+    stage("study"); spot("sp", (0, -5, 7), (0, 0, 2.3), 3000, size=.8, ang=.9, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 2.3), 8, 700)
     S["clk"], S["hd"] = wall_clock("clk")
+    wd = pbr_mat("plinth", "dark_wood", 1.0, (.4, .28, .2), 1.0, box_proj=True)       # 時計の台（宙に浮かない）
+    box("clkbase", (2.2, 1.0, .3), (0, .1, .15), wd, bevel=.03); cyl("clkneck", .12, .35, (0, .1, .45), gold_mat("brassl", .3, (.86, .62, .3)), 32)
 
 
 def a_s00(u, t, f):
@@ -481,7 +525,7 @@ def a_s02(u, t, f):
 
 def base_dial(upto):
     """床の時計盤の舞台（s03〜s05 共通）：扇は upto まで、ベッド、机・テレビ・食卓"""
-    stage("arena"); spot("sp", (0, -4, 9), (0, 0, 0), 4000, size=1.0, ang=1.0, blend=.5); reflector("rf", (0, -14, 5), (0, 0, 0), 10, 600)
+    stage("study"); spot("sp", (0, -4, 9), (0, 0, 0), 4000, size=1.0, ang=1.0, blend=.5); reflector("rf", (0, -14, 5), (0, 0, 0), 10, 600)
     floor_dial("fd"); S["w"] = all_wedges(upto); (x, y), a = seg_mid("sleep", 1.7)
     S["bed"] = bed("bed"); S["bed"].rotation_euler = (0, 0, -a); S["bedp"] = (x, y, .19); ANIM.append(S["bed"])
     sl = fig("sleeper", (0, 0, 0), .5, goldfig()); parent(sl, S["bed"]); sl.location = (0, .05, .62); sl.rotation_euler = (-math.pi / 2, 0, 0)
@@ -540,33 +584,134 @@ def a_s05(u, t, f):
     go("s05", [(0, (x - 2.6, y - 2.2, 1.0), (x, y, .3), 30), (2, (x - 1.0, y - 3.4, 2.4), (x * .7, y * .7, .2), 30)], t, 4.0)
 
 
-def s_s06():                                   # じゃあ、親と過ごす時間は？：夜の家。窓と玄関に明かり
+# ---------------------------------------------------------------- 人生の使い方：一生で使う年数の金の棒（v2）
+LINES_J = json.load(open(os.path.join(HERE, "..", "lines.json"), encoding="utf-8"))["lines"]
+TLL = {x["id"]: x for x in TL["lines"]}
+
+
+def pb(lid, j, off=0):
+    """字幕の句 j が出る拍（場面の拍 0 から数えて）。renderer.html の phrases() と同じ計算"""
+    ln = next(x for x in LINES_J if x["id"] == lid); L = TLL[lid]; tot = len("".join(ln["sub"])); acc = len("".join(ln["sub"][:j]))
+    a = round((L["start"] + (L["end"] - L["start"]) * acc / tot - .05) / BP); return a - round(CUE[ln["scene"]] / BP) + off
+
+
+BARS = PLAN["bars"]; BX = [-3.6, -2.4, -1.2, 0.0, .9, 2.1, 3.3]; YS = .42      # 1 年＝0.42m
+
+
+def icon(kind, name):
+    root = empty(name); g = gold_mat("gold", .13); dk = plain("ink", (.12, .1, .1), .5)
+    if kind == "phone":
+        parent(box(name + "_b", (.36, .04, .7), (0, 0, .35), plain("phoneb", (.05, .05, .06), .25, coat=.8), bevel=.04), root)
+        parent(box(name + "_s", (.32, .005, .62), (0, -.022, .36), glow_mat("phscr", (.45, .6, 1.0), 2.0), bevel=0), root)
+    elif kind == "hobby":                      # カメラ
+        parent(box(name + "_b", (.34, .2, .22), (0, 0, .11), dk, bevel=.02), root); o = cyl(name + "_l", .08, .12, (0, -.14, .12), plain("lens", (.08, .08, .09), .2, coat=.8), 32); o.rotation_euler = (math.pi / 2, 0, 0); parent(o, root)
+    elif kind == "travel":                     # スーツケース
+        parent(box(name + "_b", (.34, .18, .46), (0, 0, .25), plain("suit", (.55, .12, .1), .4, coat=.4), bevel=.04), root); parent(torus(name + "_h", .07, .012, (0, 0, .52), g, (math.pi / 2, 0, 0)), root)
+    elif kind == "cook":                       # 鍋
+        parent(cyl(name + "_b", .17, .16, (0, 0, .08), plain("pot", (.7, .7, .72), .25, metal=1.0), 48), root)
+        for sx in (-1, 1):
+            parent(box(name + "_h%d" % sx, (.08, .03, .025), (sx * .21, 0, .13), dk, bevel=0), root)
+    elif kind == "book":
+        parent(box(name + "_b", (.3, .22, .06), (0, 0, .03), plain("bookc", (.15, .25, .45), .5), bevel=.01), root); parent(box(name + "_b2", (.28, .2, .05), (.02, 0, .085), plain("bookc2", (.5, .12, .1), .5), bevel=.01), root)
+    elif kind == "friends":
+        f1 = fig(name + "_f1", (-.12, 0, 0), .28, ceramic(), rz=-.4); f2 = fig(name + "_f2", (.12, 0, 0), .28, ceramic(), rz=.4); parent(f1, root); parent(f2, root)
+    return root
+
+
+def bars_set():
+    """書斎の床に並ぶ 7 本の金の棒（高さ＝一生で使う年数）。上に名前、手前に小物"""
+    stage("study"); spot("sp", (0, -5, 7), (0, 0, 1.2), 3200, size=.8, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.5), 12, 700)
+    S["bars"] = []
+    for i, (nm, yr, ic) in enumerate(BARS):
+        h = max(.06, yr * YS); x = BX[i]; m = gold_mat("gold", .13)
+        o = empty("bar%d" % i, (x, 0, 0)); parent(box("barb%d" % i, (.55, .55, h), (0, 0, h / 2), m, bevel=.02), o)
+        parent(label("barl%d" % i, nm, (0, -.3, h + .25), .14 if len(nm) < 5 else .11), o)
+        parent(label("bary%d" % i, ("%.1f年" % yr) if yr >= 1 else ("%dか月" % round(yr * 12)), (0, -.3, h + .08), .12), o)
+        o["h"] = h + .6; ANIM.append(o); ic_o = icon(ic, "ic%d" % i); ic_o.location = (x, -.75, 0); ANIM.append(ic_o); S["bars"].append((o, ic_o, x))
+
+
+def show_bars(t, name, plan, icon_at=None):
+    """plan：{棒の番号: 拍}（場面の拍 0 から）。それより前の場面で出た棒は最初から立っている"""
+    for i, (o, ic, x) in enumerate(S["bars"]):
+        k = plan.get(i, None)
+        if k is None:
+            o.location = (x, 0, -50); ic.location = (x, -.75, -50)
+        elif k == "on":
+            o.location = (x, 0, 0); ic.location = (x, -.75, 0)
+        else:
+            rise(o, (x, 0, 0), t, lbeat(name, k), .4); drop(ic, (x, -.75, 0), t, lbeat(name, (icon_at or {}).get(i, k - 1)), h=1.6)
+
+
+def s_s06():                                   # スマホ：1 日約 2 時間 → 一生で約 7 年。スマホが落ち、いちばん高い棒がせり上がる
+    bars_set()
+
+
+def a_s06(u, t, f):
+    show_bars(t, "s06", {0: pb("L06", 1)}, {0: 1})                     # スマホは拍 1 に落ちる（場面の入りから見せる）
+    x = BX[0]; k1 = pb("L06", 1)
+    go("s06", [(0, (x + 1.2, -2.6, .5), (x, -.7, .3), 36), (k1, (x + 2.6, -4.4, 1.2), (x, 0, 1.8), 28), (k1 + 3, (x + 3.4, -6.2, 2.0), (x + .6, 0, 2.2), 28)], t, 3.0)
+
+
+def s_s07():                                   # 趣味・娯楽 約 2 年 10 か月、泊まりの旅行 約 1 年 2 か月
+    bars_set()
+
+
+def a_s07(u, t, f):
+    k1, k2 = pb("L07", 0, 1), pb("L07", 1)
+    show_bars(t, "s07", {0: "on", 1: k1, 2: k2})
+    go("s07", [(0, (-1.0, -5.2, 1.4), (-2.4, 0, 1.1), 30), (k2, (.2, -4.6, 1.0), (-1.6, 0, .7), 30), (k2 + 3, (-.6, -6.6, 2.0), (-1.8, 0, 1.4), 28)], t, 3.0)
+
+
+def s_s08():                                   # 料理 女性 約 4 年半・男性 約 10 か月、本や雑誌 約 9 か月
+    bars_set()
+
+
+def a_s08(u, t, f):
+    k1, k2 = pb("L08", 0, 1), pb("L08", 1)
+    show_bars(t, "s08", {0: "on", 1: "on", 2: "on", 3: k1, 4: k1 + 1, 5: k2})
+    go("s08", [(0, (1.6, -4.8, 1.4), (.3, 0, 1.2), 30), (k2, (3.2, -4.0, 1.0), (1.8, 0, .6), 30), (k2 + 3, (2.0, -6.4, 1.8), (.8, 0, 1.2), 28)], t, 3.0)
+
+
+def s_s09():                                   # 友達と会って話す時間は、たった 7 か月：光る小さな棒 → 引くと全体
+    bars_set(); spot("sp2", (3.3, -2.5, 3.5), (3.3, 0, .1), 900, (1, .85, .6), size=.3, ang=.5, blend=.6)
+
+
+def a_s09(u, t, f):
+    k1 = pb("L09", 1)
+    show_bars(t, "s09", {0: "on", 1: "on", 2: "on", 3: "on", 4: "on", 5: "on", 6: 1})
+    x = BX[6]
+    go("s09", [(0, (x + .2, -2.2, .4), (x, -.3, .2), 40), (k1, (x - .4, -1.6, .35), (x, 0, .2), 46), (k1 + 2, (0, -9.0, 2.2), (0, 0, 1.4), 28)], t, 3.0)
+
+
+def s_s10():                                   # じゃあ、親と過ごす時間は？：夜の家。窓と玄関に明かり
     stage("night"); S["h"] = house("home"); S["h"].location = (0, 1.0, 0)
     reflector("rf", (0, -14, 3), (0, 0, 1), 8, 300)
 
 
-def a_s06(u, t, f):
-    go("s06", [(0, (2.6, -7.5, 1.0), (0, 0, 1.2), 30), (2, (.9, -4.2, .9), (.5, .1, .9), 34)], t, 4.0, mv=.5)
+def a_s10(u, t, f):
+    go("s10", [(0, (2.6, -7.5, 1.0), (0, 0, 1.2), 30), (2, (.9, -4.2, .9), (.5, .1, .9), 34)], t, 4.0, mv=.5)
 
 
-def s_s07():                                   # 家を出るまでは、毎日のように一緒：明かりの下の食卓、大人 2 人と子ども（金）
+def s_s11():                                   # 家を出るまでは、毎日のように一緒：明かりの下の食卓、大人 2 人と子ども（金）
     stage("room"); S["tb"] = table("tb", 1.2, .8, .5); S["tb"].location = (0, .8, 0)
     spot("lamp", (0, .8, 2.6), (0, .8, .5), 900, (1, .82, .55), size=.3, ang=1.0, blend=.6)
     cyl("lampshade", .25, .18, (0, .8, 1.7), plain("shade", (.9, .8, .6), .6), 48); cyl("lampcord", .006, 1.0, (0, .8, 2.3), plain("cord", (.05, .05, .05), .5), 8)
     S["dad"] = fig("dad", (-.85, .8, 0), .62, ceramic(), rz=-math.pi / 2); S["mom"] = fig("mom", (.85, .8, 0), .62, ceramic(), rz=math.pi / 2); S["kid"] = fig("kid", (0, .05, 0), .42, goldfig())
 
 
-def a_s07(u, t, f):
-    S["kid"].location = (0, .05, bob("s07", t, range(0, 5), .07, .32))
-    S["dad"].location = (-.85, .8, bob("s07", t, (1, 3), .03)); S["mom"].location = (.85, .8, bob("s07", t, (0, 2, 4), .03))
-    go("s07", [(0, (0, -2.6, 1.9), (0, .7, .6), 32), (2, (1.8, -1.4, 1.0), (0, .6, .6), 30)], t, 3.0)
+def a_s11(u, t, f):
+    S["kid"].location = (0, .05, bob("s11", t, range(0, 5), .07, .32))
+    S["dad"].location = (-.85, .8, bob("s11", t, (1, 3), .03)); S["mom"].location = (.85, .8, bob("s11", t, (0, 2, 4), .03))
+    go("s11", [(0, (0, -2.6, 1.9), (0, .7, .6), 32), (2, (1.8, -1.4, 1.0), (0, .6, .6), 30)], t, 3.0)
 
 
 MONTHS = [(i + 1, (i % 4 - 1.5) * .95, 2.6 - (i // 4) * .95) for i in range(12)]
 
 
-def s_s08():                                   # 18 歳で家を出て、お盆と正月に 3 日ずつ：12 か月の札が並び、8 月と 1 月だけ金に
-    stage("arena"); spot("sp", (0, -5, 6), (0, 0, 1.6), 3000, size=.8, ang=1.0, blend=.5); reflector("rf", (0, -14, 3), (0, 0, 1.6), 8, 500)
+def s_s12():                                   # 18 歳で家を出て、お盆と正月に 3 日ずつ：12 か月の札が並び、8 月と 1 月だけ金に
+    stage("study"); spot("sp", (0, -5, 6), (0, 0, 1.6), 3000, size=.8, ang=1.0, blend=.5); reflector("rf", (0, -14, 3), (0, 0, 1.6), 8, 500)
+    box("calboard", (4.3, .08, 3.3), (0, .12, 1.65), pbr_mat("panel2", "dark_wood", 1 / 1.5, (.45, .3, .2), 1.0, box_proj=True), bevel=.03)   # 札を掛ける木の板
+    box("calfoot", (4.6, .5, .12), (0, .2, .06), pbr_mat("panel2", "dark_wood", 1 / 1.5, (.45, .3, .2), 1.0, box_proj=True), bevel=.02)
     S["tiles"] = []; c = ceramic(); g = gold_mat("gold", .13)
     for m, x, z in MONTHS:
         o = empty("mt%d" % m); parent(box("mtb%d" % m, (.8, .08, .8), (0, 0, 0), c, bevel=.03), o)
@@ -578,28 +723,28 @@ def s_s08():                                   # 18 歳で家を出て、お盆�
         parent(text_obj("gtd%d" % m, "3日", (0, -.06, -.18), .16, plain("ink", (.12, .1, .1), .5), extrude=.01, font="BIZUDPGothic-Bold.ttf"), o); ANIM.append(o); S["gold"].append((o, (x, -.25, z)))
 
 
-def a_s08(u, t, f):
+def a_s12(u, t, f):
     for i, (m, o, p) in enumerate(S["tiles"]):
-        rise(o, p, t, lbeat("s08", -1), .35, depth=4.0)
-        col = (m - 1) % 4; o.location = (o.location.x, o.location.y - kick("s08", t, [b for b in range(0, 9) if b % 4 == col], .12), o.location.z)          # 場面の入りから並んでいる（暗いコマを出さない）
+        rise(o, p, t, lbeat("s12", -1), .35, depth=4.0)
+        col = (m - 1) % 4; o.location = (o.location.x, o.location.y - kick("s12", t, [b for b in range(0, 9) if b % 4 == col], .12), o.location.z)          # 場面の入りから並んでいる（暗いコマを出さない）
     for o, p in S["gold"]:
-        k = eio(clamp((t - (lbeat("s08", 2) - .3)) / .3)); o.location = (p[0], lerp(.0, p[1], k) if k > 0 else 0.05, p[2] if k > 0 else -50)
-    go("s08", [(0, (0, -6.4, 1.4), (0, 0, 1.2), 30), (2, (-1.2, -4.6, 2.2), (-.3, 0, 1.9), 32), (5, (1.6, -5.6, .9), (0, 0, 1.4), 30)], t, 3.0)
+        k = eio(clamp((t - (lbeat("s12", pb("L12", 1)) - .3)) / .3)); o.location = (p[0], lerp(.0, p[1], k) if k > 0 else 0.05, p[2] if k > 0 else -50)
+    go("s12", [(0, (0, -6.4, 1.4), (0, 0, 1.2), 30), (2, (-1.2, -4.6, 2.2), (-.3, 0, 1.9), 32), (5, (1.6, -5.6, .9), (0, 0, 1.4), 30)], t, 3.0)
 
 
-def s_s09():                                   # 親が 87 歳まで生きても、残りは約 940 時間：砂がほとんど落ちた砂時計
-    stage("arena"); spot("sp", (1, -3, 5), (0, 0, .6), 2500, size=.5, ang=.8, blend=.5); reflector("rf", (0, -12, 2), (0, 0, .6), 6, 400)
+def s_s13():                                   # 親が 87 歳まで生きても、残りは約 940 時間：砂がほとんど落ちた砂時計
+    stage("study"); spot("sp", (1, -3, 5), (0, 0, .6), 2500, size=.5, ang=.8, blend=.5); reflector("rf", (0, -12, 2), (0, 0, .6), 6, 400)
     S["hg"] = hourglass("hg", 1.0); ANIM.append(S["hg"])
 
 
-def a_s09(u, t, f):
-    drop(S["hg"], (0, 0, 0), t, lbeat("s09", 1), h=2.0)
-    S["hg"].rotation_euler = (0, 0, sum(.06 * (1 if k % 2 else -1) * math.exp(-max(0.0, t - lbeat("s09", k)) * 8) * (t >= lbeat("s09", k)) for k in range(2, 7)))
-    go("s09", [(0, (0, -4.2, 1.6), (0, 0, .6), 34), (2, (1.4, -2.4, .8), (0, 0, .5), 36), (4, (-.6, -2.0, 1.2), (0, 0, .35), 42)], t, 4.0)
+def a_s13(u, t, f):
+    drop(S["hg"], (0, 0, 0), t, lbeat("s13", 1), h=2.0)
+    S["hg"].rotation_euler = (0, 0, sum(.06 * (1 if k % 2 else -1) * math.exp(-max(0.0, t - lbeat("s13", k)) * 8) * (t >= lbeat("s13", k)) for k in range(2, 7)))
+    go("s13", [(0, (0, -4.2, 1.6), (0, 0, .6), 34), (2, (1.4, -2.4, .8), (0, 0, .5), 36), (4, (-.6, -2.0, 1.2), (0, 0, .35), 42)], t, 4.0)
 
 
-def s_s10():                                   # 1 分 50 秒：時計盤の上に細い金の線（親と過ごす時間）。引くと 24 時間、最後に壁の時計
-    stage("arena"); spot("sp", (0, -1, 9), (0, 0, 0), 4000, size=1.0, ang=.8, blend=.5); reflector("rf", (0, -14, 5), (0, 0, 1), 10, 600)
+def s_s14():                                   # 1 分 50 秒：時計盤の上に細い金の線（親と過ごす時間）。引くと 24 時間、最後に壁の時計
+    stage("study"); spot("sp", (0, -1, 9), (0, 0, 0), 4000, size=1.0, ang=.8, blend=.5); reflector("rf", (0, -14, 5), (0, 0, 1), 10, 600)
     floor_dial("fd"); S["w"] = all_wedges(None)
     for k, o in S["w"].items():
         o.location = (0, 0, .05)
@@ -611,10 +756,10 @@ def s_s10():                                   # 1 分 50 秒：時計盤の上�
     S["clk"], S["hd"] = wall_clock("clk", (0, 7.5, 3.6), 2.6)
 
 
-def a_s10(u, t, f):
-    S["hd"].rotation_euler = (0, ANG(HM(8, 32)), 0); bx, by, bz = S["clk"]["base"]; S["clk"].location = (bx, by - kick("s10", t, range(6, 12), .08), bz)
+def a_s14(u, t, f):
+    S["hd"].rotation_euler = (0, ANG(HM(8, 32)), 0); bx, by, bz = S["clk"]["base"]; S["clk"].location = (bx, by - kick("s14", t, range(6, 12), .08), bz)
     a = ANG(19.0); dx, dy = math.sin(a), math.cos(a)                    # 外側から中心に向かって見る：扇は細い光の線に見える
-    go("s10", [(0, (4.2 * dx, 4.2 * dy, .5), (1.6 * dx, 1.6 * dy, .2), 40), (3, (7.0 * dx, 7.0 * dy, 3.4), (0, 0, 0), 30), (6, (0, -8.4, 7.0), (0, 1.0, 0), 28),
+    go("s14", [(0, (4.2 * dx, 4.2 * dy, .5), (1.6 * dx, 1.6 * dy, .2), 40), (3, (7.0 * dx, 7.0 * dy, 3.4), (0, 0, 0), 30), (6, (0, -8.4, 7.0), (0, 1.0, 0), 28),
                (9, (0, -6.0, 3.0), (0, 7.5, 3.6), 30)], t, 4.0, mv=.5)
 
 
