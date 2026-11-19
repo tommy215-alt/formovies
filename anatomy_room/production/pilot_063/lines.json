@@ -1,0 +1,177 @@
+{
+ "title": "あなたの一生を、24時間にしたら？",
+ "theme": "平均寿命 84.34 年を 24 時間の時計に。睡眠・仕事・テレビ・食事・通勤で時計が埋まり、最後に親と過ごす時間は 1 分 50 秒（新ドパ設計 v2）",
+ "note": "新ドパ設計 v2（061 型）：冒頭と最後は W 春日部つむぎ、本編は M 青山龍星 ノーマル。BGM は Kevin MacLeod「Funk Game Loop」（CC BY 4.0、061 と同じ並べ替え）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "voice_override": {
+  "M": {
+   "name": "青山龍星",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13
+   },
+   "default_style": "normal",
+   "speed": 1.725,
+   "inton": 1.0
+  },
+  "W": {
+   "name": "春日部つむぎ",
+   "credit": "VOICEVOX:春日部つむぎ",
+   "styles": {
+    "normal": 8
+   },
+   "default_style": "normal",
+   "speed": 1.35,
+   "inton": 1.0
+  }
+ },
+ "gap": 0.05,
+ "max_duration": 70.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "W",
+   "scene": "s00",
+   "speech": "もし、あなたの一生を、24時間に縮めたら。いま、何時？",
+   "sub": [
+    "あなたの一生を 24時間にしたら",
+    "いま 何時？"
+   ],
+   "pause": 0.593,
+   "kind": "open",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "s01",
+   "speech": "平均寿命は、約84年。生まれた瞬間が0時、84歳で、また0時。",
+   "sub": [
+    "平均寿命 約84年",
+    "生まれた瞬間が0時 84歳でまた0時"
+   ],
+   "pause": 0.455,
+   "kind": "dial",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "s02",
+   "speech": "20歳は、朝5時41分。30歳は、8時32分。40歳で、もう11時23分。",
+   "sub": [
+    "20歳は 朝5時41分",
+    "30歳は 8時32分",
+    "40歳で もう11時23分"
+   ],
+   "pause": 0.431,
+   "kind": "ages",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "s03",
+   "speech": "この1日で、いちばん長いのは、睡眠。約28年、時計の、7時間54分ぶん。",
+   "sub": [
+    "いちばん長いのは 睡眠",
+    "約28年＝7時間54分ぶん"
+   ],
+   "pause": 0.327,
+   "kind": "sleep",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "s04",
+   "speech": "仕事は、約12年。テレビなどは、約7年半。食事だけで、約6年。",
+   "sub": [
+    "仕事 約12年",
+    "テレビなど 約7年半",
+    "食事 約6年"
+   ],
+   "pause": 0.389,
+   "kind": "work",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "s05",
+   "speech": "通勤と通学だけで、約1年10か月。",
+   "sub": [
+    "通勤・通学だけで 約1年10か月"
+   ],
+   "pause": 0.336,
+   "kind": "commute",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "s06",
+   "speech": "じゃあ、親と過ごす時間は？",
+   "sub": [
+    "じゃあ 親と過ごす時間は？"
+   ],
+   "pause": 0.15,
+   "kind": "parents",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "s07",
+   "speech": "家を出るまでは、毎日のように、一緒。",
+   "sub": [
+    "家を出るまでは",
+    "毎日のように 一緒"
+   ],
+   "pause": 0.317,
+   "kind": "home",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "s08",
+   "speech": "18歳で家を出て、お盆と正月に、3日ずつ帰る。1日4時間、一緒にいるとして。",
+   "sub": [
+    "18歳で家を出て",
+    "お盆と正月に 3日ずつ帰る",
+    "1日4時間 一緒にいるとして"
+   ],
+   "pause": 0.255,
+   "kind": "visit",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "s09",
+   "speech": "親が87歳まで生きても、残りは、約940時間。",
+   "sub": [
+    "親が87歳まで生きても",
+    "残りは 約940時間"
+   ],
+   "pause": 0.546,
+   "kind": "remain",
+   "fact": "scripts/pilot_063/fact_check.md"
+  },
+  {
+   "id": "L10",
+   "who": "W",
+   "scene": "s10",
+   "speech": "一生の24時間に直すと、たった、1分50秒。あなたの時計は、いま、何時？",
+   "sub": [
+    "一生の24時間で たった1分50秒",
+    "あなたの時計は いま何時？"
+   ],
+   "pause": 0.15,
+   "kind": "end",
+   "fact": "scripts/pilot_063/fact_check.md"
+  }
+ ]
+}

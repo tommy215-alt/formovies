@@ -73,24 +73,24 @@ if not getattr(music, "_SFX60", False):
 
 
 # (場面, 拍, 音, 音量)：動きの拍。効果音も同じ拍の頭。拍は scene61.py の lbeat（場面の cue のあとの最初の拍が 0）
-MOVES = [
-    *[("s00", k, "drop", .8) for k in (1, 2, 3, 4)], ("s00", 6, "whoosh", .5), ("s00", 10, "whoosh", .45),
+MOVES = [   # v2（2026-11-19）：場面の並べ替え（ジョーダン・ニクラウス・天才 5 人の柱・偏差値 94）
+    *[("s00", k, "drop", .8) for k in (0, 1, 3, 4, 6, 7)], ("s00", 9, "whoosh", .5), ("s00", 12, "whoosh", .45),
     ("s01", 0, "rise", .7), ("s01", 3, "whoosh", .5), ("s01", 6, "clink", .7),
-    ("s02", 1, "run", .9), ("s02", 3, "whoosh", .5), ("s02", 5, "whoosh", .45), ("s02", 7, "whoosh", .45),
-    ("s03", 1, "kick", .9), ("s03", 2, "soft", .8), ("s03", 4, "pillar", .9), ("s03", 6, "whoosh", .45),
-    ("s04", 1, "bat", 1.0), ("s04", 3, "pillar", .9), ("s04", 5, "whoosh", .45),
-    ("s05", 2, "tower", 1.0), ("s05", 3, "whoosh", .5), ("s05", 5, "frame", .8), ("s05", 7, "whoosh", .5),
-    ("s06", 2, "whoosh", .5), ("s06", 3, "bat", 1.0), ("s06", 5, "grass", .8), ("s06", 7, "grass", .7), ("s06", 8, "whoosh", .45),
-    ("s07", 1, "whoosh", .45), ("s07", 2, "wicket", 1.0), *[("s07", 4 + i, "clink", .75) for i in range(6)],
-    *[("s08", k, "pillar", .7) for k in (1, 2, 3, 4)], ("s08", 6, "whoosh", .45),
-    ("s09", 1, "tower", 1.0), ("s09", 3, "whoosh", .45),
-    ("s10", 1, "whoosh", .5), ("s10", 3, "whoosh", .6), ("s10", 4, "whoosh", .45),
-    ("s11", 0, "bell", .7), ("s11", 2, "whoosh", .45), ("s11", 4, "whoosh", .5), ("s11", 6, "whoosh", .5),
-    ("s12", 2, "whoosh", .45), ("s12", 4, "whoosh", .4),
-    ("s13", 1, "wicket", 1.0), ("s13", 2, "whoosh", .5), ("s13", 4, "tower", .9),
+    ("s02", 1, "run", .9), ("s02", 3, "whoosh", .5), ("s02", 5, "whoosh", .45), ("s02", 6, "pillar", .9),
+    ("s03", 1, "soft", .7), ("s03", 2, "clink", .8), ("s03", 4, "pillar", .9), ("s03", 6, "whoosh", .45),
+    ("s04", 1, "clink", .7), ("s04", 2, "soft", .8), ("s04", 4, "pillar", .9), ("s04", 6, "whoosh", .45),
+    ("s05", 1, "bat", 1.0), ("s05", 3, "pillar", .9), ("s05", 5, "whoosh", .45),
+    ("s06", 1, "kick", .9), ("s06", 2, "soft", .8), ("s06", 4, "pillar", .9), ("s06", 6, "whoosh", .45),
+    *[("s07", k, "pillar", .75) for k in (1, 2, 3)], ("s07", 5, "whoosh", .45),
+    ("s08", 2, "tower", 1.0), ("s08", 3, "whoosh", .5), ("s08", 5, "frame", .8), ("s08", 7, "whoosh", .5),
+    ("s09", 2, "whoosh", .5), ("s09", 3, "bat", 1.0), ("s09", 5, "grass", .8), ("s09", 7, "grass", .7), ("s09", 8, "whoosh", .45),
+    ("s10", 1, "whoosh", .45), ("s10", 2, "wicket", 1.0), *[("s10", 4 + i, "clink", .75) for i in range(6)],
+    *[("s11", k, "pillar", .7) for k in (1, 2, 3, 4)], ("s11", 6, "whoosh", .45),
+    ("s12", 1, "tower", 1.0), ("s12", 3, "whoosh", .45),
+    ("s13", 1, "whoosh", .5), ("s13", 3, "whoosh", .45), ("s13", 4, "drop", .8),
     ("s14", 0, "bell", .8), ("s14", 2, "whoosh", .45), ("s14", 5, "whoosh", .45),
 ]
-SEAL = [("s02", 5, "stamp", .7), ("s12", 3, "stamp", .6)]   # 2D の判（9.58、7,000÷70＝100）
+SEAL = [("s02", 5, "stamp", .7)]   # 2D の判（9.58）
 
 
 def events(tl_path, lines, BP, phrase_gain=.6):

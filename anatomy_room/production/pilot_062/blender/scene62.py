@@ -1,6 +1,6 @@
 """pilot_062「人類のスポーツ記録、いちばん"ありえない"のは？」の 3D（Blender Cycles）。新ドパ設計 v2（061 型）。
 ショット＝セリフの行（s00〜s14）。場面ごとに舞台を変える（2026-11-18 ユーザーの指示「常に同一の場所に固定されない構造」）：
-暗い展示室（道具・偏差値の人の山）→ 陸上のトラック → サッカー場 → 野球場 → クリケット場 → 夜の競技場。
+暗い展示室（6 つの競技の道具）→ 陸上のトラック → バスケのコート → ゴルフのグリーン → 野球場 → サッカー場 → 天才 5 人の柱 → クリケット場 → 偏差値の人の山 → 記念碑（v2、2026-11-19）。
 人は顔のない陶器の人形（CHARACTER_GUIDE の方針）。動き・カメラの着地は表拍（lbeat の整数）。閃光なし。
 blender -b -P blender/scene62.py -- [s00 s01 …] [--samples N]     試し描き：AT="1.5,3" PCT=40 で work/test/ に"""
 import sys, os, time, random
@@ -110,7 +110,7 @@ def glow_mat(name, col, k):
 
 
 def stage(kind):
-    """舞台：arena（暗い展示室）・track・pitch（サッカー）・diamond（野球）・cricket・night（夜のクリケット場）"""
+    """舞台：arena（暗い展示室）・track・pitch（サッカー）・court（バスケ）・golf・diamond（野球）・cricket・night（夜のクリケット場）"""
     clear_scene(); ANIM[:] = [cam.o]
     if kind == "arena":
         plane("floor", 80, 80, (0, 0, 0), plain("blackfloor", (.025, .024, .027), .22, coat=.8))
@@ -133,6 +133,18 @@ def stage(kind):
             lights((700, (1, .85, .65)), (1400, (.7, .8, 1)), "orlando_stadium_2k.hdr", .25, 2.0, 1)
         else:
             lights((1300, (1, .96, .9)), (700, (1, .9, .8)), "stadium_01_2k.hdr" if kind == "pitch" else "orlando_stadium_2k.hdr", 1.0, 1.2, 1)
+    elif kind == "court":                     # バスケのコート（暗い体育館、木の床）
+        plane("floor", 80, 80, (0, 0, 0), pbr_mat("court", "wood_floor", 1 / 1.6, (1, .9, .78), 1.0, box_proj=True))
+        plane("paint", 1.7, 2.4, (0, 2.45, .003), plain("paint", (.5, .14, .07), .45, coat=.3))
+        ln = plain("cline", (.95, .95, .92), .5)
+        for (sx, sy, x, y) in ((1.74, .04, 0, 1.25), (.04, 2.4, -.87, 2.45), (.04, 2.4, .87, 2.45), (12, .04, 0, 3.65)):
+            box("cl%g%g" % (x, y), (sx, sy, .003), (x, y, .005), ln, bevel=0)
+        plane("backw", 80, 20, (0, 12, 10), plain("gymw", (.05, .05, .06), .7), rot=(math.pi / 2, 0, 0))
+        lights((1100, (1, .95, .88)), (650, (1, .85, .7)), "studio_small_08_2k.hdr", .35)
+    elif kind == "golf":                      # ゴルフのグリーン（昼の草原）
+        plane("floor", 300, 300, (0, 0, 0), pbr_mat("grs", "grass_ground", 1 / 2.5, (.75, .9, .7), 1.0, box_proj=True))
+        cyl("green", 3.4, .012, (0, 1.6, .002), pbr_mat("greenm", "grass_ground", 1 / .6, (.55, 1.05, .45), 1.0, box_proj=True), 96)
+        lights((1300, (1, .96, .9)), (700, (1, .9, .8)), "meadow_2_2k.hdr", 1.0, 1.0, 1)
     elif kind == "diamond":
         plane("floor", 300, 300, (0, 0, 0), pbr_mat("grs", "grass_ground", 1 / 2.5, (.75, .9, .7), 1.0, box_proj=True))
         d = plane("dirt", 7, 7, (0, 2.6, .004), pbr_mat("infield", "raked_dirt", 1 / 2.0, (1, .8, .65), 1.0, box_proj=True)); d.rotation_euler = (0, 0, math.pi / 4)
@@ -205,6 +217,78 @@ def photo_frame(name, key, loc, rz=-.3, w=1.4):
     ANIM.append(root); return root
 
 
+
+def torus(name, R, r, loc, m, rot=(0, 0, 0)):
+    bpy.ops.mesh.primitive_torus_add(major_radius=R, minor_radius=r, major_segments=64, minor_segments=12, location=loc, rotation=rot)
+    o = bpy.context.active_object; o.name = name; o.data.materials.append(m); bpy.ops.object.shade_smooth(); return o
+
+
+def reflector(name, loc, at, size, energy):
+    """カメラの後ろの大きな光の板：カメラには写らず、金の面にだけ映り込む（暗く沈まないように）"""
+    o = area_light(name, loc, at, size, energy, (1, .95, .88)); o.visible_camera = False; o.visible_diffuse = False; return o
+
+
+def label(name, txt, loc, size=.15, rot=(math.pi / 2, 0, 0)):
+    return text_obj(name, txt, loc, size, gold_mat("goldtext", .2), rot=rot, extrude=.012, font="BIZUDPGothic-Bold.ttf")
+
+
+ICO = [(0, a, b) for a in (-1, 1) for b in (-1.618, 1.618)] + [(a, b, 0) for a in (-1, 1) for b in (-1.618, 1.618)] + [(b, 0, a) for a in (-1, 1) for b in (-1.618, 1.618)]
+
+
+def soccer_ball(name, r=.2):
+    from mathutils import Vector
+    root = empty(name); parent(sphere(name + "_w", r, (0, 0, 0), plain("sbw", (.93, .93, .9), .4, coat=.3), 64), root); bk = plain("sbk", (.03, .03, .035), .4, coat=.3)
+    for i, v in enumerate(ICO):
+        d = Vector(v).normalized(); o = cyl(name + "_p%d" % i, r * .36, r * .06, tuple(d * r * .985), bk, 5); o.rotation_euler = d.to_track_quat("Z", "Y").to_euler(); parent(o, root)
+    return root
+
+
+def baseball(name, r=.12):
+    root = empty(name); parent(sphere(name + "_w", r, (0, 0, 0), plain("bbw", (.94, .92, .86), .5, coat=.2), 48), root); rd = plain("bbred", (.75, .06, .05), .5)
+    a, b = .72, .28
+    for i in range(72):
+        t = i / 72 * 2 * math.pi; x, y, z = a * math.cos(t) + b * math.cos(3 * t), a * math.sin(t) - b * math.sin(3 * t), 2 * math.sqrt(a * b) * math.sin(2 * t)
+        parent(sphere(name + "_s%d" % i, r * .07, (x * r * 1.0, y * r * 1.0, z * r * 1.0), rd, 8), root)
+    return root
+
+
+def basketball(name, r=.2):
+    root = empty(name); parent(sphere(name + "_o", r, (0, 0, 0), plain("bkor", (.8, .3, .07), .65, coat=.1), 64), root); bk = plain("bkln", (.04, .03, .03), .6)
+    for i, rot in enumerate(((0, 0, 0), (math.pi / 2, 0, 0), (0, math.pi / 2, 0))):
+        parent(torus(name + "_r%d" % i, r * 1.002, r * .025, (0, 0, 0), bk, rot), root)
+    return root
+
+
+def stopwatch(name, s=1.0):
+    root = empty(name); sil = plain("silver", (.8, .8, .82), .2, metal=1.0); wh = plain("swface", (.95, .94, .9), .4, coat=.3); bk = plain("swhand", (.05, .05, .05), .4)
+    o = cyl(name + "_c", .17 * s, .06 * s, (0, 0, 0), sil, 64, bevel=.008); o.rotation_euler = (math.pi / 2, 0, 0); parent(o, root)
+    o = cyl(name + "_f", .145 * s, .062 * s, (0, -.002, 0), wh, 64); o.rotation_euler = (math.pi / 2, 0, 0); parent(o, root)
+    for k in range(12):
+        a = k / 12 * 2 * math.pi; o = box(name + "_tk%d" % k, (.006 * s, .004, .025 * s), (math.sin(a) * .12 * s, -.034 * s, math.cos(a) * .12 * s), bk, bevel=0); o.rotation_euler = (0, a, 0); parent(o, root)
+    o = box(name + "_h", (.008 * s, .004, .11 * s), (.03 * s, -.036 * s, .045 * s), plain("swred", (.8, .08, .06), .4), bevel=0); o.rotation_euler = (0, .55, 0); parent(o, root)
+    parent(cyl(name + "_k", .025 * s, .05 * s, (0, 0, .2 * s), sil, 24), root); parent(torus(name + "_ring", .035 * s, .008 * s, (0, 0, .255 * s), sil, (math.pi / 2, 0, 0)), root)
+    return root
+
+
+def golf_set(name):
+    root = empty(name); wh = plain("gbw", (.95, .95, .93), .35, coat=.3)
+    parent(cyl(name + "_tee", .008, .05, (0, 0, .025), plain("tee", (.85, .7, .4), .5), 16), root); parent(sphere(name + "_b", .045, (0, 0, .095), wh, 32), root)
+    sh = cyl(name + "_sh", .007, .8, (.18, .05, .39), plain("shaft", (.75, .75, .78), .2, metal=1.0), 16); sh.rotation_euler = (0, -.22, 0); parent(sh, root)
+    parent(box(name + "_hd", (.12, .05, .035), (.12, .05, .02), plain("ironh", (.7, .7, .72), .25, metal=1.0), bevel=.008), root)
+    parent(cyl(name + "_gr", .011, .2, (.26, .05, .74), plain("grip", (.08, .08, .1), .7), 16), root)
+    return root
+
+
+def cricket_props(name):
+    root = empty(name); b = bat(name + "_bat", 1.0); b.location = (-.05, 0, .03); b.rotation_euler = (0, math.pi / 2, .3); parent(b, root)
+    parent(sphere(name + "_rb", .1, (.32, -.1, .1), plain("cball_.55", (.55, .05, .04), .35, coat=.6), 32), root); return root
+
+
+def hop(t, t0, h=.2, dur=.4):
+    """t0 で頂点（拍の頭に一番高い）"""
+    u = (t - (t0 - dur / 2)) / dur; return h * math.sin(math.pi * u) if 0 < u < 1 else 0.0
+
+
 # ---------------------------------------------------------------- 偏差値の人の山（正規分布）：x＝偏差値、列の人数＝分布の高さ
 DX = .9                                     # 偏差値 10（1 標準偏差）あたりの間隔 m
 dvx = lambda dv: (dv - 50) / 10 * DX
@@ -228,26 +312,43 @@ def ruler(pfx, marks=(50, 60, 70, 80, 90, 100, 110, 120)):
 
 
 # ================================================================ ショット
-def s_s00():                                   # 冒頭：暗い展示室、金の台座に競技の道具が拍ごとに落ちる
-    stage("arena"); spot("sp", (0, -3, 7), (0, 0, .5), 2200, size=.8, ang=1.1)
+PROPS = [("陸上", "stopwatch"), ("バスケ", "basketball"), ("ゴルフ", "golf"), ("野球", "baseball"), ("サッカー", "soccer"), ("クリケット", "cricket")]
+PX = [(i - 2.5) * 1.25 for i in range(6)]
+
+
+def s_s00():                                   # 冒頭：暗い展示室、金の台座に 6 つの競技の道具が拍ごとに落ちる（台座に競技の名前）
+    stage("arena"); sp = spot("sp", (0, -4, 7), (0, 0, .5), 3800, size=.8, ang=.95, blend=.6); sp.visible_glossy = False   # 斜めから見ると床に光の筋が写る
+    reflector("rf", (0, -14, 3.5), (0, 0, 1.0), 10, 2500)
+    for sx in (-1, 1):                         # 列の両端の壁（斜めのカメラで、床に周りの光が写り込まないように）
+        plane("endw%d" % sx, 40, 20, (sx * 9, 0, 10), pbr_mat("bw", "brushed_concrete", 1 / 3.0, (.16, .15, .15), 1.0, box_proj=True), rot=(math.pi / 2, 0, math.pi / 2))
     wd = pbr_mat("plinth", "dark_wood", 1.0, (.4, .32, .26), 1.0, box_proj=True); g = gold_mat("gold", .13)
     S["props"] = []
-    for i, x in enumerate((-2.4, -.8, .8, 2.4)):
-        cyl("ped%d" % i, .5, .9, (x, 0, .45), wd, 64, bevel=.02); cyl("pedg%d" % i, .52, .05, (x, 0, .925), g, 64)
-    sb = sphere("soccer", .22, (0, 0, 0), plain("whiteball", (.93, .93, .9), .4, coat=.3), 48); S["props"].append((sb, (-2.4, 0, 1.17)))
-    bb = sphere("baseball", .12, (0, 0, 0), plain("whiteball", (.93, .93, .9), .4, coat=.3), 32); S["props"].append((bb, (-.8, 0, 1.07)))
-    cb = bat("cbat", 1.0); cb.rotation_euler = (0, math.pi / 2, .3); S["props"].append((cb, (.8 - .25, 0, 1.0)))
-    rb = ball("redball", .1); S["props"].append((rb, (2.4, 0, 1.05)))
-    for o, _ in S["props"]:
-        ANIM.append(o)
-    S["sp"] = None
+    for i, (lab, kind) in enumerate(PROPS):
+        x = PX[i]; cyl("ped%d" % i, .5, .9, (x, 0, .45), wd, 64, bevel=.02); cyl("pedg%d" % i, .52, .05, (x, 0, .925), g, 64)
+        label("lab%d" % i, lab, (x, -.52, .55), .15 if len(lab) < 5 else .12)
+        if kind == "stopwatch":
+            o = stopwatch("sw"); base = (x, 0, 1.13)
+        elif kind == "basketball":
+            o = basketball("bk", .2); base = (x, 0, 1.15)
+        elif kind == "golf":
+            o = golf_set("gf"); base = (x - .08, 0, .95)
+        elif kind == "baseball":
+            o = baseball("bb", .12); base = (x, 0, 1.07)
+        elif kind == "soccer":
+            o = soccer_ball("sb", .2); base = (x, 0, 1.15)
+        else:
+            o = cricket_props("ck"); base = (x - .12, 0, .95)
+        o.rotation_euler = (0, 0, .25 if kind in ("baseball", "soccer") else 0); S["props"].append((o, base)); ANIM.append(o)
 
 
 def a_s00(u, t, f):
-    for j, (o, base) in enumerate(S["props"]):
-        drop(o, base, t, lbeat("s00", 1 + j), h=2.5)
-    go("s00", [(0, (-2.6, -3.4, 1.7), (-2.4, 0, 1.15), 40), (2, (-.9, -3.2, 1.6), (-.8, 0, 1.1), 42), (3, (.5, -3.3, 1.7), (.7, 0, 1.05), 40),
-               (4, (2.5, -3.2, 1.6), (2.4, 0, 1.1), 42), (6, (0, -8.5, 2.6), (0, 0, .9), 32), (10, (0, -6.0, 1.4), (0, 0, 1.0), 30)], t, 3.0)
+    for j, (o, base) in enumerate(S["props"]):                   # 2 つずつ映す：台座の組ごとに、拍 0・1／3・4／6・7 に落ちる（最初のコマにもう 1 つ乗っている）
+        drop(o, base, t, lbeat("s00", DB[j]), h=2.5)
+    K_ = [(3 * i, ((PX[2 * i] + PX[2 * i + 1]) / 2, -3.7, 1.5), ((PX[2 * i] + PX[2 * i + 1]) / 2, 0, 1.0), 34) for i in range(3)]
+    go("s00", K_ + [(9, (-5.4, -2.5, 1.55), (-.6, 0, 1.0), 30), (12, (5.4, -2.7, 1.6), (.6, 0, 1.0), 30)], t, 3.0)
+
+
+DB = [0, 1, 3, 4, 6, 7]
 
 
 def s_s01():                                   # 物差し：一流の選手の山（正規分布）、1 人だけ前へ
@@ -263,7 +364,7 @@ def a_s01(u, t, f):
 
 
 def s_s02():                                   # ボルト：トラックを 8 人が走り、金の 1 人が抜け出す
-    stage("track"); S["run"] = []
+    stage("track"); S["run"] = []; S["pil"] = pillar("p85", (4.6, 2.6, 0), (85 - 50) * .08, label="85")
     for i in range(8):
         y = (i - 3.5) * .7; m = goldfig() if i == 4 else ceramic(); S["run"].append(fig("r%d" % i, (-6, y, 0), .55, m, rz=-math.pi / 2))
 
@@ -279,10 +380,78 @@ def a_s02(u, t, f):
         r.rotation_euler = (0, .18 if t > lbeat("s02", 1) else 0, -math.pi / 2)
     xg = runx(4, t)
     go("s02", [(0, (-6.0, -3.8, .6), (-6.0, .3, .4), 36), (1, (xg - 1.5, -4.2, .7), (xg, .3, .4), 34), (3, (lbeat("s02", 3) * 3.75 - 6 - .2, -4.0, .8), (lbeat("s02", 3) * 3.75 - 6 + 1.2, .3, .4), 34),
-               (5, (3.0, -1.2, 1.0), (1.4, .3, .4), 30), (7, (3.6, -6.5, 2.6), (2.0, 0, .3), 30)], t, 3.0, mv=.4)
+               (5, (3.0, -1.2, 1.0), (1.4, .3, .4), 30), (6, (6.0, -2.0, 1.4), (4.6, 2.6, 1.8), 34)], t, 3.0, mv=.4)
+    rise(S["pil"], (4.6, 2.6, 0), t, lbeat("s02", 6), .4)
 
 
-def s_s03():                                   # ペレ：サッカー場。球がゴールへ → 偏差値 87 の柱
+def s_s03():                                   # ジョーダン：バスケのコート。金の 1 人が跳んでシュート → 偏差値 84 の柱
+    stage("court"); dk = plain("pole", (.12, .12, .13), .4, metal=.6)
+    cyl("hpole", .05, 1.3, (0, 4.4, .65), dk, 24); box("harm", (.06, .6, .06), (0, 4.1, 1.28), dk, bevel=.01)
+    box("board", (.95, .03, .58), (0, 3.78, 1.28), plain("boardm", (.92, .93, .95), .15, coat=.6), bevel=.01)
+    box("bsq", (.32, .032, .22), (0, 3.776, 1.17), plain("bsqm", (.8, .25, .08), .4), bevel=0)
+    torus("rim", .12, .009, (0, 3.6, 1.05), plain("rimm", (.85, .3, .06), .3, metal=.5))
+    S["ball"] = basketball("bkb", .065); ANIM.append(S["ball"])
+    S["sh"] = fig("shooter", (0, 1.2, 0), .55, goldfig(), rz=0.0)
+    S["pil"] = pillar("p84", (1.9, 2.4, 0), (84 - 50) * .08, label="84")
+
+
+def a_s03(u, t, f):
+    t1, t2 = lbeat("s03", 1), lbeat("s03", 2); z = hop(t, t1, .22, .5); S["sh"].location = (0, 1.2, z)
+    if t < t1:
+        S["ball"].location = (.06, 1.12, .62 + z)
+    elif t < t2:
+        k = (t - t1) / (t2 - t1); S["ball"].location = (lerp(.06, 0, k), lerp(1.12, 3.6, k), lerp(.84, 1.12, k) + 1.1 * 4 * k * (1 - k))
+    else:
+        v = t - t2; zz = 1.12 - 4.9 * v * v
+        if zz < .065:
+            v0 = math.sqrt((1.12 - .065) / 4.9); w = v - v0; zz = .065 + abs(1.2 * w - 4.9 * w * w) * (w < .245)
+        S["ball"].location = (0, 3.6 + .3 * max(0, v - .4), zz)
+    rise(S["pil"], (1.9, 2.4, 0), t, lbeat("s03", 4), .4)
+    go("s03", [(0, (1.1, -1.5, .75), (0, 2.4, .95), 30), (2, (.55, 2.35, 1.3), (0, 3.6, 1.05), 40), (4, (3.8, -1.6, 1.4), (1.2, 2.6, 1.3), 30),
+               (6, (4.2, -2.2, .9), (1.9, 2.4, 2.4), 34)], t, 3.0)
+
+
+def s_s04():                                   # ニクラウス：ゴルフのグリーン。金の 1 人のパット → カップイン → 偏差値 85 の柱
+    stage("golf"); cyl("cup", .055, .02, (0, 2.2, .003), plain("cupm", (.01, .01, .01), .9), 32)
+    cyl("stick", .008, 1.3, (0, 2.2, .65), plain("stickm", (.95, .95, .93), .4), 16); box("flag", (.36, .006, .22), (.185, 2.2, 1.18), plain("flagm", (.9, .1, .08), .6), bevel=0)
+    S["g"] = fig("golfer", (-.3, -1.1, 0), .55, goldfig(), rz=-.3)
+    pt = empty("putter", (-.14, -1.02, .42)); parent(cyl("pt_s", .006, .42, (0, 0, -.21), plain("shaft", (.75, .75, .78), .2, metal=1.0), 16), pt)
+    parent(box("pt_h", (.09, .03, .025), (.03, 0, -.42), plain("ironh", (.7, .7, .72), .25, metal=1.0), bevel=.006), pt); S["pt"] = pt; ANIM.append(pt)
+    S["ball"] = sphere("gball", .028, (0, -1.0, .028), plain("gbw", (.95, .95, .93), .35, coat=.3), 32); ANIM.append(S["ball"])
+    S["pil"] = pillar("p85g", (1.9, 3.3, 0), (85 - 50) * .08, label="85")
+
+
+def a_s04(u, t, f):
+    t1, t2 = lbeat("s04", 1), lbeat("s04", 2); sw = clamp((t - (t1 - .35)) / .35); S["pt"].rotation_euler = (-.35 * math.sin(math.pi * sw) if t < t1 else .25 * eio(clamp((t - t1) / .2)), 0, 0)
+    if t < t1:
+        S["ball"].location = (0, -1.0, .028)
+    elif t < t2:
+        k = eout(clamp((t - t1) / (t2 - t1))); S["ball"].location = (0, lerp(-1.0, 2.2, k), .028)
+    else:
+        S["ball"].location = (0, 2.2, max(-.04, .028 - 2.5 * (t - t2)))
+    rise(S["pil"], (1.9, 3.3, 0), t, lbeat("s04", 4), .4)
+    go("s04", [(0, (.12, -2.3, .22), (0, .9, .05), 30), (2, (.45, 1.55, .3), (0, 2.2, .02), 40), (4, (3.8, -1.2, 1.4), (1.2, 2.9, 1.3), 30),
+               (6, (4.2, -1.8, .9), (1.9, 3.3, 2.4), 34)], t, 3.0)
+
+
+def s_s05():                                   # カッブ：野球場。打球が上がる → 偏差値 86 の柱（87 の隣）
+    stage("diamond"); S["bat"] = fig("hitter", (0, -2.35, 0), .55, goldfig(), rz=.3)
+    b = bat("bbat", 1.0); b.location = (.15, -2.3, .45); ANIM.append(b); S["bb"] = b
+    S["ball"] = sphere("bball", .06, (0, 0, -50), plain("whiteball", (.93, .93, .9), .4, coat=.3), 24); ANIM.append(S["ball"])
+    S["pil"] = pillar("p86", (2.4, -1.0, 0), (86 - 50) * .08, label="86")
+
+
+def a_s05(u, t, f):
+    t1 = lbeat("s05", 1); sw = eio(clamp((t - (t1 - .12)) / .2)); S["bb"].rotation_euler = (0, -.6 + 2.2 * sw, .3 + 1.6 * sw)
+    if t < t1:
+        S["ball"].location = (lerp(0, .1, clamp((t - (t1 - .4)) / .4)), lerp(1.5, -2.2, clamp((t - (t1 - .4)) / .4)), .55)
+    else:
+        v = t - t1; S["ball"].location = (.1 - 1.8 * v, -2.2 + 7 * v, .55 + 5 * v - 4.9 * v * v * .5)
+    rise(S["pil"], (2.4, -1.0, 0), t, lbeat("s05", 3), .4)
+    go("s05", [(0, (1.6, -4.4, .8), (0, -2.3, .45), 34), (1, (-.4, -5.5, .5), (-.6, 2.0, 1.4), 28), (3, (5.6, -4.8, 1.4), (2.9, -1.0, 1.4), 30), (5, (6.2, -5.6, .9), (2.9, -1.0, 2.4), 34)], t, 3.0)
+
+
+def s_s06():                                   # ペレ：サッカー場。球がゴールへ → 偏差値 87 の柱
     stage("pitch"); wh = plain("post", (.95, .95, .93), .4)
     for x in (-1.2, 1.2):
         cyl("gp%g" % x, .04, .8, (x, 3.0, .4), wh, 24)
@@ -293,46 +462,47 @@ def s_s03():                                   # ペレ：サッカー場。球�
     S["pil"] = pillar("p87", (2.6, 1.0, 0), (87 - 50) * .08, label="87")
 
 
-def a_s03(u, t, f):
-    t1, t2 = lbeat("s03", 1), lbeat("s03", 2)
+def a_s06(u, t, f):
+    t1, t2 = lbeat("s06", 1), lbeat("s06", 2)
     if t < t1:
         S["ball"].location = (.3, -1.7, .11)
     else:
         k = clamp((t - t1) / (t2 - t1)); S["ball"].location = (lerp(.3, -.4, k), lerp(-1.7, 3.3, k), .11 + .55 * math.sin(math.pi * min(k, 1)) * .9 + (.25 if k >= 1 else 0) * 0)
-    rise(S["pil"], (2.6, 1.0, 0), t, lbeat("s03", 4), .4)
-    go("s03", [(0, (1.4, -3.6, .7), (.3, -1.6, .3), 36), (2, (-.2, .2, 1.1), (-.3, 3.2, .4), 32), (4, (4.6, -3.6, 1.6), (2.4, 1.0, 1.4), 30), (6, (5.2, -4.4, 1.0), (2.6, 1.0, 2.6), 34)], t, 3.0)
+    rise(S["pil"], (2.6, 1.0, 0), t, lbeat("s06", 4), .4)
+    go("s06", [(0, (1.4, -3.6, .7), (.3, -1.6, .3), 36), (2, (-.2, .2, 1.1), (-.3, 3.2, .4), 32), (4, (4.6, -3.6, 1.6), (2.4, 1.0, 1.4), 30), (6, (5.2, -4.4, 1.0), (2.6, 1.0, 2.6), 34)], t, 3.0)
 
 
-def s_s04():                                   # カッブ：野球場。打球が上がる → 偏差値 86 の柱（87 の隣）
-    stage("diamond"); S["bat"] = fig("hitter", (0, -2.35, 0), .55, goldfig(), rz=.3)
-    b = bat("bbat", 1.0); b.location = (.15, -2.3, .45); ANIM.append(b); S["bb"] = b
-    S["ball"] = sphere("bball", .06, (0, 0, -50), plain("whiteball", (.93, .93, .9), .4, coat=.3), 24); ANIM.append(S["ball"])
-    S["pil"] = pillar("p86", (2.4, -1.0, 0), (86 - 50) * .08, label="86"); S["p87"] = pillar("p87b", (3.4, -1.0, 0), (87 - 50) * .08, label="87", m=gold_mat("goldpil_dim", .3, (.6, .45, .22)))
+def s_s07():                                   # 歴史に残る天才たちでも 84〜87：5 本の柱がほとんど同じ高さに並ぶ
+    stage("arena"); spot("sp", (0, -6, 8), (0, 0, 1), 3000, size=1.0, ang=1.3); S["ps"] = []; reflector("rf", (0, -16, 4), (0, 0, 2), 16, 1100)
+    for i, (nm, dv) in enumerate(GENIUS):
+        x = (i - 2) * 1.0; h = (dv - 50) * .08; o = pillar("g%d" % i, (x, 0, 0), h, w=.62, label=str(dv)); S["ps"].append((o, x))
+        parent(label("gn%d" % i, nm, (0, -.33, h + 1.0), .15), o); o["h"] = h + 1.3
 
 
-def a_s04(u, t, f):
-    t1 = lbeat("s04", 1); sw = eio(clamp((t - (t1 - .12)) / .2)); S["bb"].rotation_euler = (0, -.6 + 2.2 * sw, .3 + 1.6 * sw)
-    if t < t1:
-        S["ball"].location = (lerp(0, .1, clamp((t - (t1 - .4)) / .4)), lerp(1.5, -2.2, clamp((t - (t1 - .4)) / .4)), .55)
-    else:
-        v = t - t1; S["ball"].location = (.1 - 1.8 * v, -2.2 + 7 * v, .55 + 5 * v - 4.9 * v * v * .5)
-    rise(S["pil"], (2.4, -1.0, 0), t, lbeat("s04", 3), .4); rise(S["p87"], (3.4, -1.0, 0), t, lbeat("s04", 3), .4)
-    go("s04", [(0, (1.6, -4.4, .8), (0, -2.3, .45), 34), (1, (-.4, -5.5, .5), (-.6, 2.0, 1.4), 28), (3, (5.6, -4.8, 1.4), (2.9, -1.0, 1.4), 30), (5, (6.2, -5.6, .9), (2.9, -1.0, 2.4), 34)], t, 3.0)
+GENIUS = [("ジョーダン", 84), ("ボルト", 85), ("ニクラウス", 85), ("カッブ", 86), ("ペレ", 87)]
 
 
-def s_s05():                                   # でも、ひとりだけ：クリケット場。87・86 の柱の横から、ブラッドマンの柱が空へ
+def a_s07(u, t, f):
+    for i, (o, x) in enumerate(S["ps"]):
+        rise(o, (x, 0, 0), t, lbeat("s07", 1 + i // 2), .35)
+    go("s07", [(0, (-4.8, -3.4, 1.4), (-1.2, 0, 2.2), 30), (3, (0, -9.2, 2.2), (0, 0, 2.2), 30), (5, (4.6, -3.8, 2.4), (.6, 0, 2.6), 30)], t, 3.0)
+
+
+def s_s08():                                   # でも、ひとりだけ：クリケット場。87・86 の柱の横から、ブラッドマンの柱が空へ
     stage("cricket")
-    S["p87"] = pillar("q87", (-2.2, 0, 0), (87 - 50) * .08, label="87", m=gold_mat("goldpil_dim", .3, (.6, .45, .22)))
-    S["p86"] = pillar("q86", (-1.2, 0, 0), (86 - 50) * .08, label="86", m=gold_mat("goldpil_dim", .3, (.6, .45, .22)))
+    dm = gold_mat("goldpil_dim", .3, (.6, .45, .22)); S["gq"] = []
+    for i, (nm, dv) in enumerate(GENIUS):
+        x = -3.4 + i * .6; S["gq"].append((pillar("q%d" % i, (x, 0, 0), (dv - 50) * .08, w=.5, m=dm, label=str(dv), lab_size=.26), x))
     S["pb"] = pillar("qb", (.6, 0, 0), 30.0, w=.9); S["ph"] = photo_frame("phb", "bradman_bat", (2.6, -.6, 0), rz=-.35)
     stumps("stA", (0, 5.0, 0))
 
 
-def a_s05(u, t, f):
-    rise(S["p87"], (-2.2, 0, 0), t, -1, .3); rise(S["p86"], (-1.2, 0, 0), t, -1, .3)
-    t1 = lbeat("s05", 2); k = clamp((t - t1) / (BP * 3)); S["pb"].location = (.6, 0, -30 + 30 * eio(k) if t > t1 else -30)
-    drop(S["ph"], (2.6, -.6, 0), t, lbeat("s05", 5), h=2.0, rz=-.35)
-    go("s05", [(0, (-1.0, -5.5, 1.6), (-1.6, 0, 1.6), 32), (2, (2.6, -5.8, .6), (.6, 0, 3.0), 26), (3, (3.4, -7.0, .4), (.6, 0, 9.0), 22), (5, (4.2, -3.8, 1.2), (2.6, -.6, .9), 36),
+def a_s08(u, t, f):
+    for o, x in S["gq"]:
+        o.location = (x, 0, 0)
+    t1 = lbeat("s08", 2); k = clamp((t - t1) / (BP * 3)); S["pb"].location = (.6, 0, -30 + 30 * eio(k) if t > t1 else -30)
+    drop(S["ph"], (2.6, -.6, 0), t, lbeat("s08", 5), h=2.0, rz=-.35)
+    go("s08", [(0, (-1.2, -6.6, 1.7), (-1.6, 0, 1.6), 30), (2, (2.6, -5.8, .6), (.6, 0, 3.0), 26), (3, (3.4, -7.0, .4), (.6, 0, 9.0), 22), (5, (4.2, -3.8, 1.2), (2.6, -.6, .9), 36),
                (7, (1.0, -9.0, 1.0), (.6, 0, 6.0), 24)], t, 4.0)
 
 
@@ -349,12 +519,12 @@ def bowler_run(t, t_rel):
     o.location = (-.3, 8.0 - 2.6 * eio(k), .03 * abs(math.sin(t * 12)) * (k < 1))
 
 
-def s_s06():
+def s_s09():
     cricket_set()
 
 
-def a_s06(u, t, f):                            # 投げる（拍 2）→ 弾む → 打つ（拍 3）→ 打者が反対側へ走る（拍 5〜8）
-    t_rel, t_hit = lbeat("s06", 2), lbeat("s06", 3); bowler_run(t, t_rel)
+def a_s09(u, t, f):                            # 投げる（拍 2）→ 弾む → 打つ（拍 3）→ 打者が反対側へ走る（拍 5〜8）
+    t_rel, t_hit = lbeat("s09", 2), lbeat("s09", 3); bowler_run(t, t_rel)
     if t < t_rel:
         S["ball"].location = (-.3, 5.4, -50)
     elif t < t_hit:
@@ -362,20 +532,20 @@ def a_s06(u, t, f):                            # 投げる（拍 2）→ 弾む 
     else:
         v = t - t_hit; S["ball"].location = (.3 + 4.5 * v, -4.6 + 3.0 * v, max(.045, .5 + 2.2 * v - 4.9 * v * v))
     sw = eio(clamp((t - (t_hit - .12)) / .2)); S["bt"].rotation_euler = (-1.4 * sw, -.5, 0)
-    tr = lbeat("s06", 5); k = clamp((t - tr) / (BP * 3))
+    tr = lbeat("s09", 5); k = clamp((t - tr) / (BP * 3))
     S["bat"].location = (.25, lerp(-4.75, 4.6, eio(k)), .03 * abs(math.sin(t * 12)) * (0 < k < 1)); S["bt"].location = (S["bat"].location.x + .22, S["bat"].location.y - .05, .56)
-    go("s06", [(0, (2.5, -9.5, 1.6), (0, -3.0, .5), 30), (2, (-1.2, 7.2, 2.4), (0, 2.0, .6), 30), (3, (1.8, -7.2, .7), (.2, -5.0, .6), 34), (5, (4.0, -2.0, 1.4), (0, -1.0, .5), 26),
+    go("s09", [(0, (2.5, -9.5, 1.6), (0, -3.0, .5), 30), (2, (-1.2, 7.2, 2.4), (0, 2.0, .6), 30), (3, (1.8, -7.2, .7), (.2, -5.0, .6), 34), (5, (4.0, -2.0, 1.4), (0, -1.0, .5), 26),
                (8, (2.6, 7.4, 1.2), (0, 4.0, .5), 30)], t, 3.0)
 
 
-def s_s07():
+def s_s10():
     cricket_set(); g = gold_mat("coin", .15); S["coins"] = []
     for i in range(6):
         o = cyl("coin%d" % i, .3, .08, (0, 0, -50), g, 48, bevel=.01); S["coins"].append(o); ANIM.append(o)
 
 
-def a_s07(u, t, f):                            # 球が柱に当たる（拍 2、ベイルが飛ぶ）→ 金の玉（点）が拍ごとに積み上がる（拍 4〜9）
-    t_rel, t_hit = lbeat("s07", 1), lbeat("s07", 2); bowler_run(t, t_rel)
+def a_s10(u, t, f):                            # 球が柱に当たる（拍 2、ベイルが飛ぶ）→ 金の玉（点）が拍ごとに積み上がる（拍 4〜9）
+    t_rel, t_hit = lbeat("s10", 1), lbeat("s10", 2); bowler_run(t, t_rel)
     if t < t_rel:
         S["ball"].location = (-.3, 5.4, -50)
     elif t < t_hit:
@@ -385,104 +555,57 @@ def a_s07(u, t, f):                            # 球が柱に当たる（拍 2�
     bails_fly(S["bA"], t, t_hit)
     S["bt"].rotation_euler = (0, -.5, 0)
     for i, o in enumerate(S["coins"]):
-        drop(o, (1.6, -3.4, .04 + .082 * i), t, lbeat("s07", 4 + i), h=1.2, dur=.25)
-    go("s07", [(0, (1.6, -7.6, .5), (0, -5.3, .45), 40), (2, (.9, -6.4, .35), (0, -5.3, .55), 55), (4, (3.4, -5.4, 1.0), (1.6, -3.4, .4), 38), (7, (3.6, -6.0, 1.3), (1.6, -3.4, .6), 34)], t, 2.8)
+        drop(o, (1.6, -3.4, .04 + .082 * i), t, lbeat("s10", 4 + i), h=1.2, dur=.25)
+    go("s10", [(0, (1.6, -7.6, .5), (0, -5.3, .45), 40), (2, (.9, -6.4, .35), (0, -5.3, .55), 55), (4, (3.4, -5.4, 1.0), (1.6, -3.4, .4), 38), (7, (3.6, -6.0, 1.3), (1.6, -3.4, .6), 34)], t, 2.8)
 
 
-def s_s08():                                   # 名選手でも 60 点前後：低い柱の列
+def s_s11():                                   # 名選手でも 60 点前後：低い柱の列
     stage("arena"); spot("sp", (0, -6, 8), (0, 0, 0), 2600, size=1.0, ang=1.3)
     R = random.Random(8); dm = gold_mat("goldpil_dim", .3, (.6, .45, .22)); S["ps"] = []
     for i in range(12):
         av = R.uniform(55, 61.9); x = (i - 5.5) * .75; o = pillar("a%d" % i, (x, 0, 0), av * .05, w=.5, m=dm); S["ps"].append((o, x))
 
 
-def a_s08(u, t, f):
-    for i, (o, x) in enumerate(S["ps"]):
-        rise(o, (x, 0, 0), t, lbeat("s08", 1 + i // 3), .35)
-    go("s08", [(0, (-6.5, -4.5, 1.2), (-3.0, 0, 1.4), 32), (3, (0, -8.0, 2.6), (0, 0, 1.6), 28), (6, (5.5, -4.0, 1.0), (2.0, 0, 2.2), 30)], t, 3.0)
-
-
-def s_s09():                                   # 99.94：金の柱が、60 の列の 1.7 倍の高さへ
-    s_s08(); S["pb"] = pillar("b9994", (0, -1.4, 0), 99.94 * .05, w=.75, label="99.94", lab_size=.5); spot("spb", (0, -5, 9), (0, -1.4, 3), 2500, size=.5, ang=.6)
-
-
-def a_s09(u, t, f):
-    for i, (o, x) in enumerate(S["ps"]):
-        o.location = (x, 0, 0)
-    rise(S["pb"], (0, -1.4, 0), t, lbeat("s09", 1), .4)
-    go("s09", [(0, (0, -9.0, 1.0), (0, 0, 2.0), 28), (1, (2.4, -7.6, .5), (0, -1.4, 3.6), 26), (3, (0, -10.5, 3.2), (0, -1.4, 3.4), 24)], t, 4.0)
-
-
-def s_s10():                                   # 偏差値 94 → 116：人の山と物差し
-    stage("arena"); spot("sp", (2, -6, 9), (2, -1, 0), 3000, size=1.0, ang=1.4); S["bell"] = bell("c", .32); ruler("rl")
-    S["bm"] = fig("brad", (dvx(94), -.2, 0), .5, goldfig()); spot("spb", (dvx(105), -2.5, 4), (dvx(105), 0, .3), 1200, size=.4, ang=.9)
-
-
-def a_s10(u, t, f):
-    t1 = lbeat("s10", 3); k = eio(clamp((t - (t1 - .4)) / .4)); S["bm"].location = (lerp(dvx(94), dvx(116), k), -.2, .03 * abs(math.sin(t * 10)) * (0 < k < 1))
-    go("s10", [(0, (dvx(70), -6.0, 2.4), (dvx(80), 0, .3), 30), (1, (dvx(94) - .4, -2.0, .7), (dvx(94), 0, .4), 42), (3, (dvx(116) - .4, -2.0, .7), (dvx(116), 0, .4), 42), (4, (dvx(84), -8.5, 3.4), (dvx(84), -.5, .2), 26)], t, 3.0)
-
-
-def s_s11():                                   # 18 万人に 1 人：人の海の中に、金の 1 人
-    stage("arena"); coll = bpy.data.collections.get("figcol")
-    if coll is None:
-        coll = bpy.data.collections.new("figcol"); m = ceramic()
-        h = sphere("ci_h", .17 * .4, (0, 0, .4), m, 16); b = sphere("ci_b", .3 * .4, (0, 0, .16), m, 20); b.scale = (.85, .7, 1.35)
-        for o in (h, b):
-            for c in list(o.users_collection):
-                c.objects.unlink(o)
-            coll.objects.link(o)
-    R = random.Random(18)
-    for i in range(-45, 46):
-        for j in range(0, 70):
-            if i == 0 and j == 3:
-                continue
-            e = bpy.data.objects.new("ci%d_%d" % (i, j), None); e.instance_type = "COLLECTION"; e.instance_collection = coll
-            e.location = (i * .3 + R.uniform(-.06, .06), j * .3 + R.uniform(-.06, .06), 0); e.rotation_euler = (0, 0, R.uniform(0, 6)); link(e)
-    fig("one", (0, .9, 0), .4, goldfig()); spot("sp1", (0, -.3, 4.5), (0, .9, .2), 900, size=.3, ang=.35, blend=.6)
-    lights((350, (1, .92, .8)), (250, (.8, .85, 1)), "studio_small_08_2k.hdr", .3)
-
-
 def a_s11(u, t, f):
-    go("s11", [(0, (0, -.2, 1.3), (0, .9, .2), 50), (2, (0, -2.5, 2.6), (0, .9, .2), 40), (4, (0, -6.0, 7.0), (0, 4.0, 0), 30), (6, (0, -7.0, 13.0), (0, 7.0, 0), 28)], t, 6.0, mv=.5)
+    for i, (o, x) in enumerate(S["ps"]):
+        rise(o, (x, 0, 0), t, lbeat("s11", 1 + i // 3), .35)
+    go("s11", [(0, (-6.5, -4.5, 1.2), (-3.0, 0, 1.4), 32), (3, (0, -8.0, 2.6), (0, 0, 1.6), 28), (6, (5.5, -4.0, 1.0), (2.0, 0, 2.2), 30)], t, 3.0)
 
 
-def s_s12():                                   # 最後の打席（夕方〜夜の競技場）
-    cricket_set("night"); spot("sp", (1.5, -7.5, 6), (.25, -4.75, .6), 2600, (1, .9, .75), size=.6, ang=.6)
+def s_s12():                                   # 99.94：金の柱が、60 の列の 1.7 倍の高さへ
+    s_s11(); S["pb"] = pillar("b9994", (0, -1.4, 0), 99.94 * .05, w=.75, label="99.94", lab_size=.5); spot("spb", (0, -5, 9), (0, -1.4, 3), 2500, size=.5, ang=.6)
 
 
 def a_s12(u, t, f):
-    bowler_run(t, 99); S["ball"].location = (0, 0, -50); S["bt"].rotation_euler = (0, -.5, 0)
-    go("s12", [(0, (0, -13.0, 1.8), (0, -4.8, .7), 30), (2, (2.4, -8.6, 1.0), (.25, -4.75, .7), 40), (4, (1.6, -7.4, .9), (.25, -4.75, .75), 50)], t, 2.4)
+    for i, (o, x) in enumerate(S["ps"]):
+        o.location = (x, 0, 0)
+    rise(S["pb"], (0, -1.4, 0), t, lbeat("s12", 1), .4)
+    go("s12", [(0, (0, -9.0, 1.0), (0, 0, 2.0), 28), (1, (2.4, -7.6, .5), (0, -1.4, 3.6), 26), (3, (0, -10.5, 3.2), (0, -1.4, 3.4), 24)], t, 4.0)
 
 
-def s_s13():                                   # 0 点 → それでも、金の柱は誰も届かない高さ
-    cricket_set("night"); spot("sp", (1.5, -7.5, 6), (.25, -4.75, .6), 2600, (1, .9, .75), size=.6, ang=.6)
-    S["pb"] = pillar("bigp", (0, -9.5, 0), 99.94 * .09, w=1.2, label="99.94", lab_size=.9)
-    dm = gold_mat("goldpil_dim", .3, (.6, .45, .22))
-    for i, x in enumerate((-3.4, -2.2, 2.2, 3.4)):
-        pillar("lp%d" % i, (x, -9.5, 0), 60 * .09, w=.9, m=dm)
-    spot("spp", (0, -3, 12), (0, -9.5, 5), 6000, (1, .9, .75), size=1.0, ang=.9)
+def s_s13():                                   # 偏差値 94：人の山と物差し。天才 5 人（84〜87）から、金の 1 人が 94 へ。「＋7」
+    stage("arena"); spot("sp", (2, -6, 9), (2.5, -1, 0), 3000, size=1.0, ang=1.4); S["bell"] = bell("c", .32); ruler("rl", (50, 60, 70, 80, 90, 100))
+    S["gs"] = [fig("gz%d" % i, (dvx(dv), -.15 - .3 * (i % 2), 0), .42, goldfig(), rz=.2) for i, (nm, dv) in enumerate(GENIUS)]
+    S["bm"] = fig("brad", (dvx(87), -.9, 0), .5, goldfig()); spot("spb", (dvx(94), -2.5, 4), (dvx(94), -.5, .3), 1400, size=.4, ang=.8)
+    S["p7"] = text_obj("plus7", "+7", (0, 0, 0), .32, gold_mat("goldtext", .2), extrude=.03); ANIM.append(S["p7"])
 
 
 def a_s13(u, t, f):
-    t_rel, t_hit = lbeat("s13", 0) - BP, lbeat("s13", 1); bowler_run(t, t_rel)
-    if t < t_hit:
-        S["ball"].location = path_bowl(t, t_rel, t_hit, (-.2, 5.3, 1.9), (-.05, -1.2, .05), (0, -5.3, .3)) if t > t_rel else (0, 0, -50)
-    else:
-        v = t - t_hit; S["ball"].location = (0, -5.3 - 1.2 * v, max(.045, .3 - 2 * v))
-    bails_fly(S["bA"], t, t_hit); S["bt"].rotation_euler = (0, -.5, 0)
-    go("s13", [(0, (.9, -6.6, .35), (0, -5.3, .55), 50), (2, (2.5, -1.0, 1.0), (0, -8.0, 3.0), 24), (4, (0, -1.0, .4), (0, -9.5, 5.5), 20)], t, 3.0)
+    t1 = lbeat("s13", 1); k = eio(clamp((t - (t1 - .4)) / .4)); S["bm"].location = (lerp(dvx(87), dvx(94), k), lerp(-.9, -.4, k), .03 * abs(math.sin(t * 10)) * (0 < k < 1))
+    drop(S["p7"], ((dvx(87) + dvx(94)) / 2, -.6, 1.05), t, lbeat("s13", 4), h=1.2)
+    go("s13", [(0, (dvx(85.5), -2.6, .9), (dvx(85.5), -.3, .35), 40), (1, (dvx(94) - .3, -2.2, .7), (dvx(94), -.4, .4), 42), (3, (dvx(80), -6.4, 2.4), (dvx(85), -.4, .4), 30),
+               (4, (dvx(90.5), -3.2, 1.2), (dvx(90.5), -.5, .8), 36)], t, 3.0)
 
 
-def s_s14():                                   # 99.94：金の数字の記念碑（暗い展示室、光の柱）
+def s_s14():                                   # 偏差値 94：金の数字の記念碑（暗い展示室、光の柱）
     stage("arena"); spot("sp", (0, -2.5, 8), (0, 0, 1.0), 3200, size=.6, ang=.7, blend=.5)
-    wd = pbr_mat("plinth", "dark_wood", 1.0, (.4, .32, .26), 1.0, box_proj=True); box("base", (4.4, 1.4, .6), (0, 0, .3), wd, bevel=.03)
-    S["num"] = text_obj("n9994", "99.94", (0, 0, 1.25), 1.25, gold_mat("goldnum", .12), extrude=.12); ANIM.append(S["num"])
+    wd = pbr_mat("plinth", "dark_wood", 1.0, (.4, .32, .26), 1.0, box_proj=True); box("base", (3.0, 1.4, .6), (0, 0, .3), wd, bevel=.03); reflector("rf", (0, -14, 3), (0, 0, 1.4), 6, 450)
+    label("hensa", "偏差値", (0, -.72, .3), .26)
+    S["num"] = text_obj("n94", "94", (0, 0, 1.45), 1.7, gold_mat("goldnum", .12), extrude=.14); ANIM.append(S["num"])
 
 
 def a_s14(u, t, f):
-    S["num"].location = (0, 0, 1.25 + .02 * math.sin(t * 2))
+    S["num"].location = (0, 0, 1.45 + .02 * math.sin(t * 2))
     go("s14", [(0, (-3.6, -4.6, .8), (0, 0, 1.2), 34), (2, (2.8, -4.2, 1.6), (0, 0, 1.3), 34), (5, (0, -6.5, 1.3), (0, 0, 1.25), 30)], t, 4.0, mv=.5)
 
 

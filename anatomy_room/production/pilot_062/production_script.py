@@ -36,7 +36,7 @@ def snap():
     old = json.loads(SNAP.read_text(encoding="utf-8")) if SNAP.exists() else {}
     add, shift = {}, 0.0
     for a, b in zip(LINES, LINES[1:]):
-        t = st[b["id"]]["start"] + shift; k = math.ceil((t - .02) / P); d = k * P - t
+        t = st[b["id"]]["start"] + shift; k = math.ceil((t - .045) / P); d = k * P - t   # 開始はコマ（1/30 秒）に丸められるので、拍より少し後ろでも同じ拍とみなす
         if d < .08:                   # ほとんど拍の上なら、そのまま（小さく前へずらすと詰まって聞こえる）
             d = 0.0
         add[a["id"]] = round(old.get(a["id"], 0.0) + d, 3); shift += d
@@ -55,15 +55,15 @@ EP = standard.config({
     "cues": {l["scene"]: [l["id"], 0.0] for l in LINES},
     "sfx": SFX,
     "final_hold": P * 2,
-    "music": {"style": "file_062", "sections": [["s00", 0.0, "f_full"], ["s01", 0.0, "f_85"], ["s05", 0.0, "f_full"], ["s06", 0.0, "f_70"], ["s09", 0.0, "f_full"], ["s11", 0.0, "f_70"], ["s13", 0.0, "f_85"], ["s14", 0.0, "f_full"]]},
+    "music": {"style": "file_062", "sections": [["s00", 0.0, "f_full"], ["s01", 0.0, "f_85"], ["s08", 0.0, "f_full"], ["s09", 0.0, "f_70"], ["s12", 0.0, "f_full"], ["s13", 0.0, "f_85"], ["s14", 0.0, "f_full"]]},
     "segments": [l["scene"] for l in LINES],
     "extra_files": epkit.FILES + ["assets/plan.js", "work/blender/index.js", "../ext/blender/blframes.js"],
     "workers": 2,
     "qc_frames": [[l["scene"], .5] for l in LINES],
     "scenes": [(f"{i} {l['scene']}", l["scene"] if i else None, LINES[i + 1]["scene"] if i + 1 < len(LINES) else "endcard", l["id"], "") for i, l in enumerate(LINES)]
               + [(f"{len(LINES)} 終わり（エンディングなし）", "endcard", None, "", "")],
-    "plan_notes": ["## 演出の方針", "", "- 新ドパ設計 v2（061 型）：3D（Blender）。場面ごとに舞台を変える（陸上のトラック・サッカー場・野球場・クリケット場・夜の競技場）。動き・効果音は表拍、カメラは拍に合わせて素早く。",
-                   "- 物差しは偏差値（50＋10×z）。柱の高さ＝偏差値。ブラッドマンの柱だけ天井を突き抜ける。閃光・点滅なし。"],
+    "plan_notes": ["## 演出の方針", "", "- 新ドパ設計 v2（061 型）：3D（Blender）。場面ごとに舞台を変える（陸上のトラック・バスケのコート・ゴルフのグリーン・野球場・サッカー場・クリケット場）。動き・効果音は表拍、カメラは拍に合わせて素早く。",
+                   "- 物差しは偏差値（50＋10×z）。柱の高さ＝偏差値。天才 5 人（84〜87）の柱はほぼ同じ高さ、ブラッドマンの柱だけ空へ。最後は偏差値 94 の記念碑（v2）。閃光・点滅なし。"],
 })
 
 if __name__ == "__main__":
