@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """pilot_064 の素材を data の JS にまとめる（土台 ext/kit/make_assets.py）。
-写真（assets/photo/、Wikimedia Commons のパブリックドメイン、credits.jsonl。権利は scripts/pilot_063/assets.md）と、
+写真（assets/photo/、Wikimedia Commons のパブリックドメイン、credits.jsonl。権利は scripts/pilot_064/assets.md）と、
 書体：Dela Gothic One・Mochiy Pop One（kit の共通、OFL）＋本文の BIZ UDPゴシック Bold（OFL、assets/fonts/）を画面の文字だけに絞って埋め込む。
 画面の文字を変えたら python plan.py のあとに再実行する。"""
 import base64

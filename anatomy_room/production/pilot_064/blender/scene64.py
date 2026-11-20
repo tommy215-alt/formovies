@@ -5,6 +5,7 @@ blender -b -P blender/scene64.py -- [s00 s01 …] [--samples N]     試し描き
 import sys, os, time, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib64 import *  # noqa: F401,F403
+from lib64 import _sc
 
 O = K.args()
 NAMES = [l["scene"] for l in PLAN["lines"]]
@@ -108,12 +109,78 @@ def glow_mat(name, col, k):
     return m
 
 
-def stage(kind):
-    """舞台：study（書斎、v3）・arena（暗い展示室）・room（夜の食卓の部屋）・night（夜の住宅街の家の前）"""
-    clear_scene(); ANIM[:] = [cam.o]
+HALL_DOTS = []
+ENV = {}
+# 景色：HDRI・地面の質感・質感の縮尺・色・地面の大きさ・HDRI の明るさ・向き・キーの光・リムの光
+OUTENV = {"ward": ("hospital_room_2_2k.hdr", None, .3, (.5, .58, .64), 9, 1.0, math.pi / 2, (300, (1, 1, 1)), (300, (.9, .95, 1))),
+          "veld": ("aarfontein_dirt_road_2k.hdr", "raked_dirt", 1 / 2.5, (.95, .82, .68), 300, 1.0, 0.0, (500, (1, .8, .6)), (500, (1, .7, .45))),
+          "field": ("farm_sunset_2k.hdr", "park_dirt", 1 / 2.5, (.85, .75, .6), 300, 1.0, 0.0, (400, (1, .82, .62)), (500, (1, .7, .45))),
+          "school": ("school_hall_2k.hdr", "wood_floor", 1 / 1.6, (1, .9, .78), 9, 1.0, math.pi, (400, (1, .92, .8)), (300, (1, .85, .7))),
+          "garden": ("ninomaru_teien_2k.hdr", "grass_ground", 1 / 2.5, (.75, .9, .65), 300, 1.0, 0.0, (400, (1, .95, .85)), (400, (1, .9, .75))),
+          "garden2": ("ninomaru_teien_2k.hdr", "grass_ground", 1 / 2.5, (.75, .9, .65), 300, 1.0, 3.14, (400, (1, .95, .85)), (400, (1, .9, .75)))}
+
+
+def stage(*kinds):
+    """舞台を 1 つ以上つくる。2 つ以上なら use_env() で場面の途中に切り替える（使わない方は床の下へ）"""
+    clear_scene(); ANIM[:] = [cam.o]; HALL_DOTS.clear(); ENV.clear()
+    for k in kinds:
+        before = set(_sc().objects); _build_env(k); w = bpy.context.scene.world
+        root = empty("env_" + k, (0, 0, 0))
+        for o in _sc().objects:
+            if o not in before and o is not root and o.parent is None:
+                parent(o, root)
+        ENV[k] = {"w": w, "root": root, "key": (KEY.data.energy, tuple(KEY.data.color)), "rim": (RIM.data.energy, tuple(RIM.data.color))}
+        ANIM.append(root)
+    use_env(kinds[0])
+
+
+def use_env(k):
+    e = ENV[k]; bpy.context.scene.world = e["w"]
+    KEY.data.energy, KEY.data.color = e["key"]; RIM.data.energy, RIM.data.color = e["rim"]
+    for kk, ee in ENV.items():
+        ee["root"].location = (0, 0, 0) if kk == k else (0, 0, -300)
+
+
+def dots_on(which):
+    """世界地図の国の灯り（0 日本・1 アメリカ・2 インド・3 チャド）。which に入っていない灯りは消す"""
+    for i in range(4):
+        sp, li = HALL_DOTS[2 * i], HALL_DOTS[2 * i + 1]; on = i in which
+        sp.scale = (1, 1, 1) if on else (.001, .001, .001); li.data.energy = 40 if on else 0
+        if sp not in ANIM:
+            ANIM.extend([sp, li])
+
+
+def _build_env(kind):
+    """舞台：world（064：世界地図の展示室）・study（書斎、v3）・arena（暗い展示室）・room（夜の食卓の部屋）・night（夜の住宅街の家の前）"""
     if kind == "arena":
         plane("floor", 80, 80, (0, 0, 0), plain("blackfloor", (.025, .024, .027), .22, coat=.8))
         plane("backw", 80, 20, (0, 9, 10), pbr_mat("bw", "brushed_concrete", 1 / 3.0, (.16, .15, .15), 1.0, box_proj=True), rot=(math.pi / 2, 0, 0)); lights((900, (1, .92, .8)), (600, (1, .8, .6)), "studio_small_08_2k.hdr", .35)
+    elif kind == "world":                     # 064：紺の展示室の奥の壁いっぱいに金の大陸の世界地図、4 つの国の位置に灯り。床は暗い鏡面
+        plane("floor", 80, 80, (0, 0, 0), plain("navyfloor", (.012, .016, .03), .16, coat=.9))
+        nv = plain("navywall", (.03, .045, .09), .7)
+        plane("backw", 80, 24, (0, 9.45, 12), nv, rot=(math.pi / 2, 0, 0))
+        for sx in (-1, 1):
+            plane("sidew%d" % sx, 40, 24, (sx * 15, 0, 12), nv, rot=(math.pi / 2, 0, math.pi / 2))
+        MW, MH, MZ = 26.0, 26.0 * 1594 / 4096, 10.6
+        plane("map", MW, MH, (0, 9.4, MZ - MH / 2), image_mat("worldmap", os.path.join(HERE, "..", "assets", "worldmap.png"), .55, .55), rot=(math.pi / 2, 0, 0))
+        brass = gold_mat("brassl", .3, (.86, .62, .3))
+        box("mapframe_t", (MW + .3, .12, .12), (0, 9.33, MZ + .06), brass, bevel=.02); box("mapframe_b", (MW + .3, .12, .12), (0, 9.33, MZ - MH - .06), brass, bevel=.02)
+        dot = glow_mat("mapdot", (1, .9, .7), 30.0)
+        for lon, lat in ((139.7, 35.7), (-98.0, 39.0), (78.9, 21.0), (18.7, 15.5)):       # 日本・アメリカ・インド・チャド
+            x = ((lon + 170) % 360 / 360 - .5) * MW; z = MZ - (80 - lat) / 140 * MH
+            HALL_DOTS.append(sphere("dot%g" % lon, .1, (x, 9.3, z), dot, 24))
+            l = bpy.data.lights.new("dl%g" % lon, "POINT"); l.energy = 40; l.color = (1, .85, .6); l.shadow_soft_size = .1
+            o = bpy.data.objects.new("dl%g" % lon, l); o.location = (x, 9.0, z); link(o); HALL_DOTS.append(o)
+        lights((1000, (1, .9, .8)), (800, (.7, .8, 1)), "studio_small_08_2k.hdr", .4)
+    elif kind in OUTENV:                      # 064：国・時代の景色（Poly Haven の CC0 の HDRI を背景に見せる）＋その地面の質感
+        hd, tex, sc_, tint, size, stren, rot, key, rim = OUTENV[kind]
+        fm = plain("fl_" + kind, tint, sc_, coat=.3) if tex is None else pbr_mat("fl_" + kind, tex, sc_, tint, 1.0, box_proj=True)   # 屋内は床を小さく（その先は HDRI の床）
+        rot = float(os.environ.get("ROT_" + kind, rot))
+        if size < 50:                         # 屋内：床は影だけを受ける（見えるのは HDRI の床）
+            o = plane("fl_" + kind, 60, 60, (0, 0, 0), fm); o.is_shadow_catcher = True
+        else:
+            plane("fl_" + kind, size, size, (0, 0, 0), fm)
+        lights(key, rim, hd, stren, rot, 1)
     elif kind == "study":                     # 書斎：大理石の床、奥に天井までの本棚と木の壁、真鍮の灯り（v3）
         plane("floor", 60, 60, (0, 0, 0), pbr_mat("marble", "marble_01", 1 / 2.2, (.95, .9, .82), .6, box_proj=True))
         wd = pbr_mat("panel", "dark_wood", 1 / 1.5, (.55, .38, .26), 1.0, box_proj=True)
@@ -363,18 +430,19 @@ def baby(name, m=None, s=1.0):
 
 
 def crowd(name, pts, s, m, kind="baby"):
-    """たくさんの赤ちゃん（または人形）を 1 つのメッシュに（物の数を増やさない）"""
-    bm = bmesh.new()
-    for (x, y, rz) in pts:
-        if kind == "baby":
-            parts = BABY
-        else:
-            parts = [((0, 0, .4), .3, (.85, .7, 1.35)), ((0, 0, 1.0), .17, (1, 1, 1))]
+    """たくさんの赤ちゃん（または人形）を 1 つのメッシュに（物の数を増やさない）。1 体の形を作って numpy で並べる（bmesh に足していくと遅い）"""
+    import numpy as np
+    parts = BABY if kind == "baby" else [((0, 0, .4), .3, (.85, .7, 1.35)), ((0, 0, 1.0), .17, (1, 1, 1))]
+    tb = bmesh.new()
+    for c, r, sc in parts:
+        bm_ball(tb, c, r, sc)
+    tb.verts.index_update(); V = np.array([v.co[:] for v in tb.verts]) * s; F = [[v.index for v in f.verts] for f in tb.faces]; tb.free()
+    nv = len(V); AV, AF = [], []
+    for k, (x, y, rz) in enumerate(pts):
         cr, sr = math.cos(rz), math.sin(rz)
-        for c, r, sc in parts:
-            cx, cy = c[0] * cr - c[1] * sr, c[0] * sr + c[1] * cr
-            bm_ball(bm, (x + cx * s, y + cy * s, c[2] * s), r * s, sc)
-    o = bpy.data.objects.new(name, mesh_from_bm(name, bm, [m])); return link(o)
+        AV.append(np.stack([V[:, 0] * cr - V[:, 1] * sr + x, V[:, 0] * sr + V[:, 1] * cr + y, V[:, 2]], 1)); AF.extend([[i + k * nv for i in fc] for fc in F])
+    me = bpy.data.meshes.new(name); me.from_pydata(np.concatenate(AV).tolist(), [], AF); me.materials.append(m)
+    me.polygons.foreach_set("use_smooth", [True] * len(me.polygons)); o = bpy.data.objects.new(name, me); return link(o)
 
 
 def mini(name, loc, s, m):
@@ -424,17 +492,26 @@ def grow(t, t0, h0, h1, dur=.4):
     return h0 + (h1 - h0) * eio((t - (t0 - dur)) / dur)
 
 
+def flat(o):
+    for pg in o.data.polygons:
+        pg.use_smooth = False
+
+
 def lottery():
     """ガラガラの抽選機：八角形の木の胴（x 軸まわりに回る）、金の縁、取っ手、手前の受け皿"""
-    wd = pbr_mat("plinth", "dark_wood", 1.0, (.42, .3, .22), 1.0, box_proj=True); g = gold_mat("brassl", .3, (.86, .62, .3)); red = plain("lacq", (.42, .06, .05), .25, coat=.8)
+    wd = pbr_mat("plinth", "dark_wood", 1.0, (.42, .3, .22), 1.0, box_proj=True); g = gold_mat("gold", .13); red = plain("lacq", (.30, .03, .03), .3, coat=.8)
     root = empty("lot", (0, 0, 0))
     parent(box("lotbase", (2.0, 1.1, .12), (0, 0, .06), wd, bevel=.02), root)
     for sx in (-1, 1):
         parent(box("lotside%d" % sx, (.1, .5, 1.05), (sx * .82, 0, .6), wd, bevel=.02), root)
     dr = empty("drum", (0, 0, 1.08)); parent(dr, root)
-    o = cyl("drumb", .56, 1.3, (0, 0, 0), red, 8); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr)
+    o = cyl("drumb", .56, 1.3, (0, 0, 0), red, 8, bevel=.015); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr); flat(o)   # 八角形の面が見えるように
     for sx in (-1, 1):
-        o = cyl("drumc%d" % sx, .6, .06, (sx * .66, 0, 0), g, 8); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr)
+        o = cyl("drumc%d" % sx, .6, .06, (sx * .66, 0, 0), g, 8, bevel=.01); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr); flat(o)
+    for k in range(8):                       # 胴の 8 面に 4 か国の国旗（国のくじ）
+        ph = math.radians(22.5 + 45 * k); key = CT[k % 4][2]; ap = .56 * math.cos(math.radians(22.5)) + .004
+        fw, fh = (.46, .24) if key == "us" else (.42, .28)
+        parent(plane("drumf%d" % k, fw, fh, (0, ap * math.sin(ph), -ap * math.cos(ph)), flag_mat(key), rot=(ph + math.pi, 0, 0)), dr)
     o = cyl("axle", .045, 2.0, (0, 0, 0), g, 24); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr)
     parent(box("crank", (.05, .06, .5), (1.02, 0, -.25), g, bevel=.01), dr); o = cyl("knob", .05, .22, (1.12, 0, -.48), wd, 24); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr)
     parent(box("tray", (.62, .42, .05), (0, -.62, .66), g, bevel=.01), root)
@@ -442,6 +519,8 @@ def lottery():
         parent(box("trayw%d" % sx, (.03, .42, .1), (sx * .3, -.62, .7), g, bevel=0), root)
     parent(box("trayf", (.62, .03, .1), (0, -.82, .7), g, bevel=0), root)
     parent(box("trayleg", (.08, .3, .62), (0, -.5, .33), wd, bevel=.01), root)
+    for j, (bx, by) in enumerate(((-.2, -.52), (.21, -.7), (.19, -.5))):   # 受け皿に白い玉（はずれ）
+        parent(sphere("wball%d" % j, .075, (bx, by, .7 + .075), ceramic(), 48), root)
     S["drum"] = dr; S["ball"] = sphere("ball", .075, (0, 0, -50), gold_mat("gold", .13), 48); ANIM.append(S["ball"])
 
 
@@ -451,7 +530,7 @@ def spin_drum(t, t0, t1, turns, base=0.0):
 
 
 def s_s00():                                   # 冒頭：書斎の抽選機が回り、金の玉が出て、金の赤ちゃんに
-    stage("study"); spot("sp", (0, -4.5, 5.5), (0, 0, 1.0), 2600, size=.8, ang=.9, blend=.5); reflector("rf", (0, -12, 3), (0, 0, 1.0), 8, 650)
+    stage("world"); spot("sp", (-2.6, -2.2, 5.0), (0, 0, 1.0), 1500, size=1.2, ang=.9, blend=.6); reflector("rf", (0, -12, 3), (0, 0, 1.0), 8, 650)
     lottery(); S["bb"] = baby("bb0", s=.5)
 
 
@@ -468,7 +547,7 @@ def a_s00(u, t, f):
         k = spring(clamp((t - (t6 - .02)) / .35)); S["bb"].scale = (.5 * k, .5 * k, .5 * k); S["bb"].location = (0, -.62, .69 + bob("s00", t, (7, 8), .05))
     else:
         S["bb"].location = (0, 0, -50)
-    go("s00", [(0, (0, -2.4, 1.25), (0, 0, 1.05), 32), (3, (1.9, -2.6, 1.5), (0, -.2, .95), 30), (5, (.35, -1.7, .95), (0, -.62, .7), 42), (7, (0, -3.2, 1.3), (0, -.4, .9), 34)], t, 3.0)
+    go("s00", [(0, (-1.8, -2.8, 1.5), (0, 0, 1.0), 30), (3, (1.9, -2.6, 1.5), (0, -.2, .95), 30), (5, (.35, -1.7, .95), (0, -.62, .7), 42), (7, (0, -3.2, 1.3), (0, -.4, .9), 34)], t, 3.0)
 
 
 # 白い赤ちゃんの群れ（19×10＝190 体、1 体だけ金）
@@ -477,7 +556,7 @@ GOLD_IJ = (9, 2)
 
 
 def s_s01():
-    stage("study"); spot("sp", (0, -6, 9), (0, 1, 0), 3600, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 5), (0, 1, 0), 10, 600)
+    stage("world"); spot("sp", (0, -6, 9), (0, 1, 0), 3600, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 5), (0, 1, 0), 10, 600)
     import random as _r
     R = _r.Random(64); pts = []
     for i in range(GX):
@@ -502,12 +581,13 @@ def a_s01(u, t, f):
 
 
 def s_s02():                                   # 同じ赤ちゃんを 4 つの国に：台座に国旗と国名、赤ちゃんが拍ごとに落ちる
-    stage("study"); spot("sp", (0, -6, 7), (0, 0, .8), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.0), 12, 700)
+    stage("world"); spot("sp", (0, -6, 7), (0, 0, .8), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.0), 12, 700)
     pedestals()
 
 
 def a_s02(u, t, f):
     ks = [pb("L02", j) for j in range(1, 5)]
+    dots_on([i for i in range(4) if t >= lbeat("s02", ks[i]) - .02])
     for i in range(4):
         drop(S["bb"][i], (PX[i], 0, .82), t, lbeat("s02", ks[i]), h=1.8)
         if t > lbeat("s02", ks[i]) + .3:
@@ -516,8 +596,8 @@ def a_s02(u, t, f):
     go("s02", keys, t, 3.2)
 
 
-def life_set():
-    stage("study"); spot("sp", (0, -6, 8), (0, .5, 1.6), 3400, size=1.0, ang=1.15, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.8), 12, 750)
+def life_set(env="world"):
+    stage(env); spot("sp", (0, -6, 8), (0, .5, 1.6), 3400, size=1.0, ang=1.15, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.8), 12, 750)
     pedestals(); pillar_set()
     for i in range(4):
         S["bb"][i].location = (PX[i], 0, .82)
@@ -559,7 +639,7 @@ def a_s04(u, t, f):
 
 
 def s_s05():                                   # 5 歳まで：日本の 400 体（20×20）から 1 体、チャドの 10 体から 1 体が静かに沈む
-    stage("study"); spot("sp", (0, -6, 8), (0, .8, 0), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 4), (0, 0, .5), 10, 650)
+    stage("garden", "veld"); spot("sp", (0, -6, 8), (0, .8, 0), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 4), (0, 0, .5), 10, 650)
     sp, s = .2, .15; c = ceramic(); pts = []
     for i in range(20):
         for j in range(20):
@@ -573,17 +653,18 @@ def s_s05():                                   # 5 歳まで：日本の 400 体
 
 def a_s05(u, t, f):
     k1, k2 = pb("L05", 1), pb("L05", 2)
+    use_env("garden" if t < lbeat("s05", k2) else "veld")            # 日本の話は日本庭園、チャドの話は乾いた大地（景色はイメージ）
     x, y, z = S["j1p"]; S["j1"].location = (x, y, -.4 * eio(clamp((t - lbeat("s05", k1 + 1)) / .7)))
     for i, o in enumerate(S["td"]):
         o.location = (2.6 + (i - 4.5) * .2, .2, -.4 * eio(clamp((t - lbeat("s05", k2 + 1)) / .7)) if i == 6 else bob("s05", t, (k2,), .03))
-    go("s05", [(0, (0, -7.5, 3.6), (0, .6, 0), 30), (k1, (-2.0, -1.6, 1.6), (x, y, .05), 40), (k2, (3.2, -1.6, .7), (2.6, .2, .12), 42), (k2 + 3, (2.2, -3.4, 1.4), (2.4, .2, .1), 34)], t, 3.0)
+    go("s05", [(0, (-.4, -6.8, 1.5), (-1.2, 2.0, .2), 28), (k1, (-2.0, -1.6, 1.6), (x, y, .05), 40), (k2, (3.2, -1.6, .7), (2.6, .2, .12), 42), (k2 + 3, (2.2, -3.4, 1.4), (2.4, .2, .1), 34)], t, 3.0)
 
 
 BOOKS = [(.15, .25, .45), (.5, .12, .1), (.12, .32, .2), (.55, .42, .15), (.3, .2, .4), (.6, .55, .45), (.1, .1, .12)]
 
 
 def s_s06():                                   # 学ぶ年数：日本 14 冊、チャド 5 冊の本の山
-    stage("study"); spot("sp", (0, -5, 6), (0, 0, .7), 3000, size=.9, ang=1.0, blend=.5); reflector("rf", (0, -12, 3), (0, 0, .8), 8, 650)
+    stage("garden2", "field"); spot("sp", (0, -5, 6), (0, 0, .7), 3000, size=.9, ang=1.0, blend=.5); reflector("rf", (0, -12, 3), (0, 0, .8), 8, 650)
     S["bk"] = {}
     for key, x, n in (("jp", -1.1, 14), ("td", 1.1, 5)):
         S["bk"][key] = []
@@ -595,6 +676,7 @@ def s_s06():                                   # 学ぶ年数：日本 14 冊、
 
 
 def a_s06(u, t, f):
+    use_env("garden2" if t < lbeat("s06", pb("L06", 2)) else "field")  # 日本の話は日本庭園（別の向き）、チャドの話は乾いた野（景色はイメージ）
     for key, j0 in (("jp", pb("L06", 1)), ("td", pb("L06", 2))):
         T = lbeat("s06", j0); L = S["bk"][key]
         for j, (o, p) in enumerate(L):
@@ -610,7 +692,7 @@ def coin(name, m):
 
 
 def s_s07():                                   # 所得 約 40 倍：金貨 40 枚と 1 枚 → 365 日の暦のうち 9 日が金に
-    stage("study"); spot("sp", (0, -6, 7), (0, 1.2, 1.2), 3400, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 1, 1.4), 12, 700)
+    stage("world"); spot("sp", (0, -6, 7), (0, 1.2, 1.2), 3400, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 1, 1.4), 12, 700)
     g = gold_mat("gold", .13); S["cj"] = [coin("cj%d" % j, g) for j in range(40)]; S["ct"] = coin("ct", g)
     for key, x in (("jp", -.9), ("td", .9)):
         parent(plane("cf" + key, .36, .24, (0, -.4, .02), flag_mat(key), rot=(math.radians(-70) + math.pi / 2, 0, 0)), empty("cfe" + key, (x, 0, 0)))
@@ -647,7 +729,7 @@ def a_s07(u, t, f):
 
 
 def s_s08():                                   # 同じ赤ちゃん：4 つの台座を横に流して見る
-    stage("study"); spot("sp", (0, -6, 7), (0, 0, .8), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.0), 12, 700)
+    stage("world"); spot("sp", (0, -6, 7), (0, 0, .8), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.0), 12, 700)
     pedestals()
 
 
@@ -658,8 +740,8 @@ def a_s08(u, t, f):
     go("s08", [(0, (-5.0, -3.0, 1.3), (-2.2, 0, 1.0), 32), (k1, (0, -9.6, 1.7), (0, 0, .95), 28)], t, 3.2, mv=.6)
 
 
-def s_s09():                                   # 100 年前の日本は約 43 年：日本の柱が縮み、チャドより低く
-    life_set(); S["l43"] = label("l43", "43年", (0, 0, -50), .26); S["l1920"] = label("l1920", "1920年代", (0, 0, -50), .2); ANIM.extend([S["l43"], S["l1920"]])
+def s_s09():                                   # 100 年前の日本は約 43 年：日本の柱が縮み、チャドより低く（日本庭園）
+    life_set("garden"); S["l43"] = label("l43", "43年", (0, 0, -50), .26); S["l1920"] = label("l1920", "1920年代", (0, 0, -50), .2); ANIM.extend([S["l43"], S["l1920"]])
 
 
 def a_s09(u, t, f):
@@ -675,8 +757,8 @@ def a_s09(u, t, f):
     go("s09", [(0, (0, -10.5, 1.8), (0, 0, 2.0), 28), (k1, (PX[0] + 1.6, -4.4, 1.6), (PX[0], PY, 1.6), 32), (k2, (0, -9.4, .7), (0, PY, 1.3), 30)], t, 3.4)
 
 
-def s_s10():                                   # 同じ国でも時代で変わる：日本の柱が 1920 年代 → 1950 年ごろ → いま と伸びる
-    life_set(); S["tags"] = []
+def s_s10():                                   # 同じ国でも時代で変わる：日本の柱が 1920 年代 → 1950 年ごろ → いま と伸びる（日本庭園）
+    life_set("garden"); S["tags"] = []
     for i, (txt, le) in enumerate(PLAN["past"]):
         o = label("tag%d" % i, "%s %d年" % (txt, round(le)), (0, 0, -50), .17); ANIM.append(o); S["tags"].append((o, le))
 

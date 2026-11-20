@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
-<title>pilot_063 renderer</title>
+<title>pilot_064 renderer</title>
 <style>
 html,body{margin:0;background:#000}
 #stage{position:relative;width:1080px;height:1920px;overflow:hidden}
@@ -34,8 +34,8 @@ html,body{margin:0;background:#000}
 <script src="work/blender/index.js"></script>
 <script src="../ext/blender/blframes.js"></script>
 <script>
-// pilot_063 のレンダラー（新ドパ設計 v2、061 型）。あなたの一生を、24時間にしたら？
-// 場面は Blender（Cycles）の 3D のコマ（blender/scene63.py）。ここでは拍の小さな寄りと場面の変わり目、文字、判（1分50秒）、出典と仮定の注記だけ。
+// pilot_064 のレンダラー（新ドパ設計 v2、061 型）。同じ赤ちゃんが、違う国に生まれたら？
+// 場面は Blender（Cycles）の 3D のコマ（blender/scene64.py）。ここでは拍の小さな寄りと場面の変わり目、文字、判（約40倍）、出典の注記だけ。
 // 動き（帯・札・判の出）は表拍。閃光なし。
 const PL = window.PLAN, BEAT = PL.beat, BP = BEAT.period;
 const LN = PL.lines, SCN_IDS = LN.map(l => l.scene);
@@ -262,7 +262,7 @@ function blDraw(c, name, t) {
 }
 function drawScene(c, i, t) { c.save(); c.clearRect(0, 0, W, H); blDraw(c, LN[i].scene, t); c.restore(); }
 function camAt(t, i) { return { fx: 540, fy: 960, z: 1.0 + .05 * barPulse(t), rot: (beatIdx(t) % 2 ? 1 : -1) * .006 * pulse(t) }; }   // v2：拍の押し出しを強く（MV のようなグルーブ）
-const TR = { s01: "zoom", s02: "whip", s03: "zoom", s04: "whip", s05: "whip", s06: "zoom", s07: "whip", s08: "whip", s09: "whip", s10: "zoom", s11: "whip", s12: "zoom", s13: "whip", s14: "zoom" };
+const TR = { s01: "zoom", s02: "whip", s03: "zoom", s04: "whip", s05: "whip", s06: "zoom", s07: "whip", s08: "zoom", s09: "whip", s10: "zoom", s11: "whip" };
 function blit(src, cm, { ox = 0, oy = 0, extra = 1, alpha = 1 } = {}) { bg.save(); bg.globalAlpha = alpha; bg.translate(540 + ox, 960 + oy); bg.rotate(cm.rot); bg.scale(cm.z * extra, cm.z * extra); bg.translate(-cm.fx, -cm.fy); bg.drawImage(src, 0, 0); bg.restore(); }
 function composite(t, i) {
   const l = LN[i], t0 = CUE[l.scene], u = t - t0, t1 = sEnd(i), cm = camAt(t, i), tr = TR[l.scene], nxt = i + 1 < LN.length ? TR[LN[i + 1].scene] : null;
@@ -280,9 +280,9 @@ function composite(t, i) {
 }
 
 // ---------------------------------------------------------------- セリフの文字：句ごとに 帯・木の札・ポップ・光る文字 を切り替える（声に合わせて出る）
-const STY = { L00: ["title", "title"], L01: ["plank", "band"], L02: ["pop", "pop", "pop"], L03: ["band", "glow"], L04: ["pop", "pop", "pop"], L05: ["glow"],
-  L06: ["band", "pop"], L07: ["pop", "pop"], L08: ["pop", "pop"], L09: ["band", "glow"],
-  L10: ["plank"], L11: ["band", "band"], L12: ["band", "pop", "band"], L13: ["band", "glow"], L14: ["glow", "pop"] };
+const STY = { L00: ["title", "title"], L01: ["plank", "band"], L02: ["band", "pop", "pop", "pop", "pop"], L03: ["band", "pop", "pop", "pop", "glow"],
+  L04: ["glow", "pop"], L05: ["band", "pop", "glow"], L06: ["band", "pop", "glow"], L07: ["pop", "band"], L08: ["band", "glow"],
+  L09: ["band", "pop", "glow"], L10: ["plank", "glow"], L11: ["band", "band"] };
 const TY = 1520, TX = 470;   // 文字の中心は少し左へ（右側のボタン列 x≥950 を避ける）
 function phrases(t) {
   const out = [], Ls = TL.lines.filter(x => !x.ending);
@@ -354,18 +354,17 @@ function frame(t) {
   NOW = t; bg.clearRect(0, 0, W, H); ui.clearRect(0, 0, W, H);
   const es = TL.ending_start, i = cur(Math.min(t, es - .001));
   composite(t, i); addGrain(t);
-  // 判（1分50秒）・出典と仮定の小さな注記
+  // 判（約40倍）・出典の小さな注記
   const sb = n => Math.round(CUE[n] / BP) * BP, inS = n => CUE[n] !== undefined && t >= CUE[n] && t < sEnd(SCN_IDS.indexOf(n));
   const note = (txt, y = 1280) => { ui.save(); ui.font = `700 26px ${BIZ}`; ui.textAlign = "left"; ui.fillStyle = "rgba(255,255,255,.85)"; ui.shadowColor = "rgba(0,0,0,.8)"; ui.shadowBlur = 8; ui.fillText(txt, 40, y); ui.restore(); };
-  if (inS("s01")) note("平均寿命：令和7年簡易生命表（男81.35年・女87.33年の平均）");
-  if (inS("s03") || inS("s05")) note("1日の平均：総務省 社会生活基本調査 2021（10歳以上）");
-  if (inS("s04")) note("社会生活基本調査 2021／スマホ：総務省 令和7年度（13〜79歳・ほかと重なる）");
-  if (inS("s06")) note("趣味・娯楽：社会生活基本調査 2021");
-  if (inS("s07")) note("旅行：観光庁 旅行・観光消費動向調査 2025（出張を含む）");
-  if (inS("s08")) note("料理：社会生活基本調査 2021／読書：NHK国民生活時間調査 2020（雑誌・マンガを含む）");
-  if (inS("s09")) note("交際・付き合い：社会生活基本調査 2021");
-  if (inS("s12") || inS("s13")) note("仮定：お盆と正月に3日ずつ・1日4時間、親と30歳差");
-  if (inS("s14")) seal(ui, "1分50秒", 470, 330, 150, t, sb("s14") + 4 * BP, -.08);
+  if (inS("s01")) note("世界銀行 WDI：出生率と人口（2024〜25年）から計算");
+  if (inS("s03") || inS("s04")) note("平均寿命：世界銀行 WDI 2024年");
+  if (inS("s05")) note("5歳未満の死亡率：世界銀行 WDI 2024年／景色はイメージ");
+  if (inS("s06")) note("18歳までに期待される就学年数：世界銀行 人的資本指数 2020年");
+  if (inS("s06")) note("景色はイメージ", 1240);
+  if (inS("s07")) note("1人あたり国民総所得（GNI）2025年・物価の差は含まない");
+  if (inS("s09") || inS("s10")) note("日本の過去：厚生労働省 完全生命表（1921〜25年・1950〜52年）");
+  if (inS("s07")) seal(ui, "約40倍", 470, 330, 150, t, sb("s07") + 2 * BP, -.08);
   phrases(t).forEach(p => drawPhrase(p, t));
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
 }

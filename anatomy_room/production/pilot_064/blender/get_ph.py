@@ -2,8 +2,8 @@
 import json, urllib.request
 from pathlib import Path
 OUT = Path(__file__).resolve().parents[1] / "assets" / "ph"; UA = {"User-Agent": "reverse-pilot064/1.0"}
-HDRI = ["modern_evening_street", "brown_photostudio_02", "studio_small_08"]
-TEX = ["wood_floor", "grass_ground", "marble_01", "dark_wood", "brushed_concrete"]
+HDRI = ["modern_evening_street", "brown_photostudio_02", "studio_small_08", "hospital_room_2", "farm_sunset", "school_hall", "aarfontein_dirt_road", "hotel_rooftop_balcony", "ninomaru_teien"]
+TEX = ["wood_floor", "grass_ground", "marble_01", "dark_wood", "brushed_concrete", "floor_tiles_06", "raked_dirt", "park_dirt", "gravel_floor"]
 def get(url, p):
     if p.exists() and p.stat().st_size: return
     p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=300).read()); print("got", p.name, flush=True)
