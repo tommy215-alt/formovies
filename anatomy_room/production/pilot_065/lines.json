@@ -1,0 +1,193 @@
+{
+ "title": "2013年まで、選挙に行けなかった日本人",
+ "theme": "成年後見を受けると選挙権を失う決まりがあった。一度も投票を休まなかった女性が国を訴え、2013年に違憲判決、法律が全会一致で変わった（新ドパ設計 v2）",
+ "note": "新ドパ設計 v2（061 型）：冒頭と最後は W 春日部つむぎ、本編は M 青山龍星 ノーマル。BGM は JMHBM「Dance the Night Away」（CC BY 4.0、062・063 と同じ）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "voice_override": {
+  "M": {
+   "name": "青山龍星",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13
+   },
+   "default_style": "normal",
+   "speed": 1.725,
+   "inton": 1.0
+  },
+  "W": {
+   "name": "春日部つむぎ",
+   "credit": "VOICEVOX:春日部つむぎ",
+   "styles": {
+    "normal": 8
+   },
+   "default_style": "normal",
+   "speed": 1.35,
+   "inton": 1.0
+  }
+ },
+ "gap": 0.05,
+ "max_duration": 80.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "W",
+   "scene": "s00",
+   "speech": "2013年まで、選挙に行けない、にほんじんが、約13万人いた。",
+   "sub": [
+    "2013年まで 選挙に行けない日本人が",
+    "約13万人いた"
+   ],
+   "pause": 0.28,
+   "kind": "open",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "s01",
+   "speech": "罪を犯したわけじゃない。ある制度を、使っただけ。",
+   "sub": [
+    "罪を犯したわけじゃない",
+    "ある制度を 使っただけ"
+   ],
+   "pause": 0.27,
+   "kind": "door",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "s02",
+   "speech": "茨城に住む、知的障害のある女性。選挙は、一度も休まなかった。",
+   "sub": [
+    "茨城に住む 知的障害のある女性",
+    "選挙は 一度も休まなかった"
+   ],
+   "pause": 0.258,
+   "kind": "home",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "s03",
+   "speech": "選挙こうほうを読み込んで、両親と、投票所へ。",
+   "sub": [
+    "選挙公報を読み込んで",
+    "両親と 投票所へ"
+   ],
+   "pause": 0.237,
+   "kind": "walk",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "s04",
+   "speech": "2007年。お金の管理を心配した父が、こうけんにんになった。",
+   "sub": [
+    "2007年",
+    "お金の管理を心配した父が",
+    "後見人になった"
+   ],
+   "pause": 0.15,
+   "kind": "guard",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "s05",
+   "speech": "すると、選挙のはがきが、届かなくなった。",
+   "sub": [
+    "すると",
+    "選挙のはがきが 届かなくなった"
+   ],
+   "pause": 0.568,
+   "kind": "mail",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "s06",
+   "speech": "法律には、こう書いてあった。せいねんひこうけんにんは、選挙権を有しない。",
+   "sub": [
+    "法律には こう書いてあった",
+    "成年被後見人は",
+    "選挙権を有しない"
+   ],
+   "pause": 0.258,
+   "kind": "law",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "s07",
+   "speech": "お金の計算が苦手なことと、誰に投票するかを選ぶこと。それは、同じこと？",
+   "sub": [
+    "お金の計算が苦手なこと",
+    "誰に投票するかを選ぶこと",
+    "それは 同じこと？"
+   ],
+   "pause": 0.335,
+   "kind": "scale",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "s08",
+   "speech": "彼女は、国を訴えた。2013年3月、裁判所は、憲法違反と判断した。",
+   "sub": [
+    "彼女は 国を訴えた",
+    "2013年3月",
+    "裁判所は 憲法違反と判断した"
+   ],
+   "pause": 0.446,
+   "kind": "court",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "s09",
+   "speech": "2か月後、法律は、全会一致で変わった。",
+   "sub": [
+    "2か月後",
+    "法律は 全会一致で変わった"
+   ],
+   "pause": 0.437,
+   "kind": "diet",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L10",
+   "who": "M",
+   "scene": "s10",
+   "speech": "その夏の選挙から、彼女のはがきは、また届くようになった。",
+   "sub": [
+    "その夏の選挙から",
+    "彼女のはがきは また届くようになった"
+   ],
+   "pause": 0.481,
+   "kind": "mail2",
+   "fact": "scripts/pilot_065/fact_check.md"
+  },
+  {
+   "id": "L11",
+   "who": "W",
+   "scene": "s11",
+   "speech": "当たり前の一票。それは、誰が、決めていたんだろう。",
+   "sub": [
+    "当たり前の一票",
+    "それは 誰が決めていたんだろう"
+   ],
+   "pause": 0.15,
+   "kind": "end",
+   "fact": "scripts/pilot_065/fact_check.md"
+  }
+ ]
+}
