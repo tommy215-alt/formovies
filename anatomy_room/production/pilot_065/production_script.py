@@ -55,7 +55,7 @@ EP = standard.config({
     "cues": {l["scene"]: [l["id"], 0.0] for l in LINES},
     "sfx": SFX,
     "final_hold": P * 2,
-    "music": {"style": "file_065", "sections": [["s00", 0.0, "f_open"], ["s01", 0.0, "f_up"], ["s05", 0.0, "f_low"], ["s08", 0.0, "f_up"], ["s11", 0.0, "f_mid2"]]},
+    "music": {"style": "file_065", "sections": [["s00", 0.0, "f_open"], ["s01", 0.0, "f_up"], ["s04", 0.0, "f_low"], ["s08", 0.0, "f_up"], ["s12", 0.0, "f_mid2"]]},
     "segments": [l["scene"] for l in LINES],
     "extra_files": epkit.FILES + ["assets/plan.js", "work/blender/index.js", "../ext/blender/blframes.js"],
     "workers": 2,

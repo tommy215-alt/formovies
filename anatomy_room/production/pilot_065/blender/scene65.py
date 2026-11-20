@@ -637,7 +637,8 @@ def _build_env(kind):
         _prev_build(kind)
 
 
-# ---------------------------------------------------------------- 場面
+# ---------------------------------------------------------------- 場面（v2：台本 v2 の 13 場面）
+
 def s_s00():                                   # 冒頭：体育館の投票所。白い人形が次々に入っていき、金の人形の前で扉が閉まる
     stage("poll"); spot("sp", (-2.5, -4.5, 5.5), (0, 0, 1.2), 2600, size=1.2, ang=1.0, blend=.6); reflector("rf", (0, -12, 3), (0, 0, 1.2), 8, 600)
     door_set("dr"); hall_inside("in")
@@ -658,44 +659,18 @@ def a_s00(u, t, f):
     go("s00", [(0, (2.2, -6.0, 1.6), (0, 0, 1.3), 28), (3, (-1.6, -4.2, 1.4), (0, -.6, 1.2), 32), (5, (.9, -2.8, 1.25), (0, -.5, 1.15), 36), (7, (0, -4.6, 1.5), (0, 0, 1.4), 30)], t, 3.0)
 
 
-def s_s01():                                   # 閉じた扉と、扉に掛かる札「成年後見制度」
-    stage("poll"); spot("sp", (-2.0, -4.0, 5.0), (0, 0, 1.4), 2400, size=1.0, ang=1.0, blend=.6); reflector("rf", (0, -12, 3), (0, 0, 1.2), 8, 600)
-    door_set("dr"); set_doors("dr", 0); S["h"] = her(loc=(.62, -.95, 0), rz=.3)
-    pl = empty("plq", (0, 0, -50)); parent(box("plq_b", (1.2, .05, .34), (0, 0, 0), pbr_mat("plank", "wood_floor", 1.0, (1, .92, .8), 1.0, box_proj=True), bevel=.01), pl)
-    parent(dark_text("plq_t", "成年後見制度", (0, -.035, 0), .14), pl); ANIM.append(pl); S["plq"] = pl
-    S["chain"] = [box("ch%d" % k, (.012, .012, .5), (0, 0, -50), gold_mat("brassl", .3, (.86, .62, .3)), bevel=0) for k in range(2)]; ANIM.extend(S["chain"])
+def s_s01():                                   # 役所のような石の廊下：条文の石板が落ちてくる（2026-11-20 書斎に見えるのでやめた）
+    stage("hall"); spot("sp", (-2.0, -4.0, 6.0), (0, 0, 1.0), 2600, size=1.0, ang=.9, blend=.6); reflector("rf", (0, -12, 3), (0, 0, 1.0), 8, 650)
+    S["tb"] = tablet("tb")
 
 
 def a_s01(u, t, f):
-    k1 = pb("L01", 1); T = lbeat("s01", k1)
-    if t < T - .3:
-        S["plq"].location = (0, 0, -50)
-        for c in S["chain"]:
-            c.location = (0, 0, -50)
-    else:
-        e = clamp((t - (T - .3)) / .3); z = 1.25 + 1.4 * (1 - e * e) + (.03 * math.exp(-6 * (t - T)) * math.sin(14 * (t - T)) if t > T else 0)
-        S["plq"].location = (0, -.12, z); S["plq"].rotation_euler = (0, 0, .03 * math.sin(3 * (t - T)) * math.exp(-1.5 * max(0, t - T)))
-        for k, sx in enumerate((-1, 1)):
-            S["chain"][k].location = (sx * .35, -.11, z + .4); S["chain"][k].rotation_euler = (0, sx * .45, 0)
-    go("s01", [(0, (2.0, -3.8, 1.3), (.2, 0, 1.25), 32), (k1, (-.5, -2.5, 1.35), (0, -.1, 1.25), 40), (k1 + 2, (-.9, -2.2, 1.4), (-.05, -.1, 1.25), 46)], t, 2.6)
+    k1 = pb("L01", 1); drop(S["tb"], (0, 1.0, 0), t, lbeat("s01", 2), h=2.6, dur=.35)
+    k2 = pb("L01", 2)
+    go("s01", [(0, (0, -4.6, 1.0), (0, 0, 1.6), 30), (k1, (-1.2, -3.2, .7), (0, 1.0, .9), 30), (k2, (.4, -2.2, .55), (0, 1.0, .55), 38), (k2 + 2, (0, -3.6, .9), (0, 1.0, .8), 30)], t, 3.0)
 
 
-def s_s02():                                   # 居間：ちゃぶ台に選挙公報、入場券が拍ごとに積み上がる（一度も休まなかった）
-    stage("lounge"); spot("sp", (-1.5, -2.5, 3.5), (0, 0, .4), 900, (1, .9, .75), size=.8, ang=1.0, blend=.6); reflector("rf", (0, -8, 2), (0, 0, .6), 6, 350)
-    chabudai("cb", (0, 0, 0)); gazette("gz", (-.12, -.05, .363), .1); S["h"] = her(loc=(.55, .45, 0), rz=2.5)
-    S["tk"] = [ticket("tk%d" % i) for i in range(10)]
-
-
-def a_s02(u, t, f):
-    k1 = pb("L02", 1)
-    for i, o in enumerate(S["tk"]):           # 句 1 から、半拍ごとに 1 枚
-        T = lbeat("s02", k1) + i * BP / 2
-        drop(o, (.26 + .004 * ((i * 7) % 3), -.08, .363 + .0028 * i), t, T, h=.5, dur=.18, rz=.15 * (((i * 5) % 5) - 2) / 2)
-    S["h"].location = (.55, .45, bob("s02", t, range(0, 8, 2), .03))
-    go("s02", [(0, (-1.2, -1.6, 1.1), (0, 0, .45), 32), (k1, (.6, -.75, .75), (.2, -.05, .36), 42), (k1 + 4, (1.3, -1.4, 1.0), (.2, 0, .45), 34)], t, 2.6)
-
-
-def s_s03():                                   # 朝の住宅街：父・母と彼女が並んで投票所へ歩く。「投票所」の看板の矢印
+def s_s02():                                   # 朝の住宅街：父・母と彼女が並んで投票所へ歩く。「投票所」の看板の矢印
     stage("suburb"); reflector("rf", (0, -12, 3), (0, 0, 1.0), 8, 450)
     S["fa"] = fig("fa", (0, 0, 0), 1.3, ceramic()); S["mo"] = fig("mo", (0, 0, 0), 1.2, ceramic()); S["h"] = her()
     sg = empty("sgn", (0, 0, -50)); parent(box("sgn_p", (.06, .06, 1.4), (0, 0, .7), plain("sgpost", (.3, .3, .32), .4, metal=.6), bevel=0), sg)
@@ -703,20 +678,20 @@ def s_s03():                                   # 朝の住宅街：父・母と�
     parent(dark_text("sgn_t", "投票所 →", (0, -.03, 1.55), .15, col=(.75, .1, .08)), sg); ANIM.append(sg); S["sg"] = sg
 
 
-def a_s03(u, t, f):
-    t1 = lbeat("s03", 8)
+def a_s02(u, t, f):
+    t1 = lbeat("s02", 8)
     for o, dy, dx in ((S["fa"], .0, -.75), (S["h"], -.15, 0.0), (S["mo"], .0, .75)):
         walk(o, (-2.6 + dx, dy, 0), (1.4 + dx, dy, 0), t, -.3, t1, step=.06, rz=-math.pi / 2)
-    k1 = pb("L03", 1); rise(S["sg"], (2.9, .6, 0), t, lbeat("s03", k1), dur=.35, depth=2.0)
-    if t < lbeat("s03", k1) - .4:
+    k1 = pb("L02", 1); rise(S["sg"], (2.9, .6, 0), t, lbeat("s02", k1), dur=.35, depth=2.0)
+    if t < lbeat("s02", k1) - .4:
         S["sg"].location = (0, 0, -50)
-    go("s03", [(0, (-1.8, -4.0, 1.2), (-1.2, 0, 1.0), 30), (k1, (.6, -4.4, 1.3), (.8, 0, 1.1), 28), (k1 + 3, (1.4, -3.4, 1.0), (1.8, .3, 1.1), 30)], t, 3.0)
+    go("s02", [(0, (-1.8, -4.0, 1.2), (-1.2, 0, 1.0), 30), (k1, (.6, -4.4, 1.3), (.8, 0, 1.1), 28), (k1 + 3, (1.4, -3.4, 1.0), (1.8, .3, 1.1), 30)], t, 3.0)
 
 
-def s_s04():                                   # 居間：書類に判。父が隣に立ち、「後見人」の札
+def s_s03():                                   # 居間：電卓（数の計算が苦手）→ 書類に判。父が隣に立ち、「後見人」の札
     stage("lounge"); spot("sp", (-1.5, -2.5, 3.5), (0, 0, .4), 900, (1, .9, .75), size=.8, ang=1.0, blend=.6); reflector("rf", (0, -8, 2), (0, 0, .6), 6, 350)
     chabudai("cb", (0, 0, 0)); S["h"] = her(loc=(-.3, .7, 0), rz=3.14)
-    doc = empty("doc", (0, -.05, .363)); parent(box("doc_p", (.21, .297, .002), (0, 0, 0), paper(), bevel=0), doc)
+    doc = empty("doc", (.14, -.05, .363)); parent(box("doc_p", (.21, .297, .002), (0, 0, 0), paper(), bevel=0), doc)
     parent(dark_text("doc_t", "後見開始", (0, .1, .002), .028, rot=(0, 0, 0)), doc)
     for k in range(5):
         parent(box("doc_l%d" % k, (.15, .004, .0022), (0, .05 - k * .03, 0), plain("tkline", (.45, .45, .42), .7), bevel=0), doc)
@@ -725,19 +700,21 @@ def s_s04():                                   # 居間：書類に判。父が�
     S["fa"] = fig("fa", (0, 0, -50), 1.3, ceramic())
     S["tag"] = empty("tag", (0, 0, -50)); parent(box("tag_b", (.62, .04, .2), (0, 0, 0), pbr_mat("plank", "wood_floor", 1.0, (1, .92, .8), 1.0, box_proj=True), bevel=.01), S["tag"])
     parent(dark_text("tag_t", "後見人", (0, -.025, 0), .12), S["tag"]); ANIM.append(S["tag"])
+    S["calc"] = calculator("calc"); S["calc"].scale = (.35, .35, .35)
 
 
-def a_s04(u, t, f):
-    T0 = lbeat("s04", 1); k1, k2 = pb("L04", 1), pb("L04", 2)
+def a_s03(u, t, f):
+    k1, k2 = pb("L03", 1), pb("L03", 2); T0 = lbeat("s03", k1)
+    drop(S["calc"], (-.24, -.08, .363), t, lbeat("s03", 1), h=.5, dur=.22, rz=.25)
     if t < T0:                                 # 判が下りる
-        S["st"].location = (.04, -.12, .366 + .35 * eio(clamp((T0 - t) / .3))); S["seal"].location = (0, 0, -50)
+        S["st"].location = (.18, -.12, .366 + .35 * eio(clamp((T0 - t) / .3))); S["seal"].location = (0, 0, -50)
     else:
-        S["st"].location = (.04, -.12, .366 + .3 * eio(clamp((t - T0 - .15) / .3))); S["seal"].location = (.04, -.12, .3652)
-    walk(S["fa"], (1.6, .9, 0), (.35, .75, 0), t, lbeat("s04", k1) - .8, lbeat("s04", k1), rz=3.14)
-    if t < lbeat("s04", k1) - .8:
+        S["st"].location = (.18, -.12, .366 + .3 * eio(clamp((t - T0 - .15) / .3))); S["seal"].location = (.18, -.12, .3652)
+    walk(S["fa"], (1.6, .9, 0), (.35, .75, 0), t, lbeat("s03", k1 + 1), lbeat("s03", k1 + 2), rz=3.14)
+    if t < lbeat("s03", k1 + 1):
         S["fa"].location = (0, 0, -50)
-    drop(S["tag"], (.35, .6, 1.95), t, lbeat("s04", k2), h=.8, dur=.25)
-    go("s04", [(0, (.5, -.8, .8), (.04, -.1, .37), 40), (k1, (-.4, -2.4, 1.3), (.1, .6, .9), 30), (k2, (.6, -1.9, 1.5), (.3, .6, 1.4), 34)], t, 2.6)
+    drop(S["tag"], (.35, .6, 1.95), t, lbeat("s03", k2), h=.8, dur=.25)
+    go("s03", [(0, (-.5, -.9, .85), (-.2, -.08, .37), 40), (k1, (.45, -.75, .8), (.16, -.1, .37), 42), (k1 + 2, (-.4, -2.4, 1.3), (.1, .6, .9), 30), (k2, (.6, -1.9, 1.5), (.3, .6, 1.4), 34)], t, 2.6)
 
 
 def mail_set():
@@ -749,49 +726,117 @@ def mail_set():
 SLOT = [(-.155, -.02), (.0, .02), (.155, -.01)]
 
 
-def s_s05():                                   # 郵便受け：家族の 2 枚が落ちてくる。3 枚目（彼女の分）は来ない
+def mail_set():
+    stage("yard"); reflector("rf", (0, -10, 3), (0, 0, 1.2), 8, 450)
+    mailbox("mb", (0, 0, 0)); S["tk"] = [ticket("mt%d" % i) for i in range(2)]; S["ol"] = outline_card("ol", (0, 0, -50)); S["g"] = ticket("mtg", gold=True)
+    S["h"] = her(loc=(-.75, -.45, 0), rz=-.5)
+
+
+SLOT = [(-.155, -.02), (.0, .02), (.155, -.01)]
+
+def s_s04():                                   # 郵便受け：家族の 2 枚が落ちてくる。3 枚目（彼女の分）は来ない
     mail_set()
 
 
-def a_s05(u, t, f):
+def a_s04(u, t, f):
     for i, o in enumerate(S["tk"]):
-        drop(o, (SLOT[i][0], SLOT[i][1], 1.024 + .003 * i), t, lbeat("s05", i + 1), h=.25, dur=.2, rz=.1 * (i - .5))
-    k1 = pb("L05", 1); T = lbeat("s05", k1 + 1)
+        drop(o, (SLOT[i][0], SLOT[i][1], 1.024 + .003 * i), t, lbeat("s04", i + 1), h=.25, dur=.2, rz=.1 * (i - .5))
+    k1 = pb("L04", 1); T = lbeat("s04", k1 + 1)
     S["ol"].location = (SLOT[2][0], SLOT[2][1], 1.023) if t > T else (0, 0, -50)
     S["g"].location = (0, 0, -50)
-    go("s05", [(0, (.7, -1.4, 1.5), (0, 0, 1.1), 34), (k1, (0, -.8, 1.42), (0, 0, 1.03), 40), (k1 + 2, (.15, -.62, 1.3), (.12, 0, 1.02), 46)], t, 2.4)
+    go("s04", [(0, (.7, -1.4, 1.5), (0, 0, 1.1), 34), (k1, (0, -.8, 1.42), (0, 0, 1.03), 40), (k1 + 2, (.15, -.62, 1.3), (.12, 0, 1.02), 46)], t, 2.4)
 
 
-def s_s06():                                   # 役所のような石の廊下：条文の石板が落ちてくる（2026-11-20 書斎に見えるのでやめた）
-    stage("hall"); spot("sp", (-2.0, -4.0, 6.0), (0, 0, 1.0), 2600, size=1.0, ang=.9, blend=.6); reflector("rf", (0, -12, 3), (0, 0, 1.0), 8, 650)
-    S["tb"] = tablet("tb")
+def old_plaque(name):
+    """古い木の札：表「禁治産（明治）」、裏「成年後見（2000年）」。root を z で π 回すと裏返る"""
+    root = empty(name, (0, 0, -50)); wd = pbr_mat("oldwood", "dark_wood", 1 / 1.2, (.35, .22, .14), 1.0, box_proj=True)
+    parent(box(name + "_b", (1.15, .08, .5), (0, 0, 0), wd, bevel=.02), root)
+    parent(dark_text(name + "_f", "禁治産", (0, -.045, .06), .2, col=(.92, .86, .72)), root)
+    parent(dark_text(name + "_fs", "明治から", (0, -.045, -.15), .08, col=(.92, .86, .72)), root)
+    parent(dark_text(name + "_r", "成年後見", (0, .045, .06), .2, rot=(math.pi / 2, 0, math.pi), col=(.95, .9, .78)), root)
+    parent(dark_text(name + "_rs", "2000年から", (0, .045, -.15), .08, rot=(math.pi / 2, 0, math.pi), col=(.95, .9, .78)), root)
+    for sx in (-1, 1):
+        o = box(name + "_ch%d" % sx, (.012, .012, .7), (sx * .4, 0, .6), gold_mat("brassl", .3, (.86, .62, .3)), bevel=0); o.rotation_euler = (0, -sx * .25, 0); parent(o, root)
+    ANIM.append(root); return root
+
+
+def tablet50(name):
+    """1950 年の選挙の法律の石板。2 行目が「禁治産者は」→「成年被後見人は」に変わる（S[name+"_a"]・S[name+"_b"]）"""
+    st = pbr_mat("stone", "brushed_concrete", 1 / 1.5, (.72, .7, .66), 1.0, box_proj=True); root = empty(name, (0, 0, -50)); ink = (.04, .035, .03)
+    parent(box(name + "_s", (2.0, .3, 1.4), (0, 0, .7), st, bevel=.04), root)
+    parent(dark_text(name + "_t0", "公職選挙法（1950年）", (0, -.16, 1.17), .12, col=ink), root)
+    parent(box(name + "_ln", (1.6, .01, .012), (0, -.155, 1.05), plain("ink_ln", ink, .6), bevel=0), root)
+    S[name + "_a"] = parent(dark_text(name + "_t1a", "禁治産者は", (0, -.16, .8), .2, col=ink), root)
+    S[name + "_b"] = parent(dark_text(name + "_t1b", "成年被後見人は", (0, -.16, .8), .2, col=ink), root)
+    parent(dark_text(name + "_t2", "選挙権を有しない", (0, -.16, .44), .2, col=ink), root)
+    S[name + "_g"] = parent(box(name + "_gl", (1.7, .01, .025), (0, -.17, .29), glow_mat("ruleglow", (1, .7, .3), 6.0), bevel=0), root)
+    ANIM.extend([root, S[name + "_a"], S[name + "_b"], S[name + "_g"]]); return root
+
+
+def history_set():
+    stage("hall"); spot("sp", (-1.5, -4.5, 6.0), (0, .8, 1.2), 2600, size=1.0, ang=1.0, blend=.6); reflector("rf", (0, -12, 3), (0, 0, 1.0), 8, 650)
+    S["pq"] = old_plaque("pq"); S["tb"] = tablet50("tb")
+
+
+PQ = (-1.25, -.3, 1.75)
+TB = (.75, .9, 0)
+
+
+def tb_line(t, T):
+    """石板の 2 行目：T より前は「禁治産者は」、あとは「成年被後見人は」（ひっくり返るように縦につぶして入れ替え）"""
+    a, b = S["tb_a"], S["tb_b"]
+    if T is None or t < T - .15:
+        a.scale = (1, 1, 1); b.scale = (1, .001, 1); return
+    k = clamp((t - (T - .15)) / .3)
+    if k < .5:
+        a.scale = (1, max(.001, 1 - 2 * k), 1); b.scale = (1, .001, 1)
+    else:
+        a.scale = (1, .001, 1); b.scale = (1, max(.001, 2 * k - 1), 1)
+
+
+def s_s05():                                   # なぜか：1950 年の選挙の法律の石板と、明治からの「禁治産」の古い札（役所の石の廊下）
+    history_set()
+
+
+def a_s05(u, t, f):
+    k1, k2, k3 = pb("L05", 1), pb("L05", 2), pb("L05", 3)
+    drop(S["tb"], TB, t, lbeat("s05", k1), h=2.6, dur=.35)
+    drop(S["pq"], PQ, t, lbeat("s05", k2), h=1.6, dur=.3)
+    tb_line(t, None); S["tb_g"].scale = (.001, 1, 1)
+    go("s05", [(0, (0, -5.0, 1.6), (0, 1, 1.4), 26), (k1, (1.6, -2.6, 1.0), (TB[0], TB[1], .8), 32), (k2, (-2.0, -2.4, 1.6), (PQ[0], PQ[1], PQ[2]), 36), (k3, (-.35, -5.4, 1.5), (-.3, .4, 1.15), 26)], t, 3.0)
+
+
+def s_s06():                                   # 2000 年：札は「成年後見」に裏返るが、石板の決まりは残る
+    history_set()
 
 
 def a_s06(u, t, f):
-    k1 = pb("L06", 1); drop(S["tb"], (0, 1.0, 0), t, lbeat("s06", k1), h=2.6, dur=.35)
-    k2 = pb("L06", 2)
-    go("s06", [(0, (0, -4.6, 1.0), (0, 0, 1.6), 30), (k1, (-1.2, -3.2, .7), (0, 1.0, .9), 30), (k2, (.4, -2.2, .55), (0, 1.0, .55), 38), (k2 + 2, (0, -3.6, .9), (0, 1.0, .8), 30)], t, 3.0)
+    k1, k2 = pb("L06", 1), pb("L06", 2); T = lbeat("s06", 1)
+    S["tb"].location = TB; S["pq"].location = PQ
+    S["pq"].rotation_euler = (0, 0, math.pi * eio(clamp((t - (T - .35)) / .35)) + .02 * math.sin(3 * t))
+    tb_line(t, lbeat("s06", 2))
+    S["tb_g"].scale = (max(.001, eio(clamp((t - (lbeat("s06", k2) - .3)) / .6))), 1, 1)
+    go("s06", [(0, (-2.0, -2.6, 1.7), (PQ[0], PQ[1], PQ[2]), 34), (2, (1.4, -2.4, 1.0), (TB[0], TB[1], .85), 32), (k1, (.4, -3.0, .9), (TB[0], TB[1], .75), 30), (k2, (.9, -1.9, .55), (TB[0], TB[1], .5), 36)], t, 3.0)
 
 
-def s_s07():                                   # 彼女の居間の天秤：左に電卓、右に投票用紙。釣り合わない（2026-11-20 書斎に見えるのでやめた）
-    stage("lounge2"); spot("sp", (-2.0, -5.0, 7.0), (0, 0, 2.2), 2800, size=1.0, ang=.9, blend=.6); reflector("rf", (0, -12, 4), (0, 0, 2.0), 8, 700)
-    S["bal"] = balance("bal", (0, 0, 0), .7); S["calc"] = calculator("calc"); S["bl"] = ballot("bl")
+def s_s07():                                   # 国の言い分：記載台の前の彼女、白紙の票が箱に落ち、後ろから白い人形が寄りかかる（投票所）
+    stage("poll"); spot("sp", (-1.5, -3.0, 5.0), (0, 1.2, 1.0), 2200, size=1.0, ang=1.0, blend=.6); reflector("rf", (0, -10, 3), (0, 1, 1.0), 8, 600)
+    hall_inside("in", 0.0); S["h"] = her(loc=(-1.2, 1.0, 0), rz=0.0); S["cp"] = fig("cp", (-1.0, 1.45, 0), 1.3, ceramic(), 0.0)
+    S["bw"] = ballot("blw"); S["bw2"] = ballot("blw2")
 
 
 def a_s07(u, t, f):
-    k1, k2 = pb("L07", 1), pb("L07", 0, 1); T1, T2 = lbeat("s07", k2), lbeat("s07", k1)
-    ang = 0.0
-    if t > T1:
-        ang += .22 * eio(clamp((t - T1) / .35)) + .04 * math.exp(-2.5 * (t - T1)) * math.sin(9 * (t - T1))
-    if t > T2:
-        ang += -.06 * eio(clamp((t - T2) / .35)) + .05 * math.exp(-2.5 * (t - T2)) * math.sin(9 * (t - T2))
-    root, pv, pans = S["bal"]; set_balance(root, pv, pans, ang)
-    s = .7; L0, R0 = pans[0][1].location, pans[1][1].location
-    lp = (L0.x * s, L0.y * s, (L0.z + .06) * s); rp = (R0.x * s, R0.y * s, (R0.z + .06) * s)
-    drop(S["calc"], lp, t, T1, h=1.2, dur=.3) if t < T1 + .3 else setattr(S["calc"], "location", lp)
-    drop(S["bl"], rp, t, T2, h=1.0, dur=.35) if t < T2 + .35 else setattr(S["bl"], "location", rp)
-    k3 = pb("L07", 2)
-    go("s07", [(0, (0, -5.6, 1.9), (0, 0, 1.6), 28), (k2, (-2.2, -3.0, 1.4), (-1.5, 0, 1.0), 34), (k1, (2.2, -3.0, 1.5), (1.5, 0, 1.2), 34), (k3, (0, -6.4, 1.6), (0, 0, 1.6), 26)], t, 3.0)
+    k1, k2 = pb("L07", 1), pb("L07", 2); T1, T2 = lbeat("s07", k2), lbeat("s07", k2 + 2)
+    for o, T in ((S["bw"], T1), (S["bw2"], T2)):
+        if t < T - .45:
+            o.location = (0, 0, -50)
+        else:
+            e = clamp((t - (T - .45)) / .45); o.rotation_euler = (math.pi / 2, 0, 0); o.scale = (.6, .6, .6)
+            o.location = (0, .9, 1.11 + .5 * (1 - e) - .25 * clamp((t - T) / .3))
+    lean = .22 * eio(clamp((t - (lbeat("s07", k1) - .3)) / .5))
+    S["cp"].rotation_euler = (lean, 0, 0); S["cp"].location = (-1.0, 1.45, 0)
+    go("s07", [(0, (-.2, -2.6, 1.7), (-.5, 1.2, 1.0), 28), (k1, (-.5, -.7, 1.4), (-1.1, 1.2, 1.1), 34), (k2, (.75, -.35, 1.35), (0, .9, 1.15), 38), (k2 + 3, (-.1, -2.2, 1.6), (-.5, 1.1, 1.0), 28)], t, 3.0)
+
 
 
 def s_s08():                                   # 法廷：証言台の前の彼女。判決の句で上から光が少しずつ差す（閃光なし）
@@ -806,8 +851,50 @@ def a_s08(u, t, f):
     go("s08", [(0, (.6, -7.5, 2.4), (0, 2.0, 1.5), 26), (pb("L08", 1), (-2.0, -4.6, 1.3), (0, 2.0, 1.7), 28), (k2, (-.9, -3.4, .95), (0, -1.2, 1.05), 34), (k2 + 3, (-.4, -6.2, 2.0), (0, 1.0, 1.3), 26)], t, 3.0)
 
 
-def s_s09():                                   # 国会の議場（イメージ）：半円の席の議員が、列ごとに一斉に立つ（全会一致・起立）
-    stage("rotunda"); spot("sp", (0, -4, 9), (0, 2.5, 0), 3000, size=1.5, ang=1.2, blend=.6); reflector("rf", (0, -14, 4), (0, 2, .8), 10, 600)
+def s_s09():                                   # 彼女の居間の天秤：左に電卓、右に投票用紙。釣り合わない（2026-11-20 書斎に見えるのでやめた）
+    stage("lounge2"); spot("sp", (-2.0, -5.0, 7.0), (0, 0, 2.2), 2800, size=1.0, ang=.9, blend=.6); reflector("rf", (0, -12, 4), (0, 0, 2.0), 8, 700)
+    S["bal"] = balance("bal", (0, 0, 0), .7); S["calc"] = calculator("calc"); S["bl"] = ballot("bl")
+
+
+def a_s09(u, t, f):
+    k1, k2 = pb("L09", 1), pb("L09", 0, 1); T1, T2 = lbeat("s09", k2), lbeat("s09", k1)
+    ang = 0.0
+    if t > T1:
+        ang += .22 * eio(clamp((t - T1) / .35)) + .04 * math.exp(-2.5 * (t - T1)) * math.sin(9 * (t - T1))
+    if t > T2:
+        ang += -.06 * eio(clamp((t - T2) / .35)) + .05 * math.exp(-2.5 * (t - T2)) * math.sin(9 * (t - T2))
+    root, pv, pans = S["bal"]; set_balance(root, pv, pans, ang)
+    s = .7; L0, R0 = pans[0][1].location, pans[1][1].location
+    lp = (L0.x * s, L0.y * s, (L0.z + .06) * s); rp = (R0.x * s, R0.y * s, (R0.z + .06) * s)
+    drop(S["calc"], lp, t, T1, h=1.2, dur=.3) if t < T1 + .3 else setattr(S["calc"], "location", lp)
+    drop(S["bl"], rp, t, T2, h=1.0, dur=.35) if t < T2 + .35 else setattr(S["bl"], "location", rp)
+    k3 = pb("L09", 2)
+    go("s09", [(0, (0, -5.6, 1.9), (0, 0, 1.6), 28), (k2, (-2.2, -3.0, 1.4), (-1.5, 0, 1.0), 34), (k1, (2.2, -3.0, 1.5), (1.5, 0, 1.2), 34), (k3, (0, -6.4, 1.6), (0, 0, 1.6), 26)], t, 3.0)
+
+
+def s_s10():                                   # 証拠もない：証言台の上の「証拠」の箱を開けると、空（法廷）
+    stage("court"); reflector("rf", (0, -12, 3), (0, 0, 1.2), 8, 800); spot("bsp", (0, -2.0, 6.0), (0, 2.6, 1.6), 2200, (1, .9, .75), size=1.0, ang=1.2, blend=.6)
+    S["sp"] = spot("esp", (.3, -1.6, 3.2), (0, -.6, 1.05), 0, (1, .9, .7), size=.3, ang=.5, blend=.6)
+    wd = pbr_mat("plinth", "dark_wood", 1.0, (.42, .3, .22), 1.0, box_proj=True); felt = plain("felt", (.05, .05, .06), .9)
+    bx = empty("ebox", (0, -.62, 1.0))
+    parent(box("eb_bot", (.52, .36, .02), (0, 0, .01), wd, bevel=.003), bx); parent(box("eb_in", (.48, .32, .005), (0, 0, .022), felt, bevel=0), bx)
+    for nm, sz, lc in (("f", (.52, .02, .2), (0, -.17, .1)), ("b", (.52, .02, .2), (0, .17, .1)), ("l", (.02, .36, .2), (-.25, 0, .1)), ("r", (.02, .36, .2), (.25, 0, .1))):
+        parent(box("eb_" + nm, sz, lc, wd, bevel=.003), bx)
+    parent(dark_text("eb_t", "証拠", (0, -.185, .1), .08, col=(.92, .86, .72)), bx)
+    hg = parent(empty("eb_hg", (0, .18, .2)), bx); parent(box("eb_lid", (.54, .38, .025), (0, -.18, .012), wd, bevel=.004), hg); S["lid"] = hg; ANIM.append(hg)
+    S["h"] = her(loc=(.9, -1.4, 0), rz=.4)
+
+
+def a_s10(u, t, f):
+    k1, k2 = pb("L10", 1), pb("L10", 2); T = lbeat("s10", k2)
+    S["lid"].rotation_euler = (-math.radians(105) * eio(clamp((t - (T - .4)) / .4)), 0, 0)
+    S["sp"].data.energy = 900 * eio(clamp((t - (T - .4)) / .6))
+    go("s10", [(0, (0, -5.4, 1.9), (0, 1.0, 1.3), 28), (k1, (-.9, -2.2, 1.5), (0, -.6, 1.05), 38), (k2, (0, -1.35, 1.75), (0, -.6, 1.0), 40), (k2 + 3, (.8, -2.4, 1.6), (0, -.6, 1.0), 32)], t, 3.0)
+
+
+
+def s_s11():                                   # 国会の議場（イメージ）：半円の席の議員が、列ごとに一斉に立つ（全会一致・起立）→ 句 2 で郵便受けに金のはがき
+    stage("rotunda", "yard"); spot("sp", (0, -4, 9), (0, 2.5, 0), 3000, size=1.5, ang=1.2, blend=.6); reflector("rf", (0, -14, 4), (0, 2, .8), 10, 600)
     wd = pbr_mat("plinth", "dark_wood", 1.0, (.55, .38, .26), 1.0, box_proj=True); S["rows"] = []
     for r in range(5):                          # 半円の 5 列。机は列ごとに 1 つのメッシュ
         R = 2.2 + r * .75; n = 9 + r * 3; pts = []; bm = bmesh.new()
@@ -827,47 +914,44 @@ def s_s09():                                   # 国会の議場（イメージ�
                     ca, sa = math.cos(a - math.pi / 2), math.sin(a - math.pi / 2); v.co.x = cx + vx * ca - vy * sa; v.co.y = cy + vx * sa + vy * ca; v.co.z = vz + r * .09
         link(bpy.data.objects.new("desk%d" % r, mesh_from_bm("desk%d" % r, bm, [wd], smooth=False)))
         o = crowd("mp%d" % r, [(x, y, rz) for x, y, rz in pts], .62, ceramic()); o["z"] = r * .18; ANIM.append(o); S["rows"].append(o)
-    box("rostrum", (1.4, .8, 1.1), (0, 2.6, .55), wd, bevel=.02)
+    rr = ENV["rotunda"]["root"]
+    for o in [x for x in bpy.context.scene.objects if x.parent is None and (x.name.startswith("desk") or x.name.startswith("mp"))]:
+        parent(o, rr)
+    parent(box("rostrum", (1.4, .8, 1.1), (0, 2.6, .55), wd, bevel=.02), rr)
+    yr = ENV["yard"]["root"]; parent(mailbox("mb", (0, 0, 0)), yr)
+    S["tk"] = [parent(ticket("mt%d" % i), yr) for i in range(2)]; S["g"] = parent(ticket("mtg", gold=True), yr)
 
 
-def a_s09(u, t, f):
-    k1 = pb("L09", 1)
-    for r, o in enumerate(S["rows"]):
-        T = lbeat("s09", k1) + r * BP / 2; z0 = o["z"] - .28
-        o.location = (0, 0, z0 + .28 * eio(clamp((t - (T - .2)) / .2)))
-    go("s09", [(0, (0, -2.0, 4.6), (0, 3.2, .6), 26), (k1, (-3.4, -1.2, 1.8), (0, 3.0, .9), 28), (k1 + 3, (0, -2.6, 2.6), (0, 3.4, .9), 26)], t, 3.2)
-
-
-def s_s10():                                   # 郵便受け：3 枚目のはがき（彼女の分）が、枠の中に落ちてくる
-    mail_set()
-
-
-def a_s10(u, t, f):
+def a_s11(u, t, f):
+    k1, k2 = pb("L11", 1), pb("L11", 2); T2 = lbeat("s11", k2)
+    use_env("rotunda" if t < T2 - .45 else "yard")
     for i, o in enumerate(S["tk"]):
         o.location = (SLOT[i][0], SLOT[i][1], 1.024 + .003 * i); o.rotation_euler = (0, 0, .1 * (i - .5))
-    k1 = pb("L10", 1); T = lbeat("s10", k1)
-    S["ol"].location = (SLOT[2][0], SLOT[2][1], 1.023) if t < T else (0, 0, -50)
-    drop(S["g"], (SLOT[2][0], SLOT[2][1], 1.024), t, T, h=.3, dur=.22, rz=.05)
-    S["h"].location = (-.75, -.45, hop(t, T + BP, .12, .4))
-    go("s10", [(0, (0, -1.1, 1.5), (0, 0, 1.03), 36), (k1, (.08, -.85, 1.42), (.06, 0, 1.03), 38), (k1 + 3, (.3, -2.8, 1.3), (-.3, 0, .9), 30)], t, 5.6)
+    drop(S["g"], (SLOT[2][0], SLOT[2][1], 1.024), t, lbeat("s11", k2 + 1), h=.3, dur=.22, rz=.05)
+    for r, o in enumerate(S["rows"]):
+        T = lbeat("s11", k1) + r * BP / 2; z0 = o["z"] - .28
+        o.location = (0, 0, z0 + .28 * eio(clamp((t - (T - .2)) / .2)))
+    go("s11", [(0, (0, -2.0, 4.6), (0, 3.2, .6), 26), (k1, (-3.4, -1.2, 1.8), (0, 3.0, .9), 28), (k1 + 2, (0, -2.6, 2.6), (0, 3.4, .9), 26), (k2, (0, -1.1, 1.5), (0, 0, 1.03), 36), (k2 + 2, (.08, -.85, 1.42), (.06, 0, 1.03), 38)], t, 4.0)
 
 
-def s_s11():                                   # 最後：投票所の扉が開き、彼女が入って、一票を箱へ
+def s_s12():                                   # 最後：投票所の扉が開き、彼女が入って、一票を箱へ
     stage("poll"); spot("sp", (-2.5, -4.5, 5.5), (0, 1.0, 1.2), 2600, size=1.2, ang=1.0, blend=.6); reflector("rf", (0, -12, 3), (0, 1, 1.2), 8, 600)
     door_set("dr"); hall_inside("in"); S["h"] = her(); S["bl"] = ballot("blg", gold=True)
 
 
-def a_s11(u, t, f):
-    to = lbeat("s11", 1); set_doors("dr", eio(clamp((t - (to - .5)) / .5)))
-    tw = lbeat("s11", 5); walk(S["h"], (0, -1.6, 0), (0, 1.55, 0), t, to, tw)
-    k1 = pb("L11", 1); T = lbeat("s11", k1 + 1)
+def a_s12(u, t, f):
+    to = lbeat("s12", 1); set_doors("dr", eio(clamp((t - (to - .5)) / .5)))
+    tw = lbeat("s12", 5); walk(S["h"], (0, -1.6, 0), (0, 1.55, 0), t, to, tw)
+    k1 = pb("L12", 1); T = lbeat("s12", k1 + 1)
     bx, by, bz = 0, 1.2 + .9, 1.11
     if t < T - .4:
         S["bl"].location = (0, 0, -50)
     else:                                      # 金の票が箱の口へ（縦にして落ちる）
         e = clamp((t - (T - .4)) / .4); S["bl"].rotation_euler = (math.pi / 2, 0, 0); S["bl"].scale = (.6, .6, .6)
         S["bl"].location = (bx, by, bz + .45 * (1 - e) - .25 * clamp((t - T) / .3))
-    go("s11", [(0, (0, -4.6, 1.5), (0, 0, 1.4), 30), (2, (1.2, -3.2, 1.4), (0, .8, 1.2), 30), (k1, (.8, .6, 1.5), (bx, by, 1.05), 40), (k1 + 3, (0, -4.8, 1.8), (0, 1.0, 1.2), 26)], t, 3.0)
+    go("s12", [(0, (0, -4.6, 1.5), (0, 0, 1.4), 30), (2, (1.2, -3.2, 1.4), (0, .8, 1.2), 30), (k1, (.8, .6, 1.5), (bx, by, 1.05), 40), (k1 + 3, (0, -4.8, 1.8), (0, 1.0, 1.2), 26)], t, 3.0)
+
+
 
 
 # ---------------------------------------------------------------- 書き出し

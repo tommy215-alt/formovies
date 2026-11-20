@@ -262,7 +262,7 @@ function blDraw(c, name, t) {
 }
 function drawScene(c, i, t) { c.save(); c.clearRect(0, 0, W, H); blDraw(c, LN[i].scene, t); c.restore(); }
 function camAt(t, i) { return { fx: 540, fy: 960, z: 1.0 + .05 * barPulse(t), rot: (beatIdx(t) % 2 ? 1 : -1) * .006 * pulse(t) }; }   // v2：拍の押し出しを強く（MV のようなグルーブ）
-const TR = { s01: "zoom", s02: "whip", s03: "whip", s04: "zoom", s05: "whip", s06: "zoom", s07: "whip", s08: "zoom", s09: "whip", s10: "zoom", s11: "whip" };
+const TR = { s01: "zoom", s02: "whip", s03: "whip", s04: "zoom", s05: "whip", s06: "zoom", s07: "whip", s08: "zoom", s09: "whip", s10: "zoom", s11: "whip", s12: "zoom" };
 function blit(src, cm, { ox = 0, oy = 0, extra = 1, alpha = 1 } = {}) { bg.save(); bg.globalAlpha = alpha; bg.translate(540 + ox, 960 + oy); bg.rotate(cm.rot); bg.scale(cm.z * extra, cm.z * extra); bg.translate(-cm.fx, -cm.fy); bg.drawImage(src, 0, 0); bg.restore(); }
 function composite(t, i) {
   const l = LN[i], t0 = CUE[l.scene], u = t - t0, t1 = sEnd(i), cm = camAt(t, i), tr = TR[l.scene], nxt = i + 1 < LN.length ? TR[LN[i + 1].scene] : null;
@@ -280,8 +280,9 @@ function composite(t, i) {
 }
 
 // ---------------------------------------------------------------- セリフの文字：句ごとに 帯・木の札・ポップ・光る文字 を切り替える（声に合わせて出る）
-const STY = { L00: ["title", "title"], L01: ["band", "glow"], L02: ["band", "pop"], L03: ["plank", "band"], L04: ["plank", "band", "pop"], L05: ["band", "glow"],
-  L06: ["band", "pop", "pop"], L07: ["band", "band", "glow"], L08: ["band", "plank", "pop"], L09: ["plank", "glow"], L10: ["band", "glow"], L11: ["glow", "band"] };
+const STY = { L00: ["title", "title", "title"], L01: ["band", "pop", "pop"], L02: ["band", "plank", "pop"], L03: ["band", "plank", "pop"], L04: ["band", "glow"],
+  L05: ["plank", "band", "band", "pop"], L06: ["band", "band", "glow"], L07: ["band", "band", "glow"], L08: ["band", "plank", "pop"], L09: ["band", "band", "glow"],
+  L10: ["band", "band", "glow"], L11: ["plank", "band", "glow"], L12: ["glow", "band"] };
 const TY = 1520, TX = 470;   // 文字の中心は少し左へ（右側のボタン列 x≥950 を避ける）
 function pa(id, j) {   // 字幕の句 j が出る時刻（phrases() と同じ計算）
   const L = TL.lines.find(x => x.id === id), ln = window.SUBS[id], tot = ln.join("").length, acc = ln.slice(0, j).join("").length;
@@ -361,10 +362,12 @@ function frame(t) {
   const sb = n => Math.round(CUE[n] / BP) * BP, inS = n => CUE[n] !== undefined && t >= CUE[n] && t < sEnd(SCN_IDS.indexOf(n));
   const note = (txt, y = 1280) => { ui.save(); ui.font = `700 26px ${BIZ}`; ui.textAlign = "left"; ui.fillStyle = "rgba(255,255,255,.85)"; ui.shadowColor = "rgba(0,0,0,.8)"; ui.shadowBlur = 8; ui.fillText(txt, 40, y); ui.restore(); };
   if (inS("s00")) note("2012年末の成年被後見人 約13万6千人（国会審議での数字）");
-  if (inS("s02") || inS("s03") || inS("s04")) note("人物は模型による再現（報道をもとに）");
-  if (inS("s06")) note("公職選挙法 第11条1項1号（2013年の改正で削除）");
-  if (inS("s08")) note("東京地裁 2013年3月14日判決");
-  if (inS("s09")) note("議場はイメージ／2013年5月27日 改正法が成立");
+  if (inS("s01")) note("公職選挙法 第11条1項1号（2013年の改正で削除）");
+  if (inS("s02") || inS("s03") || inS("s04")) note("人物は模型による再現（判決・報道をもとに）");
+  if (inS("s05") || inS("s06")) note("東京地裁 2013年3月14日判決の認定から");
+  if (inS("s07")) note("国の主張（東京地裁 2013年3月14日判決より）");
+  if (inS("s08") || inS("s09") || inS("s10")) note("東京地裁 2013年3月14日判決");
+  if (inS("s11")) note("議場はイメージ／2013年5月27日 改正法が成立");
   if (inS("s08")) seal(ui, "違憲", 470, 330, 170, t, pa("L08", 2), -.08);
   phrases(t).forEach(p => drawPhrase(p, t));
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
