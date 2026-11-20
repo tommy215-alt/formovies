@@ -21,7 +21,7 @@ P = BEAT["period"]
 START = BEAT["phase"] + P * BEAT.get("start_beats", 9)            # 曲のこの秒を動画の 0 秒に（小節の頭、前奏のあとの音の厚いところ）
 pipeline, standard = epkit.setup(HERE, "intel", bgm=(BGM, round(BEAT["bpm"])), ending_gain=.0)
 import bgm_file  # noqa: E402
-bgm_file.register("file_065", HERE / "assets" / "bgm" / BGM, start=START, bpm=round(BEAT["bpm"]), gains={"ending": .0, "f_open": 1.8, "f_up": 1.5, "f_mid2": 1.25, "f_low": .95}, smooth=.3)
+bgm_file.register("file_065", HERE / "assets" / "bgm" / BGM, start=START, bpm=round(BEAT["bpm"]), gains={"ending": .0, "f_open": 1.35, "f_up": 1.05, "f_mid2": .88, "f_low": .67}, smooth=.3)
 import noend_ext  # noqa: E402
 noend_ext.apply(pipeline, black=0.0)
 
