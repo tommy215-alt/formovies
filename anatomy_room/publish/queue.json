@@ -457,6 +457,15 @@
    "reupload": true,
    "note": "2026-11-19 ユーザーの指示「明日から 60 から順番に予約」",
    "uploaded": "2026-11-19T14:18:36.431Z"
+  },
+  {
+   "id": "pilot_064",
+   "video": "anatomy_room/production/pilot_064/reverse_064_birth_lottery.mp4",
+   "meta": "anatomy_room/production/pilot_064/youtube_metadata.md",
+   "publish_at": "2026-11-24 19:00",
+   "status": "scheduled",
+   "note": "2026-11-20 ユーザーの指示「これで予約して」（v2、日本・インド・チャド）",
+   "uploaded": "2026-11-20T03:33:29.573Z"
   }
  ]
 }
