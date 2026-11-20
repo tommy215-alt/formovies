@@ -429,13 +429,13 @@
    "uploaded": "2026-11-19T13:24:29.236Z"
   },
   {
-   "id": "pilot_061",
+   "id": "pilot_061_old4",
    "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
    "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
    "publish_at": "2026-11-21 19:00",
-   "status": "scheduled",
+   "status": "private",
    "reupload": true,
-   "note": "2026-11-19 ユーザーの指示「明日から 60 から順番に予約」 ／ 予約は済んだがセッションが切れて記録が残らなかったので、Studio の一覧（公開予約）で確かめて手で記録",
+   "note": "2026-11-19 ユーザーの指示「明日から 60 から順番に予約」 ／ 予約は済んだがセッションが切れて記録が残らなかったので、Studio の一覧（公開予約）で確かめて手で記録 ／ 2026-11-21 冒頭 3 秒を強くした版に差し替えるため非公開に（削除はしていない）",
    "url": "https://youtu.be/HJCyrpbG1pM"
   },
   {
@@ -466,6 +466,17 @@
    "status": "scheduled",
    "note": "2026-11-20 ユーザーの指示「これで予約して」（v2、日本・インド・チャド）",
    "uploaded": "2026-11-20T03:33:29.573Z"
+  },
+  {
+   "id": "pilot_061",
+   "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
+   "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
+   "publish_at": "2026-11-21 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」",
+   "uploaded": "2026-11-20T15:35:01.093Z",
+   "url": "https://youtube.com/shorts/fLyxnETodtM?feature=share"
   }
  ]
 }

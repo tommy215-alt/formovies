@@ -21,14 +21,15 @@
    "id": "L00",
    "who": "W",
    "scene": "s00",
-   "speech": "もし、世界中のお金が、いま、金に変わったら？",
+   "speech": "世界のお金が全部金に。あなたの分は、何グラム？",
    "sub": [
-    "もし世界中の お金が",
-    "いま金に 変わったら？"
+    "世界のお金が 全部金に",
+    "あなたの分は 何グラム？"
    ],
-   "pause": 0.15,
+   "pause": 0.45,
    "kind": "open",
-   "fact": "scripts/pilot_061/fact_check.md"
+   "fact": "scripts/pilot_061/fact_check.md",
+   "speed": 1.45
   },
   {
    "id": "L01",
