@@ -280,10 +280,14 @@ function composite(t, i) {
 }
 
 // ---------------------------------------------------------------- セリフの文字：句ごとに 帯・木の札・ポップ・光る文字 を切り替える（声に合わせて出る）
-const STY = { L00: ["title", "title"], L01: ["plank", "band"], L02: ["band", "pop", "pop", "pop", "pop"], L03: ["band", "pop", "pop", "pop", "glow"],
-  L04: ["glow", "pop"], L05: ["band", "pop", "glow"], L06: ["band", "pop", "glow"], L07: ["pop", "band"], L08: ["band", "glow"],
+const STY = { L00: ["title", "title"], L01: ["plank", "band"], L02: ["band", "pop", "pop", "pop"], L03: ["band", "pop", "pop", "glow"],
+  L04: ["glow", "pop"], L05: ["band", "pop", "pop", "glow"], L06: ["band", "pop", "pop", "glow"], L07: ["band", "pop", "glow", "band"], L08: ["band", "glow"],
   L09: ["band", "pop", "glow"], L10: ["plank", "glow"], L11: ["band", "band"] };
 const TY = 1520, TX = 470;   // 文字の中心は少し左へ（右側のボタン列 x≥950 を避ける）
+function pa(id, j) {   // 字幕の句 j が出る時刻（phrases() と同じ計算）
+  const L = TL.lines.find(x => x.id === id), ln = window.SUBS[id], tot = ln.join("").length, acc = ln.slice(0, j).join("").length;
+  return Math.round((L.start + (L.end - L.start) * acc / tot - .05) / BP) * BP;
+}
 function phrases(t) {
   const out = [], Ls = TL.lines.filter(x => !x.ending);
   Ls.forEach((L, li) => { const ln = (window.SUBS && window.SUBS[L.id]) || []; if (!ln.length) return; const tot = ln.join("").length; let acc = 0;
@@ -363,8 +367,8 @@ function frame(t) {
   if (inS("s06")) note("18歳までに期待される就学年数：世界銀行 人的資本指数 2020年");
   if (inS("s06")) note("景色はイメージ", 1240);
   if (inS("s07")) note("1人あたり国民総所得（GNI）2025年・物価の差は含まない");
-  if (inS("s09") || inS("s10")) note("日本の過去：厚生労働省 完全生命表（1921〜25年・1950〜52年）");
-  if (inS("s07")) seal(ui, "約40倍", 470, 330, 150, t, sb("s07") + 2 * BP, -.08);
+  if (inS("s09") || inS("s10")) note("日本の過去：厚生労働省 完全生命表（1921〜25年・1950〜52年）／景色はイメージ");
+  if (inS("s07")) seal(ui, "約40倍", 470, 330, 150, t, pa("L07", 2), -.08);
   phrases(t).forEach(p => drawPhrase(p, t));
   bg.getImageData(0, 0, 1, 1); ui.getImageData(0, 0, 1, 1);
 }

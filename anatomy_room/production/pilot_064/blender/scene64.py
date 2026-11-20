@@ -117,12 +117,16 @@ OUTENV = {"ward": ("hospital_room_2_2k.hdr", None, .3, (.5, .58, .64), 9, 1.0, m
           "field": ("farm_sunset_2k.hdr", "park_dirt", 1 / 2.5, (.85, .75, .6), 300, 1.0, 0.0, (400, (1, .82, .62)), (500, (1, .7, .45))),
           "school": ("school_hall_2k.hdr", "wood_floor", 1 / 1.6, (1, .9, .78), 9, 1.0, math.pi, (400, (1, .92, .8)), (300, (1, .85, .7))),
           "garden": ("ninomaru_teien_2k.hdr", "grass_ground", 1 / 2.5, (.75, .9, .65), 300, 1.0, 0.0, (400, (1, .95, .85)), (400, (1, .9, .75))),
-          "garden2": ("ninomaru_teien_2k.hdr", "grass_ground", 1 / 2.5, (.75, .9, .65), 300, 1.0, 3.14, (400, (1, .95, .85)), (400, (1, .9, .75)))}
+          "garden2": ("ninomaru_teien_2k.hdr", "grass_ground", 1 / 2.5, (.75, .9, .65), 300, 1.0, 3.14, (400, (1, .95, .85)), (400, (1, .9, .75))),
+          # 2026-11-20 v2：日本＝都会（ユーザーの指示）。インド＝田舎（garden・garden2）、チャド＝乾いた大地（veld・field）
+          "city": (os.environ.get("CITY_HD", "canary_wharf") + "_2k.hdr", "concrete_floor_02", 1 / 2.0, (.8, .8, .8), 300, 1.0, 0.0, (400, (1, .95, .9)), (400, (.9, .95, 1))),
+          "city2": (os.environ.get("CITY2_HD", "potsdamer_platz") + "_2k.hdr", "concrete_floor_02", 1 / 2.0, (.8, .8, .8), 300, 1.0, 0.0, (400, (1, .95, .9)), (400, (.9, .95, 1))),
+          "city3": (os.environ.get("CITY3_HD", "modern_buildings_2") + "_2k.hdr", "concrete_floor_02", 1 / 2.0, (.8, .8, .8), 300, 1.0, 0.0, (400, (1, .95, .9)), (400, (.9, .95, 1)))}
 
 
 def stage(*kinds):
     """舞台を 1 つ以上つくる。2 つ以上なら use_env() で場面の途中に切り替える（使わない方は床の下へ）"""
-    clear_scene(); ANIM[:] = [cam.o]; HALL_DOTS.clear(); ENV.clear()
+    clear_scene(); ANIM[:] = [cam.o]; HALL_DOTS.clear(); ENV.clear(); ENV_AT.clear()
     for k in kinds:
         before = set(_sc().objects); _build_env(k); w = bpy.context.scene.world
         root = empty("env_" + k, (0, 0, 0))
@@ -134,7 +138,26 @@ def stage(*kinds):
     use_env(kinds[0])
 
 
+ENV_AT = {}                                     # コマ番号 → 舞台（world と灯りの強さは keyframe にならないので、描く直前に切り替える）
+CURF = [None]
+
+
+def _env_handler(scene, *_):
+    k = ENV_AT.get(scene.frame_current - 1)
+    if k is not None and k in ENV:
+        _apply_env(k)
+
+
+bpy.app.handlers.frame_change_pre.append(_env_handler)
+
+
 def use_env(k):
+    if CURF[0] is not None:
+        ENV_AT[CURF[0]] = k
+    _apply_env(k)
+
+
+def _apply_env(k):
     e = ENV[k]; bpy.context.scene.world = e["w"]
     KEY.data.energy, KEY.data.color = e["key"]; RIM.data.energy, RIM.data.color = e["rim"]
     for kk, ee in ENV.items():
@@ -142,8 +165,8 @@ def use_env(k):
 
 
 def dots_on(which):
-    """世界地図の国の灯り（0 日本・1 アメリカ・2 インド・3 チャド）。which に入っていない灯りは消す"""
-    for i in range(4):
+    """世界地図の国の灯り（0 日本・1 インド・2 チャド）。which に入っていない灯りは消す"""
+    for i in range(len(CT)):
         sp, li = HALL_DOTS[2 * i], HALL_DOTS[2 * i + 1]; on = i in which
         sp.scale = (1, 1, 1) if on else (.001, .001, .001); li.data.energy = 40 if on else 0
         if sp not in ANIM:
@@ -166,7 +189,7 @@ def _build_env(kind):
         brass = gold_mat("brassl", .3, (.86, .62, .3))
         box("mapframe_t", (MW + .3, .12, .12), (0, 9.33, MZ + .06), brass, bevel=.02); box("mapframe_b", (MW + .3, .12, .12), (0, 9.33, MZ - MH - .06), brass, bevel=.02)
         dot = glow_mat("mapdot", (1, .9, .7), 30.0)
-        for lon, lat in ((139.7, 35.7), (-98.0, 39.0), (78.9, 21.0), (18.7, 15.5)):       # 日本・アメリカ・インド・チャド
+        for lon, lat in ((139.7, 35.7), (78.9, 21.0), (18.7, 15.5)):       # 日本・インド・チャド（v2 でアメリカを外した）
             x = ((lon + 170) % 360 / 360 - .5) * MW; z = MZ - (80 - lat) / 140 * MH
             HALL_DOTS.append(sphere("dot%g" % lon, .1, (x, 9.3, z), dot, 24))
             l = bpy.data.lights.new("dl%g" % lon, "POINT"); l.energy = 40; l.color = (1, .85, .6); l.shadow_soft_size = .1
@@ -405,7 +428,7 @@ def pb(lid, j, off=0):
     a = round((L["start"] + (L["end"] - L["start"]) * acc / tot - .05) / BP); return a - round(CUE[ln["scene"]] / BP) + off
 
 
-CT = PLAN["countries"]; PX = [-3.3, -1.1, 1.1, 3.3]; LS = .045          # 平均寿命 1 年＝0.045m
+CT = PLAN["countries"]; PX = [-2.4, 0.0, 2.4]; NC = len(CT); LS = .045          # 平均寿命 1 年＝0.045m
 PY = .95                                                               # 柱は台座の後ろ
 
 
@@ -468,8 +491,8 @@ def pedestal(i):
 
 
 def pedestals(babies=True):
-    S["ped"] = [pedestal(i) for i in range(4)]
-    S["bb"] = [baby("bb%d" % i, s=.62) for i in range(4)] if babies else []
+    S["ped"] = [pedestal(i) for i in range(NC)]
+    S["bb"] = [baby("bb%d" % i, s=.62) for i in range(NC)] if babies else []
 
 
 def pillar_set():
@@ -508,8 +531,8 @@ def lottery():
     o = cyl("drumb", .56, 1.3, (0, 0, 0), red, 8, bevel=.015); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr); flat(o)   # 八角形の面が見えるように
     for sx in (-1, 1):
         o = cyl("drumc%d" % sx, .6, .06, (sx * .66, 0, 0), g, 8, bevel=.01); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr); flat(o)
-    for k in range(8):                       # 胴の 8 面に 4 か国の国旗（国のくじ）
-        ph = math.radians(22.5 + 45 * k); key = CT[k % 4][2]; ap = .56 * math.cos(math.radians(22.5)) + .004
+    for k in range(8):                       # 胴の 8 面に 3 か国の国旗（国のくじ）
+        ph = math.radians(22.5 + 45 * k); key = CT[k % NC][2]; ap = .56 * math.cos(math.radians(22.5)) + .004
         fw, fh = (.46, .24) if key == "us" else (.42, .28)
         parent(plane("drumf%d" % k, fw, fh, (0, ap * math.sin(ph), -ap * math.cos(ph)), flag_mat(key), rot=(ph + math.pi, 0, 0)), dr)
     o = cyl("axle", .045, 2.0, (0, 0, 0), g, 24); o.rotation_euler = (0, math.pi / 2, 0); parent(o, dr)
@@ -586,20 +609,20 @@ def s_s02():                                   # 同じ赤ちゃんを 4 つの�
 
 
 def a_s02(u, t, f):
-    ks = [pb("L02", j) for j in range(1, 5)]
-    dots_on([i for i in range(4) if t >= lbeat("s02", ks[i]) - .02])
-    for i in range(4):
+    ks = [pb("L02", j) for j in range(1, NC + 1)]
+    dots_on([i for i in range(NC) if t >= lbeat("s02", ks[i]) - .02])
+    for i in range(NC):
         drop(S["bb"][i], (PX[i], 0, .82), t, lbeat("s02", ks[i]), h=1.8)
         if t > lbeat("s02", ks[i]) + .3:
             S["bb"][i].location = (PX[i], 0, .82 + bob("s02", t, range(ks[i] + 2, ks[i] + 12, 2), .04))
-    keys = [(0, (0, -9.5, 2.2), (0, 0, .9), 28)] + [(ks[i], (PX[i] + .9, -3.4, 1.5), (PX[i], 0, 1.0), 36) for i in range(4)] + [(ks[3] + 2, (0, -9.8, 2.0), (0, 0, .9), 28)]
+    keys = [(0, (0, -9.5, 2.2), (0, 0, .9), 28)] + [(ks[i], (PX[i] + .9, -3.4, 1.5), (PX[i], 0, 1.0), 36) for i in range(NC)] + [(ks[-1] + 2, (0, -8.6, 2.0), (0, 0, .9), 28)]
     go("s02", keys, t, 3.2)
 
 
 def life_set(env="world"):
     stage(env); spot("sp", (0, -6, 8), (0, .5, 1.6), 3400, size=1.0, ang=1.15, blend=.5); reflector("rf", (0, -14, 3.5), (0, 0, 1.8), 12, 750)
     pedestals(); pillar_set()
-    for i in range(4):
+    for i in range(NC):
         S["bb"][i].location = (PX[i], 0, .82)
 
 
@@ -608,11 +631,11 @@ def s_s03():                                   # 平均寿命の金の柱が拍�
 
 
 def a_s03(u, t, f):
-    ks = [pb("L03", j) for j in range(1, 5)]
-    for i in range(4):
+    ks = [pb("L03", j) for j in range(1, NC + 1)]
+    for i in range(NC):
         T = lbeat("s03", ks[i]); set_pillar(i, grow(t, T, 0, CT[i][1] * LS) if t > T - .4 else 0, t, T)
         S["bb"][i].location = (PX[i], 0, .82 + bob("s03", t, (ks[i],), .06))
-    keys = [(0, (0, -10.5, 1.6), (0, 0, 1.9), 28)] + [(ks[i], (PX[i] + (.9 if i < 3 else -.9), -4.2, 1.0), (PX[i], PY, CT[i][1] * LS * .6), 32) for i in range(4)] + [(ks[3] + 2, (0, -10.8, 1.4), (0, 0, 2.0), 28)]
+    keys = [(0, (0, -10.5, 1.6), (0, 0, 1.9), 28)] + [(ks[i], (PX[i] + (.9 if i < NC - 1 else -.9), -4.6, 1.0), (PX[i], PY, CT[i][1] * LS * .6), 30) for i in range(NC)] + [(ks[-1] + 2, (0, -9.4, 1.4), (0, 0, 2.0), 28)]
     go("s03", keys, t, 3.4)
 
 
@@ -624,13 +647,13 @@ def s_s04():                                   # 差 約 29 年：チャドの�
 
 
 def a_s04(u, t, f):
-    for i in range(4):
+    for i in range(NC):
         set_pillar(i, CT[i][1] * LS)
-    h0, h1 = CT[3][1] * LS, CT[0][1] * LS; k1 = pb("L04", 0, 1); T = lbeat("s04", k1)
-    k = eio(clamp((t - (T - .35)) / .35)); x = PX[3]
+    h0, h1 = CT[-1][1] * LS, CT[0][1] * LS; k1 = pb("L04", 0, 1); T = lbeat("s04", k1)
+    k = eio(clamp((t - (T - .35)) / .35)); x = PX[-1]
     if k > 0:
         hh = (h1 - h0) * k; S["gap"].scale = (1, 1, hh); S["gap"].location = (x, PY, h0 + hh / 2)
-        S["line"].scale = (PX[3] - PX[0] + .62, 1, 1); S["line"].location = ((PX[0] + PX[3]) / 2, PY - .27, h1); S["gl"].location = (x - 1.0, PY - .3, (h0 + h1) / 2)
+        S["line"].scale = (PX[-1] - PX[0] + .62, 1, 1); S["line"].location = ((PX[0] + PX[-1]) / 2, PY - .27, h1); S["gl"].location = (x - 1.0, PY - .3, (h0 + h1) / 2)
     else:
         for o in (S["gap"], S["line"], S["gl"]):
             o.location = (0, 0, -50)
@@ -638,53 +661,72 @@ def a_s04(u, t, f):
     go("s04", [(0, (0, -10.5, 1.8), (0, 0, 2.0), 28), (k1, (x - 2.6, -5.0, 2.4), (x - .4, PY, h0 + .4), 32), (k2, (x - 1.4, -3.6, 3.2), (x - .3, PY, (h0 + h1) / 2), 36)], t, 3.4)
 
 
-def s_s05():                                   # 5 歳まで：日本の 400 体（20×20）から 1 体、チャドの 10 体から 1 体が静かに沈む
-    stage("garden", "veld"); spot("sp", (0, -6, 8), (0, .8, 0), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 4), (0, 0, .5), 10, 650)
-    sp, s = .2, .15; c = ceramic(); pts = []
+def s_s05():                                   # 5 歳まで：日本の 400 体から 1 体（都会）、インドの 38 体から 1 体（田舎）、チャドの 10 体から 1 体（乾いた大地）が静かに沈む
+    stage("city", "garden", "veld"); spot("sp", (0, -6, 8), (0, .8, 0), 3200, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 4), (0, 0, .5), 10, 650)
+    sp, s = .17, .15; c = ceramic(); pts = []
     for i in range(20):
         for j in range(20):
             if (i, j) == (13, 6):
                 continue
-            pts.append((-2.6 + (i - 9.5) * sp, .8 + (j - 9.5) * sp * .9, 0))
-    crowd("jp400", pts, s, c, "fig"); S["j1"] = mini("j1", (-2.6 + 3.5 * sp, .8 - 3.5 * sp * .9, 0), s, c); S["j1p"] = tuple(S["j1"].location)
-    S["td"] = [mini("td%d" % i, (2.6 + (i - 4.5) * sp, .2, 0), s, c) for i in range(10)]
-    label("l5j", "日本", (-2.6, 3.0, .3), .34); label("l5t", "チャド", (2.6, 1.0, .3), .34)
+            pts.append((U5X[0] + (i - 9.5) * sp, .9 + (j - 9.5) * sp * .9, 0))
+    crowd("jp400", pts, s, c, "fig"); S["j1"] = mini("j1", (U5X[0] + 3.5 * sp, .9 - 3.5 * sp * .9, 0), s, c)
+    pts = []; S["in"] = []
+    for n in range(38):                       # インド：38 体（8 列）、1 体が沈む
+        i, j = n % 8, n // 8; pt = (U5X[1] + (i - 3.5) * .2, .5 + (j - 2) * .19, 0)
+        if n == 19:
+            S["i1"] = mini("i1", pt, s, c)
+        else:
+            pts.append(pt)
+    crowd("in38", pts, s, c, "fig")
+    S["td"] = [mini("td%d" % i, (U5X[2] + (i - 4.5) * .2, .2, 0), s, c) for i in range(10)]
+    S["p0"] = {k: tuple(S[k].location) for k in ("j1", "i1")}
+    label("l5j", "日本", (U5X[0], 3.0, .3), .34); label("l5i", "インド", (U5X[1], 1.4, .3), .34); label("l5t", "チャド", (U5X[2], 1.0, .3), .34)
+
+
+U5X = [-4.2, 0.0, 3.8]
 
 
 def a_s05(u, t, f):
-    k1, k2 = pb("L05", 1), pb("L05", 2)
-    use_env("garden" if t < lbeat("s05", k2) else "veld")            # 日本の話は日本庭園、チャドの話は乾いた大地（景色はイメージ）
-    x, y, z = S["j1p"]; S["j1"].location = (x, y, -.4 * eio(clamp((t - lbeat("s05", k1 + 1)) / .7)))
+    k1, k2, k3 = pb("L05", 1), pb("L05", 2), pb("L05", 3)
+    use_env("city" if t < lbeat("s05", k2) else "garden" if t < lbeat("s05", k3) else "veld")   # 日本は都会、インドは田舎、チャドは乾いた大地（景色はイメージ）
+    for key, kk in (("j1", k1), ("i1", k2)):
+        x, y, z = S["p0"][key]; S[key].location = (x, y, -.4 * eio(clamp((t - lbeat("s05", kk + 1)) / .7)))
     for i, o in enumerate(S["td"]):
-        o.location = (2.6 + (i - 4.5) * .2, .2, -.4 * eio(clamp((t - lbeat("s05", k2 + 1)) / .7)) if i == 6 else bob("s05", t, (k2,), .03))
-    go("s05", [(0, (-.4, -6.8, 1.5), (-1.2, 2.0, .2), 28), (k1, (-2.0, -1.6, 1.6), (x, y, .05), 40), (k2, (3.2, -1.6, .7), (2.6, .2, .12), 42), (k2 + 3, (2.2, -3.4, 1.4), (2.4, .2, .1), 34)], t, 3.0)
+        o.location = (U5X[2] + (i - 4.5) * .2, .2, -.4 * eio(clamp((t - lbeat("s05", k3 + 1)) / .7)) if i == 6 else bob("s05", t, (k3,), .03))
+    jx, jy, _ = S["p0"]["j1"]; ix, iy, _ = S["p0"]["i1"]
+    go("s05", [(0, (U5X[0] + 1.2, -5.0, .9), (U5X[0], 4.0, 1.3), 26), (k1, (jx + .7, jy - 1.9, .7), (jx, jy + 2.5, .7), 34),
+               (k2, (ix + .7, iy - 2.0, .55), (ix, iy + 2.5, .55), 34), (k3, (U5X[2] + .6, -1.6, .7), (U5X[2], .2, .12), 42), (k3 + 3, (U5X[2] - .4, -3.4, 1.4), (U5X[2] - .2, .2, .1), 34)], t, 3.0)
 
 
 BOOKS = [(.15, .25, .45), (.5, .12, .1), (.12, .32, .2), (.55, .42, .15), (.3, .2, .4), (.6, .55, .45), (.1, .1, .12)]
 
 
-def s_s06():                                   # 学ぶ年数：日本 14 冊、チャド 5 冊の本の山
-    stage("garden2", "field"); spot("sp", (0, -5, 6), (0, 0, .7), 3000, size=.9, ang=1.0, blend=.5); reflector("rf", (0, -12, 3), (0, 0, .8), 8, 650)
+BKX = {"jp": -1.5, "in": 0.0, "td": 1.5}
+
+
+def s_s06():                                   # 学ぶ年数：日本 14 冊（都会）、インド 11 冊（田舎）、チャド 5 冊（乾いた野）の本の山
+    stage("city2", "garden2", "field"); spot("sp", (0, -5, 6), (0, 0, .7), 3000, size=.9, ang=1.0, blend=.5); reflector("rf", (0, -12, 3), (0, 0, .8), 8, 650)
     S["bk"] = {}
-    for key, x, n in (("jp", -1.1, 14), ("td", 1.1, 5)):
-        S["bk"][key] = []
+    for key, n in (("jp", 14), ("in", 11), ("td", 5)):
+        x = BKX[key]; S["bk"][key] = []
         for j in range(n):
             o = box("bk%s%d" % (key, j), (.62 + .04 * ((j * 7) % 3), .44, .09), (0, 0, 0), plain("bookc%d" % (j % 7), BOOKS[j % 7], .5), bevel=.008); o.rotation_euler = (0, 0, (((j * 37) % 11) - 5) * .02)
             ANIM.append(o); S["bk"][key].append((o, (x, 0, .045 + j * .092)))
         parent(plane("bkf" + key, .42, .28, (0, -.36, .02), flag_mat(key), rot=(math.radians(-70) + math.pi / 2, 0, 0)), empty("bkfe" + key, (x, 0, 0)))
-    S["n"] = {"jp": label("bkn_jp", "14年", (0, 0, -50), .26), "td": label("bkn_td", "5年", (0, 0, -50), .26)}; ANIM.extend(S["n"].values())
+    S["n"] = {"jp": label("bkn_jp", "14年", (0, 0, -50), .26), "in": label("bkn_in", "11年", (0, 0, -50), .26), "td": label("bkn_td", "5年", (0, 0, -50), .26)}; ANIM.extend(S["n"].values())
 
 
 def a_s06(u, t, f):
-    use_env("garden2" if t < lbeat("s06", pb("L06", 2)) else "field")  # 日本の話は日本庭園（別の向き）、チャドの話は乾いた野（景色はイメージ）
-    for key, j0 in (("jp", pb("L06", 1)), ("td", pb("L06", 2))):
+    k1, k2, k3 = pb("L06", 1), pb("L06", 2), pb("L06", 3)
+    use_env("city2" if t < lbeat("s06", k2) else "garden2" if t < lbeat("s06", k3) else "field")   # 日本は都会、インドは田舎、チャドは乾いた野（景色はイメージ）
+    for key, j0 in (("jp", k1), ("in", k2), ("td", k3)):
         T = lbeat("s06", j0); L = S["bk"][key]
         for j, (o, p) in enumerate(L):
             drop(o, p, t, T + j * .06, h=1.2, dur=.22)
         top = L[-1][1][2] + .3; T2 = T + len(L) * .06 + .1
         S["n"][key].location = (L[0][1][0], -.1, top + .1 * hop(t, T2, 1, .3)) if t > T2 - .1 else (0, 0, -50)
-    k1, k2 = pb("L06", 1), pb("L06", 2)
-    go("s06", [(0, (0, -5.4, 1.4), (0, 0, .7), 32), (k1, (-1.9, -3.0, 1.0), (-1.1, 0, .7), 34), (k2, (1.8, -2.9, .7), (1.1, 0, .3), 36), (k2 + 3, (0, -5.0, 1.6), (0, 0, .7), 30)], t, 3.2)
+    go("s06", [(0, (0, -6.0, 1.4), (0, 0, .7), 32), (k1, (-2.3, -3.0, 1.0), (BKX["jp"], 0, .7), 34), (k2, (.6, -3.0, .9), (BKX["in"], 0, .55), 36),
+               (k3, (2.2, -2.9, .7), (BKX["td"], 0, .3), 36), (k3 + 3, (0, -6.0, 1.6), (0, 0, .7), 30)], t, 3.2)
 
 
 def coin(name, m):
@@ -693,8 +735,8 @@ def coin(name, m):
 
 def s_s07():                                   # 所得 約 40 倍：金貨 40 枚と 1 枚 → 365 日の暦のうち 9 日が金に
     stage("world"); spot("sp", (0, -6, 7), (0, 1.2, 1.2), 3400, size=1.0, ang=1.1, blend=.5); reflector("rf", (0, -14, 3.5), (0, 1, 1.4), 12, 700)
-    g = gold_mat("gold", .13); S["cj"] = [coin("cj%d" % j, g) for j in range(40)]; S["ct"] = coin("ct", g)
-    for key, x in (("jp", -.9), ("td", .9)):
+    g = gold_mat("gold", .13); S["cj"] = [coin("cj%d" % j, g) for j in range(40)]; S["ci"] = [coin("ci%d" % j, g) for j in range(3)]; S["ct"] = coin("ct", g)
+    for key, x in (("jp", -1.1), ("in", 0.0), ("td", 1.1)):   # 日本 40 枚・インド 3 枚（38,340÷2,760＝約 14 倍 → 40÷14）・チャド 1 枚
         parent(plane("cf" + key, .36, .24, (0, -.4, .02), flag_mat(key), rot=(math.radians(-70) + math.pi / 2, 0, 0)), empty("cfe" + key, (x, 0, 0)))
     # 暦：25×15（365 日）、左上の 9 日が金に
     bm = bmesh.new(); S["cal"] = []; c = ceramic(); tw, gap = .15, .03
@@ -713,11 +755,13 @@ def s_s07():                                   # 所得 約 40 倍：金貨 40 �
 
 
 def a_s07(u, t, f):
-    T0 = lbeat("s07", 1)
+    T0 = lbeat("s07", 1); TI = lbeat("s07", pb("L07", 1)); TT = lbeat("s07", pb("L07", 2))
     for j, o in enumerate(S["cj"]):
-        drop(o, (-.9, 0, .015 + j * .031), t, T0 + j * .025, h=.9, dur=.18)
-    drop(S["ct"], (.9, 0, .015), t, T0 + .3, h=.9, dur=.2)
-    k1 = pb("L07", 1)
+        drop(o, (-1.1, 0, .015 + j * .031), t, T0 + j * .025, h=.9, dur=.18)
+    for j, o in enumerate(S["ci"]):
+        drop(o, (0, 0, .015 + j * .031), t, TI + j * .06, h=.9, dur=.2)
+    drop(S["ct"], (1.1, 0, .015), t, TT, h=.9, dur=.2)
+    k1 = pb("L07", 3)
     for i, (x, z) in enumerate(S["cal"]):
         T = lbeat("s07", k1 + 1) + i * .07
         if t < T:
@@ -725,7 +769,7 @@ def a_s07(u, t, f):
         else:
             S["cw"][i].location = (x, 2.6, -50); S["cg"][i].location = (x, 2.6 - .25 * hop(t, T, 1, .35) - .05, z)
     cx, cz = S["cal"][4]
-    go("s07", [(0, (0, -3.6, 1.0), (0, 0, .55), 32), (k1, (0, -5.2, 2.3), (0, 2.6, 2.0), 30), (k1 + 2, (cx + .4, -.8, cz - .1), (cx, 2.6, cz), 40), (k1 + 5, (0, -4.8, 2.2), (0, 2.6, 2.1), 30)], t, 3.4)
+    go("s07", [(0, (-.6, -3.8, 1.1), (-.6, 0, .55), 32), (pb("L07", 1), (.5, -2.6, 1.2), (0, 0, .1), 36), (pb("L07", 2), (1.6, -2.5, 1.3), (1.0, 0, .05), 38), (k1, (0, -5.2, 2.3), (0, 2.6, 2.0), 30), (k1 + 2, (cx + .4, -.8, cz - .1), (cx, 2.6, cz), 40), (k1 + 5, (0, -4.8, 2.2), (0, 2.6, 2.1), 30)], t, 3.4)
 
 
 def s_s08():                                   # 同じ赤ちゃん：4 つの台座を横に流して見る
@@ -734,19 +778,19 @@ def s_s08():                                   # 同じ赤ちゃん：4 つの�
 
 
 def a_s08(u, t, f):
-    for i in range(4):
+    for i in range(NC):
         S["bb"][i].location = (PX[i], 0, .82 + bob("s08", t, range(0, 12), .045))
     k1 = pb("L08", 1)
-    go("s08", [(0, (-5.0, -3.0, 1.3), (-2.2, 0, 1.0), 32), (k1, (0, -9.6, 1.7), (0, 0, .95), 28)], t, 3.2, mv=.6)
+    go("s08", [(0, (-4.2, -3.0, 1.3), (-1.6, 0, 1.0), 32), (k1, (0, -8.4, 1.7), (0, 0, .95), 28)], t, 3.2, mv=.6)
 
 
 def s_s09():                                   # 100 年前の日本は約 43 年：日本の柱が縮み、チャドより低く（日本庭園）
-    life_set("garden"); S["l43"] = label("l43", "43年", (0, 0, -50), .26); S["l1920"] = label("l1920", "1920年代", (0, 0, -50), .2); ANIM.extend([S["l43"], S["l1920"]])
+    life_set("city"); S["l43"] = label("l43", "43年", (0, 0, -50), .26); S["l1920"] = label("l1920", "1920年代", (0, 0, -50), .2); ANIM.extend([S["l43"], S["l1920"]])
 
 
 def a_s09(u, t, f):
     k1, k2 = pb("L09", 1), pb("L09", 2); T = lbeat("s09", k1); h84, h43 = CT[0][1] * LS, 42.6 * LS
-    for i in range(1, 4):
+    for i in range(1, NC):
         set_pillar(i, CT[i][1] * LS)
     h = h84 if t < T - .5 else grow(t, T, h84, h43, .5); r, lb, le = S["pil"][0]
     set_pillar(0, h, t, None, S["l43"] if t >= T else lb)
@@ -758,13 +802,13 @@ def a_s09(u, t, f):
 
 
 def s_s10():                                   # 同じ国でも時代で変わる：日本の柱が 1920 年代 → 1950 年ごろ → いま と伸びる（日本庭園）
-    life_set("garden"); S["tags"] = []
+    life_set("city"); S["tags"] = []
     for i, (txt, le) in enumerate(PLAN["past"]):
         o = label("tag%d" % i, "%s %d年" % (txt, round(le)), (0, 0, -50), .17); ANIM.append(o); S["tags"].append((o, le))
 
 
 def a_s10(u, t, f):
-    for i in range(1, 4):
+    for i in range(1, NC):
         set_pillar(i, CT[i][1] * LS)
     ks = [0, pb("L10", 0, 1), pb("L10", 1)]
     h = 42.6 * LS
@@ -795,7 +839,17 @@ def _setup(k):
     return f
 
 
-SHOTS = {k: (_setup(k), (lambda a: (lambda u, t, f: a(u, t, f)))(globals()["a_" + k])) for k in NAMES}
+def _wrap(a):
+    def run(u, t, f):
+        CURF[0] = f
+        try:
+            return a(u, t, f)
+        finally:
+            CURF[0] = None
+    return run
+
+
+SHOTS = {k: (_setup(k), _wrap(globals()["a_" + k])) for k in NAMES}
 
 if os.environ.get("AT"):
     ats = [float(x) for x in os.environ["AT"].split(",")]; out = os.path.join(HERE, "..", "work", "test"); os.makedirs(out, exist_ok=True)
