@@ -182,6 +182,27 @@ async function makePrivate(item) {   // 動画の編集画面で、公開設定�
     if (!/非公開|Private/.test(v) || /スケジュール|Scheduled/.test(v)) throw new Error("非公開になったか確かめられない：" + v.slice(0, 80));
   } catch (e) { const f = await shot("error"); e.message += `（画面：${f}）`; throw e; } finally { await ctx.close(); }
 }
+// retitle 回 "新しいタイトル"：予約済みの動画のタイトルだけを Studio の編集画面で書き換える（2026-11-22 追加、ユーザーの指示）。
+//   一覧から「旧タイトル」で、予約中（非公開の旧版は除く）の行を探す。成功したら youtube_metadata.md のタイトルも書き換える
+async function retitle(item, newTitle) {
+  const { title } = meta(item.meta), stem = title.replace(/\s*#shorts\s*$/, "");
+  if (!newTitle || newTitle.length > 100 || /[<>]/.test(newTitle)) throw new Error("新しいタイトルが空、100 文字超、または < > を含む");
+  const ctx = await open(!SHOW); page = ctx.pages()[0] || await ctx.newPage();
+  try {
+    await page.goto("https://studio.youtube.com/"); await page.waitForTimeout(4000); await dismiss();
+    if (!/studio\.youtube\.com\/channel\//.test(page.url())) throw new Error("ログインしていない");
+    const hits = (await studioRows()).filter(r => r.title.includes(stem) && /予約|スケジュール|Scheduled/.test(r.vis));
+    if (hits.length !== 1) throw new Error(`予約中の動画が 1 本に決まらない（${hits.length} 本）：${stem}`);
+    const id = hits[0].id; await page.goto(`https://studio.youtube.com/video/${id}/edit`); await page.waitForTimeout(5000); await dismiss();
+    await typeInto("#title-textarea #textbox", newTitle); await page.waitForTimeout(1000); await shot("retitle_" + item.id);
+    await clickFirst(["ytcp-button#save:not([disabled])", "#save"]); await page.waitForTimeout(4000); await shot("retitled_" + item.id);
+    await page.reload(); await page.waitForTimeout(6000); await dismiss();
+    const now = (await page.locator("#title-textarea #textbox").first().innerText().catch(() => "")).trim();
+    if (now !== newTitle) throw new Error("保存されたか確かめられない：" + now);
+    const v = (await page.locator("ytcp-video-metadata-visibility").first().innerText().catch(() => "")).replace(/\s+/g, " ");
+    return { id, vis: v.slice(0, 60) };
+  } catch (e) { const f = await shot("error"); e.message += `（画面：${f}）`; throw e; } finally { await ctx.close(); }
+}
 // 公開の枠（日本時間、queue.json の slots：2026-11-12〜 19:00 だけ）：PC が切れていて予定の時刻を過ぎた回、または publish_at が空の回は、次に空いている枠に振り直す
 const jst = (d, hm) => new Date(`${d}T${hm}:00+09:00`);
 function nextSlot(q, after) {
@@ -249,6 +270,12 @@ async function deleteVideos(ids) {
     const ids = args.slice(1), targets = q.items.filter(x => x.status === "scheduled" && (!ids.length || ids.includes(x.id)) && jst(...x.publish_at.split(" ")) > new Date());
     for (const item of targets) { await makePrivate(item); item.status = "private"; save(); say(`✅ 非公開にしました：${item.id}（予約 ${item.publish_at} を外した）`); logRun(`private ${item.id}`); }
     if (!targets.length) say("非公開にする予約がありません"); return;
+  }
+  if (cmd === "retitle") {
+    const item = q.items.find(x => x.id === args[1] && x.status === "scheduled"); if (!item) throw new Error("予約中の回がない：" + args[1]);
+    const old = meta(item.meta).title, r = await retitle(item, args[2]);
+    const f = path.join(ROOT, item.meta); fs.writeFileSync(f, fs.readFileSync(f, "utf-8").replace(old, args[2]), "utf-8");
+    say(`✅ タイトルを変えました：${item.id}（${r.id}、${r.vis}）${old} → ${args[2]}`); logRun(`retitle ${item.id} ${r.id}`); return;
   }
   // next：queued の回を上から順に、全部上げる（PC が切れていた間の分も、起動したときにまとめて）
   const items = cmd === "upload" ? q.items.filter(x => x.id === args[1]) : q.items.filter(x => x.status === "queued");
