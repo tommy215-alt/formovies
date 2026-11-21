@@ -327,7 +327,8 @@ function hookFrame(t) {
 function hookDraw(p, t, u, out) {
   hookFrame(t);
   const F = sz => `700 ${sz}px ${BIZ}`, L2 = p.s.split(" ").filter(x => x); let size = 140;   // v3（2026-11-21「フォントと文字の色だけシンプルに」）：ゴシック・白 ui.font = F(size);
-  while (Math.max(...L2.map(x => ui.measureText(x).width)) > 760 && size > 70) { size -= 4; ui.font = F(size); }
+  const wOf = x => Math.max(ui.measureText(x).width, [...x].length * size * .97);   // 字数からの見積もりも使う（066：測った幅が小さく出て枠からはみ出した）
+  while (Math.max(...L2.map(wOf)) > 760 && size > 70) { size -= 4; ui.font = F(size); }
   const gap = size * 1.32, yc = 760;
   ui.save(); ui.globalAlpha *= 1 - out; ui.font = F(size); ui.textAlign = "center"; ui.textBaseline = "middle";
   L2.forEach((ln, k) => {
