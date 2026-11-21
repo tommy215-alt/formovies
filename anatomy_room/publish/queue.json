@@ -567,6 +567,15 @@
    "status": "scheduled",
    "note": "2026-11-21 ユーザーの指示「65も直したら予約していいよ」（v2・BGM を下げた版・冒頭の優雅な枠）",
    "uploaded": "2026-11-21T00:35:40.857Z"
+  },
+  {
+   "id": "pilot_066",
+   "video": "anatomy_room/production/pilot_066/reverse_066_unchosen_puppies.mp4",
+   "meta": "anatomy_room/production/pilot_066/youtube_metadata.md",
+   "publish_at": "2026-11-26 19:00",
+   "status": "scheduled",
+   "note": "2026-11-21 ユーザーの指示「犬のも含めて全て予約して」",
+   "uploaded": "2026-11-21T05:26:05.671Z"
   }
  ]
 }
