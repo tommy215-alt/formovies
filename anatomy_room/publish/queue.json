@@ -468,6 +468,58 @@
    "uploaded": "2026-11-20T03:33:29.573Z"
   },
   {
+   "id": "pilot_061_old5",
+   "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
+   "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
+   "publish_at": "2026-11-21 19:00",
+   "status": "private",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」 ／ 2026-11-21 冒頭 3 秒を強くした版に差し替えるため非公開に（削除はしていない）",
+   "uploaded": "2026-11-20T15:35:01.093Z",
+   "url": "https://youtube.com/shorts/fLyxnETodtM?feature=share"
+  },
+  {
+   "id": "pilot_064_old2",
+   "video": "anatomy_room/production/pilot_064/reverse_064_birth_lottery.mp4",
+   "meta": "anatomy_room/production/pilot_064/youtube_metadata.md",
+   "publish_at": "2026-11-24 19:00",
+   "status": "private",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」 ／ 2026-11-21 冒頭 3 秒を強くした版に差し替えるため非公開に（削除はしていない）",
+   "uploaded": "2026-11-20T16:01:01.600Z"
+  },
+  {
+   "id": "pilot_063_old4",
+   "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
+   "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
+   "publish_at": "2026-11-23 19:00",
+   "status": "private",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」 ／ 2026-11-21 冒頭 3 秒を強くした版に差し替えるため非公開に（削除はしていない）",
+   "uploaded": "2026-11-20T16:22:56.346Z"
+  },
+  {
+   "id": "pilot_062_old3",
+   "video": "anatomy_room/production/pilot_062/reverse_062_sports_outlier.mp4",
+   "meta": "anatomy_room/production/pilot_062/youtube_metadata.md",
+   "publish_at": "2026-11-22 19:00",
+   "status": "private",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」 ／ 2026-11-21 冒頭 3 秒を強くした版に差し替えるため非公開に（削除はしていない）",
+   "uploaded": "2026-11-20T16:29:02.537Z"
+  },
+  {
+   "id": "pilot_061_old6",
+   "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
+   "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
+   "publish_at": "2026-11-21 19:00",
+   "status": "private",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」 ／ 2026-11-21 冒頭 3 秒を強くした版に差し替えるため非公開に（削除はしていない）",
+   "uploaded": "2026-11-20T23:26:56.042Z",
+   "url": "https://youtube.com/shorts/NsCskgukqdc?feature=share"
+  },
+  {
    "id": "pilot_061",
    "video": "anatomy_room/production/pilot_061/reverse_061_cash_to_gold.mp4",
    "meta": "anatomy_room/production/pilot_061/youtube_metadata.md",
@@ -475,28 +527,7 @@
    "status": "scheduled",
    "reupload": true,
    "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」",
-   "uploaded": "2026-11-20T15:35:01.093Z",
-   "url": "https://youtube.com/shorts/fLyxnETodtM?feature=share"
-  },
-  {
-   "id": "pilot_064",
-   "video": "anatomy_room/production/pilot_064/reverse_064_birth_lottery.mp4",
-   "meta": "anatomy_room/production/pilot_064/youtube_metadata.md",
-   "publish_at": "2026-11-24 19:00",
-   "status": "scheduled",
-   "reupload": true,
-   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」",
-   "uploaded": "2026-11-20T16:01:01.600Z"
-  },
-  {
-   "id": "pilot_063",
-   "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
-   "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
-   "publish_at": "2026-11-23 19:00",
-   "status": "scheduled",
-   "reupload": true,
-   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」",
-   "uploaded": "2026-11-20T16:22:56.346Z"
+   "uploaded": "2026-11-21T00:29:35.265Z"
   },
   {
    "id": "pilot_062",
@@ -506,7 +537,36 @@
    "status": "scheduled",
    "reupload": true,
    "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」",
-   "uploaded": "2026-11-20T16:29:02.537Z"
+   "uploaded": "2026-11-21T00:31:06.275Z"
+  },
+  {
+   "id": "pilot_063",
+   "video": "anatomy_room/production/pilot_063/reverse_063_life_24h.mp4",
+   "meta": "anatomy_room/production/pilot_063/youtube_metadata.md",
+   "publish_at": "2026-11-23 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」",
+   "uploaded": "2026-11-21T00:32:37.334Z"
+  },
+  {
+   "id": "pilot_064",
+   "video": "anatomy_room/production/pilot_064/reverse_064_birth_lottery.mp4",
+   "meta": "anatomy_room/production/pilot_064/youtube_metadata.md",
+   "publish_at": "2026-11-24 19:00",
+   "status": "scheduled",
+   "reupload": true,
+   "note": "2026-11-21 ユーザーの指示「冒頭３秒だけ印象を強く（文字を大きく、オブジェと文字が動く、問いかけを強く）」",
+   "uploaded": "2026-11-21T00:34:08.325Z"
+  },
+  {
+   "id": "pilot_065",
+   "video": "anatomy_room/production/pilot_065/reverse_065_vote_restored.mp4",
+   "meta": "anatomy_room/production/pilot_065/youtube_metadata.md",
+   "publish_at": "2026-11-25 19:00",
+   "status": "scheduled",
+   "note": "2026-11-21 ユーザーの指示「65も直したら予約していいよ」（v2・BGM を下げた版・冒頭の優雅な枠）",
+   "uploaded": "2026-11-21T00:35:40.857Z"
   }
  ]
 }

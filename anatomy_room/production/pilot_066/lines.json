@@ -1,0 +1,182 @@
+{
+ "title": "選ばれなかった子犬は、どこへ行く？",
+ "theme": "ペットショップの賛否：繁殖の上限、売られる前の死、引き取り拒否のあとの遺棄、劣悪な繁殖業者、そして殺処分の減少とフランスの禁止。最後は買う側の“かわいい”を問う（新ドパ設計 v2）",
+ "note": "新ドパ設計 v2（061 型）：冒頭と最後は W 春日部つむぎ、本編は M 青山龍星 ノーマル。BGM は JMHBM「Dance the Night Away」（CC BY 4.0、062・063 と同じ）。中身は plan.py で決め、python plan.py でこのファイルを作る（直接直さない）。",
+ "voices": "v7",
+ "voice_override": {
+  "M": {
+   "name": "青山龍星",
+   "credit": "VOICEVOX:青山龍星",
+   "styles": {
+    "normal": 13
+   },
+   "default_style": "normal",
+   "speed": 1.725,
+   "inton": 1.0
+  },
+  "W": {
+   "name": "春日部つむぎ",
+   "credit": "VOICEVOX:春日部つむぎ",
+   "styles": {
+    "normal": 8
+   },
+   "default_style": "normal",
+   "speed": 1.35,
+   "inton": 1.0
+  }
+ },
+ "gap": 0.05,
+ "max_duration": 80.0,
+ "meta": {},
+ "lines": [
+  {
+   "id": "L00",
+   "who": "W",
+   "scene": "s00",
+   "speech": "ショーケースの子犬。選ばれなかった子は、どこへ行く？",
+   "sub": [
+    "ショーケースの 子犬",
+    "選ばれなかった子は どこへ行く？"
+   ],
+   "pause": 0.425,
+   "kind": "open",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L01",
+   "who": "M",
+   "scene": "s01",
+   "speech": "店の子犬は、ブリーダーのもとで生まれる。母犬が産むのは、一生で、6回まで。",
+   "sub": [
+    "店の子犬は ブリーダーのもとで生まれる",
+    "母犬が産むのは 一生で6回まで"
+   ],
+   "pause": 0.335,
+   "kind": "breed",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L02",
+   "who": "M",
+   "scene": "s02",
+   "speech": "この回数が、数で決まったのは、2022年。",
+   "sub": [
+    "この回数が 数で決まったのは",
+    "2022年"
+   ],
+   "pause": 0.337,
+   "kind": "rule",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L03",
+   "who": "M",
+   "scene": "s03",
+   "speech": "繁殖する業者のもとでは、子犬の約18匹に1匹が、売られる前に死んでいた。",
+   "sub": [
+    "繁殖する業者のもとでは",
+    "子犬の約18匹に1匹が",
+    "売られる前に死んでいた"
+   ],
+   "pause": 0.602,
+   "kind": "death",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L04",
+   "who": "M",
+   "scene": "s04",
+   "speech": "2013年から、自治体は、業者が持ち込む犬猫の、ひきとりを、断れるようになった。",
+   "sub": [
+    "2013年から 自治体は",
+    "業者が持ち込む犬猫の引き取りを",
+    "断れるようになった"
+   ],
+   "pause": 0.546,
+   "kind": "refuse",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L05",
+   "who": "M",
+   "scene": "s05",
+   "speech": "翌年の秋。栃木の、かせんじきと山の中で、70匹を超える犬の死骸が見つかった。",
+   "sub": [
+    "翌年の秋",
+    "栃木の河川敷と山の中で",
+    "70匹を超える犬の死骸"
+   ],
+   "pause": 0.15,
+   "kind": "river",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L06",
+   "who": "M",
+   "scene": "s06",
+   "speech": "人気の犬種ばかり。雌の多くに、何度も出産した跡があった。",
+   "sub": [
+    "人気の犬種ばかり",
+    "雌の多くに 何度も出産した跡"
+   ],
+   "pause": 0.3,
+   "kind": "tags",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L07",
+   "who": "M",
+   "scene": "s07",
+   "speech": "2021年には、長野で、450匹以上の犬を狭いケージに積んでいた繁殖業者が、逮捕された。",
+   "sub": [
+    "2021年 長野",
+    "450匹以上の犬を 狭いケージに",
+    "繁殖業者が逮捕された"
+   ],
+   "pause": 0.39,
+   "kind": "stack",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L08",
+   "who": "M",
+   "scene": "s08",
+   "speech": "一方で、ペットショップで、家族に出会えた人もいる。殺処分は、20年で、約39万匹から、約7千匹に減った。",
+   "sub": [
+    "一方で ペットショップで",
+    "家族に出会えた人もいる",
+    "殺処分は 20年で",
+    "約39万匹から 約7千匹に"
+   ],
+   "pause": 0.15,
+   "kind": "home",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L09",
+   "who": "M",
+   "scene": "s09",
+   "speech": "フランスは、2024年から、店で犬と猫を売ることをやめた。",
+   "sub": [
+    "フランスは 2024年から",
+    "店で犬と猫を売るのをやめた"
+   ],
+   "pause": 0.342,
+   "kind": "france",
+   "fact": "scripts/pilot_066/fact_check.md"
+  },
+  {
+   "id": "L10",
+   "who": "W",
+   "scene": "s10",
+   "speech": "かわいいを、店で買う。その裏で、何匹が、生まれているんだろう。",
+   "sub": [
+    "“かわいい”を 店で買う",
+    "その裏で 何匹が生まれているんだろう"
+   ],
+   "pause": 0.15,
+   "kind": "end",
+   "fact": "scripts/pilot_066/fact_check.md"
+  }
+ ]
+}

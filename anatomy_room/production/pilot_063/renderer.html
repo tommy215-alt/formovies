@@ -300,31 +300,46 @@ function fitText(ctx, s, font, size, maxW, minSize) {
 }
 // 磨いた金の文字（上が白く光り、中ほどに暗い帯、下で照り返す）
 function metalGold(c, size) { const g = c.createLinearGradient(0, -size * .5, 0, size * .5); g.addColorStop(0, "#FFFBEA"); g.addColorStop(.3, "#F6D98C"); g.addColorStop(.52, "#C98F2E"); g.addColorStop(.62, "#9A6414"); g.addColorStop(.85, "#E8C26A"); g.addColorStop(1, "#FFF0C0"); return g; }
-// ---------------------------------------------------------------- 冒頭 3 秒の hook（2026-11-20 ユーザーの指示「文字をもっと大きく、オブジェと文字が動いて主張を強く」）
-// 画面いっぱいの太いゴシックの金の文字。行ごとに大きく叩きつけて跳ね、拍で脈打つ。3D の画は拍で寄って揺れる（camAt の上書き）
+// ---------------------------------------------------------------- 冒頭の hook（v2、2026-11-21 ユーザーの指示「叩きつける感じは下品。優雅な枠に、文字が文節ごとに滑らかに」）
+// 細い金の二重線の枠（角飾りつき）が線を引くように現れ、その中に白いゴシックの文字が文節（空白で区切った塊）ごとに、ぼかしから澄んで浮かび上がる。
+// 3D の画は冒頭のあいだ、ゆっくり寄るだけ（揺らさない）
+function hookFrame(t) {
+  const l1 = TL.lines.find(x => x.id === "L01"), h = l1 ? l1.start : 3;
+  const k = easeInOut(clamp(t / .7)), fa = 1 - clamp((t - (h - .3)) / .3); if (fa <= 0 || k <= 0) return;
+  const w = 900, hh = 600, x0 = TX - w / 2, y0 = 760 - hh / 2;
+  ui.save(); ui.globalAlpha *= fa;
+  const bg = ui.createLinearGradient(0, y0, 0, y0 + hh); bg.addColorStop(0, "rgba(10,7,4,.62)"); bg.addColorStop(.5, "rgba(10,7,4,.74)"); bg.addColorStop(1, "rgba(10,7,4,.62)");
+  ui.globalAlpha *= k; ui.fillStyle = bg; ui.fillRect(x0, y0, w, hh); ui.globalAlpha /= k;
+  const per = 2 * (w + hh);
+  for (const [ins, lw, a] of [[0, 3, .95], [16, 1.2, .7]]) {   // 外の線と内の線を、上の中央から左右へ引く
+    ui.strokeStyle = `rgba(232,196,120,${a})`; ui.lineWidth = lw; ui.setLineDash([per * k, per]);
+    ui.beginPath(); ui.moveTo(TX, y0 + ins); ui.lineTo(x0 + w - ins, y0 + ins); ui.lineTo(x0 + w - ins, y0 + hh - ins); ui.lineTo(x0 + ins, y0 + hh - ins); ui.lineTo(x0 + ins, y0 + ins); ui.closePath(); ui.stroke();
+  }
+  ui.setLineDash([]); ui.globalAlpha *= clamp((k - .6) / .4);
+  ui.fillStyle = "rgba(240,206,130,.95)";
+  for (const [cx, cy] of [[x0, y0], [x0 + w, y0], [x0, y0 + hh], [x0 + w, y0 + hh]]) { ui.save(); ui.translate(cx, cy); ui.rotate(Math.PI / 4); ui.fillRect(-7, -7, 14, 14); ui.restore(); }   // 角の菱形
+  ui.fillRect(TX - 60, y0 - 1.5, 120, 3); ui.fillRect(TX - 60, y0 + hh - 1.5, 120, 3);
+  ui.restore();
+}
 function hookDraw(p, t, u, out) {
-  const F = sz => `900 ${sz}px ${BIZ}`, L2 = p.s.split(" ").filter(x => x); let size = 230; ui.font = F(size);
-  while (Math.max(...L2.map(x => ui.measureText(x).width)) > 800 && size > 90) { size -= 6; ui.font = F(size); }
-  const yc = 760, gap = size * 1.18;
-  ui.save(); ui.globalAlpha *= 1 - out;
-  const bk = ui.createRadialGradient(TX, yc, 80, TX, yc, 760); bk.addColorStop(0, "rgba(8,5,2,.72)"); bk.addColorStop(1, "rgba(8,5,2,0)"); ui.fillStyle = bk; ui.fillRect(0, yc - 700, W, 1400);
+  hookFrame(t);
+  const F = sz => `700 ${sz}px ${BIZ}`, L2 = p.s.split(" ").filter(x => x); let size = 140;   // v3（2026-11-21「フォントと文字の色だけシンプルに」）：ゴシック・白 ui.font = F(size);
+  while (Math.max(...L2.map(x => ui.measureText(x).width)) > 760 && size > 70) { size -= 4; ui.font = F(size); }
+  const gap = size * 1.32, yc = 760;
+  ui.save(); ui.globalAlpha *= 1 - out; ui.font = F(size); ui.textAlign = "center"; ui.textBaseline = "middle";
   L2.forEach((ln, k) => {
-    const cu = u - k * .14; if (cu <= 0) return;
-    const e = spring(cu / .3), sc = (1 + 1.3 * (1 - Math.min(1, e))) * (1 + .045 * pulse(t)), sh = (1 - clamp(cu / .28)) * 26;
-    const yy = yc + (k - (L2.length - 1) / 2) * gap, lw = ui.measureText(ln).width;
-    ui.save(); ui.translate(TX + sh * Math.sin(cu * 70), yy + sh * Math.cos(cu * 55)); ui.rotate((k % 2 ? 1 : -1) * .05 * (1 - clamp(cu / .3))); ui.scale(sc, sc);
-    ui.globalAlpha *= clamp(cu / .06); ui.font = F(size); ui.textAlign = "center"; ui.textBaseline = "middle"; ui.lineJoin = "round";
-    if (k === L2.length - 1 && L2.length > 1 || p.j > 0) { ui.fillStyle = CRED; ui.fillRect(-lw / 2 - 20, size * .44, (lw + 40) * clamp(cu / .25), size * .1); }
-    ui.shadowColor = "rgba(0,0,0,.85)"; ui.shadowBlur = 40; ui.shadowOffsetY = 14; ui.lineWidth = size * .17; ui.strokeStyle = "#140A02"; ui.strokeText(ln, 0, 0); ui.shadowColor = "transparent";
-    ui.lineWidth = size * .05; ui.strokeStyle = "#8A5A12"; ui.strokeText(ln, 0, 0); ui.fillStyle = metalGold(ui, size); ui.fillText(ln, 0, 0);
-    logBox(ui, ln, -lw / 2, -size * .55, lw / 2, size * .55, size); ui.restore();
+    const e = easeOut(clamp((u - .1 - k * .26) / .55)); if (e <= 0) return;
+    const yy = yc + (k - (L2.length - 1) / 2) * gap + 26 * (1 - e), lw = ui.measureText(ln).width;
+    ui.save(); ui.globalAlpha *= e; ui.filter = e < 1 ? `blur(${(1 - e) * 7}px)` : "none";
+    ui.shadowColor = "rgba(0,0,0,.55)"; ui.shadowBlur = 12; ui.shadowOffsetY = 3; ui.fillStyle = "#F7F4EE"; ui.translate(TX, yy); ui.fillText(ln, 0, 0);
+    ui.filter = "none"; ui.shadowBlur = 0; logBox(ui, ln, -lw / 2, -size * .55, lw / 2, size * .55, size); ui.restore();
   });
   ui.restore();
 }
 const _camAt0 = camAt;
-camAt = function (t, i) {   // 冒頭（2 行目のセリフまで）は 3D の画を拍で大きく寄せて揺らす
+camAt = function (t, i) {   // 冒頭（2 行目のセリフまで）は 3D の画がゆっくり寄る（揺らさない）
   const c = _camAt0(t, i), l1 = TL.lines.find(x => x.id === "L01"), h = l1 ? l1.start : 3;
-  if (t < h) { const k = 1 - clamp((t - (h - .35)) / .35); c.z += k * (.08 + .16 * pulse(t)); c.rot += k * (beatIdx(t) % 2 ? 1 : -1) * .03 * pulse(t); }
+  if (t < h) { c.z = 1.0 + .07 * easeInOut(clamp(t / h)); c.rot = 0; }
   return c;
 };
 
